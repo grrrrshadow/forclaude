@@ -1,0 +1,57 @@
+[
+ {
+  "druh": "zed_koruna",
+  "jmeno": "zed_koruna",
+  "soubor": "zed_koruna.glb",
+  "nazev": {
+   "cs": "koruna opěrné zdi (světlý kámen)"
+  },
+  "material": "kamen",
+  "delka_m": 1.0,
+  "rozmer_m": {
+   "x": [
+    0.0,
+    1.0
+   ],
+   "y": [
+    -0.05,
+    0.35
+   ],
+   "z": [
+    0.0,
+    0.25
+   ]
+  },
+  "trojuhelniku": 12,
+  "autor": "DJMaesen (https://sketchfab.com/bumstrum): brick textures (https://sketchfab.com/3d-models/brick-textures-b758a52fa80a44bfb0fc9fc0b2beba5e), textura; tvar grrrrf vyplne/vyplne.py",
+  "licence": "CC-BY-4.0 (textura DJMaesen; geometrie vlastní)",
+  "poznamka": "koruna zdi: kus 1 m dlouhý, 0,4 m široký, 0,25 m vysoký, opakuje se podél horní hrany; počátek na začátku kusu na horní hraně líce, +x podél zdi, líc k −y, přečnívá líc o 5 cm (y −0,05 až 0,35 m), stojí na zdi (z 0 až 0,25 m); světlý kámen ke cihlové i kamenné zdi; textura se opakuje po 1 m, kusy na sebe navazují"
+ },
+ {
+  "druh": "zed_zabradli",
+  "jmeno": "zed_zabradli",
+  "soubor": "zed_zabradli.glb",
+  "nazev": {
+   "cs": "zábradlí na koruně zdi"
+  },
+  "delka_m": 2.0,
+  "autor": "grrrrf: vlastní model vyplne/vyplne.py",
+  "licence": "GPL-2.0 (vlastní geometrie i barvy)",
+  "rozmer_m": {
+   "x": [
+    0.0,
+    2.0
+   ],
+   "y": [
+    -0.04,
+    0.04
+   ],
+   "z": [
+    0.0,
+    1.0
+   ]
+  },
+  "trojuhelniku": 32,
+  "poznamka": "zábradlí: kus 2 m dlouhý, 1 m vysoký, opakuje se; sloupek na začátku kusu (x 0,02 až 0,08 m), madlo a dvě tyče, vše v rovině y = 0; počátek dole na začátku kusu, +x podél zdi; ocel natřená šedě (jen barva); kam ho dát, rozhodne hra"
+ }
+]

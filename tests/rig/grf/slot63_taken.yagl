@@ -1,0 +1,20 @@
+// Test GRF: puts a real cargo of its own (TSTC) in slot 63, the slot CT_ROLA
+// wants (road_on_rail.h). The other of the two sets of slot63_blank.yagl.
+//     yagl -e <out>/slot63_taken.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container1;
+grf // Action08
+{
+    grf_id: "ROL2";
+    version: GRF8;
+    name: "Slot63";
+    description: "T";
+}
+properties<Cargos, 0x003F> // Action00
+{
+    // instance_id: 0x003F
+    {
+        bit_number: 0x1C;
+        cargo_label: "TSTC";
+    }
+}

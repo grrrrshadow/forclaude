@@ -1,0 +1,6862 @@
+[
+ {
+  "druh": "doplnek",
+  "jmeno": "bouda_99914b93",
+  "soubor": "bouda_99914b93.glb",
+  "nazev": {
+   "cs": "psí bouda"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.52,
+    0.52
+   ],
+   "y": [
+    -0.42,
+    0.42
+   ],
+   "z": [
+    0.0,
+    1.0
+   ]
+  },
+  "trojuhelniku": 64,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (psí bouda): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "drivi_12825a67",
+  "soubor": "drivi_12825a67.glb",
+  "nazev": {
+   "cs": "dříví"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.4,
+    1.4
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "delka": 2.4,
+   "vyska": 1.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (dříví): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "drivi_bea240e1",
+  "soubor": "drivi_bea240e1.glb",
+  "nazev": {
+   "cs": "dříví"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.5,
+    1.5
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "delka": 2.6,
+   "vyska": 1.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (dříví): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "drivi_f294556a",
+  "soubor": "drivi_f294556a.glb",
+  "nazev": {
+   "cs": "dříví"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.7,
+    1.7
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "delka": 3.0,
+   "vyska": 1.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (dříví): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "gril_090fce5f",
+  "soubor": "gril_090fce5f.glb",
+  "nazev": {
+   "cs": "gril"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.02,
+    1.02
+   ],
+   "y": [
+    -0.45,
+    0.45
+   ],
+   "z": [
+    -0.0,
+    1.07
+   ]
+  },
+  "trojuhelniku": 304,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "drevo": false,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (gril): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "houpacka_43f0baaf",
+  "soubor": "houpacka_43f0baaf.glb",
+  "nazev": {
+   "cs": "houpačka"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.73,
+    0.73
+   ],
+   "y": [
+    -1.34,
+    1.34
+   ],
+   "z": [
+    -0.01,
+    2.23
+   ]
+  },
+  "trojuhelniku": 156,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (houpačka): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "ker_v0",
+  "soubor": "ker_v0.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "ker_v0_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.7,
+    0.57
+   ],
+   "y": [
+    -0.77,
+    0.47
+   ],
+   "z": [
+    -0.13,
+    0.76
+   ]
+  },
+  "trojuhelniku": 320,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 9,
+  "tvar": {
+   "vyska": 1.05,
+   "r": 0.7,
+   "seed": 201,
+   "kmen": false
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "ker_v1",
+  "soubor": "ker_v1.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "ker_v1_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.74,
+    0.68
+   ],
+   "y": [
+    -0.79,
+    0.48
+   ],
+   "z": [
+    -0.15,
+    0.78
+   ]
+  },
+  "trojuhelniku": 320,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 12,
+  "tvar": {
+   "vyska": 1.05,
+   "r": 0.7,
+   "seed": 202,
+   "kmen": false
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "ker_v2",
+  "soubor": "ker_v2.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "ker_v2_maska_koruna.png",
+    "zacatek": 212,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.4,
+    0.67
+   ],
+   "y": [
+    -0.72,
+    0.56
+   ],
+   "z": [
+    -0.17,
+    0.84
+   ]
+  },
+  "trojuhelniku": 320,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 14,
+  "tvar": {
+   "vyska": 1.05,
+   "r": 0.7,
+   "seed": 203,
+   "kmen": false
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "klepac_5c888211",
+  "soubor": "klepac_5c888211.glb",
+  "nazev": {
+   "cs": "klepač s kobercem"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.06,
+    0.06
+   ],
+   "y": [
+    -1.23,
+    1.23
+   ],
+   "z": [
+    0.0,
+    1.75
+   ]
+  },
+  "trojuhelniku": 84,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "koberec": true,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (klepač s kobercem): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "klepac_7ee4f811",
+  "soubor": "klepac_7ee4f811.glb",
+  "nazev": {
+   "cs": "klepač s kobercem"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.23,
+    1.23
+   ],
+   "y": [
+    -0.06,
+    0.06
+   ],
+   "z": [
+    0.0,
+    1.75
+   ]
+  },
+  "trojuhelniku": 84,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "koberec": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (klepač s kobercem): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kocarek_99914b93",
+  "soubor": "kocarek_99914b93.glb",
+  "nazev": {
+   "cs": "kočárek"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.49,
+    0.74
+   ],
+   "y": [
+    -0.29,
+    0.29
+   ],
+   "z": [
+    0.02,
+    1.02
+   ]
+  },
+  "trojuhelniku": 192,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kočárek): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_180d54e0",
+  "soubor": "kolo_180d54e0.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_180d54e0_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.98
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "damske": true,
+   "kosik": true,
+   "naklon": 12.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_19227a85",
+  "soubor": "kolo_19227a85.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_19227a85_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.98,
+    0.97
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {
+   "damske": true,
+   "kosik": true,
+   "naklon": -12.0,
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_1f4ad4b6",
+  "soubor": "kolo_1f4ad4b6.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_1f4ad4b6_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.09,
+    0.5
+   ],
+   "y": [
+    -0.98,
+    0.97
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_2dbcdd4c",
+  "soubor": "kolo_2dbcdd4c.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_2dbcdd4c_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.98,
+    0.97
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 6,
+  "tvar": {
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_3a822c38",
+  "soubor": "kolo_3a822c38.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_3a822c38_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 5,
+  "tvar": {
+   "damske": true,
+   "kosik": true,
+   "naklon": -12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_4b4adb95",
+  "soubor": "kolo_4b4adb95.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_4b4adb95_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.09,
+    0.5
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_6a2b2b03",
+  "soubor": "kolo_6a2b2b03.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_6a2b2b03_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.23,
+    0.37
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.05
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "damske": false,
+   "kosik": false,
+   "naklon": 4.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_75ba3225",
+  "soubor": "kolo_75ba3225.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_75ba3225_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "damske": true,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_766fab94",
+  "soubor": "kolo_766fab94.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_766fab94_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.98
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 6,
+  "tvar": {
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_7c9fe836",
+  "soubor": "kolo_7c9fe836.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_7c9fe836_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.98,
+    0.97
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "damske": true,
+   "kosik": true,
+   "naklon": 12.0,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_b08bbfca",
+  "soubor": "kolo_b08bbfca.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_b08bbfca_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.98,
+    0.97
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_caddeb0b",
+  "soubor": "kolo_caddeb0b.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "barvy": [
+   {
+    "cast": "ram",
+    "maska": "kolo_caddeb0b_maska_ram.png",
+    "zacatek": 211,
+    "paleta": [
+     "B02020",
+     "1F4FA0",
+     "2E7D32",
+     "1E1E1E",
+     "D8B020",
+     "6A2A8A",
+     "E8E8E8",
+     "8B5A2B",
+     "C85A1E",
+     "2A8A8A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 12,
+  "tvar": {
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "konev_99914b93",
+  "soubor": "konev_99914b93.glb",
+  "nazev": {
+   "cs": "konev"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.13,
+    0.37
+   ],
+   "y": [
+    -0.12,
+    0.12
+   ],
+   "z": [
+    0.0,
+    0.37
+   ]
+  },
+  "trojuhelniku": 60,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (konev): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kos_99914b93",
+  "soubor": "kos_99914b93.glb",
+  "nazev": {
+   "cs": "koš"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.27,
+    0.27
+   ],
+   "y": [
+    -0.27,
+    0.27
+   ],
+   "z": [
+    0.0,
+    0.9
+   ]
+  },
+  "trojuhelniku": 120,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (koš): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kralikarna_99914b93",
+  "soubor": "kralikarna_99914b93.glb",
+  "nazev": {
+   "cs": "králíkárna"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.0,
+    1.0
+   ],
+   "y": [
+    -0.45,
+    0.5
+   ],
+   "z": [
+    0.0,
+    1.48
+   ]
+  },
+  "trojuhelniku": 108,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (králíkárna): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lavicka_99914b93",
+  "soubor": "lavicka_99914b93.glb",
+  "nazev": {
+   "cs": "lavička"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.24,
+    0.2
+   ],
+   "y": [
+    -0.8,
+    0.8
+   ],
+   "z": [
+    0.0,
+    0.86
+   ]
+  },
+  "trojuhelniku": 108,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 25,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (lavička): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_01361913",
+  "soubor": "lehatko_01361913.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_tyrkys",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_022d26bc",
+  "soubor": "lehatko_022d26bc.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_oranz",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_763dd1a8",
+  "soubor": "lehatko_763dd1a8.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.32,
+    0.32
+   ],
+   "y": [
+    -0.81,
+    0.68
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_ba85bfb9",
+  "soubor": "lehatko_ba85bfb9.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_d2e98c0f",
+  "soubor": "lehatko_d2e98c0f.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_modra",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_fcc5460f",
+  "soubor": "lehatko_fcc5460f.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_4f7517d6",
+  "soubor": "paleta_4f7517d6.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.14
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {
+   "naklad": null,
+   "seed": 1
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_a5134b92",
+  "soubor": "paleta_a5134b92.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.96
+   ]
+  },
+  "trojuhelniku": 120,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "naklad": "kartony",
+   "seed": 2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_a8c4122a",
+  "soubor": "paleta_a8c4122a.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.95
+   ]
+  },
+  "trojuhelniku": 108,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "naklad": "bedny",
+   "seed": 1
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_b77a6775",
+  "soubor": "paleta_b77a6775.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.72
+   ]
+  },
+  "trojuhelniku": 120,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "naklad": "pytle",
+   "seed": 3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "pas_keru_v0",
+  "soubor": "pas_keru_v0.glb",
+  "nazev": {
+   "cs": "kus pásu keřů"
+  },
+  "barvy": [
+   {
+    "cast": "pas",
+    "maska": "pas_keru_v0_maska_pas.png",
+    "zacatek": 216,
+    "paleta": [
+     "1F3A18",
+     "243F1C",
+     "2A4820",
+     "213D1E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.24,
+    1.27
+   ],
+   "y": [
+    -0.84,
+    0.84
+   ],
+   "z": [
+    -0.01,
+    0.76
+   ]
+  },
+  "trojuhelniku": 600,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "tvar": {
+   "delka": 2.5,
+   "sirka": 1.8,
+   "seed": 401
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kus pásu keřů): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "pas_keru_v1",
+  "soubor": "pas_keru_v1.glb",
+  "nazev": {
+   "cs": "kus pásu keřů"
+  },
+  "barvy": [
+   {
+    "cast": "pas",
+    "maska": "pas_keru_v1_maska_pas.png",
+    "zacatek": 216,
+    "paleta": [
+     "1F3A18",
+     "243F1C",
+     "2A4820",
+     "213D1E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.24
+   ],
+   "y": [
+    -0.81,
+    0.85
+   ],
+   "z": [
+    -0.02,
+    0.78
+   ]
+  },
+  "trojuhelniku": 600,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "tvar": {
+   "delka": 2.5,
+   "sirka": 1.8,
+   "seed": 402
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kus pásu keřů): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "pas_keru_v2",
+  "soubor": "pas_keru_v2.glb",
+  "nazev": {
+   "cs": "kus pásu keřů"
+  },
+  "barvy": [
+   {
+    "cast": "pas",
+    "maska": "pas_keru_v2_maska_pas.png",
+    "zacatek": 216,
+    "paleta": [
+     "1F3A18",
+     "243F1C",
+     "2A4820",
+     "213D1E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.29,
+    1.31
+   ],
+   "y": [
+    -0.83,
+    0.84
+   ],
+   "z": [
+    -0.03,
+    0.77
+   ]
+  },
+  "trojuhelniku": 600,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "tvar": {
+   "delka": 2.5,
+   "sirka": 1.8,
+   "seed": 403
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (kus pásu keřů): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popelnice_53d21dfb",
+  "soubor": "popelnice_53d21dfb.glb",
+  "nazev": {
+   "cs": "popelnice"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.3,
+    0.92
+   ],
+   "y": [
+    -0.29,
+    0.29
+   ],
+   "z": [
+    0.0,
+    1.05
+   ]
+  },
+  "trojuhelniku": 680,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 8,
+  "tvar": {
+   "n": 2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (popelnice): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popelnice_6994da60",
+  "soubor": "popelnice_6994da60.glb",
+  "nazev": {
+   "cs": "popelnice"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.3,
+    1.54
+   ],
+   "y": [
+    -0.29,
+    0.29
+   ],
+   "z": [
+    0.0,
+    1.05
+   ]
+  },
+  "trojuhelniku": 1020,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "n": 3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (popelnice): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "rudl_43f0baaf",
+  "soubor": "rudl_43f0baaf.glb",
+  "nazev": {
+   "cs": "rudl"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.29,
+    0.29
+   ],
+   "y": [
+    -0.44,
+    0.25
+   ],
+   "z": [
+    -0.03,
+    1.18
+   ]
+  },
+  "trojuhelniku": 132,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (rudl): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_0b1bf186",
+  "soubor": "slunecnik_0b1bf186.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_0b1bf186_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.64,
+    0.79
+   ],
+   "y": [
+    -0.79,
+    1.64
+   ],
+   "z": [
+    -0.01,
+    2.5
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.3,
+   "noha": "beton",
+   "r": 1.3,
+   "smer": 2.356194490192345,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_0f12a3e3",
+  "soubor": "slunecnik_0f12a3e3.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_0f12a3e3_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 7,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 0.95,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_3d988364",
+  "soubor": "slunecnik_3d988364.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_3d988364_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.93,
+    0.93
+   ],
+   "y": [
+    -0.93,
+    0.93
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 6,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.0,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_3f1eaf3c",
+  "soubor": "slunecnik_3f1eaf3c.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_3f1eaf3c_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 7,
+  "tvar": {
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_4d617408",
+  "soubor": "slunecnik_4d617408.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_4d617408_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.3,
+    1.3
+   ],
+   "y": [
+    -1.3,
+    1.3
+   ],
+   "z": [
+    0.0,
+    2.81
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.4
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_50b40b50",
+  "soubor": "slunecnik_50b40b50.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_50b40b50_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.8,
+    0.02
+   ],
+   "y": [
+    -1.09,
+    1.01
+   ],
+   "z": [
+    -0.01,
+    2.16
+   ]
+  },
+  "trojuhelniku": 180,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.0,
+   "n": 10,
+   "naklon": 0.5,
+   "noha": null,
+   "r": 1.05,
+   "smer": 3.185398163397448,
+   "tyc": "drevo_svetle",
+   "v": 2.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_64dbda57",
+  "soubor": "slunecnik_64dbda57.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_64dbda57_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.8,
+    0.8
+   ],
+   "y": [
+    -0.8,
+    0.8
+   ],
+   "z": [
+    0.0,
+    2.31
+   ]
+  },
+  "trojuhelniku": 268,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "kriz",
+   "r": 0.85,
+   "tyc": "drevo_tm",
+   "v": 1.9
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_6d676d72",
+  "soubor": "slunecnik_6d676d72.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_6d676d72_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.21,
+    1.21
+   ],
+   "y": [
+    -0.47,
+    1.86
+   ],
+   "z": [
+    -0.01,
+    2.46
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.35,
+   "noha": "beton",
+   "r": 1.3,
+   "smer": 1.5707963267948966,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_884a2ac1",
+  "soubor": "slunecnik_884a2ac1.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_884a2ac1_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.17,
+    0.23
+   ],
+   "y": [
+    -0.07,
+    0.07
+   ],
+   "z": [
+    -0.39,
+    0.51
+   ]
+  },
+  "trojuhelniku": 116,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 9,
+  "tvar": {
+   "lem": 0.0,
+   "n": 6,
+   "naklon": 0.4,
+   "noha": null,
+   "r": 0.07,
+   "tyc": "drevo_svetle",
+   "v": 0.13
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_905facf5",
+  "soubor": "slunecnik_905facf5.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_905facf5_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_b557592a",
+  "soubor": "slunecnik_b557592a.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_b557592a_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 5,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_241eb6f8",
+  "soubor": "slunecnik_ctverec_241eb6f8.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_ctverec_241eb6f8_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.21,
+    1.21
+   ],
+   "y": [
+    -1.21,
+    1.21
+   ],
+   "z": [
+    0.0,
+    2.84
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 1.2,
+   "v": 2.4
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_742f414c",
+  "soubor": "slunecnik_ctverec_742f414c.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_ctverec_742f414c_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.91,
+    0.91
+   ],
+   "y": [
+    -0.91,
+    0.91
+   ],
+   "z": [
+    0.0,
+    2.74
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 0.9,
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_c6ae6a64",
+  "soubor": "slunecnik_ctverec_c6ae6a64.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_ctverec_c6ae6a64_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.26,
+    1.26
+   ],
+   "y": [
+    -1.26,
+    1.26
+   ],
+   "z": [
+    0.0,
+    2.74
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 1.25,
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_d41af04c",
+  "soubor": "slunecnik_d41af04c.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_d41af04c_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.64,
+    0.79
+   ],
+   "y": [
+    -1.64,
+    0.79
+   ],
+   "z": [
+    -0.01,
+    2.5
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.3,
+   "noha": "beton",
+   "r": 1.3,
+   "smer": 3.9269908169872414,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_f3a245cc",
+  "soubor": "slunecnik_f3a245cc.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_f3a245cc_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.41
+   ]
+  },
+  "trojuhelniku": 244,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": null,
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_f6d29112",
+  "soubor": "slunecnik_f6d29112.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "slunecnik_f6d29112_maska_latka.png",
+    "zacatek": 212,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.16,
+    1.16
+   ],
+   "y": [
+    -1.16,
+    1.16
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 9,
+  "tvar": {
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.25,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_les_v0",
+  "soubor": "smrk_les_v0.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "barvy": [
+   {
+    "cast": "jehlici",
+    "maska": "smrk_les_v0_maska_jehlici.png",
+    "zacatek": 216,
+    "paleta": [
+     "284C2E",
+     "1F3F2A",
+     "2E5636",
+     "3A5E4A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -3.2,
+    3.2
+   ],
+   "y": [
+    -3.2,
+    3.2
+   ],
+   "z": [
+    0.0,
+    17.4
+   ]
+  },
+  "trojuhelniku": 312,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "tvar": {
+   "vyska": 16.0,
+   "r": 3.0,
+   "seed": 351,
+   "holy": 0.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.16,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_les_v1",
+  "soubor": "smrk_les_v1.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "barvy": [
+   {
+    "cast": "jehlici",
+    "maska": "smrk_les_v1_maska_jehlici.png",
+    "zacatek": 216,
+    "paleta": [
+     "284C2E",
+     "1F3F2A",
+     "2E5636",
+     "3A5E4A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -3.2,
+    3.2
+   ],
+   "y": [
+    -3.2,
+    3.2
+   ],
+   "z": [
+    0.0,
+    17.4
+   ]
+  },
+  "trojuhelniku": 312,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "tvar": {
+   "vyska": 16.0,
+   "r": 3.0,
+   "seed": 352,
+   "holy": 0.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.16,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_v0",
+  "soubor": "smrk_v0.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "barvy": [
+   {
+    "cast": "jehlici",
+    "maska": "smrk_v0_maska_jehlici.png",
+    "zacatek": 216,
+    "paleta": [
+     "284C2E",
+     "1F3F2A",
+     "2E5636",
+     "3A5E4A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -2.54,
+    2.54
+   ],
+   "y": [
+    -2.54,
+    2.54
+   ],
+   "z": [
+    0.0,
+    12.69
+   ]
+  },
+  "trojuhelniku": 312,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "tvar": {
+   "vyska": 12.0,
+   "r": 2.6,
+   "seed": 301
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.16,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_v1",
+  "soubor": "smrk_v1.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "barvy": [
+   {
+    "cast": "jehlici",
+    "maska": "smrk_v1_maska_jehlici.png",
+    "zacatek": 216,
+    "paleta": [
+     "284C2E",
+     "1F3F2A",
+     "2E5636",
+     "3A5E4A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -2.83,
+    2.83
+   ],
+   "y": [
+    -2.83,
+    2.83
+   ],
+   "z": [
+    0.0,
+    12.69
+   ]
+  },
+  "trojuhelniku": 312,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "vyska": 12.0,
+   "r": 2.6,
+   "seed": 302
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.16,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stojan_destniku_a0180099",
+  "soubor": "stojan_destniku_a0180099.glb",
+  "nazev": {
+   "cs": "stojan s deštníky"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.18,
+    0.18
+   ],
+   "y": [
+    -0.19,
+    0.18
+   ],
+   "z": [
+    0.0,
+    1.17
+   ]
+  },
+  "trojuhelniku": 492,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 6,
+  "tvar": {
+   "barvy": [
+    [
+     "destnik_cerny"
+    ],
+    [
+     "sl_cervena"
+    ],
+    [
+     "sl_modra"
+    ],
+    [
+     "destnik_cerny"
+    ]
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stojan s deštníky): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stojan_destniku_b5ec556a",
+  "soubor": "stojan_destniku_b5ec556a.glb",
+  "nazev": {
+   "cs": "stojan s deštníky"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.18,
+    0.18
+   ],
+   "y": [
+    -0.19,
+    0.18
+   ],
+   "z": [
+    0.0,
+    1.17
+   ]
+  },
+  "trojuhelniku": 492,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    [
+     "sl_cervena",
+     "sl_bila"
+    ],
+    [
+     "sl_modra"
+    ],
+    [
+     "sl_zluta"
+    ],
+    [
+     "destnik_cerny"
+    ]
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stojan s deštníky): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_04e5f008",
+  "soubor": "stolek_kavarna_04e5f008.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.6
+   ],
+   "y": [
+    -0.85,
+    0.85
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    60,
+    180,
+    300
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_175b81c4",
+  "soubor": "stolek_kavarna_175b81c4.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.36,
+    0.36
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.36,
+   "uhly": [
+    0,
+    180
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_17c02871",
+  "soubor": "stolek_kavarna_17c02871.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.4,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    90,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_398776c2",
+  "soubor": "stolek_kavarna_398776c2.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.4,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    270,
+    90
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_3c93aa8c",
+  "soubor": "stolek_kavarna_3c93aa8c.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.85,
+    0.85
+   ],
+   "y": [
+    -0.6,
+    0.6
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    150,
+    -30
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_3d216658",
+  "soubor": "stolek_kavarna_3d216658.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.54,
+    0.54
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    295,
+    115
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_7434ee83",
+  "soubor": "stolek_kavarna_7434ee83.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.88
+   ],
+   "y": [
+    -0.85,
+    0.85
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 8,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    120,
+    240
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_8347ab5e",
+  "soubor": "stolek_kavarna_8347ab5e.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    180
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_a0ef44a9",
+  "soubor": "stolek_kavarna_a0ef44a9.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.4
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_b20d1261",
+  "soubor": "stolek_kavarna_b20d1261.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.38
+   ],
+   "y": [
+    -0.88,
+    0.38
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "drevo_svetle",
+   "hrnky": true,
+   "r": 0.38,
+   "uhly": [
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_bbbc6626",
+  "soubor": "stolek_kavarna_bbbc6626.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.36,
+    0.36
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.36,
+   "uhly": [
+    90,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_cfed3188",
+  "soubor": "stolek_kavarna_cfed3188.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.88,
+    0.4
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d34c0817",
+  "soubor": "stolek_kavarna_d34c0817.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.9,
+    0.9
+   ],
+   "y": [
+    -0.41,
+    0.41
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    195,
+    15
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d3becd19",
+  "soubor": "stolek_kavarna_d3becd19.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.9,
+    0.9
+   ],
+   "y": [
+    -0.41,
+    0.41
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    345,
+    165
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d3c6f580",
+  "soubor": "stolek_kavarna_d3c6f580.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.33,
+    0.33
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    95,
+    -85
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d4a5015b",
+  "soubor": "stolek_kavarna_d4a5015b.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.75,
+    0.75
+   ],
+   "y": [
+    -0.75,
+    0.75
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.36,
+   "uhly": [
+    45,
+    225
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_dc02192d",
+  "soubor": "stolek_kavarna_dc02192d.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.4,
+    0.88
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    90,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_dc122b33",
+  "soubor": "stolek_kavarna_dc122b33.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    90,
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_efa2faa2",
+  "soubor": "stolek_kavarna_efa2faa2.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 8,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.35,
+   "uhly": [
+    0,
+    180
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_f7126baf",
+  "soubor": "stolek_kavarna_f7126baf.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.35,
+   "uhly": [
+    180,
+    0
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v0",
+  "soubor": "strom_v0.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v0_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.71,
+    1.81
+   ],
+   "y": [
+    -1.45,
+    1.7
+   ],
+   "z": [
+    0.0,
+    6.32
+   ]
+  },
+  "trojuhelniku": 1600,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 12,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 101,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v1",
+  "soubor": "strom_v1.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v1_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.87,
+    1.72
+   ],
+   "y": [
+    -1.53,
+    1.74
+   ],
+   "z": [
+    0.0,
+    6.31
+   ]
+  },
+  "trojuhelniku": 1600,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 16,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 102,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v2",
+  "soubor": "strom_v2.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v2_maska_koruna.png",
+    "zacatek": 214,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.94,
+    1.48
+   ],
+   "y": [
+    -1.43,
+    2.17
+   ],
+   "z": [
+    0.0,
+    6.64
+   ]
+  },
+  "trojuhelniku": 1600,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 19,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 103,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v3",
+  "soubor": "strom_v3.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v3_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.54,
+    1.46
+   ],
+   "y": [
+    -1.88,
+    1.79
+   ],
+   "z": [
+    0.0,
+    6.49
+   ]
+  },
+  "trojuhelniku": 1600,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 16,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 104,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "sud_99914b93",
+  "soubor": "sud_99914b93.glb",
+  "nazev": {
+   "cs": "sud"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.32,
+    0.32
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    0.0,
+    0.9
+   ]
+  },
+  "trojuhelniku": 280,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 5,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (sud): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "sud_s_pipou_99914b93",
+  "soubor": "sud_s_pipou_99914b93.glb",
+  "nazev": {
+   "cs": "sud s pípou na kozlících"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.29,
+    0.42
+   ],
+   "y": [
+    -0.33,
+    0.33
+   ],
+   "z": [
+    -0.01,
+    1.2
+   ]
+  },
+  "trojuhelniku": 588,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (sud s pípou na kozlících): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "susak_2303bdbe",
+  "soubor": "susak_2303bdbe.glb",
+  "nazev": {
+   "cs": "sušák s prádlem"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.31,
+    0.31
+   ],
+   "y": [
+    -0.51,
+    0.51
+   ],
+   "z": [
+    -0.0,
+    1.0
+   ]
+  },
+  "trojuhelniku": 100,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "seed": 2,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (sušák s prádlem): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "vozik_zmrzlina_43f0baaf",
+  "soubor": "vozik_zmrzlina_43f0baaf.glb",
+  "nazev": {
+   "cs": "vozík se zmrzlinou"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    1.25
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 504,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (vozík se zmrzlinou): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "vzv_8f502b22",
+  "soubor": "vzv_8f502b22.glb",
+  "nazev": {
+   "cs": "vysokozdvižný vozík"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.7,
+    1.05
+   ],
+   "y": [
+    -0.56,
+    0.56
+   ],
+   "z": [
+    0.01,
+    2.49
+   ]
+  },
+  "trojuhelniku": 420,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (vysokozdvižný vozík): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "zidle_f3b274b6",
+  "soubor": "zidle_f3b274b6.glb",
+  "nazev": {
+   "cs": "židle"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.26,
+    0.2
+   ],
+   "y": [
+    -0.2,
+    0.2
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 96,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "m": "kov",
+   "sedak": "drevo_tm"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů a průmyslu (židle): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_p0",
+  "soubor": "smrk_p0.glb",
+  "nazev": {
+   "cs": "malý smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -1.99,
+    1.97
+   ],
+   "y": [
+    -1.89,
+    1.77
+   ],
+   "z": [
+    0.0,
+    6.93
+   ]
+  },
+  "trojuhelniku": 624,
+  "kmen_r": 0.29,
+  "vyska_m": 6.93,
+  "polomer_m": 2.0,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     12
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_p0_maska_koruna.png",
+    "zacatek": 74
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_p0_maska_snih.png",
+    "zacatek": 65
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "214E31",
+     "295736",
+     "1F462E",
+     "325A3A",
+     "264F3E"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "62746C",
+     "5A6B63",
+     "697971"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk ve 3D (kmen a větve z karet), malý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_p1",
+  "soubor": "smrk_p1.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -3.22,
+    3.53
+   ],
+   "y": [
+    -3.3,
+    3.44
+   ],
+   "z": [
+    0.0,
+    12.37
+   ]
+  },
+  "trojuhelniku": 624,
+  "kmen_r": 0.36,
+  "vyska_m": 12.37,
+  "polomer_m": 3.59,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8,
+    11
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     12,
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_p1_maska_koruna.png",
+    "zacatek": 74
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_p1_maska_snih.png",
+    "zacatek": 65
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "214E31",
+     "295736",
+     "1F462E",
+     "325A3A",
+     "264F3E"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "62746C",
+     "5A6B63",
+     "697971"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk ve 3D, střední; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_p2",
+  "soubor": "smrk_p2.glb",
+  "nazev": {
+   "cs": "vysoký smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.56,
+    2.67
+   ],
+   "y": [
+    -2.51,
+    2.5
+   ],
+   "z": [
+    0.0,
+    17.03
+   ]
+  },
+  "trojuhelniku": 630,
+  "kmen_r": 0.45,
+  "vyska_m": 17.03,
+  "polomer_m": 2.96,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_p2_maska_koruna.png",
+    "zacatek": 74
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_p2_maska_snih.png",
+    "zacatek": 65
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "214E31",
+     "295736",
+     "1F462E",
+     "325A3A",
+     "264F3E"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "62746C",
+     "5A6B63",
+     "697971"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk ve 3D, vysoký; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "listnac_p0",
+  "soubor": "listnac_p0.glb",
+  "nazev": {
+   "cs": "listnáč"
+  },
+  "strom": "listnac",
+  "rozmer_m": {
+   "x": [
+    -2.15,
+    2.29
+   ],
+   "y": [
+    -2.7,
+    2.43
+   ],
+   "z": [
+    0.0,
+    7.95
+   ]
+  },
+  "trojuhelniku": 285,
+  "kmen_r": 0.21,
+  "vyska_m": 7.95,
+  "polomer_m": 2.79,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    0,
+    1,
+    7,
+    10
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     31
+    ]
+   },
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     17,
+     18
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "listnac_p0_maska_koruna.png",
+    "zacatek": 86
+   },
+   {
+    "cast": "snih",
+    "maska": "listnac_p0_maska_snih.png",
+    "zacatek": 79
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "7CC242",
+     "8BC34A",
+     "6DBE45",
+     "9CCC65",
+     "74B83E"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "4F8A3C",
+     "5B9541",
+     "418139",
+     "689A42",
+     "77973B",
+     "A87B30"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "AFB5B9",
+     "A8AFB4",
+     "B8BCBE"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "listnatý strom ve 3D, podzimní žlutohnědý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k0",
+  "soubor": "smrk_k0.glb",
+  "nazev": {
+   "cs": "štíhlý smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -1.95,
+    2.13
+   ],
+   "y": [
+    -2.11,
+    1.96
+   ],
+   "z": [
+    0.0,
+    17.27
+   ]
+  },
+  "trojuhelniku": 113,
+  "kmen_r": 0.26,
+  "vyska_m": 17.27,
+  "polomer_m": 2.13,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    6,
+    8
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     14,
+     16
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k0_maska_koruna.png",
+    "zacatek": 77
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k0_maska_snih.png",
+    "zacatek": 69
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "265938",
+     "2F633E",
+     "235034",
+     "396742",
+     "2B5A47"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "70847B",
+     "667A71",
+     "778A81"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "štíhlý smrk z karet, vysoký holý kmen; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "borovice_k0",
+  "soubor": "borovice_k0.glb",
+  "nazev": {
+   "cs": "borovice"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.14,
+    2.22
+   ],
+   "y": [
+    -2.2,
+    2.16
+   ],
+   "z": [
+    0.0,
+    17.43
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.26,
+  "vyska_m": 17.43,
+  "polomer_m": 2.29,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    5
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     16,
+     19
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "borovice_k0_maska_koruna.png",
+    "zacatek": 80
+   },
+   {
+    "cast": "snih",
+    "maska": "borovice_k0_maska_snih.png",
+    "zacatek": 68
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "245535",
+     "2D5E3A",
+     "214C31",
+     "36623F",
+     "295543"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "6A7D75",
+     "61746B",
+     "71837A"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "řídká borovice z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k1",
+  "soubor": "smrk_k1.glb",
+  "nazev": {
+   "cs": "hustý smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.24,
+    2.43
+   ],
+   "y": [
+    -2.49,
+    2.23
+   ],
+   "z": [
+    0.0,
+    17.43
+   ]
+  },
+  "trojuhelniku": 108,
+  "kmen_r": 0.26,
+  "vyska_m": 17.43,
+  "polomer_m": 2.49,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    11
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k1_maska_koruna.png",
+    "zacatek": 66
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k1_maska_snih.png",
+    "zacatek": 59
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "225032",
+     "2A5837",
+     "1F482E",
+     "335C3B",
+     "26513F"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "64766E",
+     "5B6E65",
+     "6B7B73"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "hustý tmavý smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k2",
+  "soubor": "smrk_k2.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.09,
+    2.4
+   ],
+   "y": [
+    -2.25,
+    2.47
+   ],
+   "z": [
+    0.0,
+    17.43
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.26,
+  "vyska_m": 17.43,
+  "polomer_m": 2.53,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8,
+    11
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k2_maska_koruna.png",
+    "zacatek": 80
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k2_maska_snih.png",
+    "zacatek": 71
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "255636",
+     "2D603C",
+     "224E32",
+     "376440",
+     "2A5744"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "6C8077",
+     "63766D",
+     "73857D"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "borovice_k1",
+  "soubor": "borovice_k1.glb",
+  "nazev": {
+   "cs": "vysoká borovice"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -3.07,
+    2.87
+   ],
+   "y": [
+    -2.87,
+    2.87
+   ],
+   "z": [
+    0.0,
+    22.29
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.33,
+  "vyska_m": 22.29,
+  "polomer_m": 3.15,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    5,
+    6
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     15,
+     19
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "borovice_k1_maska_koruna.png",
+    "zacatek": 82
+   },
+   {
+    "cast": "snih",
+    "maska": "borovice_k1_maska_snih.png",
+    "zacatek": 74
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "225032",
+     "2A5937",
+     "1F482E",
+     "335C3C",
+     "26513F"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "64766E",
+     "5B6E65",
+     "6B7B73"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "vysoká borovice z karet, koruna nahoře; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k3",
+  "soubor": "smrk_k3.glb",
+  "nazev": {
+   "cs": "menší smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.49,
+    2.49
+   ],
+   "y": [
+    -2.49,
+    2.49
+   ],
+   "z": [
+    0.0,
+    12.21
+   ]
+  },
+  "trojuhelniku": 36,
+  "kmen_r": 0.18,
+  "vyska_m": 12.21,
+  "polomer_m": 2.51,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     12
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k3_maska_koruna.png",
+    "zacatek": 76
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k3_maska_snih.png",
+    "zacatek": 67
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "265837",
+     "2E623D",
+     "224F33",
+     "386642",
+     "2A5946"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "6E827A",
+     "65796F",
+     "76887F"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "menší smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "listnac_k0",
+  "soubor": "listnac_k0.glb",
+  "nazev": {
+   "cs": "listnáč"
+  },
+  "strom": "listnac",
+  "rozmer_m": {
+   "x": [
+    -3.82,
+    3.82
+   ],
+   "y": [
+    -3.82,
+    3.82
+   ],
+   "z": [
+    0.0,
+    16.44
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.25,
+  "vyska_m": 16.44,
+  "polomer_m": 3.82,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    0,
+    2,
+    4,
+    9
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     17
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "listnac_k0_maska_koruna.png",
+    "zacatek": 99
+   },
+   {
+    "cast": "snih",
+    "maska": "listnac_k0_maska_snih.png",
+    "zacatek": 92
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "7CC242",
+     "8BC34A",
+     "6DBE45",
+     "9CCC65",
+     "74B83E"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "487E37",
+     "53883B",
+     "3B7534",
+     "5F8C3C",
+     "6D8A36",
+     "99702C"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "A0A5A9",
+     "999FA4",
+     "A8ABAE"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "široký listnáč z karet, žlutozelený (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "briza_k0",
+  "soubor": "briza_k0.glb",
+  "nazev": {
+   "cs": "bříza"
+  },
+  "strom": "listnac",
+  "rozmer_m": {
+   "x": [
+    -3.74,
+    3.9
+   ],
+   "y": [
+    -3.9,
+    3.74
+   ],
+   "z": [
+    0.0,
+    19.61
+   ]
+  },
+  "trojuhelniku": 101,
+  "kmen_r": 0.29,
+  "vyska_m": 19.61,
+  "polomer_m": 3.9,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    2,
+    3
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     17
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "briza_k0_maska_koruna.png",
+    "zacatek": 103
+   },
+   {
+    "cast": "snih",
+    "maska": "briza_k0_maska_snih.png",
+    "zacatek": 95
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCC65",
+     "A5D46A",
+     "8FC757",
+     "B0D976"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "7B9B41",
+     "8AA043",
+     "9E9E3F",
+     "6F9341"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "ADB1B4",
+     "A6ABAF"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "bříza z karet, bílý kmen, žlutá (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "jedle_k0",
+  "soubor": "jedle_k0.glb",
+  "nazev": {
+   "cs": "mladá jedle"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -1.21,
+    1.21
+   ],
+   "y": [
+    -1.21,
+    1.21
+   ],
+   "z": [
+    0.0,
+    3.69
+   ]
+  },
+  "trojuhelniku": 40,
+  "kmen_r": 0.08,
+  "vyska_m": 3.69,
+  "polomer_m": 1.21,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": []
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "jedle_k0_maska_koruna.png",
+    "zacatek": 84
+   },
+   {
+    "cast": "snih",
+    "maska": "jedle_k0_maska_snih.png",
+    "zacatek": 78
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "1F492E",
+     "265132",
+     "1C412A",
+     "2E5436",
+     "23493A"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "5B6C65",
+     "53645C",
+     "617069"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "mladý jehličnan z karet (3,7 m); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "palma_0",
+  "soubor": "palma_0.glb",
+  "nazev": {
+   "cs": "palma"
+  },
+  "strom": "palma",
+  "rozmer_m": {
+   "x": [
+    -1.66,
+    2.08
+   ],
+   "y": [
+    -2.09,
+    1.41
+   ],
+   "z": [
+    0.0,
+    5.01
+   ]
+  },
+  "trojuhelniku": 1631,
+  "kmen_r": 0.07,
+  "vyska_m": 5.01,
+  "polomer_m": 2.31,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "palma 5 m, koruna dole široká; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    28,
+    29,
+    30
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "palma_1",
+  "soubor": "palma_1.glb",
+  "nazev": {
+   "cs": "vysoká palma"
+  },
+  "strom": "palma",
+  "rozmer_m": {
+   "x": [
+    -1.93,
+    2.5
+   ],
+   "y": [
+    -1.81,
+    2.19
+   ],
+   "z": [
+    0.0,
+    6.98
+   ]
+  },
+  "trojuhelniku": 1631,
+  "kmen_r": 0.08,
+  "vyska_m": 6.98,
+  "polomer_m": 2.7,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "palma 7 m, štíhlý kmen; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    23,
+    24,
+    30
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "palma_2",
+  "soubor": "palma_2.glb",
+  "nazev": {
+   "cs": "palma"
+  },
+  "strom": "palma",
+  "rozmer_m": {
+   "x": [
+    -1.48,
+    1.59
+   ],
+   "y": [
+    -1.55,
+    1.92
+   ],
+   "z": [
+    0.0,
+    5.71
+   ]
+  },
+  "trojuhelniku": 1630,
+  "kmen_r": 0.06,
+  "vyska_m": 5.71,
+  "polomer_m": 1.94,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "palma 5,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    23,
+    26,
+    29
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "banan_0",
+  "soubor": "banan_0.glb",
+  "nazev": {
+   "cs": "banánovník"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.09,
+    1.77
+   ],
+   "y": [
+    -1.11,
+    1.55
+   ],
+   "z": [
+    0.0,
+    2.72
+   ]
+  },
+  "trojuhelniku": 1080,
+  "vyska_m": 2.72,
+  "polomer_m": 1.88,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "banánovník 2,7 m, velké listy; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    22
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "banan_1",
+  "soubor": "banan_1.glb",
+  "nazev": {
+   "cs": "banánovník"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.5,
+    1.42
+   ],
+   "y": [
+    -1.16,
+    1.46
+   ],
+   "z": [
+    0.0,
+    2.77
+   ]
+  },
+  "trojuhelniku": 1144,
+  "vyska_m": 2.77,
+  "polomer_m": 1.55,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "banánovník 2,8 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    22
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_0",
+  "soubor": "monstera_0.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -2.06,
+    1.41
+   ],
+   "y": [
+    -1.64,
+    1.63
+   ],
+   "z": [
+    0.0,
+    2.47
+   ]
+  },
+  "trojuhelniku": 2389,
+  "vyska_m": 2.47,
+  "polomer_m": 2.15,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,5 m, děrované listy; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    21
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_1",
+  "soubor": "monstera_1.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.88,
+    1.28
+   ],
+   "y": [
+    -1.48,
+    1.61
+   ],
+   "z": [
+    0.0,
+    2.79
+   ]
+  },
+  "trojuhelniku": 2607,
+  "vyska_m": 2.79,
+  "polomer_m": 1.96,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,8 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    21,
+    25
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_2",
+  "soubor": "monstera_2.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.85,
+    1.6
+   ],
+   "y": [
+    -1.81,
+    1.42
+   ],
+   "z": [
+    0.0,
+    2.37
+   ]
+  },
+  "trojuhelniku": 1257,
+  "vyska_m": 2.37,
+  "polomer_m": 2.16,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,4 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    22,
+    25
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_3",
+  "soubor": "monstera_3.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.74,
+    1.53
+   ],
+   "y": [
+    -1.89,
+    2.12
+   ],
+   "z": [
+    0.0,
+    2.37
+   ]
+  },
+  "trojuhelniku": 1257,
+  "vyska_m": 2.37,
+  "polomer_m": 2.45,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,4 m, široká; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    25,
+    21
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_0",
+  "soubor": "kapradi_0.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.87,
+    0.87
+   ],
+   "z": [
+    0.0,
+    0.69
+   ]
+  },
+  "trojuhelniku": 1152,
+  "kmen_r": 0.0,
+  "vyska_m": 0.69,
+  "polomer_m": 0.99,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "nízké kapradí 0,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_1",
+  "soubor": "kapradi_1.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.97
+   ],
+   "y": [
+    -0.95,
+    0.95
+   ],
+   "z": [
+    0.0,
+    0.71
+   ]
+  },
+  "trojuhelniku": 1152,
+  "kmen_r": 0.0,
+  "vyska_m": 0.71,
+  "polomer_m": 1.04,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "nízké kapradí 0,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_2",
+  "soubor": "kapradi_2.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -0.96,
+    0.96
+   ],
+   "y": [
+    -0.93,
+    0.93
+   ],
+   "z": [
+    0.0,
+    0.69
+   ]
+  },
+  "trojuhelniku": 1152,
+  "kmen_r": 0.0,
+  "vyska_m": 0.69,
+  "polomer_m": 1.0,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "nízké kapradí 0,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_3",
+  "soubor": "kapradi_3.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.58,
+    1.18
+   ],
+   "y": [
+    -1.35,
+    1.42
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 1446,
+  "kmen_r": 0.0,
+  "vyska_m": 1.52,
+  "polomer_m": 1.58,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "kapradí 1,5 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_4",
+  "soubor": "kapradi_4.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.49,
+    1.28
+   ],
+   "y": [
+    -1.36,
+    1.42
+   ],
+   "z": [
+    0.0,
+    1.43
+   ]
+  },
+  "trojuhelniku": 1452,
+  "kmen_r": 0.0,
+  "vyska_m": 1.43,
+  "polomer_m": 1.49,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "kapradí 1,4 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_5",
+  "soubor": "kapradi_5.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.55,
+    1.14
+   ],
+   "y": [
+    -1.41,
+    1.33
+   ],
+   "z": [
+    0.0,
+    1.56
+   ]
+  },
+  "trojuhelniku": 1290,
+  "kmen_r": 0.0,
+  "vyska_m": 1.56,
+  "polomer_m": 1.6,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "kapradí 1,6 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kaktus_bily",
+  "soubor": "kaktus_bily.glb",
+  "nazev": {
+   "cs": "kvetoucí kaktus"
+  },
+  "strom": "kaktus",
+  "rozmer_m": {
+   "x": [
+    -0.36,
+    0.5
+   ],
+   "y": [
+    -0.48,
+    0.46
+   ],
+   "z": [
+    0.0,
+    3.92
+   ]
+  },
+  "trojuhelniku": 2065,
+  "kmen_r": 0.29,
+  "vyska_m": 3.92,
+  "polomer_m": 0.5,
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    27
+   ]
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "autor": "Cacti, evolveduk (Sketchfab, licence Free Standard, https://sketchfab.com/3d-models/cacti-e4b031f9ad75497986a28d59ced81f2c); převod domy/kaktusy.py",
+  "licence": "Sketchfab Free Standard (https://sketchfab.com/licenses): smí se použít a upravit jako součást hry, samostatně se model nešíří; změny: kaktus zvlášť z balíčku, zjednodušený, textury 512 px, průhlednost MASK, bez normálových map",
+  "poznamka": "saguáro s bílými květy, 3,8 m; kaktus (hráč 1. 11.: „vem ten kvetoucí kaktus bíle, žluto oranžově a kulatej“): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; za kaktus subtropické mapy (0x1B) se tři střídají"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kaktus_zluty",
+  "soubor": "kaktus_zluty.glb",
+  "nazev": {
+   "cs": "kvetoucí opuncie"
+  },
+  "strom": "kaktus",
+  "rozmer_m": {
+   "x": [
+    -0.44,
+    0.44
+   ],
+   "y": [
+    -0.48,
+    0.43
+   ],
+   "z": [
+    0.0,
+    0.92
+   ]
+  },
+  "trojuhelniku": 1806,
+  "vyska_m": 0.92,
+  "polomer_m": 0.64,
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    27
+   ]
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "autor": "Cacti, evolveduk (Sketchfab, licence Free Standard, https://sketchfab.com/3d-models/cacti-e4b031f9ad75497986a28d59ced81f2c); převod domy/kaktusy.py",
+  "licence": "Sketchfab Free Standard (https://sketchfab.com/licenses): smí se použít a upravit jako součást hry, samostatně se model nešíří; změny: kaktus zvlášť z balíčku, zjednodušený, textury 512 px, průhlednost MASK, bez normálových map",
+  "poznamka": "opuncie se žlutooranžovými květy, 0,9 m; kaktus (hráč 1. 11.: „vem ten kvetoucí kaktus bíle, žluto oranžově a kulatej“): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; za kaktus subtropické mapy (0x1B) se tři střídají"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kaktus_kulaty",
+  "soubor": "kaktus_kulaty.glb",
+  "nazev": {
+   "cs": "kulatý kaktus"
+  },
+  "strom": "kaktus",
+  "rozmer_m": {
+   "x": [
+    -0.26,
+    0.26
+   ],
+   "y": [
+    -0.26,
+    0.26
+   ],
+   "z": [
+    0.0,
+    0.55
+   ]
+  },
+  "trojuhelniku": 891,
+  "vyska_m": 0.55,
+  "polomer_m": 0.26,
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    27
+   ]
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "autor": "Cacti, evolveduk (Sketchfab, licence Free Standard, https://sketchfab.com/3d-models/cacti-e4b031f9ad75497986a28d59ced81f2c); převod domy/kaktusy.py",
+  "licence": "Sketchfab Free Standard (https://sketchfab.com/licenses): smí se použít a upravit jako součást hry, samostatně se model nešíří; změny: kaktus zvlášť z balíčku, zjednodušený, textury 512 px, průhlednost MASK, bez normálových map",
+  "poznamka": "kulatý kaktus, 0,5 m; kaktus (hráč 1. 11.: „vem ten kvetoucí kaktus bíle, žluto oranžově a kulatej“): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; za kaktus subtropické mapy (0x1B) se tři střídají"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_previs",
+  "soubor": "popinavka_previs.glb",
+  "nazev": {
+   "cs": "popínavka (převis)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_previs_maska_listi.png",
+    "zacatek": 98,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.35
+   ],
+   "y": [
+    -1.26,
+    1.26
+   ],
+   "z": [
+    0.0,
+    1.65
+   ]
+  },
+  "trojuhelniku": 209,
+  "atlas_px": [
+   522,
+   293
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "visi_od_hrany",
+   "popis": "široký převis břečťanu přes horní hranu zdi: nahoře hustý, prameny visí dolů"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_kupa",
+  "soubor": "popinavka_kupa.glb",
+  "nazev": {
+   "cs": "popínavka (kupa)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_kupa_maska_listi.png",
+    "zacatek": 163,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.35
+   ],
+   "y": [
+    -1.21,
+    1.21
+   ],
+   "z": [
+    0.0,
+    1.19
+   ]
+  },
+  "trojuhelniku": 292,
+  "atlas_px": [
+   307,
+   492
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "kdekoli",
+   "popis": "hustá kupa břečťanu, spodní listy převislé; na zeď, na římsu nebo k patě zdi"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_pramen_0",
+  "soubor": "popinavka_pramen_0.glb",
+  "nazev": {
+   "cs": "popínavka (pramen)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_pramen_0_maska_listi.png",
+    "zacatek": 90,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.19
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.79
+   ]
+  },
+  "trojuhelniku": 12,
+  "atlas_px": [
+   307,
+   132
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "visi_od_hrany",
+   "popis": "pramen břečťanu visící dolů, nahoře hustší"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_pramen_1",
+  "soubor": "popinavka_pramen_1.glb",
+  "nazev": {
+   "cs": "popínavka (pramen podél)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_pramen_1_maska_listi.png",
+    "zacatek": 136,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.22
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    0.0,
+    0.9
+   ]
+  },
+  "trojuhelniku": 12,
+  "atlas_px": [
+   201,
+   83
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "kdekoli",
+   "popis": "pramen břečťanu podél zdi"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_pramen_2",
+  "soubor": "popinavka_pramen_2.glb",
+  "nazev": {
+   "cs": "popínavka (sloupek)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_pramen_2_maska_listi.png",
+    "zacatek": 119,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.22
+   ],
+   "y": [
+    -0.45,
+    0.45
+   ],
+   "z": [
+    0.0,
+    2.07
+   ]
+  },
+  "trojuhelniku": 12,
+  "atlas_px": [
+   378,
+   132
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "kdekoli",
+   "popis": "vysoký hustý sloupek břečťanu"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lavicka_parkova",
+  "soubor": "lavicka_parkova.glb",
+  "nazev": {
+   "cs": "lavička (sovětská parková)"
+  },
+  "barvy": [
+   {
+    "cast": "prkna_bila",
+    "maska": "lavicka_parkova_maska_prkna_bila.png",
+    "zacatek": 232,
+    "paleta": [
+     "F2F0E8",
+     "EAE8DE",
+     "F5F3EC",
+     "A8402F"
+    ]
+   },
+   {
+    "cast": "prkna_barevna",
+    "maska": "lavicka_parkova_maska_prkna_barevna.png",
+    "zacatek": 200,
+    "paleta": [
+     "C8322A",
+     "B5281F",
+     "D94A3A",
+     "E8B830",
+     "F0C640",
+     "D9A520",
+     "A8402F"
+    ]
+   },
+   {
+    "cast": "nohy",
+    "maska": "lavicka_parkova_maska_nohy.png",
+    "zacatek": 74,
+    "paleta": [
+     "2E2E2E",
+     "4A4A4A",
+     "2F4A33",
+     "5A3E2C"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.471,
+    0.471
+   ],
+   "y": [
+    -1.198,
+    1.198
+   ],
+   "z": [
+    0.0,
+    0.989
+   ]
+  },
+  "trojuhelniku": 456,
+  "atlas_px": [
+   48,
+   16
+  ],
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "mista_sedu": [
+   {
+    "poza": "sedi",
+    "poloha": [
+     0.14,
+     -0.7,
+     0.451
+    ],
+    "otoceni": 0
+   },
+   {
+    "poza": "sedi",
+    "poloha": [
+     0.14,
+     0.0,
+     0.451
+    ],
+    "otoceni": 0
+   },
+   {
+    "poza": "sedi",
+    "poloha": [
+     0.14,
+     0.7,
+     0.451
+    ],
+    "otoceni": 0
+   }
+  ],
+  "autor": "Nikita Filimonov (https://sketchfab.com/nikita3dvisions): Bench 6 USSR (Game ready) (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/bench-6-ussr-game-ready-12e4fb18364a4590862eb871c60c6b45); převod domy/lavicka_parkova.py",
+  "licence": "CC BY 4.0 (uvést Nikita Filimonov; změny: otočená předkem k +x, bez textur, jen barva po částech na barvení číslem)",
+  "poznamka": "společná lavička (hráč 4. 11.: „udělej lavičku společnou“, „takhle to je lepši bez textury, budem ji barvit“, „prkna zvlašť barvit , ty prkna na kterych se sedi, o ktere se opiraj“, „střidavě ty prkna musi byt komunisticky natřený. jedno bíle  , další červeně nebo žlutě. , bila žluta červena“, „kontrola_barvy png , ta celá červena by šla taky.  s barvama si mužem vyhrát, to nestojí mb“): sovětská parková lavička, dřevěná prkna ohnutá ze sedáku do opěradla na dvou litých nohách, 2,4 m; pro všechny sady tam, kde má být lavička (park, ulice, zastávka, u domu); bez textury, barva číslem po částech: 13 prken sedáku a opěradla střídavě od přední hrany sedáku prkna_bila (bílá, 1., 3., … 13.) a prkna_barevna (červená nebo žlutá, 2., 4., … 12.; A8402F v obou paletách: celá lavička červená), nohy (lité nohy, rám za opěradlem a příčka pod sedákem); s barvami si hra smí hrát; počátek na zemi uprostřed půdorysu, předek (kam se sedí a kouká) k +x, délka podél y, z nahoru, skutečné metry; mista_sedu: body sedu na sedáku pro pózu sedi kostry (otoceni 0 = kouká k +x), 0,7 m od sebe; jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "snehulak",
+  "soubor": "snehulak.glb",
+  "nazev": {
+   "cs": "sněhulák",
+   "en": "snowman"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.97
+   ],
+   "y": [
+    -0.5,
+    0.5
+   ],
+   "z": [
+    0.0,
+    2.01
+   ]
+  },
+  "trojuhelniku": 1249,
+  "klima": [
+   "subarkticke"
+  ],
+  "autor": "snowman (3D Warehouse, snowman_andi.zip od hráče, autor v souboru není), převod predmety/par18_doplnky.py",
+  "licence": "3D Warehouse General Model License (změny: bez čtverce sněhu pod ním, barvy místo textur, zjednodušený)",
+  "poznamka": "společný doplněk (hráč 7. 11.: „sněhulak kolem arctic měst“): sněhulák ze tří koulí, uhlíky, mrkev, kýbl na hlavě, dřevěné ruce; počátek pod patou, předek podél +x, metry jako model (1,94 m); jen barva, bez světla a bez noci; hra ho staví u domů subarktických měst na sněhu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "porek",
+  "soubor": "porek.glb",
+  "nazev": {
+   "cs": "pórek",
+   "en": "leek"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.05,
+    0.05
+   ],
+   "y": [
+    -0.06,
+    0.06
+   ],
+   "z": [
+    0.0,
+    0.6
+   ]
+  },
+  "trojuhelniku": 380,
+  "autor": "Leek Prop, HiItsSterre (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/leek-prop-64c2646c108a41ba97b8a8387c7f016b), převod predmety/par18_doplnky.py",
+  "licence": "CC BY 4.0 (uvést HiItsSterre; změny: zmenšený na 0,6 m, textura 128 px)",
+  "poznamka": "společný doplněk: jeden pórek nastojato (bílý stvol dole, zelené listy nahoře), 0,6 m; počátek pod patou, předek podél +x; jen barva, bez světla a bez noci; hra ho sází do zahrad u domů v řádcích (asi po 0,25 m, řádky 0,4 m od sebe) a bílý stvol zapustí asi o 0,1 m do záhonu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stan_kelt",
+  "soubor": "stan_kelt.glb",
+  "nazev": {
+   "cs": "keltský stan",
+   "en": "Celtic tent"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "stan_kelt_maska_latka.png",
+    "zacatek": 236,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A",
+     "E8E4DA"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.98,
+    3.09
+   ],
+   "y": [
+    -2.01,
+    1.98
+   ],
+   "z": [
+    0.0,
+    3.84
+   ]
+  },
+  "trojuhelniku": 836,
+  "dvere": [
+   {
+    "poloha": [
+     1.79,
+     0.0,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 3.59,
+    "vyska": 2.81
+   }
+  ],
+  "autor": "Trenton - Celtic Tent, andreas (Sketchfab, CC BY-NC 4.0, https://sketchfab.com/3d-models/trenton-celtic-tent-f4696719dbb846f6950e07f93062582a), převod predmety/stany.py",
+  "licence": "CC BY-NC 4.0 (jen nekomerčně, hra je zdarma; uvést andreas; změny: bez věcí na zemi, bez zavěšeného hrnce, bez cípu plachty na zemi, zvětšený 1,5×, jen textura barvy 256 px)",
+  "poznamka": "společný doplněk (hráč 7. 11.: „stany budou převeliké aby se dalo vstoupit“, „celtic tent vyhazej věci na zemi“, „zavěšený hrnec mezi sloupy stanu taky pryč“, „stany budem měnit barvu“): plachta na rámu z tyčí, dlouhá strana +x otevřená pod stříškou je vchod (dvere), uvnitř dřevěná podlaha; zvětšený 1,5× (hřeben 3,2 m, stříška 2,9 m), dá se do něj vejít; počátek uprostřed podlahy na zemi, vchod podél +x; oboustranný, jen barva bez světla a bez noci; barva plachty z palety (maska latka; poslední v paletě je její bílá)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stan_kempink",
+  "soubor": "stan_kempink.glb",
+  "nazev": {
+   "cs": "kempinkový stan",
+   "en": "camping tent"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "stan_kempink_maska_latka.png",
+    "zacatek": 158,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A",
+     "9C7A3C"
+    ]
+   },
+   {
+    "cast": "strecha",
+    "maska": "stan_kempink_maska_strecha.png",
+    "zacatek": 128,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A",
+     "2A4C8C"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -2.48,
+    2.48
+   ],
+   "y": [
+    -2.42,
+    2.42
+   ],
+   "z": [
+    0.0,
+    3.01
+   ]
+  },
+  "trojuhelniku": 250,
+  "dvere": [
+   {
+    "poloha": [
+     2.52,
+     0.0,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.32,
+    "vyska": 2.15
+   }
+  ],
+  "autor": "Camping Tent, AndreuSeara (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/camping-tent-70a8f7db5f724989a035166b79ace87b), převod predmety/stany.py",
+  "licence": "CC BY 4.0 (uvést AndreuSeara; změny: vyříznutý vchod, zvětšený 2,5×, jen textura barvy 256 px)",
+  "poznamka": "společný doplněk (hráč 7. 11.: „první otevři vchod ať se dá vstoupit“, „stany budou převeliké aby se dalo vstoupit“, „stany budem měnit barvu“): kopulový stan, vchod na +x vyříznutý až k zemi (dvere); zvětšený 2,5× (3 m vysoký), dá se do něj vejít; počátek uprostřed na zemi, vchod podél +x; oboustranný, jen barva bez světla a bez noci; barvy z palety: latka (boky, poslední v paletě jejich hnědá) a strecha (horní díl, poslední je jeho modrá); černý pás dole a tyče ne"
+ }
+]

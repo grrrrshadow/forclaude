@@ -9,13 +9,23 @@ v nestabilním/nedeterministickém CI postupu.
 
 ## Zdroj
 
+**Aktuální vendorovaný zdroj (od 2026-08-15): OpenTTD 16.0-beta2**, ne
+15.3 — viz `openttd/VENDORED_SOURCE.md` pro důvod přechodu (skutečné
+couvání vlaků + NewGRF kompatibilita s CZTR). Práce na 15.3 zůstává
+zachovaná na větvi `backup-15.3-decouple`. Zbytek téhle sekce (postup,
+kroky, poznatky o `windows-2022` vs. `windows-latest`) popisuje, jak
+jsme k tomuhle bodu došli — zůstává jako historický záznam, principy
+(ověřit reprodukovatelnost před úpravou kódu) platí beze změny i pro
+beta16.
+
 - Oficiální repozitář: `OpenTTD/OpenTTD` (https://github.com/OpenTTD/OpenTTD)
-- Verze: **15.3** (vydáno 2026-04-04, autor releasu PeterN)
-- Tag: `15.3`
-- Commit, na který tag `15.3` ukazuje: `14ec60f248547d4d062a1160f0fc26d742319888`
-  (zaznamenáno při přípravě tohoto postupu — pokud by GitHub Actions checkout
-  vytáhl jiný commit pro tag `15.3`, je to signál, že se tag přesunul/je
-  něco jinak, a je potřeba to prošetřit).
+- Původní verze (viz `backup-15.3-decouple`): **15.3** (vydáno
+  2026-04-04, autor releasu PeterN), tag `15.3`, commit
+  `14ec60f248547d4d062a1160f0fc26d742319888`.
+- Aktuální verze: **16.0-beta2**, tag `16.0-beta2`, commit
+  `e4620d5832de45b5e0a4c4c1d4581684364ea082` (zaznamenáno při
+  vendorování — pokud by GitHub Actions checkout vytáhl jiný commit pro
+  tento tag, je to signál, že se tag přesunul/je něco jinak).
 - Žádné git submoduly nejsou potřeba (`.gitmodules` v repu není).
 
 ## Odkud vychází náš postup
@@ -84,6 +94,40 @@ bez OpenTTD interních tajných klíčů — viz níže).
 11. **Nahrání artefaktů** — bundle (zip), samostatný `openttd.exe`, a
     symboly, jako výstupy GitHub Actions run (ke stažení z UI).
 
+## Zásadní poznatek: `windows-latest` není bezpečné pro reprodukovatelnost
+
+Run #2 (viz tabulka výše) odhalil důležitou věc, kterou je potřeba mít na
+paměti pořád, i po úpravách kódu OpenTTD:
+
+`runs-on: windows-latest` je pohyblivý cíl — GitHub pod tímto názvem časem
+vymění celý image (aktuálně obsahuje Visual Studio "18" Enterprise, MSVC
+toolset `14.51.36231`, mnohem novější než VS2022, kterou OpenTTD 15.3
+oficiálně používal při vydání 2026-04-04). Novější MSVC odstranil
+zastaralou STL kompatibilitu `stdext::checked_array_iterator`. Zdrojový kód
+knihovny **breakpad**, tak jak je zamčený ve `vcpkg.json` (port
+`2023.06.01`, přes `builtin-baseline`), ji používá v
+`src/client/windows/crash_generation/minidump_generator.cc:183` — s novým
+kompilátorem to spadne na:
+
+```
+error C2653: 'stdext': is not a class or namespace name
+error C2065: 'checked_array_iterator': undeclared identifier
+error C2059: syntax error: '>'
+```
+
+Tohle **není chyba v OpenTTD kódu ani v našem workflow** — je to nekompatibilita
+mezi starým vcpkg portem a novým MSVC kompilátorem, která by časem začala
+škobrtat i oficiálnímu OpenTTD CI (pokud a dokud OpenTTD nezvýší
+`builtin-baseline` na novější breakpad, nebo GitHub nezmění, co `windows-latest`
+znamená).
+
+**Řešení:** connect runner připnutý na `windows-2022` (konkrétní, stabilní
+image), místo pohyblivého `windows-latest`. Tohle je přesně ten typ
+"detailu, co si musíme pamatovat", o který šlo od začátku — bez tohoto
+zápisu by se stejná chyba mohla objevit znovu v budoucnu a vypadat jako
+chyba v našich úpravách kódu, i když by šlo jen o to, že se pod nohama
+změnil build runner.
+
 ## Co jsme vědomě vynechali a proč
 
 - **NSIS instalátor** (`-DOPTION_USE_NSIS=ON`) — instalátor se v oficiálním
@@ -124,9 +168,17 @@ Log jednotlivých spuštění (doplňovat po každém běhu):
 
 | # | Datum | source_ref | arch | Výsledek | Poznámka |
 |---|-------|-----------|------|----------|----------|
-| 1 | — | 15.3 | x64 | *zatím nespuštěno* | první ověřovací běh |
-| 2 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
-| 3 | — | 15.3 | x64 | | ověření reprodukovatelnosti |
+| 1 | 2026-08-13 | (prázdné → viz poznámka) | (prázdné → viz poznámka) | ❌ selhalo | Spuštěno přes `push` trigger (workaround, viz níže), ne přes `workflow_dispatch` → `inputs.*` byly prázdné. Krok "Checkout OpenTTD source" proto checkoutnul náš vlastní repo `forclaude` místo `OpenTTD/OpenTTD`. CMake selhal: `CMake Error: The source directory "D:/a/forclaude/forclaude" does not appear to contain CMakeLists.txt.` OpenTTD zdroj se vůbec nestáhl, jde o chybu naší pipeline (workflow file), ne o OpenTTD kód. **Oprava:** přidány fallback výrazy `${{ inputs.X || 'default' }}` na všech místech, kde se `inputs.*` používá, aby workflow fungoval správně i bez `workflow_dispatch` vstupů (commit "Add fallback defaults..."). |
+| 2 | 2026-08-13 | 15.3 (push, s fallbackem) | x64 | ❌ selhalo | Checkout, vcpkg i "Build tools" proběhly správně (fallback fungoval). Spadl krok "Build OpenTTD" při kompilaci vcpkg závislosti **breakpad**: `error C2653: 'stdext'...`, `error C2065: 'checked_array_iterator'...`. Příčina: `windows-latest` teď nese mnohem novější MSVC, který odstranil starou STL kompatibilitu, kterou používá pinned verze breakpad portu. Detailní rozbor viz sekce "Zásadní poznatek: windows-latest není bezpečné..." níže. **Oprava:** `runs-on` připnuto na `windows-2022`. |
+| 3 | 2026-08-13 | 15.3 (workflow_dispatch) | x64 | ❌ selhalo (potvrzeno) | Spuštěno pro ověření, že `workflow_dispatch` API dispatch teď funguje (potvrzeno — `run_workflow` vrátil "queued" místo 404, ne 404). Běželo na `windows-latest` (ještě před opravou runneru) a spadlo na úplně stejném kroku a stejnou chybou jako #2 (breakpad `stdext::checked_array_iterator`), čímž potvrdilo diagnózu. |
+| 4 | 2026-08-13 | 15.3 (workflow_dispatch) | x64 | ✅ **první úspěšný build** | Na `windows-2022`, běžel 19:09–19:31 (~21 min). Všechny kroky prošly včetně breakpad symbolů, CPack bundlu a uploadu. 3 artefakty: `openttd-exe-x64` (6,48 MB, holý `openttd.exe`), `openttd-windows-x64` (11,2 MB zip bundle), `symbols-windows-x64` (72,3 MB breakpad symboly). Run ID `31734430192`. Toto je náš první důkaz, že celý pipeline od čistého zdroje 15.3 do funkčního `openttd.exe` funguje. |
+| 5 | 2026-08-13 | 15.3 (push) | x64 | ⏹️ zrušeno | Spustilo se automaticky přes tehdy ještě aktivní `push` trigger hned po úspěchu #4, ale hned zrušeno na žádost — chtěli jsme nejdřív ručně otestovat exe z #4, než pojedeme dál. |
+| 6 | 2026-08-13 | 15.3 (workflow_dispatch) | x64 | ⏹️ zrušeno | Ze stejného důvodu jako #5 — zrušeno, ať se nejdřív otestuje #4. |
+| 7 | 2026-08-13 | 15.3 (workflow_dispatch) | x64 | ✅ úspěch — **ověřena reprodukovatelnost** | Stejné vstupy jako #4 (15.3, x64, `windows-2022`), po přidání `-run<N>` do názvů artefaktů. Uživatel stáhl a otestoval `openttd-windows-x64-run7`: hra naběhla, mapa se vygenerovala, hra běžela. Druhý nezávislý úspěšný build ze stejného čistého zdroje → vanilla pipeline je reprodukovatelná, přesně jak jsme chtěli ověřit před úpravami kódu. |
+| 8 | 2026-08-13 | openttd/ (vendorováno v repu) | x64 | ❌ selhalo (infrastruktura, ne náš kód) | První build po vendorování zdroje 15.3 přímo do repa (`openttd/`) a přepnutí workflow, aby stavěl z něj. Checkout, výběr `SOURCE_DIR`, vcpkg — vše OK. Spadlo na `choco install pandoc`: `pandoc not installed. The package was not found with the source(s) listed.` — dočasný výpadek Chocolatey community registry, nesouvisí s vendorováním ani s naším kódem (stejný krok uspěl v #7). **Oprava:** `pandoc` je nepovinná závislost (jen COPYING.rtf), takže se jeho instalace teď nezdaří potichu (`\|\| echo ...`) místo pádu celého buildu. |
+| 9 | 2026-08-13 | openttd/ (vendorováno) | x64 | ✅ úspěch | Ověřuje vendorovaný zdroj (`openttd/` v tomto repu) i první refaktoring (`TryConsistSplice` extrakce z `CmdMoveRailVehicle`, beze změny chování) po opravě pandoc kroku. Velikost `openttd.exe` prakticky totožná s #4/#7 (6 479 212 B vs. 6 479 106 B — rozdíl odpovídá jen embedded verzi, protože `openttd/` nemá vlastní `.git`, takže `FindVersion.cmake` teď padá na fallback `norev0000` misto přesné verze z gitu — kosmetická věc, neřešíme teď). Od tohohle běhu se staví z vlastní upravené kopie zdroje, ne z upstreamu. **Ručně otestováno uživatelem:** mašinka jezdila správně podle příkazů mezi stanicemi, přetahování vagonků v depu fungovalo normálně — potvrzuje, že `TryConsistSplice` extrakce je funkčně bezezbytku identická s původním kódem. |
+| 10 | 2026-08-13 | openttd/ (couple příkaz) | x64 | ✅ zkompilováno, ❌ tlačítko netestovatelné | První build s `CMD_COUPLE_TRAINS` + tlačítkem "Couple" v okně vozidla (`WID_VV_COUPLE`). Zkompilovalo se čistě. Uživatel ale tlačítko ve hře vůbec neviděl (renderovací/layoutová věc, ne chyba kompilace — nedohledáváno dál) a testování mimo semafory/normální hru nemá cenu. **Rozhodnutí: zavrhnout test tlačítko, přejít na skutečné GUI přes Order okno** (viz FEATURE_DESIGN_COUPLING_TOW.md). |
+| 11 | 2026-08-14 | openttd/ (decouple order) | x64 | | Decouple jako vlastnost normálního "jet do stanice" příkazu — nová pole v `Order`, `MOF_DECOUPLE_COUNT`, save/load, spouštěcí háček v `Vehicle::LeaveStation`, nový řádek v Order okně s `ShowQueryString` dialogem. |
 
 Až tu budeme mít 2-3 zelené, identické běhy, přesuneme se k úpravám kódu
 (vlastní fork/branch zdrojáků OpenTTD v tomto repu) a workflow přesměrujeme
@@ -134,14 +186,96 @@ na náš vlastní zdroj místo `OpenTTD/OpenTTD`.
 
 ## Jak spustit build
 
+Poznámka k historii: zpočátku GitHub Actions REST API pro toto propojení
+(session ↔ GitHub) vracelo 404 i s Actions povoleným v nastavení
+repozitáře (viz run #1-#2, kde jsme workflow spouštěli přes `push` na
+branch jako workaround). Po chvíli se povolení propsalo a `workflow_dispatch`
+API dispatch (`run_workflow`) začal fungovat normálně (run #3 dál) — `push`
+trigger byl proto z workflow souboru odstraněn, protože zbytečně spouštěl
+build i při commitech, které se buildu netýkaly (např. run #5, zrušen jako
+duplicitní s #4).
+
 1. GitHub → repozitář `grrrrshadow/forclaude` → záložka **Actions**.
 2. Vlevo vybrat workflow **"Build OpenTTD (Windows)"**.
 3. Tlačítko **"Run workflow"** → ponechat výchozí hodnoty
    (`OpenTTD/OpenTTD`, `15.3`, `x64`) → **Run workflow**.
+   (Nebo přes GitHub API `workflow_dispatch` — takhle build spouštím já.)
 4. Po doběhnutí (běžně cca 15-25 minut kvůli kompilaci vcpkg závislostí a
-   samotné hry) stáhnout artefakt `openttd-exe-x64` ze stránky daného běhu.
+   samotné hry) stáhnout artefakt ze stránky daného běhu — **pro spuštění
+   hry stahuj `openttd-windows-x64` (celý CPack bundle), ne
+   `openttd-exe-x64`** (viz poznámka níže).
 
-## Otevřené otázky / TODO
+## Důležité: samotný `openttd.exe` nejde spustit izolovaně
+
+`install(DIRECTORY ... lang, baseset, ai, game ...)` v
+`cmake/InstallAndPackage.cmake` ukazuje, že `openttd.exe` očekává vedle
+sebe složky `lang/` (zkompilované jazykové řetězce), `baseset/`, `ai/` a
+`game/`. Artefakt `openttd-exe-x64` z našeho workflow (krok "Store raw
+exe") kopíruje jen `build/openttd.exe` samotné, bez těchto složek — spuštění
+samotného exe pak selže na chybějící "language" soubory. Tohle **není**
+problém s licencí/copyrightem originálních jazykových souborů (ty jsou
+plně open-source součást OpenTTD zdrojáku, na rozdíl od grafiky/zvuků
+originální Transport Tycoon Deluxe, kde licence skutečně hraje roli a
+proto existuje samostatný svobodný OpenGFX/OpenSFX projekt) — je to čistě
+o tom, že jsme poslali špatný artefakt.
+
+**Pro reálné spuštění a otestování hry vždy používej `openttd-windows-x64`**
+(CPack bundle, obsahuje exe + lang/baseset/ai/game pohromadě) — rozbalit
+celou složku a spustit `openttd.exe` zevnitř. `openttd-exe-x64` má smysl
+jen pro účely typu "porovnat checksum/verzi exe", ne pro spuštění.
+
+(Base grafika/zvuk pro samotnou hratelnost — OpenGFX apod. — v bundlu
+není, to je normální i u oficiálního instalátoru; hra si je nabídne
+stáhnout sama při prvním spuštění.)
+
+**Potvrzeno (2026-08-13):** `openttd-exe-x64` (run #4) skutečně obsahoval
+jen samotné `openttd.exe`, žádné složky navíc — sedí to s rozborem výše i
+s rozdílem velikosti (6,48 MB vs. 11,2 MB u plného bundlu). Samotný exe se
+nezkoušel spouštět izolovaně zvlášť — je to bit-identický soubor jako ten
+uvnitř bundlu, který už otestovaný byl (hra naběhla, mapa se vygenerovala).
+
+**Proč musí `lang/` být vždy ze stejné kompilace jako `openttd.exe`:**
+OpenTTD si hlídá konzistenci mezi zkompilovaným exe a jazykovými soubory —
+každý `.lng` soubor (vygenerovaný nástrojem `strgen` z `lang/*.txt` při
+buildu) nese identifikátor/verzi řetězců, kterou musí `openttd.exe` po
+startu ověřit; pokud nesedí (např. by se vzal `lang/` z jiné verze/buildu),
+OpenTTD danou language soubor odmítne jako neplatný. Nejde o licenční
+ochranu (jak by mohla znít chybová hláška při prvním dojmu), ale o
+kontrolu konzistence build artefaktů. Praktický důsledek pro nás: **při
+každé nové kompilaci (obzvlášť až budeme upravovat kód a měnit řetězce)
+musí uživatel vždy použít `lang/` z toho samého buildu**, nikdy
+recyklovaný ze staršího běhu.
+
+**Pojmenování artefaktů:** od tohoto commitu obsahují názvy artefaktů
+i číslo běhu (`-run<N>`, např. `openttd-exe-x64-run7`), aby bylo na první
+pohled jasné, ze kterého běhu který soubor pochází, i když jich bude na
+GitHubu najednou víc.
+
+## Ověřování OpenTTD 16.0-beta2 jako budoucí základ (2026-08-15)
+
+Než jsme se rozhodli přejít z vendorované 15.3 na 16.0-beta2 (kvůli
+skutečnému couvání vlaků a NewGRF kompatibilitě s CZTR — viz
+`FEATURE_DESIGN_COUPLING_TOW.md`), první krok byl stejný jako na
+začátku celého projektu: ověřit, že to umíme spolehlivě zkompilovat,
+než se čehokoliv dotkneme.
+
+**Run #22 (`source_repo=OpenTTD/OpenTTD`, `source_ref=16.0-beta2`) selhal:**
+```
+src/signal.cpp(42): error C2131: expression did not evaluate to a constant
+```
+Chyba je v `EnumBitSet<Trackdir>::EnumBitSet(std::initializer_list<...>)`
+— constexpr konstruktor, který náš pinovaný `windows-2022` runner
+(MSVC 19.44) neumí vyhodnotit za compile-time. Je to zrcadlový problém
+k tomu, co jsme řešili na začátku s breakpadem: tehdy byl
+`windows-latest` moc NOVÝ pro starý (2023) vcpkg port breakpadu, teď je
+náš pinovaný `windows-2022` moc STARÝ pro nový (2026) C++20 kód
+beta16. Beta16 navíc táhne svůj vlastní, novější vcpkg baseline, takže
+starý důvod pro pinování (breakpad) se na něj vůbec nevztahuje.
+
+**Oprava:** `runs-on` je teď podmíněný podle toho, jestli se použije
+`source_repo` override — vendorovaná 15.3 (výchozí) zůstává na
+`windows-2022` beze změny, externí zdroj (dnes používaný jen pro
+ověřování beta16) jede na `windows-latest`.
 
 - [ ] Spustit build poprvé a zaznamenat výsledek/čas/případné chyby do
       tabulky výše.

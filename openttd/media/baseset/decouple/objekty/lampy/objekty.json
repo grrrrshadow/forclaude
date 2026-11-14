@@ -1,0 +1,394 @@
+[
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_papirova",
+  "soubor": "lampa_papirova.glb",
+  "nazev": {
+   "cs": "papírová lucerna",
+   "en": "paper lantern"
+  },
+  "barvy": [
+   {
+    "cast": "papir",
+    "maska": "lampa_papirova_maska_papir.png",
+    "zacatek": 210,
+    "paleta": [
+     "E07A2A",
+     "E8C04A",
+     "B83A2A",
+     "3A6AB8",
+     "4A9A5A",
+     "7A4AA8",
+     "E8E4D8",
+     "D86A8A"
+    ]
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.182,
+    0.182
+   ],
+   "y": [
+    -0.182,
+    0.182
+   ],
+   "z": [
+    -0.6,
+    0.01
+   ]
+  },
+  "trojuhelniku": 1012,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "závěsná papírová lucerna jako v Morrowindu (vejčitá, tmavá dřevěná víčka a obruče, šňůra), 0,62 m, počátek v háčku (visí dolů, pod trám, strom nebo rameno); papír barvou číslem (barvy, cast papir); uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_na_sloupu",
+  "soubor": "lampa_na_sloupu.glb",
+  "nazev": {
+   "cs": "lampa na sloupu",
+   "en": "lamp post"
+  },
+  "barvy": [
+   {
+    "cast": "papir",
+    "maska": "lampa_na_sloupu_maska_papir.png",
+    "zacatek": 210,
+    "paleta": [
+     "E07A2A",
+     "E8C04A",
+     "B83A2A",
+     "3A6AB8",
+     "4A9A5A",
+     "7A4AA8",
+     "E8E4D8",
+     "D86A8A"
+    ]
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.18,
+    0.782
+   ],
+   "y": [
+    -0.182,
+    0.182
+   ],
+   "z": [
+    0.0,
+    2.86
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "dřevěný sloup 2,8 m na kamenné patce s ramenem a papírovou lucernou na konci ramene (0,6 m od sloupu po +x), k cestám a ulicím; počátek na zemi uprostřed sloupu; papír barvou číslem; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_nastenna",
+  "soubor": "lampa_nastenna.glb",
+  "nazev": {
+   "cs": "pochodeň na zeď",
+   "en": "wall torch"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.309
+   ],
+   "y": [
+    -0.05,
+    0.05
+   ],
+   "z": [
+    -0.105,
+    0.445
+   ]
+  },
+  "trojuhelniku": 556,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "pochodeň v železném držáku na zeď, šikmo od zdi; počátek na zdi v místě držáku, +x od zdi ven (u dveří domů ve výšce asi 2 m); plamen v uzlu noc (v noci hoří); uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "svicen",
+  "soubor": "svicen.glb",
+  "nazev": {
+   "cs": "svícen",
+   "en": "candlestick"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 3
+  },
+  "rozmer_m": {
+   "x": [
+    -0.125,
+    0.125
+   ],
+   "y": [
+    -0.078,
+    0.078
+   ],
+   "z": [
+    0.0,
+    0.456
+   ]
+  },
+  "trojuhelniku": 1588,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "mosazný trojramenný svícen se svíčkami, lampička na stůl, 0,45 m; plamínky v uzlu noc; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampicka",
+  "soubor": "lampicka.glb",
+  "nazev": {
+   "cs": "olejová lampička",
+   "en": "oil lamp"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.06,
+    0.06
+   ],
+   "y": [
+    -0.058,
+    0.058
+   ],
+   "z": [
+    0.0,
+    0.3
+   ]
+  },
+  "trojuhelniku": 852,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "olejová lampička s mosaznou nádobkou a skleněným cylindrem, 0,30 m; sklo a plamínek v uzlu noc; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "ohnivy_kos",
+  "soubor": "ohnivy_kos.glb",
+  "nazev": {
+   "cs": "ohnivý koš",
+   "en": "fire basket"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.34,
+    0.34
+   ],
+   "y": [
+    -0.331,
+    0.331
+   ],
+   "z": [
+    -0.003,
+    1.186
+   ]
+  },
+  "trojuhelniku": 1684,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "železný koš na třech nohách s uhlíky a ohněm, 1,0 m (k bránám, na náměstí, k tábořišti); uhlíky a oheň v uzlu noc; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_socik",
+  "soubor": "lampa_socik.glb",
+  "nazev": {
+   "cs": "lampa socík (sadovka s talířem)"
+  },
+  "barvy": [
+   {
+    "cast": "sokl",
+    "maska": "lampy_mesto_maska_sokl.png",
+    "zacatek": 204,
+    "paleta": [
+     "B9584F",
+     "C2645A",
+     "AD5049",
+     "C96F63",
+     "CDB46C",
+     "C2A85E",
+     "D4BE7E",
+     "B4B3AB",
+     "A5A49C",
+     "C2C3BE",
+     "8FA9BC",
+     "9DB4C4"
+    ],
+    "nahoda": "mesto"
+   },
+   {
+    "cast": "trubka",
+    "maska": "lampy_mesto_maska_trubka.png",
+    "zacatek": 204,
+    "paleta": [
+     "CBB262",
+     "BFA55A",
+     "E4E2DA",
+     "D8D6CC",
+     "A4A8AC",
+     "8B8F94",
+     "70747A"
+    ],
+    "nahoda": "mesto"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.36,
+    0.36
+   ],
+   "y": [
+    -0.36,
+    0.36
+   ],
+   "z": [
+    0.0,
+    5.35
+   ]
+  },
+  "trojuhelniku": 800,
+  "atlas_px": [
+   128,
+   80
+  ],
+  "okraje_textur": 16,
+  "pouziti_lampy": {
+   "klima": [
+    "mirne",
+    "subarkticke"
+   ],
+   "kde": [
+    "okraj_mesta",
+    "park"
+   ]
+  },
+  "autor": "Ondřej H. (Lampa_sadovka, SketchUp 19, ondrej_h_lampa_socik.zip od hráče), kryt patky lampa_01.stp od hráče; převod predmety/lampy_mesto.py",
+  "licence": "modely od hráče, licence neuvedena (jen pro tuto hru)",
+  "poznamka": "parková lampa socík 5,35 m: tenký ocelový sloup, nahoře plochý kulatý talíř 0,72 m (béžový difuzor, který v noci svítí, bílá stříška a šedé víko), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře); tvary změřené ze souboru Ondřeje H. a znovu vysoustružené s méně trojúhelníky (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“, hře „lampy budou mít v každým městě svoji barvu spodku, některý město bledě červený spodky lamp, jiný město šedý, jiný bledě modrý, třeba, a zbytek horní trubka lampy taky můžou být žluté bílé šedé.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá červená jako červená 1203, ne růžová, vybledlá žlutá, šedá starých nenatřených krytů, bledě modrá; hráč 4. 11.: „dej těm lampam vybledlý ne vyblitý barvy … v pozadí je 1203 a tam se mi podobná barva líbí. barva na spodku lampy má málo červené“; nahoda mesto: v každém městě jiná barva krytu); horní trubka barvou číslem (část trubka: sloup nad krytem, u lampy Davida H. i rameno až po hlavu; vybledlá žlutá, bílá, šedá; nahoda mesto); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_david_h",
+  "soubor": "lampa_david_h.glb",
+  "nazev": {
+   "cs": "pouliční lampa s ramenem"
+  },
+  "barvy": [
+   {
+    "cast": "sokl",
+    "maska": "lampy_mesto_maska_sokl.png",
+    "zacatek": 204,
+    "paleta": [
+     "B9584F",
+     "C2645A",
+     "AD5049",
+     "C96F63",
+     "CDB46C",
+     "C2A85E",
+     "D4BE7E",
+     "B4B3AB",
+     "A5A49C",
+     "C2C3BE",
+     "8FA9BC",
+     "9DB4C4"
+    ],
+    "nahoda": "mesto"
+   },
+   {
+    "cast": "trubka",
+    "maska": "lampy_mesto_maska_trubka.png",
+    "zacatek": 204,
+    "paleta": [
+     "CBB262",
+     "BFA55A",
+     "E4E2DA",
+     "D8D6CC",
+     "A4A8AC",
+     "8B8F94",
+     "70747A"
+    ],
+    "nahoda": "mesto"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.207,
+    3.068
+   ],
+   "y": [
+    -0.207,
+    0.207
+   ],
+   "z": [
+    0.0,
+    5.486
+   ]
+  },
+  "trojuhelniku": 502,
+  "atlas_px": [
+   128,
+   80
+  ],
+  "okraje_textur": 16,
+  "pouziti_lampy": {
+   "kde": [
+    "centrum",
+    "dalnice"
+   ]
+  },
+  "autor": "David H. (david_h_lampa.skp, SketchUp od hráče), kryt patky lampa_01.stp od hráče; převod predmety/lampy_mesto.py",
+  "licence": "modely od hráče, licence neuvedena (jen pro tuto hru)",
+  "poznamka": "pouliční lampa 5,5 m s obloukovým ramenem (rameno k +x, světlo na jeho konci 2,8 m od sloupu), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře), u sloupu 8 cm každý bod o 2 cm dál od osy; tam, kam nejde socík: do center měst a k dálnicím (klima hráč neřekl, tedy všude) (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“, hře „lampy budou mít v každým městě svoji barvu spodku, některý město bledě červený spodky lamp, jiný město šedý, jiný bledě modrý, třeba, a zbytek horní trubka lampy taky můžou být žluté bílé šedé.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá červená jako červená 1203, ne růžová, vybledlá žlutá, šedá starých nenatřených krytů, bledě modrá; hráč 4. 11.: „dej těm lampam vybledlý ne vyblitý barvy … v pozadí je 1203 a tam se mi podobná barva líbí. barva na spodku lampy má málo červené“; nahoda mesto: v každém městě jiná barva krytu); horní trubka barvou číslem (část trubka: sloup nad krytem, u lampy Davida H. i rameno až po hlavu; vybledlá žlutá, bílá, šedá; nahoda mesto); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
+ }
+]

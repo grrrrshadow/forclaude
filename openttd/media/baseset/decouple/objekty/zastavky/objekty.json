@@ -1,0 +1,29 @@
+[
+ {
+  "druh": "objekt",
+  "jmeno": "zastavka_znacka",
+  "soubor": "zastavka_znacka.glb",
+  "nazev": {
+   "cs": "značka zastávky",
+   "en": "bus stop sign"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.315,
+    0.315
+   ],
+   "y": [
+    -0.25,
+    0.25
+   ],
+   "z": [
+    0.0,
+    2.67
+   ]
+  },
+  "trojuhelniku": 251,
+  "autor": "Busstop (SketchUp, 3D Warehouse, autor v souboru není)",
+  "licence": "3D Warehouse General Model License",
+  "poznamka": "značka autobusové zastávky na sloupu; hra ji dává se svou zastávkou (GRF hry), objekt pro ni; počátek uprostřed půdorysu na zemi, otevřená strana (k silnici) k +x, dlouhá strana podél y; metry, skutečná velikost"
+ }
+]

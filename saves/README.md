@@ -1,0 +1,87 @@
+# Hráčovy savy ke scénám rigu
+
+Savy, na kterých se měří konkrétní situace (viz TEMATA.md). Rig je načítá
+přes `-g` a scény jsou v baterii.
+
+- `eka.sav` — odtahovka 28 v depu (125,78), dvě řady s mašinkami uvnitř na
+  nástupištích naproti (120,78) a (120,79). TEMATA 4.13 (odtahovka držená
+  nedosažitelnou poruchou) a Nedořešeno (porucha ve vratech depa odtahovky).
+- `vlak31.sav` — vlak 31 s „ignorovat návěst" před vjezdem do depa (97,73),
+  kam napůl vjíždí vlak 32; odtahovka 30 v depu (112,75). TEMATA 4.14.
+  Scéna `protlacit`: `testporucha 32` — porucha ve vratech, odtahovka 30 ji
+  protlačí dovnitř (TEMATA 4.15).
+- `porucha.sav` — vlak 2 porouchaný ve vratech depa (97,46), ohnutý přes
+  výhybku; odtahovky 3 a 4 zabrzděné. Pád „Disconnecting train" na #132
+  (TEMATA 4.15, druhé kolo). Scéna `poruchavrata`.
+- `porucha_nastupiste.sav` — vlak 2 porouchaný na nástupišti (98,54–56),
+  ocas na návěstidle (98,53); odtahovka 3 v depu (100,48) „nenajde cestu".
+  Scéna `poruchanastup` (TEMATA 4.16).
+- `porucha_za_vlakem.sav` — vlak 2 porouchaný na nástupišti (98,54–56),
+  za ním stojí mašinka 5 na (98,50); odtahovka 4 v depu (97,46) musí jet
+  předem, kolem přes jednosměrku (98,57). TEMATA 4.17 (zeď), 4.18 (srážky
+  bez odtahovky), 4.19 (orientace po složení). Scéna `poruchazavlakem`.
+- `emu.sav`, `emu_reverz.sav` — dvě depa, osm dvouhlavých jednotek, čtyři
+  čekají na spojení, čtyři jedou spojit (v `emu_reverz` reverzně), pak
+  odpojit a do depa. TEMATA 2.35. Scény `emu`, `emujz`.
+- `loko_obou_stran.sav` — mašinka–vůz–mašinka z obyčejných lokomotiv:
+  17–20 čekají na spojení, 21–24 jsou sběračky (odpojit vše na stanici 3,
+  pak depo). „Odpojit celý vlak" (TEMATA §3). Scény `lokonula` (nechat si
+  0) a `lokocely` (celý vlak): 17–20 pustit, po 8 000 ticích 21 naklonovat
+  3×.
+- `odtah_peron.sav` — porucha 37 uprostřed nástupiště (108–111,72), vedle
+  souběžné nástupiště téže stanice; odtahovka (v rigu vlak 36 přes
+  `testodtahovka`) z depa (97,73). TEMATA 4.20. Scéna `odtahperon`.
+- `new1.sav` — nádraží se dvěma nakládacími perony za nádražním
+  směrováním „load" a třetím za „peron3", kde stavitelka (vlak 2) zakládá
+  dlouhou řadu; klasické směrování „2" na slepé koleji, vlak 1 vozí vozy z
+  depa (106,92). TEMATA 2.38 (založit za směrováním), 4.22 (puštěné držení
+  bez záboru). Scéna `zalozsmer`. Otevřené: odtahovka na vagonky (§16).
+- `obmena.sav` — čtyři vlaky čekají na nástupišti (151,166–169), dva
+  couvají; mašinky mají nastavenou náhradu, depa (139,167) a (164,167),
+  směrování „0" na slepé koleji (147,160). TEMATA 4.23 (směr přes obměnu:
+  `testskip 1`, `testskip 2`) a §16 (crash obměny nad odtahovkou
+  s poruchou: `testpostav 139 167 8 odtahovka`, `testporucha 1`).
+- `obmenaporucha.sav` — totéž nádraží; vlak 2 porouchaný na nástupišti
+  (151,167), odtahovka 5 zabrzděná v depu (164,167), seznam náhrad
+  nastavený. Po načtení lhůta poruchy vyprší a vlak 2 se opraví sám; na
+  (149,170) se porouchá znovu a `testza 10 testbrzda 5` pro něj odtahovku
+  pošle pro tu druhou. Odtahovka puštěná hned (`testzatik 10 testbrzda 5`)
+  jede pro poruchu na výhybce, narovná ji přes nástupiště a tlačí do depa
+  (139,167). TEMATA 4.24 (obměna nad vlakem, který veze jiný vlak; otočka
+  po spojení `testzatik 2450 testotoc 5`) a 4.25 (roztržená porucha:
+  lože přes nástupiště, krátké dotažení). Scény `odtahotoc`,
+  `odtahvyhybka`.
+- `rada_s_masinkou.sav` — řada vagonků s mašinkou 42 uvnitř (špatně
+  připojená lokomotiva, chyba hráče) visí ze západního konce slepého
+  nástupiště (32–34,67) na oblouk (31,67); hráč pro ni zavolal odtahovku 7
+  z depa (26,64). Dva vlaky hra při načtení hlásí jako „neplatnou délku“
+  (spojené o pixel blíž starším buildem). Scéna `radasmasinkou` (§109).
+- `rig.sav` — hráčův zkušební polygon (9. 9., druhé vydání): nádraží 1
+  uprostřed (96–98,17–22) s výjezdy na obě strany, nádraží 2 na západě a 3
+  na východě, dvoukolejný koridor po y=17/18. Depa: 0 (86,17) vlaky 1–8,
+  3 (111,18) 9–16, 1 (111,17) 17–24, 2 (86,18) 25–32, 5 (87,16) 33–40
+  a 4 (110,16) 57–64 (dvouhlavé jednotky), 9 (89,16) 85–92 a 10 (108,16)
+  77–84 (mašinka–vůz–mašinka), 8 = C (111,19) 65–76: trojice bez čudlíku /
+  reversní chod / automaticky, dvouhlavé jednotky 65–73 a samotné mašinky
+  74–76, rozkaz nádraží 1 → zpět do depa C — dopředu vede jen dlouhý okruh
+  přes nádraží 2, zpátky rovnou. TEMATA 2.41 (automatika).
+  V každém z dep 5, 4, 9 a 10 čtyři čekají a čtyři sbírají; sběračky
+  odkládají rozkazem **odpojit celý vlak**, ne „odpojit vše" — tak se
+  složí zpátky celá jednotka, ne jen její vozy. Stará depa 6 (88,16) a
+  7 (109,16) zůstala prázdná po vlacích 41–56.
+  Nejvyšší číslo vlaku v savu je 92, takže první klon dostane 93; scény,
+  které klony pouštějí jménem, na tom stojí.
+  Scény `rigC2h`, `rigC1m`, `rigD0`…`rigD5`, matice `mx`…`mv`. Šest vlaků
+  puštěných naráz se zamkne v křižovatce u dep C (PBS bez otáčení
+  u návěstí) — pouštět s rozestupem.
+- `panicky_krizovatka.sav`, `panicky_krizovatka2.sav` (o minutu později) —
+  dvojitá úhlopříčka u stanice 6, na (116,38)–(118,40) dvě souběžné koleje
+  na jednom políčku. Vlak 3 stojí u (118,41), vlak 8 u (117,38), v druhém
+  savu vlak 3 u (117,38) a vlak 9 zeleně u (119,41): zamluvené koleje bez
+  vlaku (116,38), resp. (117,39)+(118,39), nechané úklidem nezdařené
+  rezervace, který se zastavil o vlak na souběžné koleji. Scény
+  `krizovatka`, `krizovatka2` (TEMATA_RUZNE §117).
+- `panicky_vlak6.sav` — vlak 6 s „připojit plné, železná ruda, 9, založit“ na
+  cestě ke stanici 9, kde stojí prázdná řada (35,60) s „nenakládat“ (řada
+  vožená po kouscích k nakládce). Starý filtr ji bral za plnou („hotová“).
+  Scéna `vlak6plne` (TEMATA_RUZNE §119).

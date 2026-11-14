@@ -1,0 +1,585 @@
+/*
+ * This file is part of ottd Decouple by Karel Mácha, a game built on OpenTTD.
+ * Copyright (C) 2026 Karel Mácha. All rights not granted by the licence below are reserved.
+ * This file is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2 only.
+ * It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with it. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ * The licence grants no right to the name "ottd Decouple" or its logo.
+ */
+
+/**
+ * @file cab_view_gui.cpp Driving a vehicle from its cab (cab_view.h): the arrows, the horn, the lights, the route,
+ * the cargo, the camera and the look about with the right button -- for the view from the first person in a vehicle
+ * (E gets in). The window of the cab view of its own is gone (the player, test4: "remove the cab view icon from the
+ * window of the train, the car, the plane, the ship; there will be no cab view, E gets in").
+ */
+
+#include "stdafx.h"
+#include "cab_view.h"
+#include "window_gui.h"
+#include "window_func.h"
+#include "gfx_func.h"
+#include "strings_func.h"
+#include "vehicle_base.h"
+#include "vehicle_func.h"
+#include "vehicle_gui.h"
+#include "viewport_func.h"
+#include "command_func.h"
+#include "vehicle_cmd.h"
+#include "openttd.h"
+#include "company_func.h"
+#include "cab_drive.h"
+#include "roadveh.h"
+#include "road.h"
+#include "station_map.h"
+#include "tunnel_map.h"
+#include "tile_map.h"
+#include "order_base.h"
+#include "direction_func.h"
+#include "gfx_func.h"
+#include "timer/timer.h"
+#include "timer/timer_window.h"
+#include "blitter/factory.hpp"
+#include "core/backup_type.hpp"
+#include "aircraft.h"
+#include "airport.h"
+#include "ship.h"
+#include "train.h"
+#include "engine_base.h"
+#include "sound_func.h"
+#include "newgrf_sound.h"
+#include "widgets/first_person_widget.h"
+#include "video/video_driver.hpp"
+#include "fileio_func.h"
+#include "map_drag.h"
+#include "three_d.h"
+#include "settings_type.h"
+#include "core/geometry_func.hpp"
+#include "simtrains_cab.h"
+#include "3rdparty/fmt/format.h"
+
+#include "table/strings.h"
+
+#include <array>
+#include <climits>
+#include <optional>
+#include <cmath>
+#include <ctime>
+
+#include "safeguards.h"
+
+/**
+ * Whether the player can take a vehicle's wheel from its cab now and drive it freely (CmdCabDrive()): a road vehicle on
+ * the road (not a tram, not in its depot, a tunnel or a bay -- nor at a tunnel's mouth, which the game drives it into
+ * and through, RoadVehFreeStep()), a ship on the water (not in its shed or a tunnel), an aircraft in the air (not taking
+ * off or landing). A train follows its rails: only its speed is the player's.
+ */
+static bool CabCanDriveFreely(const Vehicle *v)
+{
+	switch (v->type) {
+		case VehicleType::Road: {
+			const RoadVehicle *rv = RoadVehicle::From(v);
+			return !RoadTypeIsTram(rv->roadtype) && !rv->IsInDepot() && rv->state != RVSB_WORMHOLE && !IsBayRoadStopTile(rv->tile) && !rv->IsCarried() && !IsTunnelTile(rv->tile);
+		}
+		case VehicleType::Ship: {
+			const Ship *sh = Ship::From(v);
+			return !sh->IsInDepot() && sh->state != Track::Wormhole;
+		}
+		case VehicleType::Aircraft:
+			return Aircraft::From(v)->state == FLYING;
+		default:
+			return false;
+	}
+}
+
+/**
+ * Left or right from the cab (its arrows): the heading driven freely, a ship's or an aircraft's in the air, a small
+ * angle. A road vehicle that cannot be driven freely yet (its depot, a bay, a tunnel) turns as soon as it can, the
+ * arrow held; no turn at the next junction (the player, 27. 10.: "right arrow and it turns right at the next junction,
+ * that was not used and should not be there").
+ * @return whether it turns by a step again while held
+ */
+bool CabTurn(const Vehicle *v, bool left)
+{
+	if (v->cab_free || v->type == VehicleType::Ship || (v->type == VehicleType::Aircraft && CabCanDriveFreely(v))) {
+		/* Driven freely, a ship or an aircraft in the air: the heading a small angle left or right (cab_drive.h). */
+		Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(left ? CabDriveOp::Left : CabDriveOp::Right));
+		return true;
+	}
+	return v->type == VehicleType::Road;
+}
+
+/**
+ * The throttle or the brake from the cab: the brake lowers the speed the vehicle is held to by a step from where it is
+ * now; the throttle raises it, and past the vehicle's own top speed lets it go free again (the limit 0).
+ */
+void CabSpeed(const Vehicle *v, bool faster)
+{
+	int max_speed = std::max(1, v->GetDisplayMaxSpeed());
+	int step = std::max(5, max_speed / 10);
+	int now = v->GetDisplaySpeed();
+	int limit = v->cab_speed_limit;
+	int base = limit != 0 ? std::min(limit, now) : now;
+	int next;
+	if (!faster) {
+		next = std::max(CAB_SLOWEST, base - step);
+	} else {
+		base = limit != 0 ? limit : now;
+		next = base + step;
+		if (next >= max_speed) next = 0;
+	}
+	Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(next));
+}
+
+/** The vehicle started or stopped from the cab. */
+void CabStartStop(const Vehicle *v)
+{
+	Command<Commands::StartStopVehicle>::Post(STR_ERROR_CAN_T_STOP_START_TRAIN + to_underlying(v->type), v->tile, v->index, false);
+}
+
+/**
+ * The horn of a car (the player, 17. 10.: "can the car honk?"; the sound from him: "a horn for the car"): the sounds
+ * of the sets have none, only the engines starting at a stop, so it is the game's own, baseset/decouple/zvuky/
+ * klakson.wav (GetGameOwnSound()). Without the file the car has no horn.
+ */
+static std::optional<SoundID> CarHornSound()
+{
+	return GetGameOwnSound("decouple" PATHSEP "zvuky" PATHSEP "klakson.wav", Subdirectory::Baseset);
+}
+
+/**
+ * The horn from the cab (I; the player, 17. 10.: "in the train the key I hoots; can the car honk?"): a train's
+ * whistle or horn as it has leaving a station, a ship's as it leaves its quay, a car's horn. Heard as from inside.
+ */
+void CabHorn(const Vehicle *v)
+{
+	NoteCabHorn(v);
+	switch (v->type) {
+		case VehicleType::Train: {
+			static const SoundFx whistle[] = {SND_04_DEPARTURE_STEAM, SND_0A_DEPARTURE_TRAIN, SND_0A_DEPARTURE_TRAIN, SND_47_DEPARTURE_MONORAIL, SND_41_DEPARTURE_MAGLEV};
+			SndPlayFx(whistle[to_underlying(RailVehInfo(v->engine_type)->engclass)]);
+			break;
+		}
+		case VehicleType::Road:
+			if (auto horn = CarHornSound(); horn.has_value()) SndPlayFx(*horn);
+			break;
+		case VehicleType::Ship:
+			SndPlayFx(ShipVehInfo(v->engine_type)->sfx);
+			break;
+		default:
+			break;
+	}
+}
+
+/**
+ * The lights switched from the cab (F): on if they are off now (by day too), off if they are on (at night too). Only
+ * how this computer draws the vehicle (Vehicle::cab_lights, VehicleLightsOn()).
+ */
+void CabToggleLights(const Vehicle *v)
+{
+	Vehicle *front = Vehicle::Get(v->First()->index);
+	front->cab_lights = VehicleLightsOn(front) ? Vehicle::CAB_LIGHTS_OFF : Vehicle::CAB_LIGHTS_ON;
+	MarkWholeScreenDirty();
+}
+
+/**
+ * The button and the key of the route (the player, 17. 10.: "as soon as you get into the cab you drive; instead of the
+ * off road there is the button 'go your route'"): to its route -- back to its orders from where it is driven freely,
+ * the turn or the heading asked for forgotten, held to no speed --, or the wheel taken again.
+ */
+void CabToggleRoute(const Vehicle *v, CabArrows &arrows)
+{
+	if (arrows.route) {
+		arrows.route = false;
+		arrows.free_wait = 0;
+		return;
+	}
+	arrows.route = true;
+	if (v->owner != _local_company) return;
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	/* A train driven from its desk goes its route again: the game drives it (simtrains_cab.h). */
+	SimtrainsCabLetGo(v);
+	if (v->cab_free) {
+		if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
+	} else if (v->cab_heading != Direction::Invalid) {
+		Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+	}
+	if (v->cab_speed_limit != 0) Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
+}
+
+/**
+ * Load or unload from the cab (the player, 27. 10.: "load, unload"; CmdCabCargo()): begun, or stopped when it does so
+ * already.
+ */
+void CabCargo(const Vehicle *v, bool unload)
+{
+	const uint8_t op = unload ? Vehicle::CAB_CARGO_UNLOAD : Vehicle::CAB_CARGO_LOAD;
+	Command<Commands::CabCargo>::Post(unload ? STR_ERROR_CAB_CAN_T_UNLOAD : STR_ERROR_CAB_CAN_T_LOAD, v->tile, v->index, v->cab_cargo == op ? Vehicle::CAB_CARGO_NONE : op);
+}
+
+/**
+ * Whoever steers from the cab lets go when leaving it (the cab view closed, the walker getting out): a ship or a road
+ * vehicle goes back to its orders; driven freely, back from the next road or course, and a road vehicle out in the
+ * fields stops there, not to wander off without anyone at the wheel.
+ */
+void CabLetGo(const Vehicle *v)
+{
+	if (_game_mode != GameMode::Normal || _exit_game || _switch_mode != SwitchMode::None || v == nullptr || v->owner != _local_company) return;
+	/* A train driven from its desk: the game drives it again (simtrains_cab.h). */
+	if (v->type == VehicleType::Train) {
+		SimtrainsCabLetGo(v);
+		return;
+	}
+	if (!v->IsCabSteered()) return;
+	if (v->cab_free) {
+		if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
+		if (v->type == VehicleType::Road && !IsTileType(v->tile, TileType::Road) && !v->vehstatus.Test(VehState::Stopped)) {
+			Command<Commands::StartStopVehicle>::Post(v->tile, v->index, false);
+		}
+	} else {
+		Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+	}
+}
+
+/** Down held so long with the vehicle stopped: it goes backwards (CabArrows::Drive()). */
+static constexpr int CAB_BACKWARDS_HOLD_MS = 800;
+/** Up pressed and the vehicle standing so long: why, into jizda.log (CabStandingRecord()). */
+static constexpr int CAB_STILL_MS = 2000;
+/** And no more lines than so many in it. */
+static constexpr int CAB_STILL_LINES = 200;
+
+std::string DescribeRoadVehFreeAhead(const Vehicle *v);
+
+/**
+ * A vehicle driven from the cab that stands though Up was pressed (the player, 23. 10.: "I stopped the car in front
+ * of the depot, walked to it in the first person view and wanted to drive; it only turned left and right"): all that
+ * keeps a vehicle where it is, a line in jizda.log beside the saved games' folder, so that the cause is seen.
+ */
+static void CabStandingRecord(const Vehicle *v, const CabArrows &arrows, DirectionKeys now)
+{
+	static std::optional<FileHandle> file;
+	static int lines = 0;
+	if (lines >= CAB_STILL_LINES) return;
+	if (!file.has_value()) {
+		file = FileHandle::Open(FioDiaryPath("jizda.log"), "w");
+		if (!file.has_value()) {
+			lines = CAB_STILL_LINES;
+			return;
+		}
+		fmt::print(*file, "OpenTTD Decouple: auto z kabiny stoji, ackoli byla zmacknuta sipka nahoru (radek po 2 s stani).\n");
+	}
+	const std::time_t t = std::time(nullptr);
+	char clock[16];
+	std::strftime(clock, sizeof(clock), "%H:%M:%S", std::localtime(&t));
+	const Window *aw = ArrowsWindow();
+	std::string order = "zadny";
+	if (v->current_order.IsType(OT_GOTO_DEPOT)) order = "do depa";
+	if (v->current_order.IsType(OT_GOTO_STATION)) order = "na stanici";
+	if (v->current_order.IsType(OT_LOADING)) order = "nakladka";
+	if (v->current_order.IsType(OT_GOTO_WAYPOINT)) order = "pres bod";
+	std::string road = "-";
+	if (v->type == VehicleType::Road) {
+		const RoadVehicle *rv = RoadVehicle::From(v);
+		road = fmt::format("stav {:#x} v depu {} tramvaj {} nalozeno na vlaku {} ", rv->state, rv->IsInDepot() ? "ano" : "ne", RoadTypeIsTram(rv->roadtype) ? "ano" : "ne", rv->IsCarried() ? "ano" : "ne");
+	}
+	fmt::print(*file, "{} vozidlo {} typ {} motor {} | moje {} stoji {} rozbite {} (porucha {}) zniceno {} | volne {} zpet {} yaw {} smer {} | omezeni {} rychlost {} max {} | dlazdice {},{} typu {} | {}| pred nim: {} | rozkaz {} | trasa {} | sipky {:#x} okno sipek {} | naposled: {}\n",
+			clock, v->unitnumber, to_underlying(v->type), v->engine_type, v->owner == _local_company ? "ano" : "NE", v->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne",
+			v->breakdown_ctr == 1 ? "ANO" : "ne", v->breakdown_ctr, v->vehstatus.Test(VehState::Crashed) ? "ANO" : "ne",
+			v->cab_free ? "ano" : "ne", v->cab_rejoin ? "ano" : "ne", v->cab_yaw, to_underlying(v->direction),
+			v->cab_speed_limit, v->GetDisplaySpeed(), v->GetDisplayMaxSpeed(), TileX(v->tile), TileY(v->tile), to_underlying(GetTileType(v->tile)),
+			road, DescribeRoadVehFreeAhead(v), order, arrows.route ? "ANO (sipky neridi)" : "ne", now.base(),
+			aw == nullptr ? "zadne" : "oci", arrows.done.empty() ? "-" : arrows.done);
+	fflush(*file);
+	lines++;
+}
+
+/** The arrows held: what is pressed now does it, what is held does it again in its time. Only the owner drives. */
+
+void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
+{
+	const DirectionKeys pressed = now;
+	const bool mine = v != nullptr && v->owner == _local_company && !v->vehstatus.Test(VehState::Crashed);
+	/* Going its route: an arrow pressed takes the wheel, driven freely from here (the player, 27. 10.: "off road by
+	 * default as soon as the player touches the arrows; he can go back to the route at any time"). */
+	if (mine && this->route) {
+		for (DirectionKey key : {DirectionKey::Left, DirectionKey::Up, DirectionKey::Right, DirectionKey::Down}) {
+			if (!pressed.Test(key) || this->held.Test(key)) continue;
+			this->route = false;
+			this->free_wait = 0;
+			break;
+		}
+	}
+	if (!mine || this->route) now = {};
+	/* As the player's click: the local company's command (the windows' timers run where nobody is). */
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	/* At the wheel: as soon as the vehicle can be driven freely, it is (out of its depot, an aircraft in the air);
+	 * asked once in half a second while the command is on its way. */
+	if (v != nullptr && v->owner == _local_company && !this->route && !v->vehstatus.Test(VehState::Crashed) && (!v->cab_free || v->cab_rejoin)) {
+		if ((this->free_wait -= ms) <= 0 && (v->cab_free || CabCanDriveFreely(v))) {
+			this->free_wait = 500;
+			Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Free));
+		}
+	}
+	const bool flying = v != nullptr && v->type == VehicleType::Aircraft;
+	/* A road vehicle driven freely goes backwards too (the player, 27. 10.: "Down to brake and then reverse"): Down
+	 * brakes it to the slowest and then stops it; held on with it stopped (CAB_BACKWARDS_HOLD_MS), it goes backwards
+	 * while it is held, at most Vehicle::CAB_REVERSE_SPEED, and stops as it is let go; Up stops it and turns it
+	 * forwards again. */
+	const bool backwards_too = v != nullptr && v->type == VehicleType::Road && v->cab_free && !v->cab_rejoin;
+	if (this->backwards_wait > 0) this->backwards_wait -= ms;
+	auto arrow = [&](DirectionKey key) {
+		switch (key) {
+			case DirectionKey::Left:
+			case DirectionKey::Right:
+				/* A train follows its rails. */
+				if (v->type == VehicleType::Train) return false;
+				return CabTurn(v, key == DirectionKey::Left);
+			case DirectionKey::Up:
+			case DirectionKey::Down:
+				/* An aircraft: its height instead of its speed (the player, 17. 10.). */
+				if (flying) {
+					if (!v->cab_free) return false;
+					Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(key == DirectionKey::Up ? CabDriveOp::Up : CabDriveOp::Down));
+					return true;
+				}
+				if (backwards_too && v->cab_reverse) {
+					if (key == DirectionKey::Down) {
+						/* Backwards: on again from where it stopped. */
+						if (v->vehstatus.Test(VehState::Stopped)) CabStartStop(v);
+						this->done = "dolu: couva";
+						return true;
+					}
+					/* Up: stopped, forwards again; the next Up starts it. */
+					if (this->backwards_wait <= 0) {
+						Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Forward));
+						if (!v->vehstatus.Test(VehState::Stopped)) CabStartStop(v);
+						this->backwards_wait = 500;
+					}
+					this->done = "nahoru: z couvani dopredu";
+					return true;
+				}
+				if (backwards_too && key == DirectionKey::Down) {
+					/* Stopped already: held on, it goes backwards (below). At the slowest: it stops. */
+					if (v->vehstatus.Test(VehState::Stopped)) return true;
+					if (v->cab_speed_limit != 0 && v->cab_speed_limit <= CAB_SLOWEST) {
+						CabStartStop(v);
+						this->done = "dolu: zastavit";
+						return true;
+					}
+				}
+				if (key == DirectionKey::Up && v->vehstatus.Test(VehState::Stopped)) {
+					CabStartStop(v);
+					this->done = fmt::format("nahoru: rozjet ({})", v->vehstatus.Test(VehState::Stopped) ? "NEPOVEDLO SE, stoji dal" : "rozjeto");
+					return false;
+				}
+				CabSpeed(v, key == DirectionKey::Up);
+				this->done = fmt::format("{}: omezeni {}", key == DirectionKey::Up ? "nahoru" : "dolu", v->cab_speed_limit);
+				return true;
+		}
+		return false;
+	};
+	if (this->up_tapped != INT_MAX) this->up_tapped = std::min(this->up_tapped + ms, INT_MAX - 1);
+	for (DirectionKey key : {DirectionKey::Left, DirectionKey::Up, DirectionKey::Right, DirectionKey::Down}) {
+		int &left = this->repeat_in[to_underlying(key)];
+		if (!now.Test(key)) continue;
+		/* Turning and an aircraft's height: about seven steps a second (a quarter turn held a second and a quarter);
+		 * the speed three. */
+		const int again = key == DirectionKey::Left || key == DirectionKey::Right || flying ? 150 : 300;
+		if (!this->held.Test(key)) {
+			if (key == DirectionKey::Up) this->up_tapped = 0;
+			left = arrow(key) ? again + 150 : INT_MAX;
+		} else if (left != INT_MAX && (left -= ms) <= 0) {
+			left = arrow(key) ? again : INT_MAX;
+		}
+	}
+	/* Ctrl+Up (the first person's OnKeyPress()): full speed (no limit), kept with the arrow let go, till braked -- once
+	 * it goes (a stopped one is started by the Up held with Ctrl); not up in the air, nor backwards. Up pressed twice
+	 * no longer does it (the player's test9: "now it is under Ctrl and the arrow"). */
+	if (this->full_asked) {
+		if (v == nullptr || !mine || flying || (backwards_too && v->cab_reverse)) {
+			this->full_asked = false;
+		} else if (!v->vehstatus.Test(VehState::Stopped)) {
+			Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
+			this->done = fmt::format("ctrl nahoru: plna rychlost (omezeni {})", v->cab_speed_limit);
+			this->full_asked = false;
+			this->repeat_in[to_underlying(DirectionKey::Up)] = INT_MAX;
+		} else if (this->up_tapped > 1500) {
+			/* Stopped still a while after the Up pressed with Ctrl (which starts it): nothing asked any more. */
+			this->full_asked = false;
+		}
+	}
+	/* Down held with it stopped: backwards after a while; backwards and Down let go: it stops. */
+	if (backwards_too && !v->cab_reverse && now.Test(DirectionKey::Down) && v->vehstatus.Test(VehState::Stopped)) {
+		if ((this->down_still_ms += ms) >= CAB_BACKWARDS_HOLD_MS && this->backwards_wait <= 0) {
+			Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Reverse));
+			CabStartStop(v);
+			this->backwards_wait = 500;
+			this->down_still_ms = 0;
+			this->done = "dolu drzeno: couvat";
+		}
+	} else {
+		this->down_still_ms = 0;
+	}
+	if (backwards_too && v->cab_reverse && this->held.Test(DirectionKey::Down) && !now.Test(DirectionKey::Down) && !v->vehstatus.Test(VehState::Stopped)) {
+		CabStartStop(v);
+		this->done = "dolu pusteno: stat";
+	}
+	/* Going its route, the arrows held so: let go and pressed again they take the wheel. */
+	this->held = this->route ? pressed : now;
+	/* Up pressed, and it stands: after two seconds of that, why (CabStandingRecord()); once till it moves. */
+	if (v != nullptr && !flying) {
+		if (v->cur_speed != 0) {
+			this->still_ms = 0;
+			this->still_told = false;
+		} else if (pressed.Test(DirectionKey::Up) || this->up_tapped < CAB_STILL_MS) {
+			if (!this->still_told && (this->still_ms += ms) >= CAB_STILL_MS) {
+				CabStandingRecord(v, *this, pressed);
+				this->still_told = true;
+			}
+		} else {
+			this->still_ms = 0;
+		}
+	}
+}
+
+/**
+ * A picture of the view from the eyes onto the screen, within the clipping of the moment (the cab view's, the first
+ * person's): its pixels; or, drawn by the graphics card and shown straight from it (CabViewPicture::shown), a hole of
+ * pixels of alpha 0 where it is, the video driver laying the card's picture into it (VideoDriver::ShowThreeDPicture()):
+ * what the window draws over it after stays.
+ * @param w whose picture it is
+ * @param px where in the window, left
+ * @param py top
+ * @param tint laid over it by its alpha (Colour::data), 0 none (hurt)
+ */
+void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, uint32_t tint)
+{
+	const DrawPixelInfo *dpi = _cur_dpi;
+	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
+	int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
+	int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
+	if (x0 >= x1 || y0 >= y1) return;
+	/* Written straight into the screen: not the palette's colours of what was under it. The picture or the hole for the
+	 * card's overwrites every pixel, so the indexes are only forgotten, the pixels not read (Blitter::ClearAnimation(),
+	 * cota PRO-HRU.md section 7: reading them cost the phone the most of 207 ms a frame). */
+	blitter->ClearAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
+	const Rect on_screen{w.left + px, w.top + py, w.left + px + pic.width - 1, w.top + py + pic.height - 1};
+	if (pic.shown != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&w, on_screen, pic.shown, tint, false, 0, 0, 0, {0.0f, 0.0f, 1.0f, 1.0f}, WindowPlaceFromBack(&w))) {
+		for (int y = y0; y < y1; y++) {
+			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+			std::fill(dst, dst + (x1 - x0), 0u);
+		}
+		return;
+	}
+	VideoDriver::GetInstance()->HideThreeDPicture(&w);
+	if (pic.pixels.size() != static_cast<size_t>(pic.width) * pic.height) return;
+	const Colour tc(tint);
+	const uint a = tint == 0 ? 0 : tc.a;
+	if (a == 0) {
+		/* Untinted: the rows as they are, made opaque -- a pixel at a time through Colour this cost the phone tens of ms
+		 * a frame (the player's log of 25. 10.: the canvas 61 ms each time it was drawn). */
+		const uint32_t opaque = Colour(0, 0, 0, 255).data;
+		for (int y = y0; y < y1; y++) {
+			const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width + (x0 - px)];
+			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+			std::transform(src, src + (x1 - x0), dst, [opaque](uint32_t c) { return c | opaque; });
+		}
+		return;
+	}
+	for (int y = y0; y < y1; y++) {
+		const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
+		uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+		for (int x = x0; x < x1; x++, dst++) {
+			Colour sc(src[x - px]);
+			if (a != 0) {
+				sc = Colour(static_cast<uint8_t>((sc.r * (255 - a) + tc.r * a) / 255), static_cast<uint8_t>((sc.g * (255 - a) + tc.g * a) / 255), static_cast<uint8_t>((sc.b * (255 - a) + tc.b * a) / 255));
+			}
+			*dst = Colour(sc.r, sc.g, sc.b).data;
+		}
+	}
+}
+
+static constexpr double CAB_LOOK_MOUSE = 0.005;   ///< radians a pixel the hand moves, as from the eyes
+static constexpr double CAB_LOOK_PITCH_MAX = 0.8; ///< up or down at most, radians
+
+/** The camera of the cab chosen (the setting gui.cab_camera). */
+CabCamera CabCameraChosen()
+{
+	return static_cast<CabCamera>(std::min<uint8_t>(_settings_client.gui.cab_camera, to_underlying(CabCamera::Roof)));
+}
+
+/** The next camera of the cab, for both windows; the head looks ahead again (the player, 28. 10.). */
+void CabNextCamera(CabViewCamera &camera)
+{
+	_settings_client.gui.cab_camera = (to_underlying(CabCameraChosen()) + 1) % (to_underlying(CabCamera::Roof) + 1);
+	camera.head = 0;
+	camera.pitch = 0;
+	camera.eye_dz = -1;
+	SetWindowClassesDirty(WindowClass::FirstPerson);
+	SetWindowClassesDirty(WindowClass::GameOptions);
+}
+
+/** What the button Camera says: the camera chosen. */
+std::string CabCameraText()
+{
+	return GetString(STR_CAB_VIEW_CAMERA, STR_CONFIG_SETTING_CAB_CAMERA_INSIDE + to_underlying(CabCameraChosen()));
+}
+
+/** As big as the button Camera's text is for any camera: it does not change its size as the cameras go round. */
+Dimension CabCameraTextSize()
+{
+	Dimension d{0, 0};
+	for (uint8_t c = 0; c <= to_underlying(CabCamera::Roof); c++) d = maxdim(d, GetStringBoundingBox(GetString(STR_CAB_VIEW_CAMERA, STR_CONFIG_SETTING_CAB_CAMERA_INSIDE + c)));
+	return d;
+}
+
+/** The right button went down on the picture from the cab. */
+void CabLook::Press(CabViewCamera &camera)
+{
+	const auto now = std::chrono::steady_clock::now();
+	if (!this->looked && now - this->clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
+		camera.head = 0;
+		camera.pitch = 0;
+		this->clicked = {};
+	} else {
+		this->clicked = now;
+	}
+	this->looked = false;
+	_scrolling_viewport = true;
+	_cursor.fix_at = true;
+	_look_pinned = true;
+}
+
+/** The hand moved with the right button held: the pointer to the right looks to the right, down looks down; round to the back window and on. */
+void CabLook::Move(CabViewCamera &camera, int dx, int dy)
+{
+	if (dx != 0 || dy != 0) this->looked = true;
+	camera.head = std::remainder(camera.head - dx * CAB_LOOK_MOUSE, 2 * M_PI);
+	camera.pitch = std::clamp(camera.pitch - dy * CAB_LOOK_MOUSE, -CAB_LOOK_PITCH_MAX, CAB_LOOK_PITCH_MAX);
+}
+
+/**
+ * The window the arrows are for (the player, 17. 10.: "while the cab view or the first person view is open, the arrows
+ * always go to that window, not to the map"): the view from the first person, on foot or in a vehicle (the window of
+ * the cab view is gone, the player, test4: "no cab view, E gets in"). None while an edit box takes the keys.
+ */
+Window *ArrowsWindow()
+{
+	if (_game_mode != GameMode::Normal || EditBoxInGlobalFocus()) return nullptr;
+	auto takes = [](const Window *w) { return w != nullptr && w->window_class == WindowClass::FirstPerson; };
+	if (takes(_focused_window)) return _focused_window;
+	for (Window *w : Window::IterateFromFront()) {
+		if (takes(w)) return w;
+	}
+	return nullptr;
+}
+
+/** The rig: the car's horn, as read from its file. */
+std::string DescribeCarHorn()
+{
+	auto horn = CarHornSound();
+	const SoundEntry *e = horn.has_value() ? GetSound(*horn) : nullptr;
+	if (e == nullptr || e->data == nullptr) return "klakson neni";
+	return fmt::format("klakson zvuk {}: {} Hz, {} bitu, {} vzorku", *horn, e->rate, e->bits_per_sample, e->data->size() / (e->bits_per_sample / 8));
+}
+

@@ -1,0 +1,56 @@
+// Test GRF: the lock of 'decouple_128_cargo' as another game sees it -- it asks a
+// name nobody answers, so bit 8 of 0x9D stays clear and the Action B stops it.
+// Past the lock it would take the second road vehicle with one-byte block 1
+// (callback result 0x077); it must never get there. The Action 14 comes before
+// the Action 8: a file is scanned only up to its Action 8, and the feature tests
+// are read in that scan.
+//     yagl -e <out>/bloky_zamek.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container1;
+optional_info // Action14
+{
+    FTST: 
+    {
+        NAME: default, "decouple_tohle_nikdo_nezna"; // Default
+        MINV: [ 0x01 0x00 ];
+        SETP: [ 0x08 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGz";
+    version: GRF8;
+    name: "Rig: zamek";
+    description: "Lock that nobody answers";
+}
+if_act7 (is_bit_set(global_var[0x9D] & 0xFF, 1 << 8)) // Action07
+{
+    skip_sprites: 0x01;
+    // Or skip to the next label (Action10) with this value - search wraps at end of GRF.
+    // 0x00 means skip to end of GRF file - may disable the GRF.
+}
+error_message<Fatal, default, 0xFF> // Action0B <severity, language, message>
+{
+    message: "Tento GRF patri ke hre OpenTTD decouple by Karel Macha a jinde nefunguje.";
+}
+switch<RoadVehicles, 0x01, PrimaryByte> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00000077;
+    };
+    ranges:
+    {
+    };
+    default: 0x7FFF;
+}
+feature_graphics<RoadVehicles> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x0001;
+    feature_ids: [ 0x0001 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}

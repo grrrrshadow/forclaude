@@ -1,0 +1,956 @@
+[
+ {
+  "soubor": "chobotnicka.glb",
+  "jmeno": "chobotnicka",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "chobotnička",
+   "en": "octopus"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.49,
+   1.5,
+   0.7
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "pozy": {
+   "stoji": {
+    "animace": "Animation",
+    "snimku": 58,
+    "tiku": 8
+   }
+  },
+  "trojuhelniku": 7035,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "chobotnicka_maska_telo.png",
+    "zacatek": 217,
+    "paleta": [
+     "C2452D",
+     "E07A3A",
+     "8A3FA0",
+     "D14A8A",
+     "3A7FC4",
+     "4FA36A",
+     "D8B23A"
+    ]
+   }
+  ],
+  "autor": "Octopus, kenchoo (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/octopus-330402cc0ade4fc5bb147f3d618e58c3), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: otočený, zmenšený na skutečnou velikost, zjednodušený)",
+  "poznamka": "skutečné metry, čelem k +x, nahoru +y, počátek na dně pod chapadly; stojí na místě a hýbe chapadly, nikam neplave (hráč 7. 11.: „hejbat chapadlama ale neměnit souřadnice jinam neplavat“); kostra a animace modelu, pozy: animace v glb, snímky, tiky; v moři, v noci svítí; barva celého těla z palety (maska telo)"
+ },
+ {
+  "soubor": "kosatka.glb",
+  "jmeno": "kosatka",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "kosatka",
+   "en": "orca"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   7.0,
+   3.84,
+   2.8
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "pozy": {
+   "plave": {
+    "animace": "Orca_Rig|Orca_Rig|swim",
+    "snimku": 36,
+    "tiku": 2,
+    "krok_m": 4.9
+   },
+   "klid": {
+    "animace": "Orca_Rig|Orca_Rig|idle",
+    "snimku": 36,
+    "tiku": 2
+   },
+   "vyskok": {
+    "animace": "Orca_Rig|Orca_Rig|rushbeach",
+    "snimku": 53,
+    "tiku": 3
+   }
+  },
+  "trojuhelniku": 1080,
+  "autor": "Orca - Animated Low Poly, WildPoly3D (Sketchfab, CC-BY-NC-4.0, https://sketchfab.com/3d-models/orca-animated-low-poly-1033151e98dd4152a9c10cc91ff90586), převod voda/more.py",
+  "licence": "CC-BY-NC-4.0 (uvést autora; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla (plave ve vodě); kostra a animace modelu, pozy: animace v glb, snímky, tiky, plave s krok_m za jedno kolo; v moři, v noci svítí; barvy modelu"
+ },
+ {
+  "soubor": "ryba_kreslena.glb",
+  "jmeno": "ryba_kreslena",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "kreslená ryba",
+   "en": "cartoon fish"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.3,
+   0.11,
+   0.21
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "pozy": {
+   "plave": {
+    "animace": "Take 001",
+    "snimku": 62,
+    "tiku": 8,
+    "krok_m": 0.21
+   }
+  },
+  "trojuhelniku": 568,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "ryba_kreslena_maska_telo.png",
+    "zacatek": 240,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Fish pack, bestgamekits (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/fish-pack-890d98d796294423bd1aeb0e2542a833), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla (plave ve vodě); kostra a animace modelu, pozy: animace v glb, snímky, tiky, plave s krok_m za jedno kolo; v moři, v noci svítí; barva celého těla z palety (maska telo)"
+ },
+ {
+  "soubor": "ryba_klaun.glb",
+  "jmeno": "ryba_klaun",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "klaun očkatý",
+   "en": "clownfish"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.11,
+   0.02,
+   0.06
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "pozy": {
+   "plave": {
+    "animace": "FishSwimming",
+    "snimku": 60,
+    "tiku": 1,
+    "krok_m": 0.08
+   }
+  },
+  "trojuhelniku": 890,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "ryba_klaun_maska_telo.png",
+    "zacatek": 246,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Fish, rkuhlf (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/fish-5a2b7976ef5c44658de22e98bf381277), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku, barvy z materiálů v atlasu)",
+  "poznamka": "skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla (plave ve vodě); kostra a animace modelu, pozy: animace v glb, snímky, tiky, plave s krok_m za jedno kolo; v moři, v noci svítí; barva celého těla z palety (maska telo)"
+ },
+ {
+  "soubor": "ryba_modra.glb",
+  "jmeno": "ryba_modra",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "modrá ryba",
+   "en": "blue tang"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.25,
+   0.05,
+   0.1
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "pozy": {
+   "plave": {
+    "animace": "FishSwimming",
+    "snimku": 60,
+    "tiku": 1,
+    "krok_m": 0.17
+   }
+  },
+  "trojuhelniku": 702,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "ryba_modra_maska_telo.png",
+    "zacatek": 221,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Fish, rkuhlf (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/fish-5a2b7976ef5c44658de22e98bf381277), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku, barvy z materiálů v atlasu)",
+  "poznamka": "skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla (plave ve vodě); kostra a animace modelu, pozy: animace v glb, snímky, tiky, plave s krok_m za jedno kolo; v moři, v noci svítí; barva celého těla z palety (maska telo)"
+ },
+ {
+  "soubor": "tunak.glb",
+  "jmeno": "tunak",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "tuňák",
+   "en": "tuna"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.5,
+   0.39,
+   0.72
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "pozy": {
+   "plave": {
+    "animace": "FishSwimming",
+    "snimku": 60,
+    "tiku": 1,
+    "krok_m": 1.05
+   }
+  },
+  "trojuhelniku": 753,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "tunak_maska_telo.png",
+    "zacatek": 154,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Fish, rkuhlf (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/fish-5a2b7976ef5c44658de22e98bf381277), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku, barvy z materiálů v atlasu)",
+  "poznamka": "skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla (plave ve vodě); kostra a animace modelu, pozy: animace v glb, snímky, tiky, plave s krok_m za jedno kolo; v moři, v noci svítí; barva celého těla z palety (maska telo)"
+ },
+ {
+  "soubor": "ryba_hneda.glb",
+  "jmeno": "ryba_hneda",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "hnědá ryba",
+   "en": "brown fish"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.4,
+   0.08,
+   0.16
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "pozy": {
+   "plave": {
+    "animace": "FishSwimming",
+    "snimku": 60,
+    "tiku": 1,
+    "krok_m": 0.28
+   }
+  },
+  "trojuhelniku": 814,
+  "autor": "Fish, rkuhlf (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/fish-5a2b7976ef5c44658de22e98bf381277), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla (plave ve vodě); kostra a animace modelu, pozy: animace v glb, snímky, tiky, plave s krok_m za jedno kolo; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "zralok.glb",
+  "jmeno": "zralok",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "žralok bílý",
+   "en": "great white shark"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   4.0,
+   2.02,
+   1.39
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "zralok_maska_telo.png",
+    "zacatek": 197,
+    "paleta": [
+     "8A8F96",
+     "9EA3AA",
+     "B4B8BE",
+     "C8CCD1",
+     "777C83",
+     "A9ADB3",
+     "D2D5D9",
+     "6A6F76"
+    ]
+   }
+  ],
+  "trojuhelniku": 894,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, otočený čelem k +x, skutečná velikost)",
+  "poznamka": "skutečné metry (4 m), čelem k +x, nahoru +y, počátek uprostřed těla (plave ve vodě); bez kostry (hra ho jen posouvá); v moři, v noci svítí; barva těla z palety odstínů šedé (hráč 7. 11.: „barvit žraloka odstiny šedy a je to“; maska telo: tělo, oči ne)"
+ },
+ {
+  "soubor": "more_trava_1.glb",
+  "jmeno": "more_trava_1",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "světlá mořská tráva",
+   "en": "pale seagrass"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.72,
+   0.99,
+   1.89
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "more_trava_1_maska_telo.png",
+    "zacatek": 238,
+    "paleta": [
+     "3AA655",
+     "7FBF3F",
+     "C6C83A",
+     "8A3FA0",
+     "B866E8",
+     "E85AA8",
+     "E07A3A",
+     "C2452D",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 560,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka scény 0,33 m ze žraloka), počátek pod patou na dně, nahoru +y; v moři, v noci svítí; barva z palety (maska telo: rostlina, písek pod ní ne)"
+ },
+ {
+  "soubor": "more_koral.glb",
+  "jmeno": "more_koral",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "větvený korál na písku",
+   "en": "branching coral on sand"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.09,
+   1.12,
+   1.72
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "more_koral_maska_telo.png",
+    "zacatek": 236,
+    "paleta": [
+     "3AA655",
+     "7FBF3F",
+     "C6C83A",
+     "8A3FA0",
+     "B866E8",
+     "E85AA8",
+     "E07A3A",
+     "C2452D",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 508,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka scény 0,33 m ze žraloka), počátek pod patou na dně, nahoru +y; v moři, v noci svítí; barva z palety (maska telo: rostlina, písek pod ní ne)"
+ },
+ {
+  "soubor": "more_prsty.glb",
+  "jmeno": "more_prsty",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "prstovitý korál",
+   "en": "finger coral"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.7,
+   0.99,
+   1.06
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "more_prsty_maska_telo.png",
+    "zacatek": 226,
+    "paleta": [
+     "3AA655",
+     "7FBF3F",
+     "C6C83A",
+     "8A3FA0",
+     "B866E8",
+     "E85AA8",
+     "E07A3A",
+     "C2452D",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 480,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka scény 0,33 m ze žraloka), počátek pod patou na dně, nahoru +y; v moři, v noci svítí; barva z palety (maska telo: rostlina, písek pod ní ne)"
+ },
+ {
+  "soubor": "more_rasa_1.glb",
+  "jmeno": "more_rasa_1",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "mořská řasa",
+   "en": "seaweed"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.82,
+   1.16,
+   1.24
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "more_rasa_1_maska_telo.png",
+    "zacatek": 231,
+    "paleta": [
+     "3AA655",
+     "7FBF3F",
+     "C6C83A",
+     "8A3FA0",
+     "B866E8",
+     "E85AA8",
+     "E07A3A",
+     "C2452D",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 480,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka scény 0,33 m ze žraloka), počátek pod patou na dně, nahoru +y; v moři, v noci svítí; barva z palety (maska telo: rostlina, písek pod ní ne)"
+ },
+ {
+  "soubor": "more_rasa_2.glb",
+  "jmeno": "more_rasa_2",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "mořská řasa",
+   "en": "seaweed"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.71,
+   1.41,
+   1.2
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "more_rasa_2_maska_telo.png",
+    "zacatek": 231,
+    "paleta": [
+     "3AA655",
+     "7FBF3F",
+     "C6C83A",
+     "8A3FA0",
+     "B866E8",
+     "E85AA8",
+     "E07A3A",
+     "C2452D",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 400,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka scény 0,33 m ze žraloka), počátek pod patou na dně, nahoru +y; v moři, v noci svítí; barva z palety (maska telo: rostlina, písek pod ní ne)"
+ },
+ {
+  "soubor": "more_trava_2.glb",
+  "jmeno": "more_trava_2",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "světlá mořská tráva",
+   "en": "pale seagrass"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.59,
+   1.22,
+   1.82
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "more_trava_2_maska_telo.png",
+    "zacatek": 238,
+    "paleta": [
+     "3AA655",
+     "7FBF3F",
+     "C6C83A",
+     "8A3FA0",
+     "B866E8",
+     "E85AA8",
+     "E07A3A",
+     "C2452D",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 400,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka scény 0,33 m ze žraloka), počátek pod patou na dně, nahoru +y; v moři, v noci svítí; barva z palety (maska telo: rostlina, písek pod ní ne)"
+ },
+ {
+  "soubor": "more_houba.glb",
+  "jmeno": "more_houba",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "mořská houba s otvory",
+   "en": "tube sponge"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.95,
+   0.86,
+   1.08
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "more_houba_maska_telo.png",
+    "zacatek": 241,
+    "paleta": [
+     "3AA655",
+     "7FBF3F",
+     "C6C83A",
+     "8A3FA0",
+     "B866E8",
+     "E85AA8",
+     "E07A3A",
+     "C2452D",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 376,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka scény 0,33 m ze žraloka), počátek pod patou na dně, nahoru +y; v moři, v noci svítí; barva z palety (maska telo: rostlina, písek pod ní ne)"
+ },
+ {
+  "soubor": "hvezdice.glb",
+  "jmeno": "hvezdice",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "hvězdice",
+   "en": "starfish"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.3,
+   0.3,
+   0.08
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "hvezdice_maska_telo.png",
+    "zacatek": 245,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "trojuhelniku": 232,
+  "autor": "L-P Shark Cage Diving Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/l-p-shark-cage-diving-scene-5bf4fcbbc6ea40b69c734f54180fa38c), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutá ze scény, položená na dno, skutečná velikost)",
+  "poznamka": "skutečné metry (0,3 m napříč), leží na dně, počátek pod ní, nahoru +y; v moři, v noci svítí; barva z palety (maska telo)"
+ },
+ {
+  "soubor": "reka_lekniny_1.glb",
+  "jmeno": "reka_lekniny_1",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "leknín na stonku",
+   "en": "water lily on a stalk"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.37,
+   0.48,
+   1.15
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "vyska_listu_m": 1.15,
+  "trojuhelniku": 132,
+  "autor": "Low Poly Lake Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/low-poly-lake-scene-5fa5d2f996ef472fa41baafe79f64ec2), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka 0,8 m), počátek pod patou na dně řeky, nahoru +y; listy nahoře patří k hladině: postav ji tak hluboko, aby nejvyšší list byl u hladiny (vyska_listu_m), nebo ji zmenši; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "reka_lekniny_2.glb",
+  "jmeno": "reka_lekniny_2",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "lekníny na stoncích",
+   "en": "water lilies on stalks"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.41,
+   1.22,
+   2.06
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "vyska_listu_m": 2.06,
+  "trojuhelniku": 264,
+  "autor": "Low Poly Lake Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/low-poly-lake-scene-5fa5d2f996ef472fa41baafe79f64ec2), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka 0,8 m), počátek pod patou na dně řeky, nahoru +y; listy nahoře patří k hladině: postav ji tak hluboko, aby nejvyšší list byl u hladiny (vyska_listu_m), nebo ji zmenši; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "reka_lekniny_3.glb",
+  "jmeno": "reka_lekniny_3",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "lekníny na stoncích",
+   "en": "water lilies on stalks"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.17,
+   1.15,
+   1.77
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "vyska_listu_m": 1.77,
+  "trojuhelniku": 396,
+  "autor": "Low Poly Lake Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/low-poly-lake-scene-5fa5d2f996ef472fa41baafe79f64ec2), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno)",
+  "poznamka": "velikost jako ve scéně (jednotka 0,8 m), počátek pod patou na dně řeky, nahoru +y; listy nahoře patří k hladině: postav ji tak hluboko, aby nejvyšší list byl u hladiny (vyska_listu_m), nebo ji zmenši; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "reka_trava_1.glb",
+  "jmeno": "reka_trava_1",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "vodní tráva",
+   "en": "waterweed"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.51,
+   0.37,
+   2.59
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "trojuhelniku": 494,
+  "autor": "Low Poly Lake Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/low-poly-lake-scene-5fa5d2f996ef472fa41baafe79f64ec2), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno, zjednodušený)",
+  "poznamka": "velikost jako ve scéně (jednotka 0,8 m), počátek pod patou na dně řeky, nahoru +y; celá pod vodou; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "reka_trava_2.glb",
+  "jmeno": "reka_trava_2",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "vodní tráva",
+   "en": "waterweed"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.23,
+   0.96,
+   3.57
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "trojuhelniku": 960,
+  "autor": "Low Poly Lake Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/low-poly-lake-scene-5fa5d2f996ef472fa41baafe79f64ec2), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno, zjednodušený)",
+  "poznamka": "velikost jako ve scéně (jednotka 0,8 m), počátek pod patou na dně řeky, nahoru +y; celá pod vodou; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "reka_trava_3.glb",
+  "jmeno": "reka_trava_3",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "vodní tráva",
+   "en": "waterweed"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.94,
+   1.29,
+   3.48
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "trojuhelniku": 1912,
+  "autor": "Low Poly Lake Scene, EdwinRC (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/low-poly-lake-scene-5fa5d2f996ef472fa41baafe79f64ec2), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: vyříznutý ze scény, na dno, zjednodušený)",
+  "poznamka": "velikost jako ve scéně (jednotka 0,8 m), počátek pod patou na dně řeky, nahoru +y; celá pod vodou; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "orobinec.glb",
+  "jmeno": "orobinec",
+  "druh": "vodni_rostlina",
+  "nazev": {
+   "cs": "orobinec",
+   "en": "cattails"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.61,
+   0.7,
+   1.61
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "u_brehu": true,
+  "trojuhelniku": 1227,
+  "autor": "Cattails, AlkaliDragon (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/cattails-2f35ed566d3d4d74abd6e7c48d82f8eb), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: na zem, zjednodušený)",
+  "poznamka": "skutečné metry (1,6 m), počátek pod trsem, nahoru +y; na břehy řek do vody u břehu (hráč: „catails na břehy řek do vody ke břehu“), stojí ve vodě, listy nad hladinou; v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "ryba_okoun.glb",
+  "jmeno": "ryba_okoun",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "velký zelený okoun",
+   "en": "big green bass"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.5,
+   0.1,
+   0.2
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "na_prut": true,
+  "uzly": {
+   "usta": [
+    0.25,
+    0.0,
+    0.002
+   ]
+  },
+  "trojuhelniku": 2460,
+  "autor": "Lowpoly fish pack, assetfactory (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/lowpoly-fish-pack-812a52c7f7cc4e10b69c5c5f9e4269f2), převod voda/pruty.py",
+  "licence": "SKETCHFAB Standard (uvést assetfactory; změny: vyříznutá z balíku, otočená, skutečná velikost, zjednodušená, textura 128 px)",
+  "poznamka": "ryba na prut (hráč: „pujdou ulovit jenom tyhle na prut“) a zároveň plave ve vodě; skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla; bez kostry, hra ji jen posouvá; prázdný uzel usta: za ten visí na háčku pod uzlem spicka prutu; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "ryba_tercovec.glb",
+  "jmeno": "ryba_tercovec",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "terčovec",
+   "en": "discus"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.2,
+   0.06,
+   0.17
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "na_prut": true,
+  "uzly": {
+   "usta": [
+    0.1,
+    0.0,
+    -0.017
+   ]
+  },
+  "trojuhelniku": 1569,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "ryba_tercovec_maska_telo.png",
+    "zacatek": 242,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Lowpoly fish pack, assetfactory (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/lowpoly-fish-pack-812a52c7f7cc4e10b69c5c5f9e4269f2), převod voda/pruty.py",
+  "licence": "SKETCHFAB Standard (uvést assetfactory; změny: vyříznutá z balíku, otočená, skutečná velikost, zjednodušená, textura 128 px)",
+  "poznamka": "ryba na prut (hráč: „pujdou ulovit jenom tyhle na prut“) a zároveň plave ve vodě; skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla; bez kostry, hra ji jen posouvá; prázdný uzel usta: za ten visí na háčku pod uzlem spicka prutu; v moři, v noci svítí; barva z palety (maska telo, oči ne)"
+ },
+ {
+  "soubor": "ryba_zavojnatka.glb",
+  "jmeno": "ryba_zavojnatka",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "závojnatka",
+   "en": "fancy goldfish"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.25,
+   0.05,
+   0.12
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "na_prut": true,
+  "uzly": {
+   "usta": [
+    0.125,
+    0.0,
+    -0.01
+   ]
+  },
+  "trojuhelniku": 2649,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "ryba_zavojnatka_maska_telo.png",
+    "zacatek": 237,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Lowpoly fish pack, assetfactory (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/lowpoly-fish-pack-812a52c7f7cc4e10b69c5c5f9e4269f2), převod voda/pruty.py",
+  "licence": "SKETCHFAB Standard (uvést assetfactory; změny: vyříznutá z balíku, otočená, skutečná velikost, zjednodušená, textura 128 px)",
+  "poznamka": "ryba na prut (hráč: „pujdou ulovit jenom tyhle na prut“) a zároveň plave ve vodě; skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla; bez kostry, hra ji jen posouvá; prázdný uzel usta: za ten visí na háčku pod uzlem spicka prutu; v moři, v noci svítí; barva z palety (maska telo, oči ne)"
+ },
+ {
+  "soubor": "chobotnice.glb",
+  "jmeno": "chobotnice",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "chobotnice na dně",
+   "en": "octopus on the floor"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.31,
+   1.5,
+   0.45
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "trojuhelniku": 650,
+  "autor": "Octopus (ReMake), Unsettledtoast (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/octopus-remake-554f792c26b04058aef4ad7c7d7171be), převod voda/more.py",
+  "licence": "CC-BY-4.0 (uvést autora; změny: otočená čelem k +x, skutečná velikost, spodek chapadel pryč, jen textura barvy 256 px v 64 barvách, zjednodušený)",
+  "poznamka": "skutečné metry (1,5 m napříč chapadly), leží na dně s roztaženými chapadly, čelem (očima) k +x, počátek pod ní, nahoru +y; bez kostry, nehýbe se; v moři, v noci svítí; barva kůže z palety (maska telo: vínová a oranžová kůže; tyrkysový spodek s přísavkami, oči a krémová místa ne)",
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "chobotnice_maska_telo.png",
+    "zacatek": 219,
+    "paleta": [
+     "C2452D",
+     "E07A3A",
+     "8A3FA0",
+     "D14A8A",
+     "3A7FC4",
+     "4FA36A",
+     "D8B23A"
+    ]
+   }
+  ]
+ }
+]

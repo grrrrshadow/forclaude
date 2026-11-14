@@ -1,0 +1,604 @@
+// Wagons named the way GETS names its own -- what the wagon is, and its kind in
+// quotes -- for the name rule (IsGreenLayerWagon(), IsCarCarrierWagon()), and one
+// of them drawing its coal the way GETS does: the wagon as one picture, the load
+// as a second one over it (CB_FLAG_MORE_SPRITES), painted in the range GETS
+// recolours by cargo. Played by the scene getsjmena (see README.md): the Eaos
+// and its livery carry marijuana with only the load green, the chosen carriers
+// take road vehicles, the Ssla Köln and the Eaoss take neither. Of the open
+// wagons the player picked by kind and town, the Om Breslau takes marijuana;
+// the Omm 55, an Om of another town and the Om Ludwigshafen, which the player
+// left out, do not.
+// Sprite set 0 the wagon, 1 the load, 2 the load of an empty wagon (nothing, as
+// GETS draws it); layer 0 the wagon, layer 1 the load -- GETS's loadstack. The
+// quotes in the names are written {dq} (yagl's name for the code 0x22); the game
+// reads them as plain quotes either way (TranslateTTDPatchCodes()).
+//     yagl -e <out>/gets_like.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x44 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGg";
+    version: GRF8;
+    name: "Rig: wagons named as GETS names them";
+    description: "Wagons named what they are and then their kind in quotes, and one drawing its coal as a layer over the wagon, as GETS does.";
+}
+properties<GlobalSettings, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        cargo_translation_table: "COAL";
+    }
+    // instance_id: 0x0001
+    {
+        cargo_translation_table: "GOOD";
+    }
+}
+sprite_sets<Trains, 0x0000> // <feature, first_set> Action01
+{
+    sprite_set // 0x0000
+    {
+        sprite_id<0x00000006>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [10, 10];
+        }
+        sprite_id<0x00000007>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [21, 10];
+        }
+        sprite_id<0x00000008>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [32, 10];
+        }
+        sprite_id<0x00000009>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [43, 10];
+        }
+        sprite_id<0x0000000A>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [54, 10];
+        }
+        sprite_id<0x0000000B>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [65, 10];
+        }
+        sprite_id<0x0000000C>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [76, 10];
+        }
+        sprite_id<0x0000000D>
+        {
+            [1, 1, 9, 5], normal, c8bpp, "gets_like-8bpp-normal-0.png", [87, 10];
+        }
+    }
+    sprite_set // 0x0001
+    {
+        sprite_id<0x0000000E>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [98, 10];
+        }
+        sprite_id<0x0000000F>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [124, 10];
+        }
+        sprite_id<0x00000010>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [150, 10];
+        }
+        sprite_id<0x00000011>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [176, 10];
+        }
+        sprite_id<0x00000012>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [202, 10];
+        }
+        sprite_id<0x00000013>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [228, 10];
+        }
+        sprite_id<0x00000014>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [254, 10];
+        }
+        sprite_id<0x00000015>
+        {
+            [16, 4, -8, -6], normal, c8bpp, "gets_like-8bpp-normal-0.png", [280, 10];
+        }
+    }
+    sprite_set // 0x0002
+    {
+        sprite_id<0x00000016>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [306, 10];
+        }
+        sprite_id<0x00000017>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [336, 10];
+        }
+        sprite_id<0x00000018>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [366, 10];
+        }
+        sprite_id<0x00000019>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [396, 10];
+        }
+        sprite_id<0x0000001A>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [426, 10];
+        }
+        sprite_id<0x0000001B>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [456, 10];
+        }
+        sprite_id<0x0000001C>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [486, 10];
+        }
+        sprite_id<0x0000001D>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "gets_like-8bpp-normal-0.png", [516, 10];
+        }
+    }
+}
+sprite_groups<Trains, 0xFF> // Action02 basic
+{
+    primary_spritesets: [ 0x0000 0x0001 ];
+    secondary_spritesets: [ 0x0000 0x0001 ];
+}
+sprite_groups<Trains, 0xFE> // Action02 basic
+{
+    primary_spritesets: [ 0x0002 ];
+    secondary_spritesets: [ 0x0002 ];
+}
+sprite_groups<Trains, 0xFD> // Action02 basic
+{
+    primary_spritesets: [ 0x0000 ];
+    secondary_spritesets: [ 0x0000 ];
+}
+switch<Trains, 0xFD, PrimaryDWord> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x0C] & 0x0000FFFF;
+    };
+    ranges:
+    {
+        0x00000000: 0x8000;
+    };
+    default: 0x00FD;
+}
+switch<Trains, 0xFD, PrimaryDWord> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x10] >> 8 & 0x000000FF;
+
+        value2 = variable[0x1A] & 0x00000001;
+        value1 = SignedCmp(value1, value2);
+
+        value2 = variable[0x1A] & 0x00000001;
+        value1 = SignedMin(value1, value2);
+
+        value2 = variable[0x1A] & 0x00000001;
+        value1 = BitwiseXor(value1, value2);
+
+        value2 = variable[0x1A] & 0x80000000;
+        value1 = Multiply(value1, value2);
+
+        value2 = variable[0x1A] & 0x00000000;
+        value1 = Addition(value1, value2);
+
+        value2 = variable[0x1A] & 0x00000100;
+        value1 = TempStore(value1, value2);
+
+        value2 = variable[0x10] >> 8 & 0x000000FF;
+        value1 = Assign(value1, value2);
+    };
+    ranges:
+    {
+        0x00000000: 0x00FE;
+        0x00000001: 0x00FF;
+    };
+    default: 0x00FD;
+}
+switch<Trains, 0xFD, PrimaryDWord> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x47] & 0x000000FF;
+    };
+    ranges:
+    {
+        0x00000000: 0x00FD;
+    };
+    default: 0x00FE;
+}
+properties<Trains, 0x012C> // Action00
+{
+    // instance_id: 0x012C
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<Trains, default, 0x012C> // <feature, language, first_id> Action04, Default
+{
+    /* 0x012C */ "Open Wagon {dq}Eaos{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FD;
+    feature_ids: [ 0x012C ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x012D> // Action00
+{
+    // instance_id: 0x012D
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<Trains, default, 0x012D> // <feature, language, first_id> Action04, Default
+{
+    /* 0x012D */ "Eaos DB Cargo livery";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FD;
+    feature_ids: [ 0x012D ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x012E> // Action00
+{
+    // instance_id: 0x012E
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<Trains, default, 0x012E> // <feature, language, first_id> Action04, Default
+{
+    /* 0x012E */ "Open Wagon {dq}Eaoss{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FD;
+    feature_ids: [ 0x012E ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x012F> // Action00
+{
+    // instance_id: 0x012F
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x01;
+        refittable_cargo_classes: 0x0020;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+    }
+}
+strings<Trains, default, 0x012F> // <feature, language, first_id> Action04, Default
+{
+    /* 0x012F */ "Flatbed {dq}Rns-z 643{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FE;
+    feature_ids: [ 0x012F ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x0130> // Action00
+{
+    // instance_id: 0x0130
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x01;
+        refittable_cargo_classes: 0x0020;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+    }
+}
+strings<Trains, default, 0x0130> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0130 */ "Sgmmrs DB livery";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FE;
+    feature_ids: [ 0x0130 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x0131> // Action00
+{
+    // instance_id: 0x0131
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x01;
+        refittable_cargo_classes: 0x0020;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+    }
+}
+strings<Trains, default, 0x0131> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0131 */ "Flatbed {dq}Ssla Köln{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FE;
+    feature_ids: [ 0x0131 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x0132> // Action00
+{
+    // instance_id: 0x0132
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<Trains, default, 0x0132> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0132 */ "Open Wagon {dq}Om Breslau{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FD;
+    feature_ids: [ 0x0132 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x0133> // Action00
+{
+    // instance_id: 0x0133
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<Trains, default, 0x0133> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0133 */ "Open Wagon {dq}Omm 55{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FD;
+    feature_ids: [ 0x0133 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x0134> // Action00
+{
+    // instance_id: 0x0134
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<Trains, default, 0x0134> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0134 */ "Open Wagon {dq}Om Schwerin{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FD;
+    feature_ids: [ 0x0134 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}
+properties<Trains, 0x0135> // Action00
+{
+    // instance_id: 0x0135
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+        miscellaneous_flags: 0x80;
+    }
+}
+strings<Trains, default, 0x0135> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0135 */ "Mineral Wagon {dq}Om Ludwigshafen{dq}";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FD;
+    feature_ids: [ 0x0135 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}

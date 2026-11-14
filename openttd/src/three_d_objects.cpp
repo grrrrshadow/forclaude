@@ -1,0 +1,15542 @@
+/*
+ * This file is part of ottd Decouple by Karel Mácha, a game built on OpenTTD.
+ * Copyright (C) 2026 Karel Mácha. All rights not granted by the licence below are reserved.
+ * This file is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2 only.
+ * It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with it. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ * The licence grants no right to the name "ottd Decouple" or its logo.
+ */
+
+/** @file three_d_objects.cpp Reading buildings as real 3D objects (three_d_objects.h): the index, the .glb files, their textures. */
+
+#include "stdafx.h"
+#include "three_d_objects.h"
+#include "three_d_witches.h"
+#include "object_base.h"
+#include "simtrains.h"
+#include "beamng.h"
+#include "industry.h"
+#include "climate_industries.h"
+#include "industry_map.h"
+#include "industrytype.h"
+#include "three_d_vehicle_object.h"
+#include "cab_view.h"
+#include "debug.h"
+#include "fileio_func.h"
+#include "sound_func.h"
+#include "newgrf_config.h"
+#include "tar_type.h"
+#include "gfx_type.h"
+#include "tile_type.h"
+#include "house.h"
+#include "map_func.h"
+#include "core/bitmath_func.hpp"
+#include "engine_base.h"
+#include "vehicle_base.h"
+#include "vehicle_func.h"
+#include "effectvehicle_func.h"
+#include "core/string_consumer.hpp"
+#include "three_d.h"
+#include "three_d_gpu.h"
+#include "town.h"
+#include "town_map.h"
+#include "road_map.h"
+#include "bridge_map.h"
+#include "station_map.h"
+#include "newgrf_roadstop.h"
+#include "table/sprites.h"
+#include "tree_map.h"
+#include "tile_map.h"
+#include "clear_map.h"
+#include "company_func.h"
+#include "company_base.h"
+#include "station_base.h"
+#include "roadstop_base.h"
+#include "rail_map.h"
+#include "water_map.h"
+#include "object_map.h"
+#include "newgrf_railtype.h"
+#include "newgrf_roadtype.h"
+#include "cargotype.h"
+#include "palette_func.h"
+#include "viewport_func.h"
+#include "slope_func.h"
+#include "language.h"
+#include "landscape.h"
+#include "round_track.h"
+#include "3rdparty/nlohmann/json.hpp"
+#include "3rdparty/meshoptimizer/meshoptimizer.h"
+#include "timer/timer.h"
+#include "timer/timer_window.h"
+#include "timer/timer_game_calendar.h"
+#include "timer/timer_game_tick.h"
+#include "openttd.h"
+#include "settings_type.h"
+#include "error.h"
+#include "strings_func.h"
+#include "string_func.h"
+#include "window_func.h"
+#include "vehicle_config.h"
+#include "table/strings.h"
+
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <cmath>
+#include <filesystem>
+#include <functional>
+#include <map>
+#include <numeric>
+#include <set>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
+#ifdef WITH_PNG
+#include <png.h>
+#endif /* WITH_PNG */
+
+#include "walker_inventory.h"
+#include "thread.h"
+
+#include "safeguards.h"
+
+/** Every object read, and whether they were looked for yet (read whole: the lists stay as they are from then on). */
+static std::vector<ThreeDObject> _three_d_objects;
+static std::atomic<bool> _three_d_objects_read = false;
+/** This thread reads the indices now: what it looks up on the way is of what it has read so far (ReadThreeDObjectsNow()). */
+static thread_local bool _three_d_objects_reading = false;
+/** The objects by the town theme (TownTheme, 0 every town), the house and the colour slot: the index into _three_d_objects. */
+static std::map<std::tuple<uint8_t, HouseID, uint>, size_t> _three_d_house_objects;
+/** The creatures of the indices ("druh": "tvor", the colleague's dragons). */
+static std::vector<ThreeDCreature> _creatures;
+/** The witches of the indices ("druh": "carodejnice"). */
+static std::vector<ThreeDWitch> _witches;
+/** The flying saucers of the indices ("druh": "ufo"). */
+static std::vector<ThreeDUfo> _ufos;
+/** The night flyers an index of ours takes out of the sky ("nahrazuje": the colleague's ghost floats along the streets instead). */
+static std::set<std::string, std::less<>> _witches_replaced;
+/** The trees of each town theme ("druh": "strom" with "tema", the colleague's mushrooms): the names of their figures. */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
+/** And the same at night: each one glowing ("<jmeno>/noc") where it has its night. */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees_night;
+/** The most states ("stavy") a vehicle's record keeps: a picture's key holds a step in 16 bits, the states made of them after them. */
+static constexpr size_t MAX_VEHICLE_STATES = 16384;
+/** The kinds of trees of the maps of all climates (TreeType 0x00-0x28). */
+static constexpr size_t MAP_TREE_KINDS = TREE_TOYLAND + TREE_COUNT_TOYLAND;
+/** The trees of the map by the kind of tree on a tile (TreeType): the add-ons that stand for it ("stromy_mapy" and
+ * "stromy_mapy_dalsi" "druhy", the colleague's trees and tropical plants of 1. 11.), each so many times bigger. */
+static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_trees;
+/** And the plants under them ("podrost": the ferns, banana plants and monsteras under the rainforest's trees). */
+static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_undergrowth;
+/** The plants under the trees of each town theme's land ("stromy_mapy_dalsi" with "tema" and "podrost": the clay town's ferns). */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_undergrowth;
+/** The add-ons among the trees of each town theme's land ("stromy_mapy_dalsi" with "tema": the clay town's palms, banana
+ * plants and monsteras), apart from the theme's own trees (its mushrooms); split by SplitThemeGuests(). */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_guests;
+/** Of those the plants ([1]: an undergrowth somewhere too, the banana plants and monsteras) and the trees ([0]: the palms). */
+static std::map<uint8_t, std::array<std::vector<std::string>, 2>> _three_d_theme_guests_split;
+/** The plants by some houses of the clay towns and the towns of the tropics (GetThreeDHousePlants()), made the first time asked for. */
+static std::vector<ThreeDMapTree> _three_d_house_plants;
+static std::vector<ThreeDMapTree> _three_d_house_palms; ///< of them the palms alone, for the desert
+static bool _three_d_house_plants_made = false;
+/** The dogs, the animals, the ghosts and the sellers of dogs of the indices (ThreeDAnimal). */
+static std::vector<ThreeDAnimal> _animals;
+/** The mushrooms to pick of the indices (ThreeDMushroom). */
+static std::vector<ThreeDMushroom> _mushrooms;
+/** The animals of the water of the indices (ThreeDWaterAnimal). */
+static std::vector<ThreeDWaterAnimal> _water_animals;
+/** And its plants (ThreeDWaterPlant). */
+static std::vector<ThreeDWaterPlant> _water_plants;
+
+/** The town theme an index names ("tema"): "hlinene" the clay town (TownTheme::Clay), 0 none or one the game does not know. */
+static uint8_t ParseIndexTheme(const nlohmann::json &e)
+{
+	const std::string theme = e.value("tema", std::string());
+	if (theme == "hlinene") return to_underlying(TownTheme::Clay);
+	return 0;
+}
+
+/**
+ * One record of the trees of the map an add-on stands for ("stromy_mapy", or one of "stromy_mapy_dalsi", the colleague's
+ * hra/3d/TROPY-PLANTAZ-PRO-HRU.md): the kinds of trees of a climate ("klima", "druhy" as TreeType), drawn so many times
+ * bigger than it is ("meritko": the banana plants and monsteras standing for the rainforest's broad trees), or under
+ * them ("podrost"); or with "tema" among the trees of that town theme's land, or under them.
+ * @param m the record
+ * @param name the add-on's figure
+ */
+static void ReadMapTrees(const nlohmann::json &m, const std::string &name)
+{
+	if (!m.is_object()) return;
+	const bool under = m.value("podrost", false);
+	auto add = [&name](std::vector<std::string> &list) {
+		if (std::ranges::find(list, name) == list.end()) list.push_back(name);
+	};
+	if (m.contains("tema")) {
+		const uint8_t theme = ParseIndexTheme(m);
+		if (theme == 0) return;
+		if (under) {
+			add(_three_d_theme_undergrowth[theme]);
+		} else {
+			add(_three_d_theme_guests[theme]);
+		}
+		return;
+	}
+	const std::string climate = m.value("klima", std::string("mirne"));
+	uint first = 0, count = 0;
+	if (climate == "mirne") {
+		first = TREE_TEMPERATE;
+		count = TREE_COUNT_TEMPERATE;
+	} else if (climate == "subarkticke") {
+		first = TREE_SUB_ARCTIC;
+		count = TREE_COUNT_SUB_ARCTIC;
+	} else if (climate == "subtropicke") {
+		first = TREE_RAINFOREST;
+		count = TREE_TOYLAND - TREE_RAINFOREST;
+	} else {
+		return;
+	}
+	if (!m.contains("druhy") || !m.at("druhy").is_array()) return;
+	const float scale = m.contains("meritko") && m.at("meritko").is_number() ? std::clamp(m.at("meritko").get<float>(), 0.1f, 10.0f) : 1.0f;
+	auto &kinds = under ? _three_d_map_undergrowth : _three_d_map_trees;
+	for (const auto &kind : m.at("druhy")) {
+		if (!kind.is_number_integer()) continue;
+		const int k = kind.get<int>();
+		if (k < static_cast<int>(first) || k >= static_cast<int>(first + count)) continue;
+		auto &trees = kinds[k];
+		if (std::ranges::find_if(trees, [&name](const ThreeDMapTree &t) { return t.name == name; }) == trees.end()) trees.push_back({name, scale});
+	}
+}
+/** The objects of the houses of sets (NewGRF): by the set's id, the house's number in the set and the colour slot. */
+static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
+/** The game's own industries' objects by the industry and the variant (-1 any), and the parts of the fields by their name ("dil"). */
+static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objects;
+/** The objects the game's industries of another kind show ("sdili": the refinery the distillery), by the industry. */
+static std::map<IndustryType, size_t> _three_d_shared_industry_objects;
+static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
+/** The add-ons of the buildings ("druh": "doplnek"), by their name: their objects in _three_d_objects (ThreeDObject::addon_places). */
+static std::map<std::string, size_t, std::less<>> _three_d_addons;
+/** The street lamps (MakeStreetLamps()) by the place of the game's street light on its tile, dx * 16 + dy: objects in _three_d_objects. */
+static std::map<int, size_t> _three_d_street_lamps;
+/** The pavements of a drive-through bus stop with their bench and sign (MakeBusStops()), by the shelter's sprite they stand for: objects in _three_d_objects. */
+static std::map<SpriteID, size_t> _three_d_bus_stops;
+/** A stone of a layout of the rocky land (the colleague's objekty/kameni, "skalnata_zem", ReadRockLayouts()). */
+struct ThreeDRockStone {
+	std::string name;              ///< its add-on ("kamen")
+	float x = 0, y = 0;            ///< its middle, metres from the tile's north corner ("poloha")
+	float turn = 0;                ///< degrees, 90 its +x to +y ("otoceni")
+	float scale = 1;               ///< "meritko"
+	std::array<float, 4> extent{}; ///< its add-on's x0, x1, y0, y1 as made ("rozmer_m"), metres
+};
+/** The layouts of the stones of the rocky land, one of them a tile (GetThreeDRocks()). */
+static std::vector<std::vector<ThreeDRockStone>> _three_d_rock_layouts;
+/** The rocky land's tiles (MakeRockTiles()) by the layout and the tile's slope: objects in _three_d_objects. */
+static std::map<std::pair<size_t, Slope>, size_t> _three_d_rock_tiles;
+/** What of a station the colleague's objekty/stanice stand for (ReadStationPiece()). */
+enum class ThreeDStationKind : uint8_t {
+	Platform, ///< "peron": a tile of a railway station, the platforms on both sides of the track
+	Waypoint, ///< "smerovani": a railway's waypoint
+	TruckStop, ///< "nakladova_rampa" "rampa": a drive-through stop of lorries
+	TruckBay, ///< "nakladova_rampa" "rampa_slepa": a bay of lorries
+	End,
+};
+/** A piece of a station as read (ReadStationPiece()): its add-on, the add-ons on it ("doplnky", the benches), where it turns. */
+struct ThreeDStationPiece {
+	std::string name;                      ///< its add-on (_three_d_addons)
+	std::vector<ThreeDObjectFigure> addons; ///< "doplnky", as a house's
+	float centre[2] = {7.4f, 7.4f};        ///< "stred" of "osa_y": what it turns about, metres
+	/** A place for a piece of the cargo waiting ("cekajici_naklad" "bunky"): its side, row and column, its middle on the floor, its turn. */
+	struct Cell {
+		uint8_t side;
+		int row, column;
+		float at[3];
+		float turn;
+	};
+	/** A place for a heap of a bulk cargo ("hromady"): over the columns of a side, both rows. */
+	struct Heap {
+		uint8_t side;
+		std::vector<int> columns;
+		float at[3];
+		float turn;
+	};
+	std::vector<Cell> cells;      ///< in the order they are filled, the back row first
+	std::vector<Heap> heaps;
+	float cell_m[2] = {1.3f, 1.0f}; ///< "bunka_m": a cell along a piece and across it
+	int floors = 1;               ///< "patra": a piece on another so many high at most
+	std::string heap_piece;       ///< "hromada" "objekt": the shared load piece a heap is
+};
+static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStationKind::End)> _three_d_station_pieces;
+/** The depots' objects (ReadDepot()) by the transport (0 railway, 1 road, 2 water) and the way (a DiagDirection; a ship depot's axis): objects in _three_d_objects. */
+static std::map<std::pair<int, int>, size_t> _three_d_depots;
+/** The lighthouses' objects (ReadLighthouse()), objects in _three_d_objects: one of them on each lighthouse's tile (GetThreeDLighthouse()). */
+static std::vector<size_t> _three_d_lighthouses;
+/** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
+static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
+
+/*
+ * The diary of the 3D houses, 3d_domy.log in the player's folder (the player, 19. 10.: in a new game the temperate
+ * houses are the boxes, the clay towns' are 3D): where each index was read from, every file that could not be read
+ * and why, and every set (NewGRF) whose houses have no 3D objects (ITL Houses, which takes the place of all the
+ * game's houses) -- such a house is drawn as the boxes, so far without a word. The first such problem the player is
+ * told of in the game, once.
+ */
+static std::mutex _read_diary_mutex;
+static std::optional<FileHandle> _read_diary;
+static std::string _read_problem;      ///< the first problem, to tell the player
+static bool _read_problem_told = false;
+static std::set<uint32_t> _boxed_house_sets; ///< the sets whose houses were told of as drawn without objects
+
+/** A line of the diary; a problem (a file not read) told to the player if it is the first. */
+static void ReadDiary(std::string_view line, bool problem)
+{
+	std::lock_guard lock(_read_diary_mutex);
+	if (!_read_diary.has_value()) _read_diary = FileHandle::Open(FioDiaryPath("3d_domy.log"), "w");
+	if (_read_diary.has_value()) {
+		std::string text(line);
+		text += '\n';
+		fwrite(text.data(), 1, text.size(), *_read_diary);
+		fflush(*_read_diary);
+	}
+	if (problem && _read_problem.empty()) _read_problem = line;
+}
+
+/**
+ * A house of a set (NewGRF) drawn in the turned view without a 3D object (no package of the set has it): its set
+ * told of, once.
+ * @param house the house of its north tile, one of a set
+ */
+void NoteThreeDHouseBoxed(HouseID house)
+{
+	const HouseSpec *hs = HouseSpec::Get(house);
+	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return;
+	const uint32_t grfid = hs->grf_prop.grfid;
+	/* (Asked for every such tile drawn: the set of the last one at once, without the lock.) */
+	static std::atomic<uint32_t> last{0};
+	if (last.load(std::memory_order_relaxed) == grfid) return;
+	{
+		std::lock_guard lock(_read_diary_mutex);
+		last.store(grfid, std::memory_order_relaxed);
+		if (!_boxed_house_sets.insert(grfid).second) return;
+	}
+	/* (The game's own houses, which have the objects, a set may switch off: ITL Houses all of them.) */
+	uint originals = 0;
+	for (HouseID h = 0; h < NEW_HOUSE_OFFSET; h++) {
+		if (HouseSpec::Get(h)->enabled) originals++;
+	}
+	const GRFConfig *config = GetGRFConfig(grfid);
+	const std::string name = config != nullptr ? config->GetName() : fmt::format("{:08X}", std::byteswap(grfid));
+	ReadDiary(fmt::format("domy z GRF {} nemají 3D model, kreslí se krabice; zapnutých původních domů hry (ty jsou 3D): {}", name, originals), true);
+}
+
+/** The player told once, in a window, of the first file of a 3D object not read (and so drawn as the boxes). */
+static const IntervalTimer<TimerWindow> _read_problem_timer(std::chrono::seconds(2), [](auto) {
+	std::string problem;
+	{
+		std::lock_guard lock(_read_diary_mutex);
+		if (_read_problem.empty() || _read_problem_told) return;
+		if (FindWindowById(WindowClass::MainWindow, 0) == nullptr) return;
+		_read_problem_told = true;
+		problem = _read_problem;
+	}
+	ShowErrorMessage(GetEncodedString(STR_ERROR_THREE_D_BOXES, problem), {}, WarningLevel::Warning);
+});
+
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true, const std::vector<float> *cover = nullptr, bool soft = false);
+/** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
+static constexpr std::string_view RAW_TEXTURE_MARK = "OTTD-RGBA";
+
+/** What a car of BeamNG is drawn from (ThreeDVehicleObject::file): its configuration, and the make of our 1203 (BeamngModel::make), -1 none. */
+static std::string BeamngObjectFile(const BeamngVehicle &b, int make)
+{
+	std::string file = "beamng:" + b.Package() + "|" + b.folder + "|" + b.config;
+	if (make >= 0) file += fmt::format("|{}", make);
+	return file;
+}
+
+/** The car of BeamNG an object is drawn from (BeamngObjectFile()) and the make of our 1203, -1 none; nullptr none. */
+static std::pair<const BeamngVehicle *, int> BeamngCarOf(std::string_view file)
+{
+	if (!file.starts_with("beamng:")) return {nullptr, -1};
+	for (const BeamngVehicle &b : FindBeamngVehicles()) {
+		if (file == BeamngObjectFile(b, -1)) return {&b, -1};
+		for (const BeamngModel &m : b.models) {
+			if (m.make >= 0 && file == BeamngObjectFile(b, m.make)) return {&b, m.make};
+		}
+	}
+	return {nullptr, -1};
+}
+
+/** The mods of BeamNG read one thread at a time (ReadBeamngShape(), BeamngLength()): the .zip files they are in are opened once, for all. */
+static std::mutex _beamng_mutex;
+
+/** The most texels a side a painted material of a car of BeamNG has in the body's texture (BeamngMesh::PaintSource): four of them 2048 x 2048. */
+static constexpr int PAINT_CELL_MOST = 1024;
+
+/** The vehicles as objects (three_d_objects.h), and whether their indices were read yet. */
+static std::vector<ThreeDVehicleObject> _vehicle_objects;
+static bool _vehicle_objects_read = false;
+/** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
+static std::vector<ThreeDVehicleObject> _figure_objects;
+/** The ivies among the add-ons ("popinavka" of a record), where they grow (GetThreeDIvies()). */
+static std::vector<ThreeDIvy> _three_d_ivies;
+/** The graffiti of the walls ("druh": "zed_grafiti"), the names of their figures (GetThreeDGraffiti()). */
+static std::vector<std::string> _three_d_graffiti;
+/** The spalled places of the concrete ("druh": "zed_odprysk"), the names of their figures (GetThreeDConcreteSpalls()). */
+static std::vector<std::string> _three_d_concrete_spalls;
+/** The pieces of rust of old vehicles ("druh": "vuz_rez"), the names of their figures (GetThreeDRustPieces()). */
+static std::vector<std::string> _three_d_rust_pieces;
+/** The boards' sizes ("sirka_m", "vyska_m"), by their figures' names (GetThreeDBoardSize()). */
+static std::map<std::string, std::pair<float, float>> _three_d_board_sizes;
+
+/**
+ * The motions of the figures of a kind of bones ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md):
+ * a file of the bones and their animations without a mesh, put on every figure of that kind by the bones' names.
+ */
+struct ThreeDMotionSet {
+	struct Motion {
+		std::string name;    ///< the animation
+		int frames = 1;      ///< "snimku", else 12 a second of "doba_s"; 1 a pose standing still
+		int frame_ticks = 1; ///< game ticks a frame is held
+		bool loop = true;    ///< "smycka"
+		float walk_m = 0;    ///< "krok_m": metres walked a round, by hips as high as the motions'
+		std::string held_file;  ///< "predmet": a thing held by a bone, its file
+		std::string held_bone;  ///< "kost"
+		float held_at[3] = {};  ///< "poloha"
+		float held_turn[4] = {0, 0, 0, 1}; ///< "rotace"
+	};
+	std::string package;
+	std::string file;
+	std::string kind;    ///< "kostra": the kind of bones they are for
+	float hips = 1.0f;   ///< "vyska_kycli": the height of the hips the animations are made for, metres
+	std::vector<Motion> motions;
+};
+/** The sets of motions of the indices: the game's, a vehicle's package's poses of its seats. */
+static std::vector<ThreeDMotionSet> _motion_sets;
+/** A figure of a kind of bones ("kostra" a name, not a file), posed by the motions of its kind (MakeHumanoidFigures()). */
+struct ThreeDHumanoid {
+	ThreeDVehicleObject figure;
+	std::string kind;
+	float hips = 1.0f;   ///< "vyska_kycli"
+};
+static std::vector<ThreeDHumanoid> _humanoids;
+/** The pieces of the shared loads (ThreeDLoadPiece), by the indices' order. */
+static std::vector<ThreeDLoadPiece> _load_pieces;
+/** The sounds of the things of the indices ("zvuky"): "<jmeno>/<zvuk>" to its file (a path, or in a tar: IN_TAR, IN_BASESET_TAR). */
+static std::map<std::string, std::string> _thing_sounds;
+/** The places of the things asked for (GetThreeDThingPlace()): "<jmeno>/<uzel>" to where it is, nothing when it has none. */
+static std::map<std::string, std::optional<std::array<float, 3>>> _thing_places;
+
+/** The clock of the objects, seconds (ForgetUnusedThreeDObjects()): what was drawn when. */
+static std::atomic<uint32_t> _three_d_clock = 1;
+
+/** Mark a thing drawn now; from the threads making textures and the one making the pictures of the vehicles too, so as an atomic. */
+static inline void MarkThreeDUsed(uint32_t &used)
+{
+	std::atomic_ref<uint32_t>(used).store(_three_d_clock.load(std::memory_order_relaxed), std::memory_order_relaxed);
+}
+/** The effects of the indices ("druh": "efekt"): the fireworks over the hut. */
+static std::vector<ThreeDVehicleObject> _effect_objects;
+/** Cars of the game's own that drive about by themselves ("auto" with "jizda", three_d_walkers.h): the ÚV KSČ Tatra. */
+static std::vector<ThreeDVehicleObject> _driving_objects;
+/** The vehicle objects by the set's id, the vehicle type and the engine's number in the set: the object and which of its pieces. */
+static std::unordered_map<uint64_t, std::pair<uint32_t, int>> _vehicle_object_pieces;
+/**
+ * Every object a piece is of, by the same key, where it is of more than one (the colleague's lorries: the two ends of
+ * the trains of lorries, the same two pieces behind every one of five semi-trailers): which of them a vehicle's piece
+ * is of is told by the pieces around it (ThreeDVehicleObjectOf()).
+ */
+static std::unordered_map<uint64_t, std::vector<std::pair<uint32_t, int>>> _vehicle_object_shared_pieces;
+
+/** The key of an engine of a set in _vehicle_object_pieces. */
+static inline uint64_t VehiclePieceKey(uint32_t grfid, VehicleType type, uint16_t local_id)
+{
+	return (static_cast<uint64_t>(grfid) << 24) | (static_cast<uint64_t>(to_underlying(type)) << 16) | local_id;
+}
+
+/** A file's bytes, or nothing when it cannot be read. */
+/** A path of a file in a tar of the NewGRF folders begins so: the rest is its name in the tar (FioFOpenFile()). */
+static constexpr std::string_view IN_TAR = "tar:";
+/** And of one in a tar in baseset/decouple/, beside the game's own sets. */
+static constexpr std::string_view IN_BASESET_TAR = "btar:";
+
+/**
+ * Open a file of the objects at its first byte: a path on the disk, or IN_TAR and the name of a file in a tar of the
+ * NewGRF folders (a package of a GRF), IN_BASESET_TAR one in a tar of baseset/decouple/.
+ * @param[out] len its length
+ */
+static std::optional<FileHandle> OpenObjectFile(const std::string &path, size_t &len)
+{
+	len = 0;
+	std::optional<FileHandle> f;
+	if (path.starts_with(IN_TAR)) {
+		f = FioFOpenFile(std::string_view(path).substr(IN_TAR.size()), "rb", Subdirectory::NewGrf, &len);
+	} else if (path.starts_with(IN_BASESET_TAR)) {
+		f = FioFOpenFile(std::string_view(path).substr(IN_BASESET_TAR.size()), "rb", Subdirectory::Baseset, &len);
+	} else {
+		f = FileHandle::Open(path, "rb");
+		if (f.has_value()) {
+			fseek(*f, 0, SEEK_END);
+			long end = ftell(*f);
+			fseek(*f, 0, SEEK_SET);
+			len = end > 0 ? static_cast<size_t>(end) : 0;
+		}
+	}
+	return f;
+}
+
+/** A whole file of the objects (OpenObjectFile()). */
+static std::vector<uint8_t> ReadWholeFile(const std::string &path)
+{
+	std::vector<uint8_t> data;
+	size_t len = 0;
+	std::optional<FileHandle> f = OpenObjectFile(path, len);
+	if (!f.has_value() || len == 0 || len > 64 * 1024 * 1024) return data;
+	data.resize(len);
+	if (fread(data.data(), len, 1, *f) != 1) data.clear();
+	return data;
+}
+
+/**
+ * The picture of a glTF image given by its "uri", a file beside its .glb (the colleague's hra/3d/GLTFPACK-CC-PRO-HRU.md:
+ * the same textures of the girls once for all their poses): by its name relative to the .glb's folder, in the same
+ * folder or tar. Its bytes are shared with every file naming it (InternThreeDTextureBytes()).
+ * @return none when there is no such file, or the name reaches out of the folder
+ */
+static ThreeDTextureBytes GlbImageBeside(const std::string &glb_path, const nlohmann::json &img)
+{
+	if (!img.contains("uri") || !img.at("uri").is_string()) return {};
+	const std::string uri = img.at("uri").get<std::string>();
+	/* Its name as glTF writes it: %XX for what is not plain. */
+	std::string name;
+	for (size_t i = 0; i < uri.size(); i++) {
+		if (uri[i] == '%' && i + 2 < uri.size()) {
+			auto hex = ParseInteger<uint8_t>(std::string_view(uri).substr(i + 1, 2), 16);
+			if (hex.has_value()) {
+				name += static_cast<char>(*hex);
+				i += 2;
+				continue;
+			}
+		}
+		name += uri[i];
+	}
+	if (name.empty() || name.starts_with("data:") || name.find(':') != std::string::npos || name.find("..") != std::string::npos || name.front() == '/' || name.front() == '\\') return {};
+	const size_t slash = glb_path.find_last_of("/\\");
+	const std::vector<uint8_t> bytes = ReadWholeFile((slash == std::string::npos ? std::string() : glb_path.substr(0, slash + 1)) + name);
+	if (bytes.empty()) return {};
+	return InternThreeDTextureBytes(bytes);
+}
+
+/*
+ * The .glb files are kept only while something is read from them (GlbFilesScope): an add-on of a vehicle is read for
+ * its shape, its lamps and its red lights, the records of a package have the same add-ons (a file of the colleague's
+ * lorries is forty megabytes) -- read once for all of them. When it is read, the file is let go of at once, as the other
+ * games do (the player, 17. 10.: "when do the other games let go of the glb"); what was made of it stays.
+ */
+/** The files kept by the reading of this thread, and how deep its reading is. */
+static thread_local std::vector<std::pair<std::string, std::shared_ptr<const std::vector<uint8_t>>>> _glb_files_kept;
+static thread_local int _glb_files_scope = 0;
+/** The bytes of the files kept by all the threads now (the rig, test3d pamet). */
+static std::atomic<size_t> _glb_files_kept_bytes = 0;
+
+/** While it lives, the .glb files read on this thread are kept for each other reading of them; at the end let go of. */
+struct GlbFilesScope {
+	GlbFilesScope() { _glb_files_scope++; }
+	~GlbFilesScope();
+	GlbFilesScope(const GlbFilesScope &) = delete;
+	GlbFilesScope &operator=(const GlbFilesScope &) = delete;
+};
+
+/** A .glb file whole (ReadWholeFile()), or as it was read already by the reading going on (GlbFilesScope). */
+static std::shared_ptr<const std::vector<uint8_t>> GlbFileBytes(const std::string &path)
+{
+	for (const auto &[kept, bytes] : _glb_files_kept) {
+		if (kept == path) return bytes;
+	}
+	auto made = std::make_shared<const std::vector<uint8_t>>(ReadWholeFile(path));
+	if (_glb_files_scope > 0) {
+		_glb_files_kept.emplace_back(path, made);
+		_glb_files_kept_bytes += made->size();
+	}
+	return made;
+}
+
+/** The first bytes of a file (as ReadWholeFile() finds it): the header of a picture. */
+static std::vector<uint8_t> ReadFileHead(const std::string &path, size_t most)
+{
+	std::vector<uint8_t> data;
+	size_t len = 0;
+	std::optional<FileHandle> f = OpenObjectFile(path, len);
+	if (!f.has_value()) return data;
+	data.resize(std::min(len, most));
+	data.resize(fread(data.data(), 1, data.size(), *f));
+	return data;
+}
+
+/** The little-endian 32 bits at an offset. */
+static uint32_t ReadU32(std::span<const uint8_t> d, size_t at)
+{
+	return d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
+}
+
+/** The bytes of one number of an accessor's component type (glTF's 5120 to 5126). */
+static size_t GlbComponentSize(int type)
+{
+	return type == 5126 || type == 5125 ? 4 : type == 5123 || type == 5122 ? 2 : 1;
+}
+
+/**
+ * One number of an accessor: a float, or a whole number of any size, signed or not. A normalised one is the fraction of
+ * its largest (a signed one -1 at the least): KHR_mesh_quantization (gltfpack, the colleague's hra/3d/PROSBA-TATRY-DOMY-
+ * POSTAVY.md) stores the normals and the texture coordinates so, the positions as whole numbers, a node's transform
+ * making them metres again.
+ * @throw std::invalid_argument for a type glTF does not have
+ */
+static double ReadGlbNumber(std::span<const uint8_t> d, size_t at, int type, bool normalized)
+{
+	switch (type) {
+		case 5126: return std::bit_cast<float>(ReadU32(d, at));
+		case 5125: return ReadU32(d, at);
+		case 5123: {
+			const double v = d[at] | (d[at + 1] << 8);
+			return normalized ? v / 65535.0 : v;
+		}
+		case 5122: {
+			const double v = static_cast<int16_t>(d[at] | (d[at + 1] << 8));
+			return normalized ? std::max(v / 32767.0, -1.0) : v;
+		}
+		case 5121: return normalized ? d[at] / 255.0 : d[at];
+		case 5120: {
+			const double v = static_cast<int8_t>(d[at]);
+			return normalized ? std::max(v / 127.0, -1.0) : v;
+		}
+		default: throw std::invalid_argument("component type");
+	}
+}
+
+/**
+ * Which lights the glass of a vehicle's "noc" is of, by its material's name (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md
+ * and VAGONY-3D-V5-PRO-HRU.md): 0 the headlights ("svetlo_predni"), 1 the red lights at the back ("svetlo_zadni"), 2 the
+ * headlights on the back end ("svetlo_predni_vzad", lit when it leads going back first), 3 the red lights on the front
+ * end ("svetlo_zadni_vpred", lit when nothing follows it going back first).
+ */
+static uint8_t NightLightKind(std::string_view material)
+{
+	if (material.find("predni_vzad") != std::string_view::npos) return 2;
+	if (material.find("zadni_vpred") != std::string_view::npos) return 3;
+	return material.find("zadni") != std::string_view::npos ? 1 : 0;
+}
+
+/**
+ * Why a .glb is not read as it is: an extension it requires that the game cannot read -- its meshes compressed by
+ * Draco, its pictures not PNG (gltfpack's -tc: KTX2, Basis; WebP). Quantised meshes (KHR_mesh_quantization), meshes
+ * compressed by gltfpack's -c, -cc (EXT_ and KHR_meshopt_compression, GlbMeshopt()) and moved textures
+ * (KHR_texture_transform) are read.
+ * @return empty when it can be read
+ */
+static std::string GlbExtensionNotRead(const nlohmann::json &j)
+{
+	if (!j.contains("extensionsRequired") || !j.at("extensionsRequired").is_array()) return {};
+	for (const auto &e : j.at("extensionsRequired")) {
+		if (!e.is_string()) continue;
+		const std::string name = e.get<std::string>();
+		if (name == "KHR_draco_mesh_compression" || name == "KHR_texture_basisu" || name == "EXT_texture_webp") {
+			return "requires " + name + ", which the game does not read (gltfpack: without -tc)";
+		}
+	}
+	return {};
+}
+
+/**
+ * A buffer view's compression by gltfpack's -c, -cc (EXT_meshopt_compression, KHR_meshopt_compression): where its
+ * compressed bytes are and how they are to be unpacked (UnpackGlbMeshopt()). nullptr: it is not compressed.
+ */
+static const nlohmann::json *GlbMeshopt(const nlohmann::json &view)
+{
+	if (!view.contains("extensions")) return nullptr;
+	const auto &ext = view.at("extensions");
+	for (const char *name : {"KHR_meshopt_compression", "EXT_meshopt_compression"}) {
+		if (ext.contains(name)) return &ext.at(name);
+	}
+	return nullptr;
+}
+
+/**
+ * The bytes of a buffer view compressed by gltfpack (GlbMeshopt()) as they are without it: unpacked
+ * (meshoptimizer's decoder), and the filter undone that made its numbers pack better.
+ * @param compressed its compressed bytes
+ * @throw std::invalid_argument when they cannot be unpacked
+ */
+static std::vector<uint8_t> UnpackGlbMeshopt(const nlohmann::json &ext, std::span<const uint8_t> compressed)
+{
+	const size_t count = ext.at("count").get<size_t>();
+	const size_t stride = ext.at("byteStride").get<size_t>();
+	const std::string mode = ext.at("mode").get<std::string>();
+	const std::string filter = ext.value("filter", "NONE");
+	/* What the decoder asks of them (it asserts it). */
+	const bool sizes = mode == "ATTRIBUTES" ? stride % 4 == 0 && stride <= 256 : (stride == 2 || stride == 4) && (mode != "TRIANGLES" || count % 3 == 0);
+	const bool filter_size = filter == "QUATERNION" ? stride == 8 : filter == "EXPONENTIAL" ? stride % 4 == 0 : filter == "NONE" || stride == 4 || stride == 8;
+	if (stride == 0 || !sizes || !filter_size || count > (size_t{1} << 28)) throw std::invalid_argument("compressed view's size");
+	std::vector<uint8_t> out(count * stride);
+	int rc;
+	if (mode == "ATTRIBUTES") {
+		rc = meshopt_decodeVertexBuffer(out.data(), count, stride, compressed.data(), compressed.size());
+	} else if (mode == "TRIANGLES") {
+		rc = meshopt_decodeIndexBuffer(out.data(), count, stride, compressed.data(), compressed.size());
+	} else if (mode == "INDICES") {
+		rc = meshopt_decodeIndexSequence(out.data(), count, stride, compressed.data(), compressed.size());
+	} else {
+		throw std::invalid_argument("compressed view's mode " + mode);
+	}
+	if (rc != 0) throw std::invalid_argument(fmt::format("compressed view cannot be unpacked ({})", rc));
+	if (filter == "OCTAHEDRAL") {
+		meshopt_decodeFilterOct(out.data(), count, stride);
+	} else if (filter == "QUATERNION") {
+		meshopt_decodeFilterQuat(out.data(), count, stride);
+	} else if (filter == "EXPONENTIAL") {
+		meshopt_decodeFilterExp(out.data(), count, stride);
+	} else if (filter == "COLOR") {
+		meshopt_decodeFilterColor(out.data(), count, stride);
+	} else if (filter != "NONE") {
+		throw std::invalid_argument("compressed view's filter " + filter);
+	}
+	return out;
+}
+
+/**
+ * A material's base colour texture: glTF's own, or the diffuse one of the older KHR_materials_pbrSpecularGlossiness,
+ * which goes before it where it is (the player, #287: the fennec and a wolf "have no colour"; nine of the colleague's
+ * dogs keep their colour so, their base colour only a stand-in). nullptr: none.
+ */
+static const nlohmann::json *GlbColourTexture(const nlohmann::json &mat)
+{
+	if (mat.contains("extensions") && mat.at("extensions").contains("KHR_materials_pbrSpecularGlossiness")) {
+		const auto &sg = mat.at("extensions").at("KHR_materials_pbrSpecularGlossiness");
+		if (sg.contains("diffuseTexture")) return &sg.at("diffuseTexture");
+	}
+	if (mat.contains("pbrMetallicRoughness") && mat.at("pbrMetallicRoughness").contains("baseColorTexture")) return &mat.at("pbrMetallicRoughness").at("baseColorTexture");
+	return nullptr;
+}
+
+/** A material's base colour, red, green, blue and alpha (as GlbColourTexture(): the diffuse one first); nullptr: none. */
+static const nlohmann::json *GlbColourFactor(const nlohmann::json &mat)
+{
+	const nlohmann::json *f = nullptr;
+	if (mat.contains("extensions") && mat.at("extensions").contains("KHR_materials_pbrSpecularGlossiness")) {
+		const auto &sg = mat.at("extensions").at("KHR_materials_pbrSpecularGlossiness");
+		if (sg.contains("diffuseFactor")) f = &sg.at("diffuseFactor");
+	}
+	if (f == nullptr && mat.contains("pbrMetallicRoughness") && mat.at("pbrMetallicRoughness").contains("baseColorFactor")) f = &mat.at("pbrMetallicRoughness").at("baseColorFactor");
+	return f != nullptr && f->is_array() && f->size() == 4 ? f : nullptr;
+}
+
+/**
+ * How a material moves its base colour texture over the coordinates (KHR_texture_transform: gltfpack stores the texture
+ * coordinates as fractions of where they lie, the move making them what they were): u' = a[0] + a[2] u + a[3] v,
+ * v' = a[1] + a[4] u + a[5] v; {0, 0, 1, 0, 0, 1} when it does not.
+ */
+static std::array<double, 6> GlbUvTransform(const nlohmann::json &j, int material)
+{
+	std::array<double, 6> a{0, 0, 1, 0, 0, 1};
+	if (material < 0 || !j.contains("materials") || static_cast<size_t>(material) >= j.at("materials").size()) return a;
+	const nlohmann::json *colour = GlbColourTexture(j.at("materials").at(material));
+	if (colour == nullptr) return a;
+	const auto &info = *colour;
+	if (!info.contains("extensions") || !info.at("extensions").contains("KHR_texture_transform")) return a;
+	const auto &t = info.at("extensions").at("KHR_texture_transform");
+	double offset[2] = {0, 0}, scale[2] = {1, 1};
+	if (t.contains("offset")) for (int k = 0; k < 2; k++) offset[k] = t.at("offset").at(k).get<double>();
+	if (t.contains("scale")) for (int k = 0; k < 2; k++) scale[k] = t.at("scale").at(k).get<double>();
+	const double r = t.value("rotation", 0.0), c = std::cos(r), s = std::sin(r);
+	/* translation * rotation * scale, the rotation as the extension has it */
+	a = {offset[0], offset[1], c * scale[0], s * scale[1], -s * scale[0], c * scale[1]};
+	return a;
+}
+
+/**
+ * The .glb files whose pictures have the background about their pieces filled already ("okraje_textur" of their
+ * record, the colleague's hra/3d/ZRYCHLENI-3D-GRF.md): where their triangles draw from is not worked out for them
+ * (TextureCover()), nor the rest of the picture filled from it -- for a big atlas hundreds of milliseconds of reading.
+ */
+static std::set<std::string> _glb_margins_filled[2]; ///< of the buildings' indices, of the vehicles' (each read anew on its own)
+static std::mutex _glb_margins_mutex;
+
+/** Which of _glb_margins_filled: the files of the buildings' indices, or of the vehicles' (with their figures and effects). */
+enum class MarginsOf : uint8_t { Buildings, Vehicles };
+
+/** Note a file of a record that says its pictures have their margins filled ("okraje_textur": the width, or true). */
+static void NoteMarginsFilled(const nlohmann::json &e, const std::string &path, MarginsOf of)
+{
+	if (!e.contains("okraje_textur")) return;
+	const auto &m = e.at("okraje_textur");
+	if (!(m.is_number() ? m.get<double>() > 0 : m.is_boolean() && m.get<bool>())) return;
+	std::lock_guard lock(_glb_margins_mutex);
+	_glb_margins_filled[to_underlying(of)].insert(path);
+}
+
+/** The indices of the buildings or of the vehicles are read anew: what they said before goes. */
+static void ForgetMarginsFilled(MarginsOf of)
+{
+	std::lock_guard lock(_glb_margins_mutex);
+	_glb_margins_filled[to_underlying(of)].clear();
+}
+
+/** Whether a file's pictures have their margins filled already (NoteMarginsFilled()). */
+static bool MarginsFilled(const std::string &path)
+{
+	std::lock_guard lock(_glb_margins_mutex);
+	return _glb_margins_filled[0].contains(path) || _glb_margins_filled[1].contains(path);
+}
+
+/**
+ * A .glb as its meshes are read from it (ReadGlbMesh()): its JSON parsed once, and of its binary buffer only the
+ * pieces the meshes and pictures read need (Piece()), read from the file as they are wanted. A file of the colleague's
+ * add-ons is forty megabytes of ten trailers, a lorry shows one of them, and all of it was read (on a cold disk five
+ * seconds for one lorry). Kept, with what was read of it, while a reading goes on on its thread (GlbFilesScope).
+ */
+struct GlbFile {
+	std::string path;
+	nlohmann::json json;
+	std::string error;              ///< why it cannot be read; empty when it can
+	size_t bin_at = 0, bin_len = 0; ///< its binary chunk: where in the file, how long
+	size_t bytes = 0;               ///< the bytes of the pieces read
+
+	explicit GlbFile(const std::string &path) : path(path)
+	{
+		if (!this->Open()) {
+			this->error = "cannot be opened";
+			return;
+		}
+		uint8_t head[20];
+		if (this->length < sizeof(head) || fread(head, sizeof(head), 1, *this->file) != 1 || ReadU32(head, 0) != 0x46546C67 || ReadU32(head, 4) != 2 || ReadU32(head, 16) != 0x4E4F534A) {
+			this->error = "not a glTF binary";
+			return;
+		}
+		/* The chunks: the JSON, then the binary buffer. */
+		const size_t json_len = ReadU32(head, 12);
+		if (20 + json_len > this->length) {
+			this->error = "its JSON is past its end";
+			return;
+		}
+		std::string text(json_len, '\0');
+		if (json_len > 0 && fread(text.data(), json_len, 1, *this->file) != 1) {
+			this->error = "its JSON cannot be read";
+			return;
+		}
+		try {
+			this->json = nlohmann::json::parse(text);
+		} catch (const std::exception &e) {
+			this->error = e.what();
+			return;
+		}
+		this->error = GlbExtensionNotRead(this->json);
+		if (!this->error.empty()) return;
+		const size_t bin_head = 20 + ((json_len + 3) & ~size_t{3});
+		uint8_t chunk[8];
+		if (bin_head + 8 <= this->length && fseek(*this->file, static_cast<long>(this->base + bin_head), SEEK_SET) == 0 && fread(chunk, sizeof(chunk), 1, *this->file) == 1 && ReadU32(chunk, 4) == 0x004E4942) {
+			this->bin_at = bin_head + 8;
+			this->bin_len = std::min<size_t>(ReadU32(chunk, 0), this->length - this->bin_at);
+		}
+	}
+
+	~GlbFile()
+	{
+		_glb_files_kept_bytes -= this->bytes;
+	}
+
+	/**
+	 * Bytes of its binary buffer, read the first time they are wanted.
+	 * @throw std::out_of_range when they are past its end
+	 */
+	std::span<const uint8_t> Piece(size_t offset, size_t len)
+	{
+		if (offset > this->bin_len || len > this->bin_len - offset) throw std::out_of_range("past the buffer");
+		for (const auto &[at, piece] : this->pieces) {
+			if (at <= offset && offset + len <= at + piece.size()) return std::span<const uint8_t>(piece).subspan(offset - at, len);
+		}
+		std::vector<uint8_t> piece(len);
+		if (len > 0) {
+			if (!this->file.has_value() && !this->Open()) throw std::runtime_error("cannot be opened again");
+			if (fseek(*this->file, static_cast<long>(this->base + this->bin_at + offset), SEEK_SET) != 0 || fread(piece.data(), len, 1, *this->file) != 1) throw std::runtime_error("cannot be read");
+		}
+		this->bytes += len;
+		_glb_files_kept_bytes += len;
+		return this->pieces.emplace_back(offset, std::move(piece)).second;
+	}
+
+	/**
+	 * Bytes of a buffer view, from where in it: as they are in the file, or unpacked when gltfpack compressed it
+	 * (GlbMeshopt()), unpacked the first time they are wanted.
+	 * @throw std::out_of_range when they are past its end
+	 */
+	std::span<const uint8_t> ViewPiece(int index, size_t offset, size_t len)
+	{
+		const auto &view = this->json.at("bufferViews").at(index);
+		const nlohmann::json *ext = GlbMeshopt(view);
+		if (ext == nullptr) return this->Piece(view.value("byteOffset", size_t{0}) + offset, len);
+		auto found = this->unpacked.find(index);
+		if (found == this->unpacked.end()) {
+			std::vector<uint8_t> bytes = UnpackGlbMeshopt(*ext, this->Piece(ext->value("byteOffset", size_t{0}), ext->at("byteLength").get<size_t>()));
+			this->bytes += bytes.size();
+			_glb_files_kept_bytes += bytes.size();
+			found = this->unpacked.emplace(index, std::move(bytes)).first;
+		}
+		if (offset > found->second.size() || len > found->second.size() - offset) throw std::out_of_range("past the view");
+		return std::span<const uint8_t>(found->second).subspan(offset, len);
+	}
+
+	/** Let go of the open file (between the readings): what was read of it stays. */
+	void Close()
+	{
+		this->file.reset();
+	}
+
+private:
+	std::optional<FileHandle> file;
+	size_t base = 0;   ///< where its first byte is in what was opened (a file in a tar)
+	size_t length = 0;
+	std::vector<std::pair<size_t, std::vector<uint8_t>>> pieces;
+	std::map<int, std::vector<uint8_t>> unpacked; ///< buffer views gltfpack compressed, unpacked (ViewPiece())
+
+	bool Open()
+	{
+		this->file = OpenObjectFile(this->path, this->length);
+		if (!this->file.has_value()) return false;
+		const long at = ftell(*this->file);
+		this->base = at > 0 ? static_cast<size_t>(at) : 0;
+		return true;
+	}
+};
+
+/** The .glb files being read on this thread (GlbFileOf()), kept while the reading goes on (GlbFilesScope). */
+static thread_local std::vector<std::shared_ptr<GlbFile>> _glb_read_kept;
+
+/** A .glb to read the meshes of (GlbFile), or as it is being read already by the reading going on. */
+static std::shared_ptr<GlbFile> GlbFileOf(const std::string &path)
+{
+	for (const auto &kept : _glb_read_kept) {
+		if (kept->path == path) return kept;
+	}
+	auto made = std::make_shared<GlbFile>(path);
+	if (_glb_files_scope > 0) _glb_read_kept.push_back(made);
+	return made;
+}
+
+GlbFilesScope::~GlbFilesScope()
+{
+	if (--_glb_files_scope > 0) return;
+	for (const auto &[path, bytes] : _glb_files_kept) _glb_files_kept_bytes -= bytes->size();
+	_glb_files_kept.clear();
+	_glb_read_kept.clear();
+}
+
+/*
+ * The textures by need (the player, 17. 10.: "textures, how do the other games do it? then probably yes"): a texture of
+ * the colleague's lorries is a picture of sixteen million pixels, halved for each level of detail 85 MB, and the map
+ * draws a level two or three coarser. A texture is made with only the levels from the finest asked for down (the finer
+ * ones without their pixels, their sizes kept); one asked for finer is made again from its picture (the view from the
+ * eyes close to it), what is not asked for any more let go of every quarter of a minute (TrimThreeDTextures()).
+ */
+/** The finest level of a texture that has its pixels. */
+static int FinestLevel(const std::vector<ThreeDObjectTexture> &lv)
+{
+	for (size_t i = 0; i < lv.size(); i++) {
+		if (!lv[i].px.empty()) return static_cast<int>(i);
+	}
+	return static_cast<int>(lv.size()) - 1;
+}
+
+/**
+ * The level of a texture drawn for a level asked for: that one, or of a texture of few colours in cells no coarser
+ * than its cells (ThreeDObjectTexture::coarsest) -- the coarser levels mix their colours.
+ */
+static int DrawnLevel(const std::vector<ThreeDObjectTexture> &lv, int level)
+{
+	return lv.empty() ? level : std::min<int>(level, lv.front().coarsest);
+}
+
+/** Whether a texture has a level with its pixels (or a coarser one, the coarsest there is). */
+static bool HasLevel(const std::vector<ThreeDObjectTexture> &lv, int level)
+{
+	return FinestLevel(lv) <= std::min(DrawnLevel(lv, level), static_cast<int>(lv.size()) - 1);
+}
+
+/** Let go of the pixels of the levels finer than a level; their sizes stay. */
+static void DropFinerLevels(std::vector<ThreeDObjectTexture> &lv, int finest)
+{
+	for (int i = 0; i < finest && i + 1 < static_cast<int>(lv.size()); i++) {
+		lv[i].px.clear();
+		lv[i].px.shrink_to_fit();
+	}
+}
+
+/** The pictures of the textures as one copy each (InternThreeDTextureBytes()), by a hash of their bytes; and those made. */
+static std::unordered_multimap<size_t, std::weak_ptr<const std::vector<uint8_t>>> _texture_bytes;
+static size_t _texture_bytes_made = 0;
+/** The textures made of the pictures (ThreeDTextureLevelsOf()), by the picture and the colour of a material without one. */
+struct TextureLevelsMade {
+	std::weak_ptr<const std::vector<uint8_t>> bytes; ///< its picture, while anything has it (its place cannot be another's then)
+	std::weak_ptr<const std::vector<ThreeDObjectTexture>> levels;
+};
+static std::map<std::tuple<const std::vector<uint8_t> *, uint32_t, bool>, TextureLevelsMade> _texture_levels;
+/** The textures of files made (TextureLevelsOfFile()), by the file and the colour of what is not in the picture. */
+static std::map<std::pair<std::string, uint32_t>, std::weak_ptr<const std::vector<ThreeDObjectTexture>>> _file_texture_levels;
+/** The masks of details made (DetailMaskOfFile()), by their file. */
+static std::map<std::string, std::weak_ptr<const ThreeDDetailMask>, std::less<>> _detail_masks_made;
+/**
+ * Where the triangles of the files draw from each picture (TextureCover()): u and v of the three corners of each
+ * triangle of a material of the picture, all of the file's meshes, by the picture.
+ */
+using TextureCoverTriangles = std::shared_ptr<const std::vector<float>>;
+struct TextureCoverMade {
+	std::weak_ptr<const std::vector<uint8_t>> bytes; ///< its picture, while anything has it
+	TextureCoverTriangles cover;
+};
+static std::map<const std::vector<uint8_t> *, TextureCoverMade> _texture_covers;
+static std::mutex _texture_bytes_mutex;
+
+/** Where the triangles draw from a picture (the cover of its bytes as the files using it were read), nullptr not known. */
+static TextureCoverTriangles TextureCover(const ThreeDTextureBytes &png)
+{
+	if (png == nullptr) return nullptr;
+	std::lock_guard lock(_texture_bytes_mutex);
+	auto it = _texture_covers.find(png.get());
+	if (it == _texture_covers.end() || it->second.bytes.lock() != png) return nullptr;
+	return it->second.cover;
+}
+
+/**
+ * A texture's picture as one copy for all that have the same: the materials of an add-on of the colleague's lorries are
+ * tens, all of one picture of sixteen million pixels, and every record of the package has the add-on. Each copy had
+ * its own bytes, and each was made into its own texture (the twenty four lorries took four seconds each, at the start).
+ * @return nullptr for no bytes
+ */
+ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes)
+{
+	if (bytes.empty()) return nullptr;
+	const size_t hash = std::hash<std::string_view>{}(std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+	std::lock_guard lock(_texture_bytes_mutex);
+	auto [first, last] = _texture_bytes.equal_range(hash);
+	for (auto it = first; it != last; ++it) {
+		ThreeDTextureBytes known = it->second.lock();
+		if (known != nullptr && std::ranges::equal(*known, bytes)) return known;
+	}
+	/* Now and then those nothing has any more go. */
+	if (++_texture_bytes_made % 256 == 0) std::erase_if(_texture_bytes, [](const auto &e) { return e.second.expired(); });
+	auto made = std::make_shared<const std::vector<uint8_t>>(bytes.begin(), bytes.end());
+	_texture_bytes.emplace(hash, made);
+	return made;
+}
+
+/**
+ * A texture made of a picture (DecodeTextureLevels()), one for all the objects that have the same picture.
+ * @param png the picture (InternThreeDTextureBytes()), nullptr none: the material's colour
+ * @param flat the material's colour where it has no picture
+ * @param finest the finest level wanted: those finer are made without their pixels
+ * @param soft its texels' alpha kept (a material "BLEND", DecodeTextureLevels())
+ */
+static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, uint32_t flat, int finest = 0, bool soft = false)
+{
+	const TextureCoverTriangles cover = TextureCover(png);
+	const auto key = std::make_tuple(png.get(), flat, soft);
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = _texture_levels.find(key);
+		if (it != _texture_levels.end()) {
+			ThreeDTextureLevels known = it->second.levels.lock();
+			if (known != nullptr && it->second.bytes.lock() == png && HasLevel(*known, finest)) return known;
+		}
+	}
+	static const std::vector<uint8_t> none;
+	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
+	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat, true, cover.get(), soft);
+	DropFinerLevels(*made, DrawnLevel(*made, finest));
+	std::lock_guard lock(_texture_bytes_mutex);
+	if (_texture_levels.size() > 64) std::erase_if(_texture_levels, [](const auto &e) { return e.second.levels.expired(); });
+	_texture_levels[key] = TextureLevelsMade{png, made};
+	return made;
+}
+
+/**
+ * A texture of a file of its own (a paint, "textura"; a mask), one for all the objects that have the file.
+ * @param flat the colour of the pixels the picture has not
+ * @param of the picture of the model whose layout it has (the body's, an add-on's): where its triangles draw from (TextureCover())
+ * @return nullptr when it cannot be read
+ */
+static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t flat, const ThreeDTextureBytes &of = nullptr, int finest = 0)
+{
+	const auto key = std::make_pair(file, flat);
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = _file_texture_levels.find(key);
+		if (it != _file_texture_levels.end()) {
+			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr && HasLevel(*known, finest)) return known;
+		}
+	}
+	std::vector<uint8_t> png = ReadWholeFile(file);
+	if (png.empty()) return nullptr;
+	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
+	const TextureCoverTriangles cover = TextureCover(of);
+	DecodeTextureLevels(png, *made, flat, true, cover.get());
+	DropFinerLevels(*made, DrawnLevel(*made, finest));
+	std::lock_guard lock(_texture_bytes_mutex);
+	_file_texture_levels[key] = made;
+	return made;
+}
+
+/**
+ * A mask of a file ("lak" "maska", "rez" "maska", an add-on's "barva" "maska"), its grey in the red; nullptr without it.
+ * @param of the picture of the model it is the mask of (TextureLevelsOfFile())
+ */
+static ThreeDTextureLevels MaskLevelsOfFile(const std::string &file, const ThreeDTextureBytes &of = nullptr, int finest = 0)
+{
+	return TextureLevelsOfFile(file, Colour(0, 0, 0).data, of, finest);
+}
+
+/**
+ * A mask of details of a file (ThreeDDetailMask), one for all the objects that have it; nullptr when it cannot be read.
+ * @param of the picture of the model it is the mask of (TextureLevelsOfFile())
+ */
+static std::shared_ptr<const ThreeDDetailMask> DetailMaskOfFile(const std::string &file, const ThreeDTextureBytes &of = nullptr)
+{
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = _detail_masks_made.find(file);
+		if (it != _detail_masks_made.end()) {
+			if (auto known = it->second.lock(); known != nullptr) return known;
+		}
+	}
+	std::vector<ThreeDObjectTexture> levels;
+	std::vector<uint8_t> png = ReadWholeFile(file);
+	/* Only as it is: a mask index is not halved; where no triangle draws from it, the index nearest. */
+	const TextureCoverTriangles cover = TextureCover(of);
+	if (!png.empty()) DecodeTextureLevels(png, levels, Colour(0, 0, 0).data, false, cover.get());
+	if (levels.empty() || levels[0].w <= 1) return nullptr;
+	auto mask = std::make_shared<ThreeDDetailMask>();
+	mask->w = levels[0].w;
+	mask->h = levels[0].h;
+	mask->index.resize(levels[0].px.size());
+	for (size_t i = 0; i < mask->index.size(); i++) mask->index[i] = levels[0].px[i] == 0 ? 0 : Colour(levels[0].px[i]).r;
+	std::lock_guard lock(_texture_bytes_mutex);
+	_detail_masks_made[file] = mask;
+	return mask;
+}
+
+/** A texture of a .glb: the PNG as it is in the file, or a plain colour where a material has none. */
+struct GlbTexture {
+	std::string name;          ///< the material's name
+	ThreeDTextureBytes png;    ///< its picture, nullptr none
+	uint32_t flat = 0; ///< the material's base colour factor (Colour::data) when it has no picture
+	bool double_sided = false; ///< the material's "doubleSided": its triangles are seen from behind too
+	uint32_t glow = 0;         ///< its own light (ThreeDVehicleShape::tex_glow), 0 none
+	uint8_t alpha = 255;       ///< how much of what is behind it hides (ThreeDVehicleShape::tex_alpha)
+};
+
+/**
+ * A material's own light and see-through (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md: the fire Tatra's
+ * beacon lit, the ghost "BLEND, 0.7, it shines by itself at night"): its "emissiveFactor" -- times the texel with an
+ * "emissiveTexture" --, and with "alphaMode" "BLEND" the alpha of its base colour, below 255 whatever it is: a material
+ * "BLEND" is see-through as much as its alpha times its texels' (the colleague's saucer's beam, fading to the ground
+ * in its texture alone).
+ */
+static void ReadMaterialLight(const nlohmann::json &mat, GlbTexture &t)
+{
+	if (mat.contains("emissiveFactor") && mat.at("emissiveFactor").is_array() && mat.at("emissiveFactor").size() == 3) {
+		const auto &f = mat.at("emissiveFactor");
+		auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f.at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+		const Colour e(c(0), c(1), c(2), mat.contains("emissiveTexture") ? ThreeDVehicleShape::GLOW_TEXTURED : ThreeDVehicleShape::GLOW_FLAT);
+		if (e.r != 0 || e.g != 0 || e.b != 0) t.glow = e.data;
+	}
+	if (mat.value("alphaMode", std::string()) == "BLEND") {
+		t.alpha = 254;
+		if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
+			t.alpha = static_cast<uint8_t>(std::min(254.0, std::clamp(f->at(3).get<double>(), 0.0, 1.0) * 255.0 + 0.5));
+		}
+	}
+}
+
+/** The meshes of a .glb as read: metres, in the game's axes (x, y, z up), normals when the file has them. */
+struct GlbMesh {
+	std::vector<float> pos;    ///< x, y, z of each corner
+	std::vector<float> nrm;    ///< its normal, or empty
+	std::vector<float> uv;     ///< u, v of each corner
+	std::vector<uint32_t> tri; ///< three corners a triangle
+	std::vector<uint8_t> tri_tex;      ///< the texture of each triangle, an index into textures
+	std::vector<GlbTexture> textures;  ///< the textures of the materials
+	std::vector<uint8_t> png;  ///< the first material's texture as it is in the file (a building's own texture)
+	int png_texture = -1;      ///< and its index in textures, -1 none
+	std::vector<uint16_t> tri_group;   ///< with groups, each triangle's: n the node groups[n - 1] it is under, 0 none
+	std::vector<uint16_t> tri_mark;    ///< with marks, each triangle's: n the node marks[n - 1] it is under, 0 none
+	std::vector<uint8_t> tri_glass;    ///< with a glass suffix, each triangle: 1 under a node whose name ends so
+};
+
+/**
+ * What of a .glb ReadGlbMesh() reads, beyond its meshes: see there. The parts of a vehicle's add-ons (the colleague's
+ * hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md) need more of it than a building does -- only the nodes the states show, each
+ * part's windows, lamps and wheels told apart within it.
+ */
+/**
+ * Whether a node of a house's or an interior's .glb is the wing of a door ("dvere_NN") or of a window ("okno_NN", the
+ * colleague's shutters of the forest cabin, hra/3d/PASTVINY-OKNA-ROZHLEDNA-PRO-HRU.md): an object of its own, opened
+ * and shut with E about the node's origin, the hinge.
+ */
+static bool IsWingNode(std::string_view name)
+{
+	return name.starts_with("dvere_") || name.starts_with("okno_");
+}
+
+struct GlbReadOptions {
+	bool all_nodes = false;
+	std::string_view frame_prefix;
+	int frame = 0;
+	std::string_view only_node;
+	std::string_view point_prefix;
+	std::string_view point_skip;  ///< with point_prefix, the nodes whose names start so are not of its places
+	std::vector<float> *points = nullptr;
+	std::vector<uint16_t> *point_groups = nullptr; ///< with points, each place's group (as tri_group), 0 none
+	std::vector<std::string> *point_names = nullptr; ///< with points, each place's node's name
+	std::string_view skip_node;
+	bool skip_wings = false;      ///< with all_nodes, the wings of doors and windows (IsWingNode(), read on their own) and their children left out
+	const std::vector<std::string> *skip_nodes = nullptr; ///< with all_nodes, the nodes so named (and their children) left out
+	const std::vector<std::string> *groups = nullptr;
+	bool only_groups = false;     ///< with groups, only the meshes under the groups' nodes (an add-on: the nodes no state shows not read at all)
+	bool skip_night = false;      ///< the nodes "noc" and "noc_<...>" and their children left out (lit only at night)
+	bool only_night = false;      ///< only the meshes under the nodes "noc" and "noc_<...>"
+	const std::vector<std::string> *marks = nullptr; ///< a second marking of nodes by name, as groups (GlbMesh::tri_mark): a part's wheels
+	std::string_view glass_suffix; ///< the nodes whose names end so (and their children) are glass (GlbMesh::tri_glass)
+	bool points_only = false;     ///< only the places (points), no mesh read: the lights at the back of an add-on's parts
+	bool frames_only = false;     ///< with frame_prefix, only the meshes under the frame's node (the torch's flame without its stick)
+	const std::vector<std::string> *skip_materials = nullptr; ///< the triangles of the materials so named left out
+	/** With groups and only_groups, the nodes whose materials are taken as textures first, in the order they are met, before
+	 * only those of groups are read: the textures of an add-on the same whatever of its nodes are read. */
+	const std::vector<std::string> *material_groups = nullptr;
+};
+
+/** Whether a node is of the lights at night: "noc", or "noc_<part>" of an add-on's part. */
+static inline bool IsNightNode(std::string_view name)
+{
+	return name == "noc" || name.starts_with("noc_");
+}
+
+/**
+ * Read the meshes of a .glb: their triangles, their corners' positions, normals and texture coordinates, the
+ * nodes' transforms applied, turned from glTF's axes (Y up, as Blender writes x, z, -y) into the game's, in metres;
+ * and the PNG of each material's base colour texture, kept as it is until the object is drawn.
+ * @param all_nodes every node of the scene, its children with their parents' transforms, one mesh as often as
+ *                  nodes name it (a vehicle: one wheel in the file, at every place it is; Blender's linked
+ *                  duplicates); else the first node with a mesh only (a building, as it always was read)
+ * @param frame_prefix with all_nodes, a figure that moves (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md): of the
+ *                     nodes whose names start so, the frames, only the one numbered frame (and its children)
+ * @param frame that frame
+ * @param only_node with all_nodes, only the meshes of the node so named and its children (a building's "noc")
+ * @param point_prefix with all_nodes and points, the nodes whose names start so are places: their origins go to points
+ * @param points where the places go, metres in the game's axes as the corners
+ * @param skip_node with all_nodes, the node so named and its children are left out (a vehicle's "noc", drawn only at night)
+ * @return whether there is something to draw
+ * @param groups with all_nodes, the nodes whose triangles (and their children's) are marked (GlbMesh::tri_group)
+ */
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOptions &o);
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0, std::string_view only_node = {}, std::string_view point_prefix = {}, std::vector<float> *points = nullptr, std::string_view skip_node = {}, const std::vector<std::string> *groups = nullptr)
+{
+	GlbReadOptions o;
+	o.all_nodes = all_nodes;
+	o.frame_prefix = frame_prefix;
+	o.frame = frame;
+	o.only_node = only_node;
+	o.point_prefix = point_prefix;
+	o.points = points;
+	o.skip_node = skip_node;
+	o.groups = groups;
+	return ReadGlbMesh(path, mesh, o);
+}
+
+/** @copydoc ReadGlbMesh() */
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOptions &o)
+{
+	const bool all_nodes = o.all_nodes;
+	const std::string_view frame_prefix = o.frame_prefix;
+	const int frame = o.frame;
+	const std::string_view only_node = o.only_node;
+	const std::string_view point_prefix = o.point_prefix;
+	std::vector<float> *points = o.points;
+	const std::string_view skip_node = o.skip_node;
+	const std::vector<std::string> *groups = o.groups;
+	const std::vector<std::string> *marks = o.marks;
+	const std::shared_ptr<GlbFile> glb = GlbFileOf(path);
+	/* Its file let go of when this reading is done; what was read of it stays while the reading goes on. */
+	struct CloseAfter {
+		GlbFile &glb;
+		~CloseAfter() { this->glb.Close(); }
+	} close_after{*glb};
+	if (!glb->error.empty()) {
+		Debug(misc, 0, "3D object {}: {}", path, glb->error);
+		ReadDiary(fmt::format("soubor {}: {}", path, glb->error), true);
+		return false;
+	}
+	using Matrix = std::array<double, 16>; // column-major
+	try {
+		const nlohmann::json &j = glb->json;
+		const auto &accessors = j.at("accessors");
+		const auto &views = j.at("bufferViews");
+		/* An accessor's bytes, read from the file when first wanted (GlbFile::ViewPiece()), and how they lie. */
+		struct AccessorBytes {
+			std::span<const uint8_t> bytes;
+			int type = 0;
+			bool normalized = false;
+			size_t count = 0, stride = 0, size = 0;
+		};
+		auto accessor_bytes = [&](int index, int comps) {
+			const auto &a = accessors.at(index);
+			const int view = a.at("bufferView").get<int>();
+			const auto &v = views.at(view);
+			AccessorBytes r;
+			r.type = a.at("componentType").get<int>();
+			r.normalized = a.value("normalized", false);
+			r.count = a.at("count").get<size_t>();
+			r.size = GlbComponentSize(r.type);
+			r.stride = v.value("byteStride", 0);
+			if (r.stride == 0) r.stride = r.size * comps;
+			r.bytes = glb->ViewPiece(view, a.value("byteOffset", 0), r.count == 0 ? 0 : (r.count - 1) * r.stride + r.size * comps);
+			return r;
+		};
+		/* An accessor's elements as floats: copied as they are when they are floats one after the other; whole
+		 * numbers (a quantised mesh) as their values, normalised ones as fractions (ReadGlbNumber()). */
+		auto read = [&](int index, int comps, std::vector<float> &out) {
+			const AccessorBytes a = accessor_bytes(index, comps);
+			out.resize(a.count * comps);
+			if constexpr (std::endian::native == std::endian::little) {
+				if (a.type == 5126 && a.stride == 4 * static_cast<size_t>(comps)) {
+					std::copy_n(a.bytes.data(), out.size() * sizeof(float), reinterpret_cast<uint8_t *>(out.data()));
+					return;
+				}
+			}
+			for (size_t i = 0; i < a.count; i++) {
+				for (int c = 0; c < comps; c++) {
+					out[i * comps + c] = static_cast<float>(ReadGlbNumber(a.bytes, i * a.stride + c * a.size, a.type, a.normalized));
+				}
+			}
+		};
+		/* The corners of a primitive's triangles: its indices, or each corner once without them. */
+		auto read_indices = [&](const nlohmann::json &p, size_t corners, std::vector<uint32_t> &out) {
+			if (!p.contains("indices")) {
+				out.resize(corners);
+				std::iota(out.begin(), out.end(), 0u);
+				return;
+			}
+			const AccessorBytes a = accessor_bytes(p.at("indices").get<int>(), 1);
+			out.resize(a.count);
+			for (size_t i = 0; i < a.count; i++) {
+				const size_t at = i * a.stride;
+				switch (a.type) {
+					case 5125: out[i] = ReadU32(a.bytes, at); break;
+					case 5123: out[i] = a.bytes[at] | (a.bytes[at + 1] << 8); break;
+					case 5121: out[i] = a.bytes[at]; break;
+					default: throw std::invalid_argument("component type of the indices");
+				}
+			}
+		};
+
+		/* A node's own transform: a matrix, or translation, rotation and scale. */
+		auto local = [](const nlohmann::json &node) {
+			Matrix m{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+			if (node.contains("matrix")) {
+				for (int k = 0; k < 16; k++) m[k] = node.at("matrix").at(k).get<double>();
+				return m;
+			}
+			double t[3] = {0, 0, 0}, s[3] = {1, 1, 1}, q[4] = {0, 0, 0, 1};
+			if (node.contains("translation")) for (int k = 0; k < 3; k++) t[k] = node.at("translation").at(k).get<double>();
+			if (node.contains("scale")) for (int k = 0; k < 3; k++) s[k] = node.at("scale").at(k).get<double>();
+			if (node.contains("rotation")) for (int k = 0; k < 4; k++) q[k] = node.at("rotation").at(k).get<double>();
+			double x = q[0], y = q[1], z = q[2], w = q[3];
+			double r[9] = {
+				1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w),
+				2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w),
+				2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y),
+			};
+			for (int col = 0; col < 3; col++) {
+				for (int row = 0; row < 3; row++) m[col * 4 + row] = r[col * 3 + row] * s[col];
+			}
+			m[12] = t[0];
+			m[13] = t[1];
+			m[14] = t[2];
+			return m;
+		};
+		auto multiply = [](const Matrix &a, const Matrix &b) {
+			Matrix c{};
+			for (int col = 0; col < 4; col++) {
+				for (int row = 0; row < 4; row++) {
+					double sum = 0;
+					for (int k = 0; k < 4; k++) sum += a[k * 4 + row] * b[col * 4 + k];
+					c[col * 4 + row] = sum;
+				}
+			}
+			return c;
+		};
+
+		/* The textures, by the material: a picture in the buffer, or the material's colour. The materials of a picture
+		 * share its bytes, and so do the files and shapes with the same picture (InternThreeDTextureBytes()). */
+		std::map<int, uint8_t> material_texture;
+		std::map<int, ThreeDTextureBytes> image_bytes;
+		auto texture_of = [&](int material) -> uint8_t {
+			auto it = material_texture.find(material);
+			if (it != material_texture.end()) return it->second;
+			GlbTexture t;
+			t.flat = Colour(150, 150, 150).data;
+			if (material >= 0 && j.contains("materials")) {
+				const auto &mat = j.at("materials").at(material);
+				t.name = mat.value("name", std::string());
+				t.double_sided = mat.value("doubleSided", false);
+				ReadMaterialLight(mat, t);
+				{
+					if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
+						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f->at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+						t.flat = Colour(c(0), c(1), c(2)).data;
+					}
+					if (const nlohmann::json *colour = GlbColourTexture(mat); colour != nullptr && j.contains("textures") && j.contains("images")) {
+						int tex = colour->at("index").get<int>();
+						int image = j.at("textures").at(tex).at("source").get<int>();
+						const auto &img = j.at("images").at(image);
+						auto known = image_bytes.find(image);
+						if (known != image_bytes.end()) {
+							t.png = known->second;
+						} else if (img.contains("bufferView")) {
+							const auto &v = views.at(img.at("bufferView").get<int>());
+							size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
+							if (offset <= glb->bin_len && len <= glb->bin_len - offset) t.png = InternThreeDTextureBytes(glb->Piece(offset, len));
+							image_bytes.emplace(image, t.png);
+						} else if (img.contains("uri")) {
+							t.png = GlbImageBeside(path, img);
+							image_bytes.emplace(image, t.png);
+						}
+					}
+				}
+			}
+			uint8_t index = static_cast<uint8_t>(std::min<size_t>(mesh.textures.size(), 255));
+			if (mesh.textures.size() < 255) mesh.textures.push_back(std::move(t));
+			material_texture.emplace(material, index);
+			return index;
+		};
+		/* A figure that moves by its frames (the pub's spit: the piglet, the calf, the lamb, each a node of its own with
+		 * materials of its own): the textures of every frame numbered as the file's materials go, the same in each, for
+		 * every frame is drawn with the textures of its first (ThreeDVehicleObject::TryGetTexture()). Numbered as each frame
+		 * met them, the calf and the lamb took the colour of the rod, black (the player, 29. 10.: "at the pub there is
+		 * always the piglet on the grill"). */
+		if (!frame_prefix.empty() && j.contains("materials")) {
+			for (size_t material = 0; material < j.at("materials").size(); material++) texture_of(static_cast<int>(material));
+		}
+
+		bool normals = true;
+		int first_material = -1;
+		/* One mesh's primitives, transformed. */
+		auto add_mesh = [&](int mesh_index, const Matrix &m, uint16_t group, uint16_t mark = 0, bool glass = false) {
+			const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
+			/* The normals turned by the inverse transpose of the transform's turning -- the cross products of its columns,
+			 * mirrored the other way round -- so a node stretched more one way than another (a quantised mesh's node,
+			 * Blender's unapplied scale) keeps them square to its faces. */
+			const double ca[3] = {m[0], m[1], m[2]}, cb[3] = {m[4], m[5], m[6]}, cc[3] = {m[8], m[9], m[10]};
+			double nm[9] = {
+				cb[1] * cc[2] - cb[2] * cc[1], cb[2] * cc[0] - cb[0] * cc[2], cb[0] * cc[1] - cb[1] * cc[0],
+				cc[1] * ca[2] - cc[2] * ca[1], cc[2] * ca[0] - cc[0] * ca[2], cc[0] * ca[1] - cc[1] * ca[0],
+				ca[1] * cb[2] - ca[2] * cb[1], ca[2] * cb[0] - ca[0] * cb[2], ca[0] * cb[1] - ca[1] * cb[0],
+			};
+			if (ca[0] * nm[0] + ca[1] * nm[1] + ca[2] * nm[2] < 0) for (double &e : nm) e = -e;
+			for (const auto &p : prims) {
+				if (p.value("mode", 4) != 4) continue; // triangles only
+				/* Its materials left out (the short rod's own float and line, the game draws its line). */
+				if (o.skip_materials != nullptr && p.contains("material") && j.contains("materials")) {
+					const auto &mat = j.at("materials").at(p.at("material").get<int>());
+					if (mat.contains("name") && mat.at("name").is_string() && std::ranges::find(*o.skip_materials, mat.at("name").get<std::string>()) != o.skip_materials->end()) continue;
+				}
+				std::vector<float> pos, nrm, uv;
+				std::vector<uint32_t> idx;
+				read(p.at("attributes").at("POSITION").get<int>(), 3, pos);
+				if (p.at("attributes").contains("TEXCOORD_0")) read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
+				if (p.at("attributes").contains("NORMAL")) read(p.at("attributes").at("NORMAL").get<int>(), 3, nrm);
+				size_t corners = pos.size() / 3;
+				if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0f);
+				if (nrm.size() != corners * 3) normals = false;
+				read_indices(p, corners, idx);
+				int material = p.value("material", -1);
+				if (first_material < 0 && material >= 0) first_material = material;
+				uint8_t tex = texture_of(material);
+				const std::array<double, 6> ut = GlbUvTransform(j, material);
+				uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
+				for (size_t i = 0; i < corners; i++) {
+					double X = pos[i * 3], Y = pos[i * 3 + 1], Z = pos[i * 3 + 2];
+					double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
+					double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
+					double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
+					/* glTF's Y is up and its Z points back along the game's -y. */
+					mesh.pos.push_back(static_cast<float>(gx));
+					mesh.pos.push_back(static_cast<float>(-gz));
+					mesh.pos.push_back(static_cast<float>(gy));
+					const double u = uv[i * 2], v = uv[i * 2 + 1];
+					mesh.uv.push_back(static_cast<float>(ut[0] + ut[2] * u + ut[3] * v));
+					mesh.uv.push_back(static_cast<float>(ut[1] + ut[4] * u + ut[5] * v));
+					if (normals) {
+						double nx = nrm[i * 3], ny = nrm[i * 3 + 1], nz = nrm[i * 3 + 2];
+						double hx = nm[0] * nx + nm[3] * ny + nm[6] * nz, hy = nm[1] * nx + nm[4] * ny + nm[7] * nz, hz = nm[2] * nx + nm[5] * ny + nm[8] * nz;
+						double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+						if (l > 0) { hx /= l; hy /= l; hz /= l; }
+						mesh.nrm.push_back(static_cast<float>(hx));
+						mesh.nrm.push_back(static_cast<float>(-hz));
+						mesh.nrm.push_back(static_cast<float>(hy));
+					}
+				}
+				for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+					uint32_t a = static_cast<uint32_t>(idx[i]), b = static_cast<uint32_t>(idx[i + 1]), c = static_cast<uint32_t>(idx[i + 2]);
+					if (a >= corners || b >= corners || c >= corners) continue;
+					mesh.tri.push_back(base + a);
+					mesh.tri.push_back(base + b);
+					mesh.tri.push_back(base + c);
+					mesh.tri_tex.push_back(tex);
+					if (groups != nullptr) mesh.tri_group.push_back(group);
+					if (marks != nullptr) mesh.tri_mark.push_back(mark);
+					if (!o.glass_suffix.empty()) mesh.tri_glass.push_back(glass ? 1 : 0);
+				}
+			}
+		};
+
+		const Matrix identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+		/* The file's first material is the first texture -- a vehicle's body, the one its paint is for -- whatever
+		 * node is read first (the V3S's glass was, and its paint went on the glass). */
+		if (all_nodes && !o.points_only && j.contains("materials") && !j.at("materials").empty()) texture_of(0);
+		if (all_nodes && j.contains("nodes")) {
+			/* The scene's nodes, each with its parents' transforms; a node only reached as a child is not a root. */
+			const auto &nodes = j.at("nodes");
+			std::vector<int> roots;
+			if (j.contains("scenes") && !j.at("scenes").empty()) {
+				const auto &scene = j.at("scenes").at(j.value("scene", 0));
+				if (scene.contains("nodes")) for (const auto &n : scene.at("nodes")) roots.push_back(n.get<int>());
+			} else {
+				std::vector<bool> child(nodes.size(), false);
+				for (const auto &n : nodes) {
+					if (n.contains("children")) for (const auto &c : n.at("children")) child[c.get<int>()] = true;
+				}
+				for (size_t i = 0; i < nodes.size(); i++) if (!child[i]) roots.push_back(static_cast<int>(i));
+			}
+			/* A node to visit: its parent's transform, whether its meshes are read, its group, its mark, its glass. */
+			struct NodeToVisit {
+				int n;
+				Matrix parent;
+				bool inside;
+				uint16_t group;
+				uint16_t mark;
+				bool glass;
+			};
+			std::vector<NodeToVisit> todo;
+			if (o.material_groups != nullptr && o.only_groups && !o.points_only) {
+				/* The textures of all the nodes of material_groups first, in the order the meshes are met. */
+				std::vector<std::pair<int, bool>> seen;
+				for (int r : roots) seen.emplace_back(r, false);
+				size_t walked = 0;
+				while (!seen.empty() && walked++ < 100000) {
+					auto [n, in] = seen.back();
+					seen.pop_back();
+					const auto &node = nodes.at(n);
+					const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
+					if (o.skip_night && IsNightNode(node_name)) continue;
+					if (std::ranges::find(*o.material_groups, node_name) != o.material_groups->end()) in = true;
+					if (in && node.contains("mesh")) {
+						for (const auto &p : j.at("meshes").at(node.at("mesh").get<int>()).at("primitives")) {
+							if (p.value("mode", 4) == 4) texture_of(p.value("material", -1));
+						}
+					}
+					if (node.contains("children")) for (const auto &c : node.at("children")) seen.emplace_back(c.get<int>(), in);
+				}
+			}
+			const bool inside_at_first = only_node.empty() && !o.only_night && !(o.only_groups && groups != nullptr) && !(o.frames_only && !frame_prefix.empty());
+			for (int r : roots) todo.push_back({r, identity, inside_at_first, 0, 0, false});
+			size_t visited = 0;
+			while (!todo.empty() && visited++ < 100000) {
+				auto [n, parent, inside, group, mark, glass] = todo.back();
+				todo.pop_back();
+				const auto &node = nodes.at(n);
+				const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
+				if (!skip_node.empty() && node_name == skip_node) continue;
+				if (o.skip_nodes != nullptr && std::ranges::find(*o.skip_nodes, node_name) != o.skip_nodes->end()) continue;
+				if (o.skip_wings && IsWingNode(node_name)) continue;
+				if (o.skip_night && IsNightNode(node_name)) continue;
+				if (!only_node.empty() && node_name == only_node) inside = true;
+				if (groups != nullptr) {
+					auto g = std::ranges::find(*groups, node_name);
+					if (g != groups->end()) {
+						group = static_cast<uint16_t>(g - groups->begin() + 1);
+						if (o.only_groups && !o.only_night) inside = true;
+					}
+				}
+				/* Only the lights at night: inside the node "noc" of the part's node (with groups, a group's only). */
+				if (o.only_night && IsNightNode(node_name) && (!o.only_groups || group != 0)) inside = true;
+				if (marks != nullptr) {
+					auto g = std::ranges::find(*marks, node_name);
+					if (g != marks->end()) mark = static_cast<uint16_t>(g - marks->begin() + 1);
+				}
+				if (!o.glass_suffix.empty() && node_name.ends_with(o.glass_suffix)) glass = true;
+				if (!frame_prefix.empty() && node.contains("name") && node.at("name").is_string()) {
+					std::string name = node.at("name").get<std::string>();
+					if (name.starts_with(frame_prefix)) {
+						auto number = ParseInteger<int>(std::string_view(name).substr(frame_prefix.size()), 10);
+						if (!number.has_value() || *number != frame) continue;
+						if (o.frames_only) inside = true;
+					}
+				}
+				Matrix m = multiply(parent, local(node));
+				if (points != nullptr && !point_prefix.empty() && node_name.starts_with(point_prefix) && (o.point_skip.empty() || !node_name.starts_with(o.point_skip))) {
+					/* A place: its origin, turned from glTF's axes as the corners are. */
+					points->push_back(static_cast<float>(m[12]));
+					points->push_back(static_cast<float>(-m[14]));
+					points->push_back(static_cast<float>(m[13]));
+					if (o.point_groups != nullptr) o.point_groups->push_back(group);
+					if (o.point_names != nullptr) o.point_names->emplace_back(node_name);
+				}
+				if (inside && !o.points_only && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m, group, mark, glass);
+				if (node.contains("children")) for (const auto &c : node.at("children")) todo.push_back({c.get<int>(), m, inside, group, mark, glass});
+			}
+		} else {
+			/* The first node with a mesh not of the night (the lit windows, "noc", are read on their own), with its
+			 * parents' transforms: gltfpack puts each mesh in a node of its own under the named one, its transform
+			 * making the quantised positions metres again, the named node's transform above it. */
+			Matrix m = identity;
+			int mesh_index = 0;
+			if (j.contains("nodes")) {
+				const auto &nodes = j.at("nodes");
+				std::vector<int> parent(nodes.size(), -1);
+				for (size_t i = 0; i < nodes.size(); i++) {
+					if (!nodes.at(i).contains("children")) continue;
+					for (const auto &c : nodes.at(i).at("children")) {
+						const size_t child = c.get<size_t>();
+						if (child < parent.size() && parent[child] < 0 && child != i) parent[child] = static_cast<int>(i);
+					}
+				}
+				auto name_of = [&](int n) {
+					const auto &node = nodes.at(n);
+					return node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
+				};
+				for (size_t i = 0; i < nodes.size(); i++) {
+					if (!nodes.at(i).contains("mesh")) continue;
+					bool night = false;
+					Matrix w = local(nodes.at(i));
+					size_t up = 0;
+					for (int n = parent[i]; n >= 0 && up++ < nodes.size(); n = parent[n]) {
+						if (IsNightNode(name_of(n))) night = true;
+						w = multiply(local(nodes.at(n)), w);
+					}
+					if (night || IsNightNode(name_of(static_cast<int>(i)))) continue;
+					mesh_index = nodes.at(i).at("mesh").get<int>();
+					m = w;
+					break;
+				}
+			}
+			add_mesh(mesh_index, m, 0);
+		}
+		/* Where in each of its pictures read now all the file's triangles draw from, whatever nodes were read: an
+		 * atlas is shared by the vehicles of a package, each showing other nodes of it (TextureCover()). */
+		auto image_of = [&](int material) {
+			if (material < 0 || !j.contains("materials") || !j.contains("textures")) return -1;
+			const nlohmann::json *colour = GlbColourTexture(j.at("materials").at(material));
+			if (colour == nullptr) return -1;
+			const int tex = colour->at("index").get<int>();
+			return j.at("textures").at(tex).value("source", -1);
+		};
+		const bool margins_filled = MarginsFilled(path);
+		for (const auto &[image, bytes] : image_bytes) {
+			if (margins_filled || bytes == nullptr || TextureCover(bytes) != nullptr || !j.contains("meshes")) continue;
+			auto cover = std::make_shared<std::vector<float>>();
+			for (const auto &me : j.at("meshes")) {
+				for (const auto &p : me.at("primitives")) {
+					if (p.value("mode", 4) != 4 || !p.at("attributes").contains("TEXCOORD_0") || image_of(p.value("material", -1)) != image) continue;
+					std::vector<float> uv;
+					std::vector<uint32_t> idx;
+					read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
+					const size_t corners = uv.size() / 2;
+					read_indices(p, corners, idx);
+					const std::array<double, 6> ut = GlbUvTransform(j, p.value("material", -1));
+					for (size_t i = 0; i + 2 < idx.size(); i += 3) {
+						for (int k = 0; k < 3; k++) {
+							const size_t c = static_cast<size_t>(idx[i + k]);
+							if (c >= corners) break;
+							const double u = uv[c * 2], v = uv[c * 2 + 1];
+							cover->push_back(static_cast<float>(ut[0] + ut[2] * u + ut[3] * v));
+							cover->push_back(static_cast<float>(ut[1] + ut[4] * u + ut[5] * v));
+						}
+						cover->resize(cover->size() / 6 * 6);
+					}
+				}
+			}
+			std::lock_guard lock(_texture_bytes_mutex);
+			if (_texture_covers.size() > 256) std::erase_if(_texture_covers, [](const auto &e) { return e.second.bytes.expired(); });
+			_texture_covers[bytes.get()] = TextureCoverMade{bytes, std::move(cover)};
+		}
+		if (!normals || mesh.nrm.size() != mesh.pos.size()) mesh.nrm.clear();
+		/* A building's own texture: the first material's (the others' its own after its add-ons', TakeGlbMesh()). */
+		if (first_material >= 0) {
+			auto it = material_texture.find(first_material);
+			if (it != material_texture.end() && it->second < mesh.textures.size() && mesh.textures[it->second].png != nullptr) {
+				mesh.png = *mesh.textures[it->second].png;
+				mesh.png_texture = it->second;
+			}
+		}
+	} catch (const std::exception &e) {
+		Debug(misc, 0, "3D object {}: {}", path, e.what());
+		ReadDiary(fmt::format("soubor {}: {}", path, e.what()), true);
+		return false;
+	}
+	return !mesh.tri.empty();
+}
+
+/*
+ * The bones of a creature (the technologies of OpenMW, the player, 16. 10.: skinning and blending): the colleague's
+ * "kostra" of a creature (hra/3d/objekty/tvorove, drak_*_kostra.glb) is its mesh with a skeleton and its animations
+ * by the same names as its frames. Its frames are posed from them a tick each, not a frame every eight ticks, and from
+ * one animation to the next the poses pass over (GetThreeDFigure("<jmeno>/<a>@<snimek>><b>")).
+ */
+
+/** A matrix of the bones, column-major as glTF writes it. */
+using BoneMatrix = std::array<double, 16>;
+
+static BoneMatrix BoneMultiply(const BoneMatrix &a, const BoneMatrix &b)
+{
+	BoneMatrix c{};
+	for (int col = 0; col < 4; col++) {
+		for (int row = 0; row < 4; row++) {
+			double sum = 0;
+			for (int k = 0; k < 4; k++) sum += a[k * 4 + row] * b[col * 4 + k];
+			c[col * 4 + row] = sum;
+		}
+	}
+	return c;
+}
+
+/** A bone's place against its parent: moved, turned (a quaternion x, y, z, w) and scaled. */
+struct BonePose {
+	double t[3] = {0, 0, 0};
+	double r[4] = {0, 0, 0, 1};
+	double s[3] = {1, 1, 1};
+
+	BoneMatrix Matrix() const
+	{
+		const double x = this->r[0], y = this->r[1], z = this->r[2], w = this->r[3];
+		const double m[9] = {
+			1 - 2 * (y * y + z * z), 2 * (x * y + z * w), 2 * (x * z - y * w),
+			2 * (x * y - z * w), 1 - 2 * (x * x + z * z), 2 * (y * z + x * w),
+			2 * (x * z + y * w), 2 * (y * z - x * w), 1 - 2 * (x * x + y * y),
+		};
+		BoneMatrix out{};
+		for (int col = 0; col < 3; col++) {
+			for (int row = 0; row < 3; row++) out[col * 4 + row] = m[col * 3 + row] * this->s[col];
+		}
+		out[12] = this->t[0];
+		out[13] = this->t[1];
+		out[14] = this->t[2];
+		out[15] = 1;
+		return out;
+	}
+
+	/** Between this one (0) and another (1): moved and scaled in a line, turned the short way round. */
+	BonePose Mix(const BonePose &o, double k) const
+	{
+		BonePose p;
+		for (int i = 0; i < 3; i++) {
+			p.t[i] = this->t[i] + (o.t[i] - this->t[i]) * k;
+			p.s[i] = this->s[i] + (o.s[i] - this->s[i]) * k;
+		}
+		double dot = 0;
+		for (int i = 0; i < 4; i++) dot += this->r[i] * o.r[i];
+		const double sign = dot < 0 ? -1 : 1;
+		double len = 0;
+		for (int i = 0; i < 4; i++) {
+			p.r[i] = this->r[i] + (sign * o.r[i] - this->r[i]) * k;
+			len += p.r[i] * p.r[i];
+		}
+		len = std::sqrt(len);
+		if (len > 0) for (int i = 0; i < 4; i++) p.r[i] /= len;
+		return p;
+	}
+};
+
+/** A creature's mesh with its bones and its animations (ReadGlbSkeleton()). */
+struct GlbSkeleton {
+	struct Node {
+		std::string name;
+		int parent = -1;
+		bool has_matrix = false; ///< its place a matrix (not animated)
+		BoneMatrix matrix{};
+		BonePose rest;
+	};
+	struct Channel {
+		int node = 0;
+		int path = 0;            ///< 0 moved, 1 turned, 2 scaled
+		bool step = false;       ///< "STEP": held until the next key, else in a line between them
+		bool cubic = false;      ///< "CUBICSPLINE": its keys with their tangents (read as in a line)
+		std::vector<float> times;
+		std::vector<float> values;
+	};
+	struct Animation {
+		std::string name;
+		double start = 0, end = 0; ///< seconds
+		std::vector<Channel> channels;
+	};
+	std::vector<Node> nodes;
+	std::vector<int> joints;               ///< the nodes of the joints
+	std::vector<BoneMatrix> inverse_bind;  ///< and their matrices from the mesh to them
+	std::vector<double> pos, nrm, uv;      ///< the mesh, glTF's axes
+	std::vector<uint32_t> tri;
+	std::vector<uint8_t> tri_tex;
+	std::vector<std::array<uint16_t, 4>> joint_of; ///< each corner's joints (indices into joints)
+	std::vector<std::array<float, 4>> weight_of;   ///< and how much each moves it
+	std::vector<GlbTexture> textures;
+	std::vector<Animation> animations;
+
+	const Animation *Find(std::string_view name) const
+	{
+		for (const Animation &a : this->animations) {
+			if (a.name == name) return &a;
+		}
+		return nullptr;
+	}
+
+	/** The node of a bone by its name, -1 none. */
+	int NodeNamed(std::string_view name) const
+	{
+		for (size_t i = 0; i < this->nodes.size(); i++) {
+			if (this->nodes[i].name == name) return static_cast<int>(i);
+		}
+		return -1;
+	}
+
+	/**
+	 * A pose of other bones put on these by the bones' names (a humanoid's motions, the colleague's
+	 * hra/3d/KOSTRA-POSTAV-PRO-HRU.md: the joints at rest unturned, so a turning means the same on every figure): each
+	 * bone turned as its namesake, moved only where the animation moves it (the hips), so far times scale; the
+	 * figure's own lengths of the others kept.
+	 * @param from the bones of the motions
+	 * @param from_pose their pose (from.Pose())
+	 * @param anim the animation of it, nullptr none
+	 * @param scale the figure's hips' height over the motions'
+	 */
+	std::vector<BonePose> Retarget(const GlbSkeleton &from, const std::vector<BonePose> &from_pose, const Animation *anim, double scale) const
+	{
+		std::vector<BonePose> pose;
+		pose.reserve(this->nodes.size());
+		for (const Node &n : this->nodes) pose.push_back(n.rest);
+		std::vector<bool> moved(from.nodes.size(), false);
+		if (anim != nullptr) {
+			for (const Channel &c : anim->channels) {
+				if (c.path == 0 && c.node >= 0 && static_cast<size_t>(c.node) < moved.size()) moved[c.node] = true;
+			}
+		}
+		for (size_t i = 0; i < from.nodes.size() && i < from_pose.size(); i++) {
+			if (from.nodes[i].name.empty()) continue;
+			const int to = this->NodeNamed(from.nodes[i].name);
+			if (to < 0) continue;
+			std::copy_n(from_pose[i].r, 4, pose[to].r);
+			if (moved[i]) for (int k = 0; k < 3; k++) pose[to].t[k] = from_pose[i].t[k] * scale;
+		}
+		return pose;
+	}
+
+	/** Every node's place in the file in a pose, glTF's axes. */
+	std::vector<BoneMatrix> Globals(const std::vector<BonePose> &pose) const
+	{
+		std::vector<BoneMatrix> global(this->nodes.size());
+		std::vector<bool> done(this->nodes.size(), false);
+		std::function<const BoneMatrix &(int)> place = [&](int i) -> const BoneMatrix & {
+			if (!done[i]) {
+				const Node &n = this->nodes[i];
+				const BoneMatrix own = n.has_matrix ? n.matrix : pose[i].Matrix();
+				global[i] = n.parent >= 0 ? BoneMultiply(place(n.parent), own) : own;
+				done[i] = true;
+			}
+			return global[i];
+		};
+		for (size_t i = 0; i < this->nodes.size(); i++) place(static_cast<int>(i));
+		return global;
+	}
+
+	/** Every bone's place against its parent in an animation at a time, seconds (none: at rest). */
+	std::vector<BonePose> Pose(const Animation *anim, double time) const
+	{
+		std::vector<BonePose> pose;
+		pose.reserve(this->nodes.size());
+		for (const Node &n : this->nodes) pose.push_back(n.rest);
+		if (anim == nullptr) return pose;
+		for (const Channel &c : anim->channels) {
+			if (c.node < 0 || static_cast<size_t>(c.node) >= pose.size() || c.times.empty()) continue;
+			const int comps = c.path == 1 ? 4 : 3;
+			const size_t keys = c.times.size();
+			auto value = [&](size_t key, int comp) {
+				return static_cast<double>(c.values[(c.cubic ? key * 3 + 1 : key) * comps + comp]);
+			};
+			size_t hi = std::upper_bound(c.times.begin(), c.times.end(), static_cast<float>(time)) - c.times.begin();
+			size_t lo = hi == 0 ? 0 : hi - 1;
+			if (hi >= keys) hi = keys - 1;
+			double k = 0;
+			if (!c.step && hi != lo && c.times[hi] > c.times[lo]) k = std::clamp((time - c.times[lo]) / (c.times[hi] - c.times[lo]), 0.0, 1.0);
+			BonePose a = pose[c.node], b = pose[c.node];
+			double *pa = c.path == 0 ? a.t : c.path == 1 ? a.r : a.s;
+			double *pb = c.path == 0 ? b.t : c.path == 1 ? b.r : b.s;
+			for (int i = 0; i < comps; i++) {
+				pa[i] = value(lo, i);
+				pb[i] = value(hi, i);
+			}
+			pose[c.node] = a.Mix(b, k);
+		}
+		return pose;
+	}
+
+	/**
+	 * The mesh in a pose: each corner moved by its joints, as much as each weighs; turned from glTF's axes into the
+	 * game's (x, -z, y), metres.
+	 */
+	void Skin(const std::vector<BonePose> &pose, std::vector<float> &out_pos, std::vector<float> &out_nrm) const
+	{
+		const std::vector<BoneMatrix> global = this->Globals(pose);
+		std::vector<BoneMatrix> joint(this->joints.size());
+		for (size_t k = 0; k < this->joints.size(); k++) joint[k] = BoneMultiply(global[this->joints[k]], this->inverse_bind[k]);
+		const size_t corners = this->pos.size() / 3;
+		out_pos.resize(corners * 3);
+		out_nrm.resize(this->nrm.size() == corners * 3 ? corners * 3 : 0);
+		for (size_t i = 0; i < corners; i++) {
+			BoneMatrix m{};
+			for (int k = 0; k < 4; k++) {
+				const float w = this->weight_of[i][k];
+				if (w == 0 || this->joint_of[i][k] >= joint.size()) continue;
+				const BoneMatrix &j = joint[this->joint_of[i][k]];
+				for (int e = 0; e < 16; e++) m[e] += j[e] * w;
+			}
+			const double X = this->pos[i * 3], Y = this->pos[i * 3 + 1], Z = this->pos[i * 3 + 2];
+			const double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
+			const double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
+			const double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
+			out_pos[i * 3] = static_cast<float>(gx);
+			out_pos[i * 3 + 1] = static_cast<float>(-gz);
+			out_pos[i * 3 + 2] = static_cast<float>(gy);
+			if (out_nrm.empty()) continue;
+			const double nx = this->nrm[i * 3], ny = this->nrm[i * 3 + 1], nz = this->nrm[i * 3 + 2];
+			double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
+			const double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+			if (l > 0) {
+				hx /= l;
+				hy /= l;
+				hz /= l;
+			}
+			out_nrm[i * 3] = static_cast<float>(hx);
+			out_nrm[i * 3 + 1] = static_cast<float>(-hz);
+			out_nrm[i * 3 + 2] = static_cast<float>(hy);
+		}
+	}
+};
+
+/**
+ * An accessor's elements of a glTF binary as numbers: the floats, or the whole numbers, normalised ones as fractions
+ * (ReadGlbNumber(): gltfpack's turnings of the bones as normalised shorts, the weights as normalised bytes); of a
+ * buffer view gltfpack compressed (GlbMeshopt()) unpacked.
+ */
+static void ReadGlbAccessor(const nlohmann::json &j, std::span<const uint8_t> bin, int index, int comps, std::vector<double> &out)
+{
+	const auto &a = j.at("accessors").at(index);
+	const auto &v = j.at("bufferViews").at(a.at("bufferView").get<int>());
+	size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
+	std::vector<uint8_t> unpacked;
+	if (const nlohmann::json *ext = GlbMeshopt(v); ext != nullptr) {
+		const size_t at = ext->value("byteOffset", size_t{0}), len = ext->at("byteLength").get<size_t>();
+		if (at > bin.size() || len > bin.size() - at) throw std::out_of_range("compressed view past the buffer");
+		unpacked = UnpackGlbMeshopt(*ext, bin.subspan(at, len));
+		bin = unpacked;
+		offset = a.value("byteOffset", 0);
+	}
+	const int type = a.at("componentType").get<int>();
+	const bool normalized = a.value("normalized", false);
+	const size_t count = a.at("count").get<size_t>();
+	const size_t size = GlbComponentSize(type);
+	size_t stride = v.value("byteStride", 0);
+	if (stride == 0) stride = size * comps;
+	out.resize(count * comps);
+	for (size_t i = 0; i < count; i++) {
+		for (int c = 0; c < comps; c++) {
+			const size_t at = offset + i * stride + c * size;
+			if (at + size > bin.size()) throw std::out_of_range("accessor past the buffer");
+			out[i * comps + c] = ReadGlbNumber(bin, at, type, normalized);
+		}
+	}
+}
+
+/**
+ * Read a creature's mesh with its bones and animations (its "kostra"), kept for the next asking.
+ * @param with_mesh whether it has to have a mesh with a skin; else its bones and animations will do (a humanoid's
+ *                  motions, "druh": "pohyby")
+ * @return nullptr when the file has no mesh with a skin and it has to
+ */
+static const GlbSkeleton *ReadGlbSkeleton(const std::string &path, bool with_mesh = true)
+{
+	/* One at a time: a shape may be made on the thread making the pictures of the vehicles too (MakeOnce()). */
+	static std::mutex kept_mutex;
+	std::lock_guard lock(kept_mutex);
+	static std::map<std::string, std::unique_ptr<GlbSkeleton>> kept;
+	auto found = kept.find(path);
+	if (found != kept.end()) return found->second != nullptr && with_mesh && found->second->tri.empty() ? nullptr : found->second.get();
+	std::unique_ptr<GlbSkeleton> &slot = kept[path];
+
+	const std::shared_ptr<const std::vector<uint8_t>> file = GlbFileBytes(path);
+	const std::vector<uint8_t> &d = *file;
+	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
+		Debug(misc, 0, "3D skeleton {}: not a glTF binary", path);
+		return nullptr;
+	}
+	std::string json_text;
+	/* (Where it is in the file: a file of the colleague's add-ons is tens of megabytes.) */
+	std::span<const uint8_t> bin;
+	for (size_t at = 12; at + 8 <= d.size();) {
+		uint32_t len = ReadU32(d, at), type = ReadU32(d, at + 4);
+		if (at + 8 + len > d.size()) break;
+		if (type == 0x4E4F534A) json_text.assign(reinterpret_cast<const char *>(&d[at + 8]), len);
+		if (type == 0x004E4942) bin = std::span<const uint8_t>(d).subspan(at + 8, len);
+		at += 8 + ((len + 3) & ~3u);
+	}
+	auto sk = std::make_unique<GlbSkeleton>();
+	try {
+		nlohmann::json j = nlohmann::json::parse(json_text);
+		if (const std::string why = GlbExtensionNotRead(j); !why.empty()) throw std::invalid_argument(why);
+		const auto &nodes = j.at("nodes");
+		sk->nodes.resize(nodes.size());
+		for (size_t i = 0; i < nodes.size(); i++) {
+			const auto &n = nodes.at(i);
+			GlbSkeleton::Node &node = sk->nodes[i];
+			node.name = n.value("name", std::string());
+			if (n.contains("matrix")) {
+				node.has_matrix = true;
+				for (int k = 0; k < 16; k++) node.matrix[k] = n.at("matrix").at(k).get<double>();
+			}
+			if (n.contains("translation")) for (int k = 0; k < 3; k++) node.rest.t[k] = n.at("translation").at(k).get<double>();
+			if (n.contains("rotation")) for (int k = 0; k < 4; k++) node.rest.r[k] = n.at("rotation").at(k).get<double>();
+			if (n.contains("scale")) for (int k = 0; k < 3; k++) node.rest.s[k] = n.at("scale").at(k).get<double>();
+		}
+		for (size_t i = 0; i < nodes.size(); i++) {
+			if (!nodes.at(i).contains("children")) continue;
+			for (const auto &c : nodes.at(i).at("children")) {
+				const size_t child = c.get<size_t>();
+				if (child < sk->nodes.size()) sk->nodes[child].parent = static_cast<int>(i);
+			}
+		}
+		/* The joints of every skin, one after the other; a skin's joints from where its first is. */
+		std::vector<size_t> skin_first;
+		if (j.contains("skins")) {
+			for (const auto &skin : j.at("skins")) {
+				skin_first.push_back(sk->joints.size());
+				const size_t first = sk->joints.size();
+				for (const auto &jn : skin.at("joints")) sk->joints.push_back(jn.get<int>());
+				sk->inverse_bind.resize(sk->joints.size(), BoneMatrix{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1});
+				if (skin.contains("inverseBindMatrices")) {
+					std::vector<double> m;
+					ReadGlbAccessor(j, bin, skin.at("inverseBindMatrices").get<int>(), 16, m);
+					for (size_t k = 0; first + k < sk->joints.size() && (k + 1) * 16 <= m.size(); k++) std::copy_n(&m[k * 16], 16, sk->inverse_bind[first + k].begin());
+				}
+			}
+		}
+		/* The textures by the material: the picture in the buffer, else its colour (shared, InternThreeDTextureBytes()). */
+		std::map<int, uint8_t> material_texture;
+		std::map<int, ThreeDTextureBytes> image_bytes;
+		auto texture_of = [&](int material) -> uint8_t {
+			auto it = material_texture.find(material);
+			if (it != material_texture.end()) return it->second;
+			GlbTexture t;
+			t.flat = Colour(150, 150, 150).data;
+			if (material >= 0 && j.contains("materials")) {
+				const auto &mat = j.at("materials").at(material);
+				t.name = mat.value("name", std::string());
+				ReadMaterialLight(mat, t);
+				{
+					if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
+						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f->at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+						t.flat = Colour(c(0), c(1), c(2)).data;
+					}
+					if (const nlohmann::json *colour = GlbColourTexture(mat); colour != nullptr && j.contains("textures") && j.contains("images")) {
+						const int image = j.at("textures").at(colour->at("index").get<int>()).at("source").get<int>();
+						const auto &img = j.at("images").at(image);
+						auto known = image_bytes.find(image);
+						if (known != image_bytes.end()) {
+							t.png = known->second;
+						} else if (img.contains("bufferView")) {
+							const auto &v = j.at("bufferViews").at(img.at("bufferView").get<int>());
+							const size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
+							if (offset + len <= bin.size()) t.png = InternThreeDTextureBytes(bin.subspan(offset, len));
+							image_bytes.emplace(image, t.png);
+						} else if (img.contains("uri")) {
+							t.png = GlbImageBeside(path, img);
+							image_bytes.emplace(image, t.png);
+						}
+					}
+				}
+			}
+			const uint8_t index = static_cast<uint8_t>(std::min<size_t>(sk->textures.size(), 255));
+			if (sk->textures.size() < 255) sk->textures.push_back(std::move(t));
+			material_texture.emplace(material, index);
+			return index;
+		};
+		/* Every node with a mesh and a skin (the body, its eyes). */
+		for (const auto &node : nodes) {
+			if (!node.contains("mesh") || !node.contains("skin")) continue;
+			const size_t skin_index = node.at("skin").get<size_t>();
+			if (skin_index >= skin_first.size()) continue;
+			for (const auto &p : j.at("meshes").at(node.at("mesh").get<int>()).at("primitives")) {
+				if (p.value("mode", 4) != 4) continue;
+				const auto &attr = p.at("attributes");
+				if (!attr.contains("JOINTS_0") || !attr.contains("WEIGHTS_0")) continue;
+				std::vector<double> pos, nrm, uv, idx, jn, wt;
+				ReadGlbAccessor(j, bin, attr.at("POSITION").get<int>(), 3, pos);
+				if (attr.contains("NORMAL")) ReadGlbAccessor(j, bin, attr.at("NORMAL").get<int>(), 3, nrm);
+				if (attr.contains("TEXCOORD_0")) ReadGlbAccessor(j, bin, attr.at("TEXCOORD_0").get<int>(), 2, uv);
+				ReadGlbAccessor(j, bin, attr.at("JOINTS_0").get<int>(), 4, jn);
+				ReadGlbAccessor(j, bin, attr.at("WEIGHTS_0").get<int>(), 4, wt);
+				const size_t corners = pos.size() / 3;
+				if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
+				if (jn.size() != corners * 4 || wt.size() != corners * 4) continue;
+				/* Weights stored as whole numbers are fractions of their largest (read so when they say they are normalised). */
+				const auto &wa = j.at("accessors").at(attr.at("WEIGHTS_0").get<int>());
+				const int wtype = wa.at("componentType").get<int>();
+				const double wscale = wa.value("normalized", false) ? 1.0 : wtype == 5121 ? 1.0 / 255 : wtype == 5123 ? 1.0 / 65535 : 1.0;
+				if (p.contains("indices")) {
+					ReadGlbAccessor(j, bin, p.at("indices").get<int>(), 1, idx);
+				} else {
+					for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
+				}
+				const uint8_t tex = texture_of(p.value("material", -1));
+				const std::array<double, 6> ut = GlbUvTransform(j, p.value("material", -1));
+				for (size_t i = 0; i < corners; i++) {
+					const double u = uv[i * 2], v = uv[i * 2 + 1];
+					uv[i * 2] = ut[0] + ut[2] * u + ut[3] * v;
+					uv[i * 2 + 1] = ut[1] + ut[4] * u + ut[5] * v;
+				}
+				const uint32_t base = static_cast<uint32_t>(sk->pos.size() / 3);
+				const bool normals = nrm.size() == corners * 3 && (sk->pos.empty() || !sk->nrm.empty());
+				if (!normals) sk->nrm.clear();
+				sk->pos.insert(sk->pos.end(), pos.begin(), pos.end());
+				if (normals) sk->nrm.insert(sk->nrm.end(), nrm.begin(), nrm.end());
+				sk->uv.insert(sk->uv.end(), uv.begin(), uv.end());
+				for (size_t i = 0; i < corners; i++) {
+					std::array<uint16_t, 4> js;
+					std::array<float, 4> ws;
+					float sum = 0;
+					for (int k = 0; k < 4; k++) {
+						js[k] = static_cast<uint16_t>(skin_first[skin_index] + static_cast<size_t>(jn[i * 4 + k]));
+						ws[k] = static_cast<float>(wt[i * 4 + k] * wscale);
+						sum += ws[k];
+					}
+					if (sum > 0) for (float &w : ws) w /= sum;
+					sk->joint_of.push_back(js);
+					sk->weight_of.push_back(ws);
+				}
+				for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+					if (idx[t] >= corners || idx[t + 1] >= corners || idx[t + 2] >= corners) continue;
+					for (int k = 0; k < 3; k++) sk->tri.push_back(base + static_cast<uint32_t>(idx[t + k]));
+					sk->tri_tex.push_back(tex);
+				}
+			}
+		}
+		if (sk->tri.empty() && with_mesh) {
+			Debug(misc, 0, "3D skeleton {}: no mesh with a skin", path);
+			return nullptr;
+		}
+		if (j.contains("animations")) {
+			for (const auto &a : j.at("animations")) {
+				GlbSkeleton::Animation anim;
+				anim.name = a.value("name", std::string());
+				anim.start = 1e18;
+				anim.end = -1e18;
+				const auto &samplers = a.at("samplers");
+				for (const auto &c : a.at("channels")) {
+					const auto &target = c.at("target");
+					if (!target.contains("node")) continue;
+					const std::string path_name = target.at("path").get<std::string>();
+					const int path_kind = path_name == "translation" ? 0 : path_name == "rotation" ? 1 : path_name == "scale" ? 2 : -1;
+					if (path_kind < 0) continue; // the weights of morph targets: none here
+					const auto &s = samplers.at(c.at("sampler").get<int>());
+					GlbSkeleton::Channel ch;
+					ch.node = target.at("node").get<int>();
+					ch.path = path_kind;
+					const std::string interp = s.value("interpolation", std::string("LINEAR"));
+					ch.step = interp == "STEP";
+					ch.cubic = interp == "CUBICSPLINE";
+					std::vector<double> times, values;
+					ReadGlbAccessor(j, bin, s.at("input").get<int>(), 1, times);
+					ReadGlbAccessor(j, bin, s.at("output").get<int>(), path_kind == 1 ? 4 : 3, values);
+					if (times.empty() || values.size() < times.size() * (path_kind == 1 ? 4 : 3) * (ch.cubic ? 3 : 1)) continue;
+					ch.times.assign(times.begin(), times.end());
+					ch.values.assign(values.begin(), values.end());
+					anim.start = std::min(anim.start, times.front());
+					anim.end = std::max(anim.end, times.back());
+					anim.channels.push_back(std::move(ch));
+				}
+				if (!anim.channels.empty()) sk->animations.push_back(std::move(anim));
+			}
+		}
+	} catch (const std::exception &e) {
+		Debug(misc, 0, "3D skeleton {}: {}", path, e.what());
+		return nullptr;
+	}
+	Debug(misc, 1, "3D skeleton {}: {} joints, {} corners, {} animations", path, sk->joints.size(), sk->pos.size() / 3, sk->animations.size());
+	slot = std::move(sk);
+	return with_mesh && slot->tri.empty() ? nullptr : slot.get();
+}
+
+/**
+ * Read one .glb into a building: its mesh (ReadGlbMesh()) from metres into units, the texture kept as it is.
+ * @return whether there is something to draw
+ */
+/**
+ * Which side of each triangle faces out: its corners' order, or the other when its normals say so (a mirrored node);
+ * neither for a material seen from both sides. Drawn, the side facing away is left out, so the back walls never come
+ * through the front ones (DrawTurnedObject()).
+ */
+static std::vector<int8_t> TriangleFacing(const GlbMesh &mesh)
+{
+	std::vector<int8_t> facing;
+	facing.reserve(mesh.tri.size() / 3);
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		size_t k = t / 3;
+		bool both = k < mesh.tri_tex.size() && mesh.tri_tex[k] < mesh.textures.size() && mesh.textures[mesh.tri_tex[k]].double_sided;
+		const float *a = &mesh.pos[mesh.tri[t] * 3], *b = &mesh.pos[mesh.tri[t + 1] * 3], *c = &mesh.pos[mesh.tri[t + 2] * 3];
+		double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+		int8_t f = 1;
+		if (both || gx * gx + gy * gy + gz * gz < 1e-12) {
+			f = 0;
+		} else if (!mesh.nrm.empty()) {
+			double s = 0;
+			for (int i = 0; i < 3; i++) {
+				const float *n = &mesh.nrm[mesh.tri[t + i] * 3];
+				s += gx * n[0] + gy * n[1] + gz * n[2];
+			}
+			f = s > 0 ? 1 : (s < 0 ? -1 : 0);
+		}
+		facing.push_back(f);
+	}
+	return facing;
+}
+
+/**
+ * The light of each corner from its normal: lit by the game as the vehicles are, by one light fixed to the world (the
+ * colleague's hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md); its axes are the world's. Without normals, the light is in the texture.
+ */
+static std::vector<uint16_t> CornerLight(const std::vector<float> &nrm)
+{
+	std::vector<uint16_t> light;
+	light.reserve(nrm.size() / 3);
+	for (size_t i = 0; i + 2 < nrm.size(); i += 3) light.push_back(ThreeDLightOfNormal(nrm[i], nrm[i + 1], nrm[i + 2]));
+	return light;
+}
+
+/**
+ * The light of a face by its normal (a unit vector in the world's axes), as the buildings and the vehicles are lit: by
+ * one light fixed to the world, 256 its whole.
+ */
+uint16_t ThreeDLightOfNormal(double nx, double ny, double nz)
+{
+	static const double L[3] = {-0.55, 0.35, 0.75};
+	const double ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+	const double d = (nx * L[0] + ny * L[1] + nz * L[2]) / ll;
+	return static_cast<uint16_t>(std::lround(256.0 * (0.55 + 0.45 * std::max(0.0, d))));
+}
+
+/**
+ * The pictures of materials taken from elsewhere (ThreeDObject::material_from) by their paths, while anything has them:
+ * a picture of another file's material read once for all the objects dressed in it (the four turns of a part of the
+ * plantation, its outside).
+ */
+static std::map<std::string, std::weak_ptr<const std::vector<uint8_t>>, std::less<>> _material_pictures;
+static std::mutex _material_pictures_mutex;
+
+/** The picture of a material taken from elsewhere: a PNG, or "<file>.glb#<material>" that material's of another .glb; nullptr when it cannot be read. */
+static ThreeDTextureBytes MaterialPictureFrom(const std::string &from)
+{
+	{
+		std::lock_guard lock(_material_pictures_mutex);
+		auto it = _material_pictures.find(from);
+		if (it != _material_pictures.end()) {
+			if (ThreeDTextureBytes known = it->second.lock(); known != nullptr) return known;
+		}
+	}
+	ThreeDTextureBytes png;
+	const size_t hash = from.rfind('#');
+	if (hash == std::string::npos) {
+		png = InternThreeDTextureBytes(ReadWholeFile(from));
+	} else {
+		GlbMesh other;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		ReadGlbMesh(from.substr(0, hash), other, o);
+		const std::string_view material = std::string_view(from).substr(hash + 1);
+		for (const GlbTexture &t : other.textures) {
+			if (t.name == material && t.png != nullptr) png = t.png;
+		}
+	}
+	if (png == nullptr) return nullptr;
+	std::lock_guard lock(_material_pictures_mutex);
+	_material_pictures[from] = png;
+	return png;
+}
+
+/**
+ * A mesh's materials dressed in the pictures taken from elsewhere (ThreeDObject::material_from): over the same texture
+ * coordinates, its first material's as the object's own texture too (GlbMesh::png).
+ */
+static void TakeMaterialPictures(GlbMesh &mesh, const ThreeDObject &obj)
+{
+	for (const auto &[material, from] : obj.material_from) {
+		for (size_t k = 0; k < mesh.textures.size(); k++) {
+			if (mesh.textures[k].name != material) continue;
+			ThreeDTextureBytes png = MaterialPictureFrom(from);
+			if (png == nullptr) {
+				Debug(misc, 0, "3D object {}: the picture {} of its material {} is not there", obj.name, from, material);
+				ReadDiary(fmt::format("objekt {}: textura {} materiálu {} chybí", obj.name, from, material), true);
+				return;
+			}
+			mesh.textures[k].png = png;
+			if (static_cast<int>(k) == mesh.png_texture) mesh.png = *png;
+		}
+	}
+}
+
+/** "textury_materialu" of a record ({"<material>": "<picture>"}, ThreeDObject::material_from), the pictures beside its index. */
+static void ReadMaterialPictures(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
+{
+	if (!e.contains("textury_materialu") || !e.at("textury_materialu").is_object()) return;
+	for (const auto &[material, from] : e.at("textury_materialu").items()) {
+		if (from.is_string() && !from.get<std::string>().empty()) obj.material_from.emplace_back(material, folder + from.get<std::string>());
+	}
+}
+
+/** A building's night from its .glb: the node "noc" (the lit windows) and the places "svetlo_NN" (the glows), when it has them. */
+static void ReadGlbNight(const std::string &path, ThreeDObject &obj)
+{
+	GlbMesh night;
+	std::vector<float> lights;
+	ReadGlbMesh(path, night, true, {}, 0, "noc", "svetlo_", &lights);
+	TakeMaterialPictures(night, obj);
+	for (size_t i = 0; i + 2 < night.pos.size(); i += 3) {
+		obj.night_pos.push_back(static_cast<float>(night.pos[i] * OBJECT_UNITS_PER_METRE));
+		obj.night_pos.push_back(static_cast<float>(night.pos[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.night_pos.push_back(static_cast<float>(night.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+	obj.night_uv = std::move(night.uv);
+	obj.night_tri = std::move(night.tri);
+	/* Each night triangle in its material's texture, as by day (TakeGlbMesh()): the colleague's ruin has the lantern
+	 * of its lookout and the torch at its cave in an atlas of their own, which drew in the ruin's. Its own texture
+	 * where the picture is its own (the castle's flames, another material of the same atlas). */
+	if (night.tri_tex.size() == obj.night_tri.size() / 3) {
+		std::vector<int> number(night.textures.size(), -1);
+		std::vector<uint8_t> tex(night.tri_tex.size(), 0);
+		bool other = false;
+		for (size_t t = 0; t < night.tri_tex.size(); t++) {
+			const uint8_t k = night.tri_tex[t];
+			if (k >= number.size()) continue;
+			if (number[k] < 0) {
+				const GlbTexture &g = night.textures[k];
+				number[k] = 0;
+				if (g.png != nullptr && *g.png != obj.png) {
+					auto same = std::ranges::find_if(obj.material_pngs, [&](const ThreeDTextureBytes &m) { return m == g.png || (m != nullptr && *m == *g.png); });
+					if (same != obj.material_pngs.end()) {
+						number[k] = static_cast<int>(same - obj.material_pngs.begin()) + 1;
+					} else if (obj.material_pngs.size() < UINT8_MAX / 2) {
+						obj.material_pngs.push_back(g.png);
+						obj.material_flats.push_back(g.flat);
+						number[k] = static_cast<int>(obj.material_pngs.size());
+					}
+				}
+			}
+			tex[t] = static_cast<uint8_t>(number[k]);
+			if (tex[t] != 0) other = true;
+		}
+		if (other) {
+			obj.night_tex = std::move(tex);
+			obj.material_levels.assign(obj.material_pngs.size(), nullptr);
+		}
+	}
+	for (size_t i = 0; i + 2 < lights.size(); i += 3) {
+		obj.lights.push_back(static_cast<float>(lights[i] * OBJECT_UNITS_PER_METRE));
+		obj.lights.push_back(static_cast<float>(lights[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.lights.push_back(static_cast<float>(lights[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+}
+
+/** A mesh read (ReadGlbMesh()) into a building: metres into units, the side of each triangle facing out, the light from its normals. */
+/**
+ * A mesh whose texture repeats (glTF's sampler repeats it unless it says otherwise; the colleague's stones of
+ * objekty/kameni, from -0.8 to 0.8 of their picture): a building's texture is not repeated where it is drawn -- on the
+ * map off it nothing (DrawTexturedTriangle() of viewport.cpp), on the card clamped to its edge --, and of the stones only
+ * pieces were left on the map (the player, test5: "he has normal stones, so what is going on?"). Its triangles that
+ * reach past the picture cut where it begins again, each piece's u and v within it, a hair from its edges, as the
+ * masonry of the bridges (MasonryMesh()); those within it as they are.
+ */
+static void CutRepeatedTexture(GlbMesh &mesh)
+{
+	const size_t corners = mesh.pos.size() / 3;
+	if (corners == 0 || mesh.uv.size() != corners * 2) return;
+	/* Past it by more than its quantising's slack. */
+	static constexpr double SLACK = 1e-3;
+	auto past = [&mesh](uint32_t i) {
+		const double u = mesh.uv[i * 2], v = mesh.uv[i * 2 + 1];
+		return u < -SLACK || u > 1 + SLACK || v < -SLACK || v > 1 + SLACK;
+	};
+	auto reaches_past = [&](size_t t) { return past(mesh.tri[t]) || past(mesh.tri[t + 1]) || past(mesh.tri[t + 2]); };
+	bool any = false;
+	for (size_t t = 0; t + 2 < mesh.tri.size() && !any; t += 3) any = reaches_past(t);
+	if (!any) return;
+	const bool normals = mesh.nrm.size() == mesh.pos.size();
+	struct Corner {
+		float p[3];
+		float n[3];
+		double u, v;
+	};
+	auto mix = [](const Corner &a, const Corner &b, double f) {
+		Corner c;
+		for (int k = 0; k < 3; k++) {
+			c.p[k] = static_cast<float>(a.p[k] + (b.p[k] - a.p[k]) * f);
+			c.n[k] = static_cast<float>(a.n[k] + (b.n[k] - a.n[k]) * f);
+		}
+		c.u = a.u + (b.u - a.u) * f;
+		c.v = a.v + (b.v - a.v) * f;
+		return c;
+	};
+	/* A polygon's part on one side of the line u (or v) = at, the side above it or below. */
+	auto cut = [&mix](const std::vector<Corner> &poly, bool v, double at, bool above) {
+		std::vector<Corner> out;
+		for (size_t k = 0; k < poly.size(); k++) {
+			const Corner &a = poly[k], &b = poly[(k + 1) % poly.size()];
+			const double da = ((v ? a.v : a.u) - at) * (above ? 1 : -1), db = ((v ? b.v : b.u) - at) * (above ? 1 : -1);
+			if (da >= 0) out.push_back(a);
+			if ((da >= 0) != (db >= 0)) out.push_back(mix(a, b, da / (da - db)));
+		}
+		return out;
+	};
+	/* Within the picture a hair from its edges: a texel past them is none. */
+	static constexpr double EDGE = 1.0 / 1024;
+	auto inside = [](double t) { return static_cast<float>(EDGE + std::clamp(t, 0.0, 1.0) * (1 - 2 * EDGE)); };
+	static constexpr double EPS = 1e-6;
+	std::vector<float> pos, nrm, uv;
+	std::vector<uint32_t> tri;
+	std::vector<uint8_t> tri_tex, tri_glass;
+	std::vector<uint16_t> tri_group, tri_mark;
+	/* Each triangle's own marks for each piece of it. */
+	auto marked = [&](size_t t) {
+		const size_t k = t / 3;
+		if (k < mesh.tri_tex.size()) tri_tex.push_back(mesh.tri_tex[k]);
+		if (k < mesh.tri_group.size()) tri_group.push_back(mesh.tri_group[k]);
+		if (k < mesh.tri_mark.size()) tri_mark.push_back(mesh.tri_mark[k]);
+		if (k < mesh.tri_glass.size()) tri_glass.push_back(mesh.tri_glass[k]);
+	};
+	/* The corners of the triangles within it kept, once each. */
+	std::vector<uint32_t> kept(corners, UINT32_MAX);
+	auto keep = [&](uint32_t i) {
+		if (kept[i] == UINT32_MAX) {
+			kept[i] = static_cast<uint32_t>(pos.size() / 3);
+			pos.insert(pos.end(), &mesh.pos[i * 3], &mesh.pos[i * 3] + 3);
+			if (normals) nrm.insert(nrm.end(), &mesh.nrm[i * 3], &mesh.nrm[i * 3] + 3);
+			uv.insert(uv.end(), &mesh.uv[i * 2], &mesh.uv[i * 2] + 2);
+		}
+		return kept[i];
+	};
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (std::max({mesh.tri[t], mesh.tri[t + 1], mesh.tri[t + 2]}) >= corners) continue;
+		if (!reaches_past(t)) {
+			tri.insert(tri.end(), {keep(mesh.tri[t]), keep(mesh.tri[t + 1]), keep(mesh.tri[t + 2])});
+			marked(t);
+			continue;
+		}
+		std::vector<Corner> poly(3);
+		double u0 = std::numeric_limits<double>::max(), u1 = -u0, v0 = u0, v1 = -u0;
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = mesh.tri[t + k];
+			for (int a = 0; a < 3; a++) {
+				poly[k].p[a] = mesh.pos[i * 3 + a];
+				poly[k].n[a] = normals ? mesh.nrm[i * 3 + a] : 0.0f;
+			}
+			poly[k].u = mesh.uv[i * 2];
+			poly[k].v = mesh.uv[i * 2 + 1];
+			u0 = std::min(u0, poly[k].u);
+			u1 = std::max(u1, poly[k].u);
+			v0 = std::min(v0, poly[k].v);
+			v1 = std::max(v1, poly[k].v);
+		}
+		const double i0 = std::floor(u0 + EPS), i1 = std::max(i0 + 1, std::ceil(u1 - EPS));
+		const double j0 = std::floor(v0 + EPS), j1 = std::max(j0 + 1, std::ceil(v1 - EPS));
+		for (double i = i0; i < i1; i++) {
+			const std::vector<Corner> strip = cut(cut(poly, false, i, true), false, i + 1, false);
+			if (strip.size() < 3) continue;
+			for (double j = j0; j < j1; j++) {
+				const std::vector<Corner> piece = cut(cut(strip, true, j, true), true, j + 1, false);
+				if (piece.size() < 3) continue;
+				const uint32_t first = static_cast<uint32_t>(pos.size() / 3);
+				for (const Corner &k : piece) {
+					pos.insert(pos.end(), k.p, k.p + 3);
+					if (normals) {
+						const float len = std::sqrt(k.n[0] * k.n[0] + k.n[1] * k.n[1] + k.n[2] * k.n[2]);
+						for (int m = 0; m < 3; m++) nrm.push_back(len > 0 ? k.n[m] / len : 0.0f);
+					}
+					uv.push_back(inside(k.u - i));
+					uv.push_back(inside(k.v - j));
+				}
+				/* (Cut by lines, it goes round as the triangle did: its outer side kept.) */
+				for (uint32_t k = 1; k + 1 < piece.size(); k++) {
+					tri.insert(tri.end(), {first, first + k, first + k + 1});
+					marked(t);
+				}
+			}
+		}
+	}
+	mesh.pos = std::move(pos);
+	mesh.nrm = std::move(nrm);
+	mesh.uv = std::move(uv);
+	mesh.tri = std::move(tri);
+	mesh.tri_tex = std::move(tri_tex);
+	mesh.tri_group = std::move(tri_group);
+	mesh.tri_mark = std::move(tri_mark);
+	mesh.tri_glass = std::move(tri_glass);
+}
+
+static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
+{
+	/* A building's texture is not repeated where it is drawn: what repeats it, cut. */
+	CutRepeatedTexture(mesh);
+	TakeMaterialPictures(mesh, obj);
+	obj.pos.reserve(mesh.pos.size());
+	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+		obj.pos.push_back(static_cast<float>(mesh.pos[i] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+		obj.top = std::max(obj.top, static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+	obj.facing = TriangleFacing(mesh);
+	obj.uv = std::move(mesh.uv);
+	obj.tri = std::move(mesh.tri);
+	obj.png = std::move(mesh.png);
+	if (!mesh.nrm.empty()) obj.light = CornerLight(mesh.nrm);
+	/* The triangles of its other materials each with its material's texture (Textures()), numbered 1, 2, ... here and
+	 * moved past its add-ons' when those are laid in (LayAddons()). All of them drew the first material's: the forest's
+	 * grass and ferns the ground's picture, its stumps a stripe of it (the player, 25. 10.: "two boards through each
+	 * other all over the clearing, and one trunk is red"). */
+	/* Its first material without a picture (the colleague's BUS sign: only a colour), all of them its other materials,
+	 * each its picture or its colour; they drew in the grey of no picture. */
+	if (mesh.tri_tex.size() != obj.tri.size() / 3 || mesh.textures.size() < (mesh.png_texture < 0 ? 1u : 2u)) return;
+	std::vector<int> number(mesh.textures.size(), -1);
+	if (mesh.png_texture >= 0) number[mesh.png_texture] = 0;
+	std::vector<uint8_t> tri_tex(mesh.tri_tex.size(), 0);
+	for (size_t t = 0; t < mesh.tri_tex.size(); t++) {
+		const uint8_t k = mesh.tri_tex[t];
+		if (k >= number.size()) continue;
+		if (number[k] < 0) {
+			/* (Room for its add-ons before them: a byte numbers all.) */
+			if (obj.material_pngs.size() >= UINT8_MAX / 2) {
+				number[k] = 0;
+			} else {
+				obj.material_pngs.push_back(mesh.textures[k].png);
+				obj.material_flats.push_back(mesh.textures[k].flat);
+				number[k] = static_cast<int>(obj.material_pngs.size());
+			}
+		}
+		tri_tex[t] = static_cast<uint8_t>(number[k]);
+	}
+	if (obj.material_pngs.empty()) return;
+	obj.material_levels.assign(obj.material_pngs.size(), nullptr);
+	obj.corner_tex.assign(obj.pos.size() / 3, 0);
+	for (size_t t = 0; t < tri_tex.size(); t++) {
+		for (int k = 0; k < 3; k++) {
+			const uint32_t c = obj.tri[t * 3 + k];
+			if (c < obj.corner_tex.size()) obj.corner_tex[c] = tri_tex[t];
+		}
+	}
+	obj.tri_tex = std::move(tri_tex);
+}
+
+/** The floors one walks on ("podlaha", "podlaha_N"): the names of their nodes (GlbReadOptions::groups). */
+static const std::vector<std::string> GLB_FLOORS = {"podlaha", "podlaha_1", "podlaha_2", "podlaha_3", "podlaha_4", "podlaha_5", "podlaha_6", "podlaha_7", "podlaha_8", "podlaha_9"};
+
+/**
+ * The triangles of a mesh under the floors (read with GLB_FLOORS as its groups) kept apart to be walked on (FloorAt()),
+ * and in no one's way (passable_tris, unless the caller marks those); drawn as they are.
+ * @param first_group the group of the first floor, those before it others' (a part of the forest's solid nodes)
+ */
+static void TakeGlbFloors(const GlbMesh &mesh, ThreeDObject &obj, uint16_t first_group = 1, bool passable = true)
+{
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (t / 3 >= mesh.tri_group.size() || mesh.tri_group[t / 3] < first_group) continue;
+		for (int k = 0; k < 3; k++) {
+			const float *p = &mesh.pos[mesh.tri[t + k] * 3];
+			obj.floor.insert(obj.floor.end(), {static_cast<float>(p[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[2] * OBJECT_HEIGHT_PER_METRE)});
+		}
+		if (!passable) continue;
+		const uint32_t n = static_cast<uint32_t>(t / 3);
+		if (!obj.passable_tris.empty() && obj.passable_tris.back() == n) {
+			obj.passable_tris.back() = n + 1;
+		} else {
+			obj.passable_tris.insert(obj.passable_tris.end(), {n, n + 1});
+		}
+	}
+}
+
+/**
+ * The rig ('testlod glbobj'): a .glb file on the disk, all its nodes as an interior is read, as a Wavefront file (a
+ * group a texture), its corners as the game reads them.
+ * @return what was done, for the console
+ */
+std::string WriteGlbAsObj(const std::string &glb, const std::string &out)
+{
+	GlbMesh mesh;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	if (!ReadGlbMesh(glb, mesh, o) || mesh.pos.empty()) return fmt::format("{} nejde precist", glb);
+	std::string text;
+	double lo[3] = {1e9, 1e9, 1e9}, hi[3] = {-1e9, -1e9, -1e9};
+	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+		text += fmt::format("v {:.3f} {:.3f} {:.3f}\n", mesh.pos[i], mesh.pos[i + 1], mesh.pos[i + 2]);
+		for (int k = 0; k < 3; k++) {
+			lo[k] = std::min<double>(lo[k], mesh.pos[i + k]);
+			hi[k] = std::max<double>(hi[k], mesh.pos[i + k]);
+		}
+	}
+	int group = -1;
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		const int tex = t / 3 < mesh.tri_tex.size() ? mesh.tri_tex[t / 3] : 0;
+		if (tex != group) text += fmt::format("g t{}\n", group = tex);
+		text += fmt::format("f {} {} {}\n", mesh.tri[t] + 1, mesh.tri[t + 1] + 1, mesh.tri[t + 2] + 1);
+	}
+	auto f = FileHandle::Open(out, "wb");
+	if (!f.has_value()) return fmt::format("{} nejde zapsat", out);
+	fwrite(text.data(), 1, text.size(), *f);
+	return fmt::format("{} do {}: {} trojuhelniku, x {:.2f}..{:.2f} y {:.2f}..{:.2f} z {:.2f}..{:.2f}", glb, out, mesh.tri.size() / 3, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
+}
+
+/**
+ * Leave out of a mesh what lies in an interior's box (a few centimetres more every way: its walls are the house's),
+ * and the wings of the doors, drawn on their own (ThreeDObject::outside).
+ * @param interior_path the interior's file
+ */
+static void CutOutInteriorBox(GlbMesh &mesh, const std::string &interior_path)
+{
+	GlbMesh in;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	if (!ReadGlbMesh(interior_path, in, o) || in.pos.empty()) return;
+	double x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+	for (size_t i = 0; i + 2 < in.pos.size(); i += 3) {
+		x0 = std::min<double>(x0, in.pos[i]); x1 = std::max<double>(x1, in.pos[i]);
+		y0 = std::min<double>(y0, in.pos[i + 1]); y1 = std::max<double>(y1, in.pos[i + 1]);
+	}
+	const double margin = 0.05;
+	auto inside = [&](uint32_t c) {
+		const double x = mesh.pos[c * 3], y = mesh.pos[c * 3 + 1];
+		return x > x0 - margin && x < x1 + margin && y > y0 - margin && y < y1 + margin;
+	};
+	std::vector<uint32_t> tri;
+	std::vector<uint8_t> tri_tex;
+	std::vector<uint16_t> tri_group;
+	const bool texs = mesh.tri_tex.size() == mesh.tri.size() / 3, groups = mesh.tri_group.size() == mesh.tri.size() / 3;
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (inside(mesh.tri[t]) && inside(mesh.tri[t + 1]) && inside(mesh.tri[t + 2])) continue;
+		tri.insert(tri.end(), mesh.tri.begin() + t, mesh.tri.begin() + t + 3);
+		if (texs) tri_tex.push_back(mesh.tri_tex[t / 3]);
+		if (groups) tri_group.push_back(mesh.tri_group[t / 3]);
+	}
+	mesh.tri = std::move(tri);
+	if (texs) mesh.tri_tex = std::move(tri_tex);
+	if (groups) mesh.tri_group = std::move(tri_group);
+}
+
+/** A mesh of a part of the forest with a clearing turned about the middle of its tile by quarter turns: exactly, no rounding of the sines. */
+static void TurnGlbMeshQuarters(GlbMesh &mesh, int quarter_turns)
+{
+	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
+	const int cs = COS[quarter_turns & 3], sn = SIN[quarter_turns & 3];
+	if (cs == 1) return;
+	const double middle_m = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0;
+	auto turn = [&](float *p, double middle) {
+		const double dx = p[0] - middle, dy = p[1] - middle;
+		p[0] = static_cast<float>(middle + dx * cs - dy * sn);
+		p[1] = static_cast<float>(middle + dx * sn + dy * cs);
+	};
+	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) turn(&mesh.pos[i], middle_m);
+	for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) turn(&mesh.nrm[i], 0.0);
+}
+
+/** An object's lights at night (ReadGlbNight(), world units) turned as its mesh (TurnGlbMeshQuarters()). */
+static void TurnNightQuarters(ThreeDObject &obj, int quarter_turns)
+{
+	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
+	const int cs = COS[quarter_turns & 3], sn = SIN[quarter_turns & 3];
+	if (cs == 1) return;
+	const double middle = TILE_SIZE / 2.0;
+	auto turn = [&](float *p) {
+		const double dx = p[0] - middle, dy = p[1] - middle;
+		p[0] = static_cast<float>(middle + dx * cs - dy * sn);
+		p[1] = static_cast<float>(middle + dx * sn + dy * cs);
+	};
+	for (size_t i = 0; i + 2 < obj.night_pos.size(); i += 3) turn(&obj.night_pos[i]);
+	for (size_t i = 0; i + 2 < obj.lights.size(); i += 3) turn(&obj.lights[i]);
+}
+
+/**
+ * An interior's .glb (the colleague's hra/3d/PROSBA-INTERIERY.md): all its nodes but the lamps lit at night ("noc", read
+ * as a house's) and the wings of its doors ("dvere_NN", objects of their own); its floors ("podlaha", "podlaha_N")
+ * kept apart too, to be walked on (FloorAt()) and in no one's way (passable_tris).
+ */
+static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj, int quarter_turns = 0)
+{
+	GlbMesh mesh;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	o.skip_night = true;
+	o.skip_wings = true;
+	o.groups = &GLB_FLOORS;
+	if (!ReadGlbMesh(path, mesh, o)) return false;
+	/* Of a part of the forest, turned as it is (the colleague's forest cabin). */
+	TurnGlbMeshQuarters(mesh, quarter_turns);
+	TakeGlbFloors(mesh, obj);
+	TakeGlbMesh(mesh, obj);
+	ReadGlbNight(path, obj);
+	TurnNightQuarters(obj, quarter_turns);
+	return true;
+}
+
+/**
+ * The wing of a door ("dvere_NN" of a house's or an interior's .glb): its node alone, turned about its origin, the
+ * hinge; of a part of the forest then as the part is turned.
+ */
+static bool ReadGlbDoor(const std::string &path, const std::string &node, int8_t turn, ThreeDObject &obj, int quarter_turns = 0)
+{
+	GlbMesh mesh;
+	std::vector<float> hinge;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	o.only_node = node;
+	o.point_prefix = node;
+	o.points = &hinge;
+	if (!ReadGlbMesh(path, mesh, o) || hinge.size() < 3) return false;
+	if (turn != 0) {
+		const double a = turn * M_PI / 2, c = std::cos(a), s = std::sin(a);
+		for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+			const double x = mesh.pos[i] - hinge[0], y = mesh.pos[i + 1] - hinge[1];
+			mesh.pos[i] = static_cast<float>(hinge[0] + x * c - y * s);
+			mesh.pos[i + 1] = static_cast<float>(hinge[1] + x * s + y * c);
+		}
+		for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) {
+			const double x = mesh.nrm[i], y = mesh.nrm[i + 1];
+			mesh.nrm[i] = static_cast<float>(x * c - y * s);
+			mesh.nrm[i + 1] = static_cast<float>(x * s + y * c);
+		}
+	}
+	TurnGlbMeshQuarters(mesh, quarter_turns);
+	TakeGlbMesh(mesh, obj);
+	return true;
+}
+
+/** The wings of the doors and the windows of a .glb: the nodes "dvere_NN", "okno_NN" with a mesh under them (the old houses' doors are empty places), by name. */
+static std::vector<std::string> GlbDoorNodes(const std::string &path)
+{
+	std::vector<std::string> out;
+	const std::vector<uint8_t> b = ReadWholeFile(path);
+	if (b.size() < 20 || b[0] != 'g' || b[1] != 'l' || b[2] != 'T' || b[3] != 'F') return out;
+	const uint32_t len = b[12] | (b[13] << 8) | (b[14] << 16) | (static_cast<uint32_t>(b[15]) << 24);
+	if (20 + static_cast<size_t>(len) > b.size()) return out;
+	try {
+		const nlohmann::json j = nlohmann::json::parse(b.begin() + 20, b.begin() + 20 + len);
+		if (!j.contains("nodes")) return out;
+		const auto &nodes = j.at("nodes");
+		std::function<bool(size_t, int)> has_mesh = [&](size_t i, int depth) {
+			const auto &n = nodes.at(i);
+			if (n.contains("mesh")) return true;
+			if (depth > 8 || !n.contains("children")) return false;
+			for (const auto &c : n.at("children")) {
+				if (has_mesh(c.get<size_t>(), depth + 1)) return true;
+			}
+			return false;
+		};
+		for (size_t i = 0; i < nodes.size(); i++) {
+			const std::string name = nodes.at(i).value("name", std::string());
+			if (IsWingNode(name) && has_mesh(i, 0)) out.push_back(name);
+		}
+	} catch (const std::exception &ex) {
+		Debug(misc, 0, "3D objects {}: {}", path, ex.what());
+	}
+	std::ranges::sort(out);
+	return out;
+}
+
+/** A mesh without the triangles \a drop says (given each triangle's index), their lists of each triangle with them. */
+template <typename Drop>
+static void DropTrianglesIf(GlbMesh &mesh, Drop drop)
+{
+	const size_t n = mesh.tri.size() / 3;
+	size_t kept = 0;
+	for (size_t t = 0; t < n; t++) {
+		if (drop(t)) continue;
+		for (int k = 0; k < 3; k++) mesh.tri[kept * 3 + k] = mesh.tri[t * 3 + k];
+		if (t < mesh.tri_tex.size()) mesh.tri_tex[kept] = mesh.tri_tex[t];
+		if (t < mesh.tri_group.size()) mesh.tri_group[kept] = mesh.tri_group[t];
+		if (t < mesh.tri_mark.size()) mesh.tri_mark[kept] = mesh.tri_mark[t];
+		if (t < mesh.tri_glass.size()) mesh.tri_glass[kept] = mesh.tri_glass[t];
+		kept++;
+	}
+	mesh.tri.resize(kept * 3);
+	if (mesh.tri_tex.size() > kept) mesh.tri_tex.resize(kept);
+	if (mesh.tri_group.size() > kept) mesh.tri_group.resize(kept);
+	if (mesh.tri_mark.size() > kept) mesh.tri_mark.resize(kept);
+	if (mesh.tri_glass.size() > kept) mesh.tri_glass.resize(kept);
+}
+
+/**
+ * A mesh without its see-through triangles (a material "BLEND": a lighthouse's lantern glass, 0.3 of its colour): the
+ * buildings are drawn opaque, the glass a box in its colour hid the reflector turning in it.
+ */
+static void DropSeeThroughTriangles(GlbMesh &mesh)
+{
+	DropTrianglesIf(mesh, [&mesh](size_t t) {
+		const uint8_t tex = t < mesh.tri_tex.size() ? mesh.tri_tex[t] : 0;
+		return tex < mesh.textures.size() && mesh.textures[tex].alpha < 255;
+	});
+}
+
+static bool ReadGlb(const std::string &path, ThreeDObject &obj)
+{
+	GlbMesh mesh;
+	if (obj.all_roots) {
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.skip_night = true;
+		if (!obj.outside_of.empty()) o.skip_wings = true;
+		o.skip_nodes = &obj.left_out;
+		/* Its floors walked on as an interior's (the dragon castle's stairs, wall walks and the hall's roof, "podlaha"). */
+		o.groups = &GLB_FLOORS;
+		if (!ReadGlbMesh(path, mesh, o)) return false;
+	} else {
+		/* Without the nodes it leaves out (a lighthouse's reflector, a figure that turns of its own). */
+		GlbReadOptions o;
+		if (!obj.left_out.empty()) o.skip_nodes = &obj.left_out;
+		if (!ReadGlbMesh(path, mesh, o)) return false;
+	}
+	if (obj.no_see_through) DropSeeThroughTriangles(mesh);
+	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
+	TakeGlbFloors(mesh, obj);
+	TakeGlbMesh(mesh, obj);
+	ReadGlbNight(path, obj);
+	/* An add-on is lit again as it is turned at each of its places (LayAddons()): its normals kept. */
+	if (obj.addon) {
+		obj.nrm = std::move(mesh.nrm);
+		return true;
+	}
+
+	/* It should lie on its plot: say so in the log when it does not. */
+	float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f, z0 = 1e9f;
+	for (size_t i = 0; i < obj.pos.size(); i += 3) {
+		x0 = std::min(x0, obj.pos[i]); x1 = std::max(x1, obj.pos[i]);
+		y0 = std::min(y0, obj.pos[i + 1]); y1 = std::max(y1, obj.pos[i + 1]);
+		z0 = std::min(z0, obj.pos[i + 2]);
+	}
+	const float slack = 1.0f;
+	if (x0 < -slack || y0 < -slack || x1 > obj.tiles_x * TILE_SIZE + slack || y1 > obj.tiles_y * TILE_SIZE + slack || z0 < -slack) {
+		Debug(misc, 1, "3D object {}: reaches out of its {}x{} tiles: x {:.1f}..{:.1f}, y {:.1f}..{:.1f}, z from {:.1f}", obj.name, obj.tiles_x, obj.tiles_y, x0, x1, y0, y1, z0);
+	}
+	return true;
+}
+
+/**
+ * The indices of the packages of GRFs (the player, 15. 10.: "objects must be as independent as GRFs: whether I give
+ * the Sergej object or not, the game cannot carry it, it is to be with the GRF"; the colleague's
+ * hra/3d/PROSBA-OBJEKTY-U-GRF.md): <package>/objekty/<set>/objekty.json beside a GRF anywhere in the NewGRF folders,
+ * a folder or a tar, as the game finds GRFs.
+ */
+class PackageIndexScanner : public FileScanner {
+public:
+	std::vector<std::string> indices;
+	std::string skip;                        ///< the folder of the game's own sets, read as those (baseset/decouple/objekty/)
+	std::string_view in_tar = IN_TAR;        ///< how a file in a tar is named
+
+	bool AddFile(const std::string &filename, size_t, const std::string &tar_filename) override
+	{
+		if (!this->skip.empty() && filename.starts_with(this->skip)) return false;
+		/* .../objekty/<set>/objekty.json */
+		std::string_view name = filename;
+		size_t last = name.find_last_of(PATHSEPCHAR);
+		if (last == std::string_view::npos || name.substr(last + 1) != "objekty.json") return false;
+		size_t set = name.find_last_of(PATHSEPCHAR, last - 1);
+		if (set == std::string_view::npos || set < 7 || name.substr(set - 7, 7) != "objekty" || (set > 7 && name[set - 8] != PATHSEPCHAR)) return false;
+		this->indices.push_back(tar_filename.empty() ? filename : std::string(this->in_tar) + filename);
+		return true;
+	}
+};
+
+/**
+ * The indices of the objects: the game's own, baseset/decouple/objekty/<set>/objekty.json (the houses of the game and
+ * the figures it draws), each set from the first place the game reads its data from that has it -- the player's own
+ * folder before the game's, so a set there needs no build of the game; then the packages of the GRFs. In the same
+ * order on every computer: a house in two folders (the colleague's 04, the same block below the snow in mirne/ and
+ * in subarkticke/) is the first folder's.
+ */
+static std::vector<std::string> FindObjectIndices()
+{
+	std::vector<std::string> indices;
+	std::set<std::string> sets;
+	for (Searchpath sp : _valid_searchpaths) {
+		std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + "decouple" PATHSEP "objekty";
+		std::error_code ec;
+		if (!std::filesystem::is_directory(OTTD2FS(dir), ec)) continue;
+		std::vector<std::string> here;
+		for (const auto &entry : std::filesystem::directory_iterator(OTTD2FS(dir), ec)) {
+			std::string set = FS2OTTD(entry.path().filename().native());
+			std::string index = FS2OTTD(entry.path().native()) + PATHSEP "objekty.json";
+			if (sets.contains(set) || !std::filesystem::is_regular_file(OTTD2FS(index), ec)) continue;
+			sets.insert(set);
+			here.push_back(index);
+		}
+		std::sort(here.begin(), here.end());
+		indices.insert(indices.end(), here.begin(), here.end());
+	}
+	PackageIndexScanner packages;
+	packages.Scan(".json", Subdirectory::NewGrf);
+	/* And packages in baseset/decouple/ beside the game's own sets, a folder or a tar (the player: "from the decouple
+	 * folder, tar"); a GRF there is one of the game's own (GRFFileScanner). */
+	for (Searchpath sp : _valid_searchpaths) {
+		std::string dir = FioGetDirectory(sp, Subdirectory::Baseset) + "decouple" PATHSEP;
+		if (!FileExists(dir)) continue;
+		PackageIndexScanner here;
+		here.skip = dir + "objekty" PATHSEP;
+		here.Scan(".json", dir);
+		packages.indices.insert(packages.indices.end(), here.indices.begin(), here.indices.end());
+	}
+	{
+		PackageIndexScanner tars;
+		tars.in_tar = IN_BASESET_TAR;
+		for (const auto &[name, entry] : _tar_filelist[Subdirectory::Baseset]) {
+			if (IsInBuiltinGRFDir(entry.tar_filename)) tars.AddFile(name, 0, entry.tar_filename);
+		}
+		packages.indices.insert(packages.indices.end(), tars.indices.begin(), tars.indices.end());
+	}
+	std::sort(packages.indices.begin(), packages.indices.end());
+	Debug(misc, 1, "3D objects: {} sets of the game's own, {} of the packages of GRFs", indices.size(), packages.indices.size());
+	for (const std::string &index : packages.indices) Debug(misc, 2, "3D objects: a package's set {}", index);
+	indices.insert(indices.end(), packages.indices.begin(), packages.indices.end());
+	return indices;
+}
+
+/**
+ * Where the game looks for the packages of GRFs, for the log: the NewGRF folders and baseset/decouple/ of each place
+ * the game reads its data from, folders and tars in them.
+ */
+std::string ThreeDPackagePlaces()
+{
+	std::string places;
+	for (Searchpath sp : _valid_searchpaths) {
+		for (const std::string &dir : {FioGetDirectory(sp, Subdirectory::NewGrf), FioGetDirectory(sp, Subdirectory::Baseset) + "decouple" PATHSEP}) {
+			if (!FileExists(dir) || places.find(dir) != std::string::npos) continue;
+			if (!places.empty()) places += ", ";
+			places += dir;
+		}
+	}
+	return places.empty() ? std::string("no folder") : places;
+}
+
+/**
+ * Whether a package lies beside the GRF of an id the game has loaded: the GRF's folder, as the game names it (in a
+ * NewGRF folder, or in a tar), is the package's. The player may keep an old and a new version of a set side by side
+ * (the colleague's hra/3d/PROSBA-TATRA-V6.md: "the one beside the loaded GRF wins"). The names in a tar are the
+ * game's in small letters, so compared so.
+ */
+static bool PackageBesideLoadedGrf(std::string package, uint32_t grfid)
+{
+	auto plain = [](std::string &s) {
+		for (char &ch : s) {
+			if (ch == '\\') ch = '/';
+			if (ch >= 'A' && ch <= 'Z') ch = static_cast<char>(ch - 'A' + 'a');
+		}
+	};
+	for (const auto &c : _grfconfig) {
+		if (c->ident.grfid != grfid) continue;
+		std::string grf = c->filename;
+		plain(grf);
+		const size_t sep = grf.find_last_of('/');
+		if (sep == std::string::npos) return false;
+		const std::string folder = grf.substr(0, sep + 1);
+		if (package.starts_with(IN_TAR)) package.erase(0, IN_TAR.size());
+		if (package.starts_with(IN_BASESET_TAR)) package.erase(0, IN_BASESET_TAR.size());
+		plain(package);
+		/* The package's folder is the one its objekty/ is in, beside the GRF. */
+		if (package.ends_with("objekty/")) package.resize(package.size() - std::string_view("objekty/").size());
+		return package.ends_with(folder) && (package.size() == folder.size() || package[package.size() - folder.size() - 1] == '/');
+	}
+	return false;
+}
+
+/** The package an index is of: the folder its set's folder is in (.../objekty/), the figures of a vehicle found there first. */
+static std::string PackageOf(const std::string &index)
+{
+	size_t last = index.find_last_of(PATHSEPCHAR);
+	size_t set = last == std::string::npos || last == 0 ? std::string::npos : index.find_last_of(PATHSEPCHAR, last - 1);
+	return set == std::string::npos ? std::string() : index.substr(0, set + 1);
+}
+
+/** The most parts painted a colour by number an object has: ten of three bits below the top bit of its paint (PaintBits()). */
+static constexpr size_t THREE_D_PAINT_PARTS_MAX = 10;
+
+/** The patterns of the parts read ("tapeta"), by their files: one for all the houses that name it. */
+static std::map<std::string, std::shared_ptr<const std::vector<ThreeDObjectTexture>>> _three_d_patterns;
+
+/** A pattern of a file ("tapeta" "soubor"), its levels halved; nullptr when it cannot be read. */
+static std::shared_ptr<const std::vector<ThreeDObjectTexture>> PatternOfFile(const std::string &path)
+{
+	auto it = _three_d_patterns.find(path);
+	if (it != _three_d_patterns.end()) return it->second;
+	std::shared_ptr<const std::vector<ThreeDObjectTexture>> made;
+	const std::vector<uint8_t> png = ReadWholeFile(path);
+	if (!png.empty()) {
+		auto levels = std::make_shared<std::vector<ThreeDObjectTexture>>();
+		/* Its alpha as it is (soft): the pattern is see-through by it. */
+		DecodeTextureLevels(png, *levels, 0, true, nullptr, true);
+		if (!levels->empty()) made = std::move(levels);
+	}
+	if (made == nullptr) Debug(misc, 0, "3D object: the pattern {} cannot be read", path);
+	_three_d_patterns.emplace(path, made);
+	return made;
+}
+
+/**
+ * The patterns of a part ("tapeta": {"soubor": a picture, "opakovani_m": metres, "jen_sikme": not on a level surface},
+ * or a list of such: the set's choice of patterns for the part, a place takes one of them by its paint), beside the index.
+ */
+static void ReadPartPattern(const nlohmann::json &b, const std::string &folder, ThreeDObjectColourPart &part)
+{
+	if (!b.contains("tapeta")) return;
+	auto add = [&](const nlohmann::json &t) {
+		if (!t.is_object() || !t.contains("soubor") || !t.at("soubor").is_string()) return;
+		if (auto pattern = PatternOfFile(folder + t.at("soubor").get<std::string>()); pattern != nullptr) {
+			part.patterns.push_back(std::move(pattern));
+			part.pattern_m.push_back(std::clamp(t.value("opakovani_m", 1.0f), 0.05f, 100.0f));
+			part.pattern_sloped.push_back(t.value("jen_sikme", false) ? 1 : 0);
+		}
+	};
+	if (b.at("tapeta").is_array()) {
+		for (const auto &t : b.at("tapeta")) add(t);
+	} else {
+		add(b.at("tapeta"));
+	}
+}
+
+/** The parts of a house painted a colour by number ("barvy"), their masks read from beside the index. */
+static void ReadColourParts(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
+{
+	/* A part in the colour of the company the tile is of ("barva_firmy", the colleague's stations and depots: the
+	 * railings, the sign, the lamps' posts as the sprites of OpenGFX have them in the company's colour): its mask and
+	 * start as "barvy", its colours the game's (CompanyPaintColour()). */
+	if (e.contains("barva_firmy") && e.at("barva_firmy").is_object() && e.at("barva_firmy").contains("maska") && e.at("barva_firmy").at("maska").is_string()) {
+		const auto &b = e.at("barva_firmy");
+		ThreeDObjectColourPart part;
+		part.name = b.value("cast", std::string());
+		part.mask_png = ReadWholeFile(folder + b.at("maska").get<std::string>());
+		part.start = std::clamp(b.value("zacatek", 255), 1, 255);
+		part.per_company = true;
+		part.palette.assign(to_underlying(Colours::End), 0);
+		if (part.mask_png.empty()) {
+			Debug(misc, 0, "3D object {}: the company's colour part {} has no mask", obj.name, part.name);
+		} else if (obj.colours.size() < THREE_D_PAINT_PARTS_MAX) {
+			obj.colours.push_back(std::move(part));
+		}
+	}
+	if (!e.contains("barvy")) return;
+	for (const auto &b : e.at("barvy")) {
+		ThreeDObjectColourPart part;
+		part.name = b.value("cast", std::string());
+		part.mask_png = ReadWholeFile(folder + b.at("maska").get<std::string>());
+		part.start = std::clamp(b.value("zacatek", 255), 1, 255);
+		for (const auto &c : b.at("paleta")) {
+			auto rgb = ParseInteger<uint32_t>(c.get<std::string>(), 16);
+			if (rgb.has_value()) part.palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
+		}
+		part.per_town = b.value("nahoda", std::string()) == "mesto";
+		ReadPartPattern(b, folder, part);
+		if (part.mask_png.empty() || part.palette.empty()) {
+			Debug(misc, 0, "3D object {}: the colour part {} has no mask or no colours", obj.name, part.name);
+			continue;
+		}
+		if (obj.colours.size() < THREE_D_PAINT_PARTS_MAX) obj.colours.push_back(std::move(part));
+	}
+}
+
+/** The colours a tree's part may be in a use at most (the colleague: "palettes of at most 8 colours, your 3 bits a part"). */
+static constexpr size_t TREE_PALETTE_MAX = 8;
+/** A tree's parts painted by its use at most: four bits a part below the use's bits (TREE_PAINT_USE_BIT) of an add-on's paint. */
+static constexpr size_t TREE_PARTS_MAX = 6;
+/** Where the use is in the paint of a tree among a building's add-ons (AddonPaintAt()): three bits. */
+static constexpr uint8_t TREE_PAINT_USE_BIT = 24;
+/** The number of a part's colour in a tree's paint that leaves the part as its texture is (a use that does not name it). */
+static constexpr uint32_t TREE_PAINT_OWN = 0xF;
+
+/** A use of a tree by its name in "barvy_pouziti" (the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md); None one the game does not know. */
+static TreeUse ParseTreeUse(std::string_view name)
+{
+	if (name == "mirne") return TreeUse::Temperate;
+	if (name == "les") return TreeUse::Forest;
+	if (name == "subarkticke") return TreeUse::SubArctic;
+	if (name == "snih") return TreeUse::Snow;
+	return TreeUse::None;
+}
+
+/** A tree's part painted by its use, as read: "barvy_casti" its mask and start, "barvy_pouziti" its colours in each use. */
+struct TreePartRead {
+	std::string name;   ///< "cast": "koruna", "snih"
+	std::string mask;   ///< "maska": the path of its grey mask of the tree's first texture
+	int start = 255;    ///< "zacatek": the texture's lightness its colour is at its own
+	std::array<std::vector<uint32_t>, TREE_USES> palettes; ///< its colours in each use (Colour::data); none its texture's own there
+};
+
+/**
+ * A tree's parts painted by its use (the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md; the player, 2. 11.: "one
+ * tree, one object, but many uses"): "barvy_casti" its parts -- a grey mask of its first texture each ("maska", its
+ * crown, its snow), the texture's lightness its colour is at ("zacatek") --, "barvy_pouziti" each part's colours in
+ * each use ("mirne", "les", "subarkticke", "snih": by the part's name a list of "RRGGBB"; a part a use does not name,
+ * and a use of nothing, {}, keep the texture's colours).
+ * @return the parts, at most TREE_PARTS_MAX; none when it is not painted so
+ */
+static std::vector<TreePartRead> ReadTreeParts(const nlohmann::json &e, const std::string &folder)
+{
+	std::vector<TreePartRead> parts;
+	if (!e.contains("barvy_casti") || !e.at("barvy_casti").is_array() || !e.contains("barvy_pouziti") || !e.at("barvy_pouziti").is_object()) return parts;
+	for (const auto &b : e.at("barvy_casti")) {
+		if (!b.is_object() || !b.contains("maska") || !b.at("maska").is_string() || parts.size() >= TREE_PARTS_MAX) continue;
+		TreePartRead part;
+		part.name = b.value("cast", std::string());
+		part.mask = folder + b.at("maska").get<std::string>();
+		part.start = std::clamp(b.value("zacatek", 255), 1, 255);
+		for (const auto &[use_name, colours] : e.at("barvy_pouziti").items()) {
+			const TreeUse use = ParseTreeUse(use_name);
+			if (use == TreeUse::None || !colours.is_object() || !colours.contains(part.name) || !colours.at(part.name).is_array()) continue;
+			std::vector<uint32_t> &palette = part.palettes[to_underlying(use)];
+			for (const auto &c : colours.at(part.name)) {
+				auto rgb = c.is_string() ? ParseInteger<uint32_t>(c.get<std::string>(), 16) : std::nullopt;
+				if (rgb.has_value() && palette.size() < TREE_PALETTE_MAX) palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
+			}
+		}
+		parts.push_back(std::move(part));
+	}
+	return parts;
+}
+
+/** A tree among the add-ons of the buildings painted by its use (ReadTreeParts()): its parts painted a colour by number, each use its own palettes. */
+static void ReadTreeColours(const nlohmann::json &e, const std::string &folder, ThreeDObject &addon)
+{
+	if (!addon.colours.empty()) return; // painted a colour by number ("barvy") as the parasols
+	for (const TreePartRead &read : ReadTreeParts(e, folder)) {
+		ThreeDObjectColourPart part;
+		part.name = read.name;
+		part.mask_png = ReadWholeFile(read.mask);
+		part.start = read.start;
+		part.use_palettes = read.palettes;
+		if (part.mask_png.empty()) {
+			Debug(misc, 0, "3D object {}: the tree's part {} has no mask", addon.name, part.name);
+			continue;
+		}
+		addon.colours.push_back(std::move(part));
+	}
+	addon.tree_uses = !addon.colours.empty();
+}
+
+/**
+ * A tree of the map painted by its use (ReadTreeParts()), a figure: its first part (the crown) its paint, its second
+ * (the snow over the crown) its second paint, both over its first texture; a state of it for each colour of their
+ * palettes in each use, the same number of both (TreeState()).
+ */
+static void ReadTreeFigurePaint(const nlohmann::json &e, const std::string &folder, ThreeDVehicleObject &fig)
+{
+	const std::vector<TreePartRead> parts = ReadTreeParts(e, folder);
+	if (parts.empty()) return;
+	fig.paint.mask_file = parts[0].mask;
+	fig.paint.start = parts[0].start;
+	if (parts.size() > 1) {
+		fig.second_paint.mask_file = parts[1].mask;
+		fig.second_paint.start = parts[1].start;
+	}
+	/* So many states in a use as the palettes it names have colours together: n % each palette's length. */
+	static constexpr size_t TREE_STATES_MAX = 24;
+	for (size_t u = 1; u < TREE_USES; u++) {
+		size_t count = 0;
+		for (size_t k = 0; k < parts.size() && k < 2; k++) {
+			const size_t len = parts[k].palettes[u].size();
+			if (len > 0) count = count == 0 ? len : std::lcm(count, len);
+		}
+		if (count == 0) continue; // its texture as it is in the use
+		count = std::min(count, TREE_STATES_MAX);
+		fig.tree_states[u] = {static_cast<uint16_t>(fig.states.size() + 1), static_cast<uint16_t>(count)};
+		for (size_t n = 0; n < count; n++) {
+			ThreeDVehicleState st;
+			st.first = 1; // no sprite picks it
+			st.last = 0;
+			const std::vector<uint32_t> &crown = parts[0].palettes[u];
+			if (!crown.empty()) st.colour = crown[n % crown.size()];
+			if (parts.size() > 1 && !parts[1].palettes[u].empty()) st.second_colour = parts[1].palettes[u][n % parts[1].palettes[u].size()];
+			fig.states.push_back(std::move(st));
+		}
+	}
+}
+
+/**
+ * An add-on of the buildings as a figure painted a colour by number ("barvy" of its record, as the add-ons of the houses:
+ * the colleague's ivies, hra/3d/VYPLNE-ZDI-POPINAVKY-PRO-HRU.md; the player, 4. 11.: "one model, many greens"): its
+ * first part's mask over its first texture and its "zacatek" its paint, a state for each of a few shades of each colour
+ * of its palette (PaletteState()). A tree painted by its use (ReadTreeFigurePaint()) is not painted so.
+ */
+static void ReadFigurePalette(const nlohmann::json &e, const std::string &folder, ThreeDVehicleObject &fig)
+{
+	if (!fig.paint.mask_file.empty() || !e.contains("barvy") || !e.at("barvy").is_array() || e.at("barvy").empty()) return;
+	const auto &b = e.at("barvy").at(0);
+	if (!b.is_object() || !b.contains("maska") || !b.at("maska").is_string() || !b.contains("paleta") || !b.at("paleta").is_array()) return;
+	std::vector<uint32_t> palette;
+	for (const auto &c : b.at("paleta")) {
+		auto rgb = c.is_string() ? ParseInteger<uint32_t>(c.get<std::string>(), 16) : std::nullopt;
+		if (rgb.has_value() && palette.size() < TREE_PALETTE_MAX) palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
+	}
+	if (palette.empty()) return;
+	fig.paint.mask_file = folder + b.at("maska").get<std::string>();
+	fig.paint.start = std::clamp(b.value("zacatek", 255), 1, 255);
+	/* Each colour of its palette in a few shades of green (the player, test2: two ivies of one shape had one green, "we
+	 * have not many kinds of one ivy"): as it is, darker, darker and bluer, darker and yellower -- the eight light greens
+	 * of its palette, close to each other, four times as many from a dark ivy to a light one. */
+	static constexpr std::array<std::array<float, 3>, 4> SHADES = {{
+		{1.00f, 1.00f, 1.00f},
+		{0.80f, 0.80f, 0.80f},
+		{0.56f, 0.62f, 0.66f},
+		{0.76f, 0.70f, 0.52f},
+	}};
+	fig.palette_states = {static_cast<uint16_t>(fig.states.size() + 1), static_cast<uint16_t>(palette.size() * SHADES.size())};
+	for (const auto &shade : SHADES) {
+		for (uint32_t colour : palette) {
+			const Colour c(colour);
+			auto scaled = [](uint8_t v, float f) { return static_cast<uint8_t>(std::clamp(std::lround(v * f), 0L, 255L)); };
+			ThreeDVehicleState st;
+			st.first = 1; // no sprite picks it
+			st.last = 0;
+			st.colour = Colour(scaled(c.r, shade[0]), scaled(c.g, shade[1]), scaled(c.b, shade[2])).data;
+			fig.states.push_back(std::move(st));
+		}
+	}
+}
+
+/**
+ * The plants standing on a building or a field ("rostliny", the colleague's hra/3d/PROSBA-PRUMYSL-3D.md): a plant's
+ * file ("druh": "rostlina" of the index, its foot at the origin, 1 m high) at every place of the list -- "poloha"
+ * metres in the building's frame, "otoceni" degrees about z, "meritko" [x, y, z] its size in metres. Drawn as the
+ * figures, a picture of the plant at the view's angle kept for every one alike: baked into the building they would
+ * be hundreds of thousands of triangles a tile.
+ */
+static void ReadPlants(const nlohmann::json &e, ThreeDObject &obj)
+{
+	if (!e.contains("rostliny") || !e.at("rostliny").is_array()) return;
+	for (const auto &p : e.at("rostliny")) {
+		if (!p.is_object() || !p.contains("soubor") || !p.contains("poloha") || !p.at("poloha").is_array() || p.at("poloha").size() != 3) continue;
+		ThreeDObjectFigure plant;
+		plant.figure = p.at("soubor").get<std::string>();
+		if (plant.figure.ends_with(".glb")) plant.figure.resize(plant.figure.size() - 4);
+		for (int k = 0; k < 3; k++) plant.at[k] = p.at("poloha").at(k).get<float>();
+		plant.facing = p.value("otoceni", 0.0f);
+		if (p.contains("meritko") && p.at("meritko").is_array() && p.at("meritko").size() == 3) {
+			const float sx = p.at("meritko").at(0).get<float>(), sy = p.at("meritko").at(1).get<float>(), sz = p.at("meritko").at(2).get<float>();
+			plant.scale = std::clamp((sx + sy) / 2, 0.05f, 50.0f);
+			plant.stretch = std::clamp(sz / plant.scale, 0.1f, 10.0f);
+		} else if (p.contains("meritko") && p.at("meritko").is_number()) {
+			plant.scale = std::clamp(p.at("meritko").get<float>(), 0.05f, 50.0f);
+		}
+		obj.plants.push_back(std::move(plant));
+	}
+}
+
+/**
+ * A house's interior ("interier", the colleague's hra/3d/PROSBA-INTERIERY.md): true its file "<house>_interier.glb",
+ * a name another file, {"soubor", "postavy"} the file and the people in it -- when the file is there. Its object and
+ * the wings of the doors of both files ("dvere_NN" with a mesh, GlbDoorNodes()) made now, read when first drawn.
+ * @param obj the house, its file's path set
+ */
+static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig);
+static void ReadInterior(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj, bool outside = false, int8_t quarter_turns = -1)
+{
+	if (!e.contains("interier")) return;
+	const auto &in = e.at("interier");
+	std::string file;
+	if (in.is_boolean() && in.get<bool>()) {
+		file = obj.file;
+		if (file.ends_with(".glb")) file.resize(file.size() - 4);
+		file += "_interier.glb";
+	} else if (in.is_string()) {
+		file = in.get<std::string>();
+	} else if (in.is_object() && in.contains("soubor") && in.at("soubor").is_string()) {
+		file = in.at("soubor").get<std::string>();
+	}
+	if (file.empty() || ReadWholeFile(folder + file).empty()) return;
+	ThreeDObject interior;
+	interior.file = file;
+	interior.name = obj.name + "/interier";
+	interior.variants = 0; // no house's
+	interior.tiles_x = obj.tiles_x;
+	interior.tiles_y = obj.tiles_y;
+	interior.glb_path = folder + file;
+	interior.is_interior = true;
+	interior.scene_turns = quarter_turns;
+	if (in.is_object()) ReadMaterialPictures(in, folder, interior);
+	if (in.is_object() && in.contains("postavy") && in.at("postavy").is_array()) {
+		for (const auto &f : in.at("postavy")) {
+			ThreeDObjectFigure fig;
+			if (ReadFigure(f, fig)) interior.figures.push_back(std::move(fig));
+		}
+	}
+	for (const std::string &path : {obj.glb_path, interior.glb_path}) {
+		for (const std::string &node : GlbDoorNodes(path)) {
+			std::array<size_t, 3> wings;
+			for (int k = 0; k < 3; k++) {
+				ThreeDObject wing;
+				wing.name = fmt::format("{}/{}{}", path == obj.glb_path ? obj.name : interior.name, node, k == 0 ? "" : (k == 1 ? "/+" : "/-"));
+				wing.variants = 0;
+				wing.tiles_x = obj.tiles_x;
+				wing.tiles_y = obj.tiles_y;
+				wing.glb_path = path;
+				wing.door_node = node;
+				wing.door_turn = static_cast<int8_t>(k == 2 ? -1 : k);
+				wing.scene_turns = quarter_turns;
+				wing.material_from = path == obj.glb_path ? obj.material_from : interior.material_from;
+				wings[k] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(wing));
+			}
+			obj.door_wings.push_back(wings);
+		}
+	}
+	Debug(misc, 1, "3D object {}: interior {}, {} doors", obj.name, file, obj.door_wings.size());
+	const std::string interior_path = interior.glb_path;
+	obj.interior = _three_d_objects.size();
+	_three_d_objects.push_back(std::move(interior));
+	/* An industry: itself without the interior's box too (ThreeDObject::outside), as it is coloured. */
+	if (outside) {
+		ThreeDObject out = obj;
+		out.name = obj.name + "/venku";
+		out.outside_of = interior_path;
+		out.interior = SIZE_MAX;
+		out.door_wings.clear();
+		out.figures.clear();
+		obj.outside = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(out));
+	}
+}
+
+/**
+ * The name of a house that is a 3D object ("nazev"), shown in the land area information instead of the original house's
+ * (the colleague's hra/3d/PROSBA-UV-KSC.md: house 0x1F is the ÚV KSČ building): one name, or one per language.
+ */
+static void ReadBuildingTitle(const nlohmann::json &e, ThreeDObject &obj)
+{
+	/* Where a car of the game's own driving to it stops ("stani", the ÚV KSČ building), metres in the house's frame. */
+	if (e.contains("stani") && e.at("stani").is_object() && e.at("stani").contains("poloha") && e.at("stani").at("poloha").is_array() && e.at("stani").at("poloha").size() == 3) {
+		const auto &st = e.at("stani");
+		obj.stop[0] = st.at("poloha").at(0).get<float>() * OBJECT_UNITS_PER_METRE;
+		obj.stop[1] = st.at("poloha").at(1).get<float>() * OBJECT_UNITS_PER_METRE;
+		obj.stop[2] = st.at("poloha").at(2).get<float>() * OBJECT_HEIGHT_PER_METRE;
+		obj.stop_turn = st.value("otoceni", 0.0f);
+		obj.has_stop = true;
+	}
+	if (!e.contains("nazev")) return;
+	const auto &n = e.at("nazev");
+	if (n.is_string()) {
+		obj.title_cs = obj.title_en = n.get<std::string>();
+	} else if (n.is_object()) {
+		obj.title_cs = n.value("cs", std::string());
+		obj.title_en = n.value("en", obj.title_cs);
+		if (obj.title_cs.empty()) obj.title_cs = obj.title_en;
+	}
+}
+
+/**
+ * The figure a place names: "postava", and of a figure of poses the pose it is in ("poza", the player, 18. 10.: "one
+ * figure object everywhere, with what it has to do"), "<postava>/<poza>". Without a pose the figure as it is named.
+ */
+/**
+ * The girls of the game (the player, 31. 10.: "when Lady Pink has the shared skeleton, she is a girl of the game and will
+ * be everywhere"): the figures on the humanoid bones of the game's own sets ("druh" "postava", "kostra" "humanoid"),
+ * without a "role" (the nurse walks with the walker), by name. Read once from the indices, by whichever reader asks
+ * first (the houses' or the vehicles', on their threads).
+ */
+static const std::vector<std::string> &GameGirls()
+{
+	static std::vector<std::string> girls;
+	static std::once_flag once;
+	std::call_once(once, [] {
+		for (const std::string &index : FindObjectIndices()) {
+			/* The game's own sets only (baseset/decouple/objekty/<set>/), not the packages of the GRFs. */
+			if (index.find(PATHSEP "decouple" PATHSEP "objekty" PATHSEP) == std::string::npos) continue;
+			std::vector<uint8_t> text = ReadWholeFile(index);
+			if (std::string_view(reinterpret_cast<const char *>(text.data()), text.size()).find("\"humanoid\"") == std::string_view::npos) continue;
+			try {
+				const nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
+				for (const auto &e : list) {
+					if (!e.is_object() || e.value("druh", std::string()) != "postava" || e.value("kostra", std::string()) != "humanoid") continue;
+					if (e.contains("role") || !e.contains("soubor") || !e.contains("jmeno")) continue;
+					girls.push_back(e.at("jmeno").get<std::string>());
+				}
+			} catch (const nlohmann::json::exception &) {
+			}
+		}
+		std::sort(girls.begin(), girls.end());
+		girls.erase(std::unique(girls.begin(), girls.end()), girls.end());
+		std::string names;
+		for (const std::string &g : girls) names += " " + g;
+		Debug(misc, 1, "3D objects: the girls of the game:{}", names);
+	});
+	return girls;
+}
+
+/** A shift of the girls dealt to a list of figures (GameGirls()): of the list's text, the same each time it is read. */
+static uint32_t GirlsShift(const nlohmann::json &list)
+{
+	uint32_t h = 2166136261u;
+	for (char c : list.dump()) h = (h ^ static_cast<uint8_t>(c)) * 16777619u;
+	return h;
+}
+
+/**
+ * A figure of a list ("postava", "poza"): "<postava>/<poza>". A girl of the game there is dealt from all of them: the
+ * one so many further on (the shift of the list), so the girls named differently in a list stay different and every
+ * girl of the game takes her turn everywhere one sits or stands -- Lady Pink and the shaman girl, and any after them.
+ * With no shift the girl named (a vehicle's crew, ReadCrew()).
+ */
+static std::string FigureNamed(const nlohmann::json &f, uint32_t shift)
+{
+	std::string name = f.at("postava").get<std::string>();
+	const std::vector<std::string> &girls = GameGirls();
+	if (auto it = std::ranges::find(girls, name); it != girls.end() && girls.size() > 1) {
+		name = girls[(static_cast<size_t>(it - girls.begin()) + shift) % girls.size()];
+		Debug(misc, 3, "3D objects: the girl {} of a list is {}", *it, name);
+	}
+	if (f.contains("poza") && f.at("poza").is_string() && !f.at("poza").get<std::string>().empty()) name += "/" + f.at("poza").get<std::string>();
+	return name;
+}
+
+/**
+ * The figures riding on a vehicle or sitting on a piece of a load ("posadka", "posadky"): each "postava" at its
+ * "poloha", turned ("otoceni"), bigger than it is by "meritko" (the girls on a lorry's back), at the driver's seat
+ * ("misto_ridicky"). The figure is the vehicle's package's, else the game's (GetThreeDFigure()).
+ * @param deal the girls of the game dealt by turns (FigureNamed()): the girls carried as a load on its seats; a
+ *        vehicle's own crew is who its record names (the player, 1. 11.: "College Girl drives by default, the other
+ *        girls in the configurator" -- the configurator's states choosing a group of "posadky", the set's to offer)
+ */
+static void ReadCrew(const nlohmann::json &list, std::vector<ThreeDVehicleCrew> &out, bool deal)
+{
+	if (!list.is_array()) return;
+	const uint32_t shift = deal ? GirlsShift(list) : 0;
+	for (const auto &c : list) {
+		if (!c.is_object() || !c.contains("postava")) continue;
+		ThreeDVehicleCrew crew;
+		crew.figure = FigureNamed(c, shift);
+		/* On the seat of a body (the colleague's riders of the horses, "uzel": "sedlo"): where it is in each pose. */
+		crew.on_seat = c.value("uzel", std::string()) == "sedlo";
+		if (!crew.on_seat) {
+			if (!c.contains("poloha")) continue;
+			const auto &at = c.at("poloha");
+			if (!at.is_array() || at.size() != 3) continue;
+			for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
+		}
+		crew.turn = c.value("otoceni", 0.0f);
+		crew.scale = std::clamp(c.value("meritko", 1.0f), 0.1f, 10.0f);
+		crew.driver_seat = c.value("misto_ridicky", false);
+		out.push_back(std::move(crew));
+	}
+}
+
+/**
+ * A boat with rooms (the colleague's sailing yacht, hra/3d/LODE-3D-PRO-HRU.md): "interier" -- its file, the whole hull
+ * with its cabins and the same origin as the boat's, "doplnky" (the barrel of beer) and "postavy" in it -- and the
+ * "postavy" on its deck. Its rooms a figure of their own "<jmeno>/interier", walked on and drawn from the eyes while the
+ * walker is aboard (the player, 7. 11.: "I want the interior"); the figures by when they are there ("kdy").
+ */
+static void ReadBoatRooms(const nlohmann::json &e, const std::string &folder, const std::string &package, ThreeDVehicleObject &obj)
+{
+	auto figures = [&obj](const nlohmann::json &list, bool inside, bool girls) {
+		if (!list.is_array()) return;
+		const uint32_t shift = girls ? GirlsShift(list) : 0;
+		for (const auto &f : list) {
+			const char *key = girls ? "postava" : "jmeno";
+			if (!f.is_object() || !f.contains(key) || !f.at(key).is_string() || !f.contains("poloha")) continue;
+			const auto &at = f.at("poloha");
+			if (!at.is_array() || at.size() != 3) continue;
+			ThreeDBoatFigure b;
+			b.figure = girls ? FigureNamed(f, shift) : f.at(key).get<std::string>();
+			for (int k = 0; k < 3; k++) b.at[k] = at.at(k).get<float>();
+			b.facing = f.value("otoceni", 0.0f);
+			b.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
+			const std::string when = f.value("kdy", std::string());
+			b.when = when == "dvere_otevrene" ? ThreeDBoatFigure::When::Loading : when == "dvere_zavrene" ? ThreeDBoatFigure::When::Sailing : ThreeDBoatFigure::When::Always;
+			b.girl = girls;
+			b.inside = inside;
+			obj.boat_figures.push_back(std::move(b));
+		}
+	};
+	if (e.contains("postavy")) figures(e.at("postavy"), false, true);
+	if (!e.contains("interier") || !e.at("interier").is_object()) return;
+	const auto &in = e.at("interier");
+	if (!in.contains("soubor") || !in.at("soubor").is_string()) return;
+	ThreeDVehicleObject rooms;
+	rooms.package = package;
+	rooms.file = folder + in.at("soubor").get<std::string>();
+	NoteMarginsFilled(e, rooms.file, MarginsOf::Vehicles);
+	rooms.name = obj.name + "/interier";
+	rooms.thing = true;
+	rooms.floors_over = 0.03f;
+	obj.interior_figure = rooms.name;
+	_figure_objects.push_back(std::move(rooms));
+	if (in.contains("doplnky")) figures(in.at("doplnky"), true, false);
+	if (in.contains("postavy")) figures(in.at("postavy"), true, true);
+}
+
+/** The figures standing on a building ("postavy") and its doors ("dvere"). */
+/** A figure of a list ("postava", "poza", "poloha", "otoceni", "meritko"); whether it is one. */
+static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig)
+{
+	if (!f.is_object() || !f.contains("postava") || !f.contains("poloha")) return false;
+	const auto &at = f.at("poloha");
+	if (!at.is_array() || at.size() != 3) return false;
+	fig.figure = FigureNamed(f, GirlsShift(f));
+	for (int k = 0; k < 3; k++) fig.at[k] = at.at(k).get<float>();
+	fig.facing = f.value("otoceni", 0.0f);
+	fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
+	/* Standing there only at night ("kdy": "noc"; the ghost of the colleagues' graves by the lighthouses, the player,
+	 * 14. 11.: "a ghost at night by the graves"). */
+	fig.night = f.value("kdy", std::string()) == "noc";
+	return true;
+}
+
+static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
+{
+	if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
+		ThreeDObjectFigure fig;
+		if (ReadFigure(f, fig)) obj.figures.push_back(std::move(fig));
+	}
+	/* Its event ("akce", the player, 18. 10.: on the new stadium the firemen with their Tatra, the pig on the spit, Mat
+	 * drawing beer and the girls of the pub sitting there; 29. 10.: two weeks once in two months): the figures standing
+	 * about it on its days (GetThreeDHouseEvent()), each as one of "postavy"; without "postava" the game's own -- the
+	 * spit, Mat at the tap, the girls sitting by turns (their files of a pose a file till the figures have poses). */
+	if (e.contains("akce") && e.at("akce").is_object()) {
+		const auto &event = e.at("akce");
+		auto stand = [&obj](const nlohmann::json &p, std::string_view figure) {
+			if (!p.is_object()) return;
+			nlohmann::json f = p;
+			if (!f.contains("postava")) {
+				if (figure.empty()) return;
+				f["postava"] = figure;
+				f.erase("poza");
+			}
+			ThreeDObjectFigure fig;
+			if (ReadFigure(f, fig)) obj.event_figures.push_back(std::move(fig));
+		};
+		if (event.contains("rozen")) stand(event.at("rozen"), "rozen");
+		if (event.contains("mat")) stand(event.at("mat"), "mat_toci");
+		static constexpr std::string_view girls[] = {"college_girl_sedi", "people_girl_sedi", "galaxia_sedi"};
+		if (event.contains("holky") && event.at("holky").is_array()) {
+			size_t k = 0;
+			for (const auto &g : event.at("holky")) stand(g, girls[k++ % std::size(girls)]);
+		}
+		/* The Tatra standing on the pitch (the colleague's "tatra": its record "zaznam", its set "sada" or the sets of its
+		 * layers -- the cab, the grille, the body), empty -- the player, 18. 10.: "on the pitch stands an empty Tatra,
+		 * without a driver" --, drawn as a figure of its own name "vozidlo:<record>|<set>|<set>..."
+		 * (GetThreeDStandingVehicle() of three_d_vehicle_object.cpp); none without its package. No horse beside it (the
+		 * player, 31. 10.: "the horse on the pitch by Mat ... has no place at the grilling"). */
+		if (event.contains("tatra") && event.at("tatra").is_object()) {
+			const auto &t = event.at("tatra");
+			const std::string record = t.value("zaznam", t.value("objekt", std::string()));
+			if (!record.empty()) {
+				nlohmann::json f = t;
+				std::string name = "vozidlo:" + record;
+				if (t.contains("sada") && t.at("sada").is_string()) name += "|" + t.at("sada").get<std::string>();
+				if (t.contains("sada") && t.at("sada").is_array()) {
+					for (const auto &set : t.at("sada")) {
+						if (set.is_string()) name += "|" + set.get<std::string>();
+					}
+				}
+				f["postava"] = name;
+				f.erase("poza");
+				ThreeDObjectFigure fig;
+				if (ReadFigure(f, fig)) obj.event_figures.push_back(std::move(fig));
+			}
+		}
+		/* The firemen are the Tatras' (their package's figures): only those named. */
+		if (event.contains("hasici") && event.at("hasici").is_array()) {
+			for (const auto &h : event.at("hasici")) stand(h, {});
+		}
+		/* Add-ons of the index standing only on its days, each by its name ("jmeno") where "postavy" stand (the grill and
+		 * the barrel of beer by the fire Tatra). */
+		if (event.contains("doplnky") && event.at("doplnky").is_array()) {
+			for (const auto &a : event.at("doplnky")) {
+				if (a.is_object() && a.contains("jmeno") && a.at("jmeno").is_string()) stand(a, a.at("jmeno").get<std::string>());
+			}
+		}
+	}
+	/* Its add-ons ("doplnky"): an add-on of the index by its name ("jmeno"), where its foot stands (metres in the
+	 * building's frame, as "postavy"), turned about it ("otoceni", degrees, 0 as it is made, 90 its +x to +y), sized
+	 * ("meritko"). Laid into its shape when it is read (LayAddons()). */
+	if (e.contains("doplnky") && e.at("doplnky").is_array()) for (const auto &a : e.at("doplnky")) {
+		if (!a.is_object() || !a.contains("jmeno") || !a.at("jmeno").is_string() || !a.contains("poloha")) continue;
+		const auto &at = a.at("poloha");
+		if (!at.is_array() || at.size() != 3) continue;
+		ThreeDObjectFigure place;
+		place.figure = a.at("jmeno").get<std::string>();
+		for (int k = 0; k < 3; k++) place.at[k] = at.at(k).get<float>();
+		place.facing = a.value("otoceni", 0.0f);
+		place.scale = std::clamp(a.value("meritko", 1.0f), 0.05f, 20.0f);
+		obj.addon_places.push_back(std::move(place));
+	}
+	/* Its doors (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md): people come out and go in there. */
+	if (e.contains("dvere") && e.at("dvere").is_array()) {
+		for (const auto &d : e.at("dvere")) {
+			if (!d.is_object() || !d.contains("poloha") || !d.contains("smer")) continue;
+			const auto &at = d.at("poloha"), &out = d.at("smer");
+			if (!at.is_array() || at.size() < 2 || !out.is_array() || out.size() < 2) continue;
+			ThreeDObjectDoor door;
+			for (int k = 0; k < 2; k++) {
+				door.at[k] = at.at(k).get<float>();
+				door.out[k] = out.at(k).get<float>();
+			}
+			door.width = d.value("sirka", 1.0f);
+			obj.doors.push_back(door);
+		}
+	}
+	/* The places on its flat roof (the colleague's desert houses, "strechy"): a monkey sits there. */
+	if (e.contains("strechy") && e.at("strechy").is_array()) {
+		for (const auto &r : e.at("strechy")) {
+			if (!r.is_object() || !r.contains("poloha") || !r.at("poloha").is_array() || r.at("poloha").size() < 3) continue;
+			ThreeDObjectRoof roof;
+			for (int k = 0; k < 3; k++) roof.at[k] = r.at("poloha").at(k).get<float>();
+			if (r.contains("smer") && r.at("smer").is_array() && r.at("smer").size() >= 2) {
+				for (int k = 0; k < 2; k++) roof.out[k] = r.at("smer").at(k).get<float>();
+			}
+			obj.roofs.push_back(roof);
+		}
+	}
+}
+
+/** Where Matylda stands by the pub, metres in its frame (the pub's object, its north corner), and her plants in front of her. */
+static constexpr float PUB_MATYLDA[3] = {6.0f, 22.0f, 0.0f};
+static constexpr float PUB_MATYLDA_FACING = 0.0f;
+
+/**
+ * Matylda by the pub with her marijuana in pots (the player, 21. 10.: "Matylda will sell the whole plant in a pot, by
+ * the pub there should be marijuana plants with a pot"; she sells them, walker_cmd.cpp): she always stands there, her
+ * pots on the grass in front of her, a plant in each (our kvetinac, the colleague's kytka_mari_*). Added to the pub's
+ * object here, its index the colleague's.
+ */
+static void AddMatyldaToPub(ThreeDObject &obj)
+{
+	ThreeDObjectFigure matylda;
+	matylda.figure = "matylda";
+	std::copy(std::begin(PUB_MATYLDA), std::end(PUB_MATYLDA), matylda.at);
+	matylda.facing = PUB_MATYLDA_FACING;
+	matylda.scale = 2.0f; // as the pub's own figures
+	obj.figures.push_back(std::move(matylda));
+	static const char *const PLANTS[] = {"kytka_mari_mlada", "kytka_mari_vysoka", "kytka_mari_kosata"};
+	static const float SIZES[] = {WALKER_POT_PLANT_M, 1.1f, 1.3f};
+	for (int i = 0; i < 3; i++) {
+		const float x = PUB_MATYLDA[0] + 1.5f, y = PUB_MATYLDA[1] - 1.3f + 1.3f * i;
+		ThreeDObjectFigure pot;
+		pot.figure = "kvetinac";
+		pot.at[0] = x;
+		pot.at[1] = y;
+		pot.facing = 30.0f * i;
+		pot.scale = WALKER_POT_M;
+		pot.stretch = WALKER_POT_HEIGHT_M / WALKER_POT_M;
+		obj.plants.push_back(std::move(pot));
+		ThreeDObjectFigure plant;
+		plant.figure = PLANTS[i];
+		plant.at[0] = x;
+		plant.at[1] = y;
+		plant.at[2] = WALKER_POT_SOIL_M;
+		plant.facing = 70.0f * i;
+		plant.scale = SIZES[i];
+		obj.plants.push_back(std::move(plant));
+	}
+}
+
+/** The game's own industry an index names ("prumysl"): its constant's name; 0xFF for one the game has not (yet). */
+static IndustryType IndexIndustryType(std::string_view name)
+{
+	if (name == "IT_GYMNASIUM") return IT_GYMNASIUM;
+	if (name == "IT_STATUE") return IT_STATUE;
+	if (name == "IT_WEED_MACHINE") return IT_WEED_MACHINE;
+	if (name == "IT_COFFEESHOP") return IT_COFFEESHOP;
+	if (name == "IT_MARIJUANA_PLANTATION") return IT_MARIJUANA_PLANTATION;
+	if (name == "lihovar" || name == "IT_DISTILLERY") return IT_DISTILLERY;
+	if (name == "hospoda" || name == "IT_PUB") return IT_PUB;
+	if (name == "draci_farma" || name == "IT_DRAGON_FARM") return IT_DRAGON_FARM;
+	if (name == "IT_PALM_PLANTATION") return IT_PALM_PLANTATION;
+	if (name == "IT_OIL_REFINERY") return 4; // the original game's, IT_OIL_REFINERY of table/build_industry.h
+	return 0xFF;
+}
+
+/**
+ * One of the game's own industries as a 3D object ("druh": "prumysl", the colleague's hra/3d/PROSBA-PRUMYSL-3D.md):
+ * "prumysl" the industry, "varianta" the statue's stone ("kamen") or bronze ("bronz"); or a part of a field ("druh":
+ * "pole", "dil") the game lays tile by tile: the soil with the girls at work on it ("prace", of marijuana and of
+ * potatoes), the field road with the girls by it ("u_cesty"), the shed, the haystack, the plants of each stage (only
+ * "rostliny", no file of its own).
+ */
+static void ReadIndustryObject(const nlohmann::json &e, const std::string &folder, bool field)
+{
+	ThreeDObject obj;
+	obj.file = e.value("soubor", std::string());
+	obj.name = e.value("jmeno", obj.file);
+	obj.variants = 0; // no house's
+	obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
+	obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
+	/* All its nodes but its heaps of hay, read as objects of their own below, and the day's. */
+	obj.all_roots = !field;
+	obj.left_out = {"den", "seno"};
+	if (e.contains("seno") && e.at("seno").is_object() && e.at("seno").contains("uzly")) {
+		for (const auto &n : e.at("seno").at("uzly")) {
+			if (n.is_string()) obj.left_out.push_back(n.get<std::string>());
+		}
+	}
+	ReadMaterialPictures(e, folder, obj);
+	if (!obj.file.empty() && !ReadGlb(folder + obj.file, obj)) return;
+	/* Read now for what the index needs of it, and again with its add-ons when it is first drawn (Read()): without its
+	 * file there, that read laid the add-ons alone over it -- since the industries have the shared trees and bushes
+	 * (23. 10.) the dragon farm drew no castle, the gymnasium and the vending machine nothing but their bushes (the
+	 * player, #300: "the school and the vending machine were there, but not seen"). */
+	if (!obj.file.empty()) obj.glb_path = folder + obj.file;
+	ReadColourParts(e, folder, obj);
+	ReadBuildingFigures(e, obj);
+	ReadBuildingTitle(e, obj);
+	ReadPlants(e, obj);
+	/* Its interior and doors as a house's (the colleague's dragon castle: the hall, its gate without a wing). */
+	if (!field) ReadInterior(e, folder, obj, true);
+	if (field) {
+		obj.field_part = e.value("dil", std::string());
+		if (obj.field_part.empty()) return;
+		if (e.contains("prace") && e.at("prace").is_object()) {
+			static const char *const crops[2] = {"marihuana", "brambory"};
+			for (int k = 0; k < 2; k++) {
+				if (!e.at("prace").contains(crops[k]) || !e.at("prace").at(crops[k]).is_array()) continue;
+				for (const auto &f : e.at("prace").at(crops[k])) {
+					ThreeDObjectFigure fig;
+					if (ReadFigure(f, fig)) obj.work[k].push_back(std::move(fig));
+				}
+			}
+		}
+		if (e.contains("u_cesty") && e.at("u_cesty").is_array()) {
+			for (const auto &f : e.at("u_cesty")) {
+				ThreeDObjectFigure fig;
+				if (ReadFigure(f, fig)) obj.by_road[f.value("okraj", std::string("sz")) == "jv" ? 1 : 0].push_back(std::move(fig));
+			}
+		}
+	} else {
+		/* Its girls when they are there (the colleague's hra/3d/PROSBA-PRUMYSL-HOLKY-NOC.md): after the deliveries. */
+		auto list = [&e](const char *key, std::vector<ThreeDObjectFigure> &into) {
+			if (!e.contains(key) || !e.at(key).is_array()) return;
+			for (const auto &f : e.at(key)) {
+				ThreeDObjectFigure fig;
+				if (ReadFigure(f, fig)) into.push_back(std::move(fig));
+			}
+		};
+		list("postavy_s_holkami", obj.girls);
+		list("postavy_stoji", obj.hut_girls[0]);
+		list("postavy_sedi", obj.hut_girls[1]);
+		obj.industry_name = e.value("prumysl", std::string());
+		obj.industry = IndexIndustryType(obj.industry_name);
+		const std::string variant = e.value("varianta", std::string());
+		obj.industry_variant = variant == "kamen" ? 0 : variant == "bronz" ? 1 : -1;
+		/* One statue for both, its stone or bronze a colour of its palette (the colleague's hra/3d/SOCHA-BARVA-PRO-HRU.md;
+		 * the player: "the statue is there twice, make it one with a colour"). */
+		if (e.contains("varianty") && e.at("varianty").is_object()) {
+			for (const auto &[name, at] : e.at("varianty").items()) {
+				if (!at.is_number_integer()) continue;
+				if (name == "kamen") obj.variant_paint[0] = static_cast<int8_t>(std::clamp(at.get<int>(), 0, 15));
+				if (name == "bronz") obj.variant_paint[1] = static_cast<int8_t>(std::clamp(at.get<int>(), 0, 15));
+			}
+		}
+		if (e.contains("sdili") && e.at("sdili").is_array()) {
+			for (const auto &sh : e.at("sdili")) {
+				if (sh.is_object() && sh.contains("prumysl")) obj.shared_with.push_back(sh.at("prumysl").get<std::string>());
+			}
+		}
+		if (obj.industry == 0xFF) Debug(misc, 1, "3D object {}: the game has no industry {} (yet)", obj.name, obj.industry_name);
+		if (obj.industry == IT_PUB) AddMatyldaToPub(obj);
+		/* The dragon farm's places of its dragons, and its heaps of hay (the colleague's hra/3d/LES-FARMA-LUCERNY-PRO-HRU.md):
+		 * each heap the node alone, read as a door's wing is (ReadGlbDoor()), not turned. */
+		if (e.contains("mista_draku") && e.at("mista_draku").is_array()) {
+			for (const auto &m : e.at("mista_draku")) {
+				if (!m.is_object() || !m.contains("poloha") || !m.at("poloha").is_array() || m.at("poloha").size() != 3) continue;
+				ThreeDObjectFigure place;
+				place.figure = m.value("drak", std::string("drak_hnedy"));
+				for (int k = 0; k < 3; k++) place.at[k] = m.at("poloha").at(k).get<float>();
+				place.facing = m.value("otoceni", 0.0f);
+				obj.dragon_places.push_back(std::move(place));
+				const std::string where = m.value("kde", std::string());
+				obj.dragon_places_in.push_back(where == "sin" ? 1 : where == "jeskyne" ? 2 : 0);
+			}
+		}
+		if (e.contains("seno") && e.at("seno").is_object() && e.at("seno").contains("uzly") && !obj.file.empty()) {
+			for (const auto &n : e.at("seno").at("uzly")) {
+				if (!n.is_string()) continue;
+				ThreeDObject heap;
+				heap.name = obj.name + "/" + n.get<std::string>();
+				heap.variants = 0;
+				heap.tiles_x = obj.tiles_x;
+				heap.tiles_y = obj.tiles_y;
+				heap.glb_path = folder + obj.file;
+				heap.door_node = n.get<std::string>();
+				obj.hay.push_back(_three_d_objects.size());
+				_three_d_objects.push_back(std::move(heap));
+			}
+		}
+	}
+	if (obj.tri.empty() && obj.plants.empty()) return;
+	_three_d_objects.push_back(std::move(obj));
+}
+
+/** A part of the original industries ("druh": "dil") as read, in metres, to be placed on the tiles. */
+struct IndustryPartMesh {
+	GlbMesh mesh;              ///< its day
+	std::vector<int8_t> facing; ///< its triangles' outer sides (TriangleFacing())
+	GlbMesh night;             ///< its lit windows (the node "noc")
+	std::vector<float> lights; ///< its glows ("svetlo_NN")
+	size_t holder = SIZE_MAX;  ///< the object of the part, keeping its texture
+};
+
+/** A tile of the original industries drawn from the parts ("druh": "prumysl_dlazdice"): the objects by their places. */
+struct OriginalIndustryTile {
+	std::string ground;          ///< "podklad": the name of its object
+	std::vector<size_t> parts;   ///< its parts placed
+	std::vector<std::string> whole; ///< parts of another set ("sada", the field's haystack and shed) standing as they are on the tile, by name
+	size_t plants = SIZE_MAX;    ///< "rostliny"
+	bool member = false;         ///< "soucast_bloku"
+	int anchor_dx = 0, anchor_dy = 0;
+	bool buildings = false;      ///< a part of "dily" on it: built in the industry's stages; without, its trees stand at once
+	std::vector<ThreeDObjectFigure> vehicles; ///< "vozidla" and the pieces of the shared loads (ThreeDIndustryTileParts::vehicles)
+	std::vector<ThreeDObjectFigure> vehicles_again; ///< the same but those shown once an industry (ThreeDIndustryTileParts::vehicles_again)
+};
+/** The tiles of the original industries by their gfx (GetThreeDOriginalIndustryTile()). */
+static std::map<IndustryGfx, OriginalIndustryTile> _original_industry_tiles;
+
+/**
+ * A part placed on a tile (the colleague's hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md): its origin in the middle of its
+ * ground plan, facing +x, turned ("otoceni", degrees about z, as the figures), sized ("meritko") and put where
+ * "poloha" says, metres from the north corner of the tile (of the block's anchor); lit by its normals turned with it.
+ * Its texture is the part's own object's (ThreeDObject::texture_of).
+ */
+static ThreeDObject PlaceIndustryPart(const IndustryPartMesh &part, std::string name, const float at[3], float turn, float scale, int tiles_x, int tiles_y)
+{
+	ThreeDObject obj;
+	obj.name = std::move(name);
+	obj.variants = 0; // no house's
+	obj.tiles_x = tiles_x;
+	obj.tiles_y = tiles_y;
+	obj.texture_of = part.holder;
+	const double a = turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	auto place = [&](const std::vector<float> &from, std::vector<float> &to) {
+		to.reserve(from.size());
+		for (size_t i = 0; i + 2 < from.size(); i += 3) {
+			const double x = from[i] * scale, y = from[i + 1] * scale, z = from[i + 2] * scale;
+			to.push_back(static_cast<float>((at[0] + x * c - y * s) * OBJECT_UNITS_PER_METRE));
+			to.push_back(static_cast<float>((at[1] + x * s + y * c) * OBJECT_UNITS_PER_METRE));
+			to.push_back(static_cast<float>((at[2] + z) * OBJECT_HEIGHT_PER_METRE));
+		}
+	};
+	place(part.mesh.pos, obj.pos);
+	for (size_t i = 2; i < obj.pos.size(); i += 3) obj.top = std::max(obj.top, obj.pos[i]);
+	obj.uv = part.mesh.uv;
+	obj.tri = part.mesh.tri;
+	obj.facing = part.facing;
+	if (!part.mesh.nrm.empty()) {
+		std::vector<float> turned(part.mesh.nrm.size());
+		for (size_t i = 0; i + 2 < turned.size(); i += 3) {
+			const float nx = part.mesh.nrm[i], ny = part.mesh.nrm[i + 1];
+			turned[i] = static_cast<float>(nx * c - ny * s);
+			turned[i + 1] = static_cast<float>(nx * s + ny * c);
+			turned[i + 2] = part.mesh.nrm[i + 2];
+		}
+		obj.light = CornerLight(turned);
+	}
+	place(part.night.pos, obj.night_pos);
+	obj.night_uv = part.night.uv;
+	obj.night_tri = part.night.tri;
+	place(part.lights, obj.lights);
+	return obj;
+}
+
+/**
+ * The parts of an index of the original industries ("druh": "dil"), each read once: its object (its own texture,
+ * and the yards drawn as they are as the ground of a tile), and its mesh in metres to be placed on the tiles.
+ */
+static std::map<std::string, IndustryPartMesh> ReadIndustryParts(const nlohmann::json &list, const std::string &folder)
+{
+	std::map<std::string, IndustryPartMesh> parts;
+	for (const auto &e : list) {
+		if (e.value("druh", std::string()) != "dil" || !e.contains("soubor")) continue;
+		const std::string file = e.at("soubor").get<std::string>();
+		const std::string path = folder + file;
+		IndustryPartMesh pm;
+		if (!ReadGlbMesh(path, pm.mesh)) continue;
+		ReadGlbMesh(path, pm.night, true, {}, 0, "noc", "svetlo_", &pm.lights);
+		pm.facing = TriangleFacing(pm.mesh);
+		ThreeDObject holder;
+		holder.file = file;
+		holder.name = e.value("jmeno", file);
+		holder.variants = 0; // no house's
+		if (!ReadGlb(path, holder)) continue;
+		pm.holder = _three_d_objects.size();
+		std::string name = holder.name;
+		_three_d_objects.push_back(std::move(holder));
+		parts.emplace(std::move(name), std::move(pm));
+	}
+	return parts;
+}
+
+/** A part of the forest with a clearing as read, by its turn: its object by its place in _three_d_objects. */
+struct ForestPartRead {
+	size_t ground = SIZE_MAX;
+	size_t grill = SIZE_MAX; ///< the trestles over its fire (the spit in them), SIZE_MAX no fire
+	ThreeDForestPart rest; ///< its girls, mushrooms, game and ghosts (its objects put in GetThreeDForestPart())
+};
+/** The parts of the forest with a clearing by their "dil", each turned by 0 to 3 quarter turns (GetThreeDForestPart()). */
+static std::map<std::string, std::array<ForestPartRead, 4>, std::less<>> _forest_parts_read;
+
+/**
+ * The triangles of a mesh read of another file under some of its nodes (ThreeDSceneMore::nodes, among the groups both
+ * were read with), turned about z and moved, laid into a mesh: its corners, textures and groups after those there.
+ */
+static void AddGlbMeshNodes(GlbMesh &into, const GlbMesh &from, const std::vector<std::string> &groups, const ThreeDSceneMore &more)
+{
+	if (from.tri_group.size() != from.tri.size() / 3) return;
+	const double a = more.turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	const bool normals = !from.nrm.empty() && (!into.nrm.empty() || into.pos.empty());
+	if (!normals) into.nrm.clear();
+	const bool textured = from.tri_tex.size() == from.tri.size() / 3 && (into.tri_tex.size() == into.tri.size() / 3);
+	/* Its textures among those there: the same picture of the same material once. */
+	std::vector<uint8_t> texture(from.textures.size(), 0);
+	for (size_t k = 0; k < from.textures.size(); k++) {
+		const GlbTexture &t = from.textures[k];
+		auto same = std::ranges::find_if(into.textures, [&](const GlbTexture &u) { return u.name == t.name && u.png == t.png && u.flat == t.flat; });
+		if (same == into.textures.end()) {
+			if (into.textures.size() >= UINT8_MAX) continue;
+			into.textures.push_back(t);
+			same = into.textures.end() - 1;
+		}
+		texture[k] = static_cast<uint8_t>(same - into.textures.begin());
+	}
+	std::vector<uint32_t> corner(from.pos.size() / 3, UINT32_MAX);
+	for (size_t t = 0; t < from.tri_group.size(); t++) {
+		const uint16_t g = from.tri_group[t];
+		if (g == 0 || g > groups.size() || std::ranges::find(more.nodes, groups[g - 1]) == more.nodes.end()) continue;
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = from.tri[t * 3 + k];
+			if (corner[i] == UINT32_MAX) {
+				corner[i] = static_cast<uint32_t>(into.pos.size() / 3);
+				const double x = from.pos[i * 3], y = from.pos[i * 3 + 1];
+				into.pos.push_back(static_cast<float>(x * c - y * s + more.at[0]));
+				into.pos.push_back(static_cast<float>(x * s + y * c + more.at[1]));
+				into.pos.push_back(static_cast<float>(from.pos[i * 3 + 2] + more.at[2]));
+				if (normals) {
+					const double nx = from.nrm[i * 3], ny = from.nrm[i * 3 + 1];
+					into.nrm.push_back(static_cast<float>(nx * c - ny * s));
+					into.nrm.push_back(static_cast<float>(nx * s + ny * c));
+					into.nrm.push_back(from.nrm[i * 3 + 2]);
+				}
+				into.uv.push_back(i * 2 + 1 < from.uv.size() ? from.uv[i * 2] : 0.0f);
+				into.uv.push_back(i * 2 + 1 < from.uv.size() ? from.uv[i * 2 + 1] : 0.0f);
+			}
+			into.tri.push_back(corner[i]);
+		}
+		if (textured) into.tri_tex.push_back(from.tri_tex[t] < texture.size() ? texture[from.tri_tex[t]] : 0);
+		into.tri_group.push_back(g);
+		if (!into.tri_mark.empty()) into.tri_mark.push_back(0);
+		if (!into.tri_glass.empty()) into.tri_glass.push_back(0);
+	}
+}
+
+/**
+ * The whole scene of a part of the forest with a clearing (ThreeDObject::scene_turns): every node but those lit at
+ * night ("noc", read as a house's), turned about the middle of the tile by quarter turns, its night and glows with it.
+ * Only the cabin, the high seat, the logs and the fireplace keep the walker off, not the ferns, the grass and the
+ * stones (passable_tris).
+ */
+static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter_turns)
+{
+	/* What one bumps into -- of the palm plantation its reed hut, benches and baskets -- and then its floors to walk on
+	 * (the high seat's steps, the player 26. 10.: "up the stairs"). */
+	static const std::vector<std::string> solid = {"srub", "posed", "klady", "ohniste", "chajda", "lavice", "kose"};
+	static const std::vector<std::string> groups = [] {
+		std::vector<std::string> all = solid;
+		all.insert(all.end(), GLB_FLOORS.begin(), GLB_FLOORS.end());
+		return all;
+	}();
+	GlbMesh mesh;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	o.skip_night = true;
+	o.groups = &groups;
+	/* Without the nodes its record leaves out ("bez_uzlu": the high seat and the logs of the forest cabin on the palm
+	 * plantation), its interior's box and the wings of its doors (ThreeDObject::outside), near drawn with them. */
+	if (!obj.left_out.empty()) o.skip_nodes = &obj.left_out;
+	if (!obj.outside_of.empty() || obj.depot) o.skip_wings = true;
+	if (!ReadGlbMesh(path, mesh, o)) return false;
+	TakeMaterialPictures(mesh, obj);
+	for (const ThreeDSceneMore &more : obj.scene_more) {
+		GlbMesh other;
+		GlbReadOptions mo;
+		mo.all_nodes = true;
+		mo.skip_night = true;
+		mo.skip_wings = true;
+		mo.groups = &groups;
+		if (!ReadGlbMesh(more.glb_path, other, mo)) {
+			Debug(misc, 0, "3D object {}: {} of scena_navic not read", obj.name, more.glb_path);
+			continue;
+		}
+		AddGlbMeshNodes(mesh, other, groups, more);
+	}
+	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
+	TurnGlbMeshQuarters(mesh, quarter_turns);
+	TakeGlbFloors(mesh, obj, static_cast<uint16_t>(solid.size() + 1), false);
+	for (size_t t = 0; t < mesh.tri_group.size(); t++) {
+		const bool passable = !obj.depot && (mesh.tri_group[t] == 0 || mesh.tri_group[t] > solid.size());
+		if (passable != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
+	}
+	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(mesh.tri.size() / 3));
+	TakeGlbMesh(mesh, obj);
+	ReadGlbNight(path, obj);
+	TurnNightQuarters(obj, quarter_turns);
+	return true;
+}
+
+/**
+ * The vehicles of the sets standing on a tile ("vozidla"; the colleague's hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md, point 4:
+ * the Zetor by the workshop of the farm, the wheelbarrow of the Special leaning on the cowshed; KONE-SPECIAL-V4-PRO-HRU.md:
+ * the horses by the farm's house and barn and on the forest's clearing): each its record ("zaznam") in the state of its
+ * sets ("sada") and add-ons ("doplnky", file: node), empty, as the fire Tatra on the pitch -- a figure
+ * "vozidlo:<record>|<set>|+<file>=<node>|^<pitch>" (GetThreeDStandingVehicle()). Leaning ("naklon", degrees about the
+ * axle "stred_naklonu" of its frame, its handles up): its front down so much, the axle where "poloha" says.
+ * @param again nullptr, or also into it each but those shown once an industry ("jednou_na_prumysl", the colleague's
+ *              hra/3d/RAFINERIE-PRO-HRU.md: the Tatra Benzina on the refinery's yard, which one layout has twice)
+ */
+static void ReadStandingVehicles(const nlohmann::json &e, std::vector<ThreeDObjectFigure> &into, std::vector<ThreeDObjectFigure> *again = nullptr)
+{
+	if (!e.contains("vozidla") || !e.at("vozidla").is_array()) return;
+	for (const auto &v : e.at("vozidla")) {
+		if (!v.is_object() || !v.contains("poloha") || !v.at("poloha").is_array() || v.at("poloha").size() != 3) continue;
+		const std::string record = v.value("zaznam", v.value("objekt", std::string()));
+		if (record.empty()) continue;
+		std::string figure = "vozidlo:" + record;
+		if (v.contains("sada") && v.at("sada").is_string()) figure += "|" + v.at("sada").get<std::string>();
+		if (v.contains("sada") && v.at("sada").is_array()) {
+			for (const auto &set : v.at("sada")) {
+				if (set.is_string()) figure += "|" + set.get<std::string>();
+			}
+		}
+		if (v.contains("doplnky") && v.at("doplnky").is_object()) {
+			for (const auto &[file, node] : v.at("doplnky").items()) {
+				if (node.is_string()) figure += "|+" + file + "=" + node.get<std::string>();
+			}
+		}
+		ThreeDObjectFigure f;
+		for (int k = 0; k < 3; k++) f.at[k] = v.at("poloha").at(k).get<float>();
+		f.facing = v.value("otoceni", 0.0f);
+		f.scale = std::clamp(v.value("meritko", 1.0f), 0.05f, 20.0f);
+		/* At most as far as a picture of the map tips an object (ObjectPicture()), the same seen from the eyes. */
+		const float lean = std::clamp(v.value("naklon", 0.0f), -60.0f, 60.0f);
+		if (lean != 0) {
+			const double pitch = -lean * M_PI / 180.0;
+			figure += fmt::format("|^{}", static_cast<int>(std::lround(-lean)));
+			if (v.contains("stred_naklonu") && v.at("stred_naklonu").is_array() && v.at("stred_naklonu").size() == 3) {
+				/* The origin such that the axle, turned with it, comes where "poloha" says. */
+				const double sx = v.at("stred_naklonu").at(0).get<double>(), sy = v.at("stred_naklonu").at(1).get<double>(), sz = v.at("stred_naklonu").at(2).get<double>();
+				const double px = sx * std::cos(pitch) - sz * std::sin(pitch), pz = sx * std::sin(pitch) + sz * std::cos(pitch);
+				const double a = f.facing * M_PI / 180.0;
+				f.at[0] -= static_cast<float>(px * std::cos(a) - sy * std::sin(a));
+				f.at[1] -= static_cast<float>(px * std::sin(a) + sy * std::cos(a));
+				f.at[2] -= static_cast<float>(pz);
+			}
+		}
+		f.figure = std::move(figure);
+		if (again != nullptr && !v.value("jednou_na_prumysl", false)) again->push_back(f);
+		into.push_back(std::move(f));
+	}
+}
+
+/**
+ * A part of the forest with a clearing ("druh": "les", the colleague's hra/3d/LES-PRO-HRU.md), or of the palm
+ * plantation ("druh": "plantaz", hra/3d/TROPY-PLANTAZ-PRO-HRU.md, as the forest's): one tile, its origin
+ * in the north corner, laid by the game turned by quarter turns about the tile's middle (the clearing's four tiles
+ * each with its north corner out of the clearing; the path from the side of the road): an object of its whole scene
+ * (ReadGlbScene()) for each turn, read when first drawn as a house is, its trees and bushes laid in as add-ons; its
+ * girls, mushrooms, game and ghosts by their places -- each turned with it.
+ */
+static void ReadForestPart(const nlohmann::json &e, const std::string &folder, std::string_view kind)
+{
+	const std::string dil = e.value("dil", std::string());
+	if (dil.empty() || !e.contains("soubor") || !e.at("soubor").is_string()) return;
+	/* The palm plantation's parts by their own names ("plantaz:zem", ...), beside the forest's. */
+	const std::string part = kind == "les" ? dil : fmt::format("{}:{}", kind, dil);
+	const std::string file = e.at("soubor").get<std::string>();
+	const std::string name = e.value("jmeno", file);
+	if (ReadWholeFile(folder + file).empty()) return;
+
+	auto figures = [&e](const char *key, std::vector<ThreeDObjectFigure> &into) {
+		if (!e.contains(key) || !e.at(key).is_array()) return;
+		for (const auto &f : e.at(key)) {
+			ThreeDObjectFigure fig;
+			if (f.is_object() && f.contains("postava") && ReadFigure(f, fig)) {
+				into.push_back(std::move(fig));
+			} else if (f.is_object() && f.contains("poloha") && f.at("poloha").is_array() && f.at("poloha").size() == 3) {
+				for (int k = 0; k < 3; k++) fig.at[k] = f.at("poloha").at(k).get<float>();
+				fig.facing = f.value("otoceni", 0.0f);
+				into.push_back(std::move(fig));
+			}
+		}
+	};
+	auto places = [&e](const char *key, const char *kinds, std::vector<ThreeDForestPlace> &into) {
+		if (!e.contains(key) || !e.at(key).is_array()) return;
+		for (const auto &f : e.at(key)) {
+			if (!f.is_object() || !f.contains("poloha") || !f.at("poloha").is_array() || f.at("poloha").size() != 3) continue;
+			ThreeDForestPlace place;
+			for (int k = 0; k < 3; k++) place.at.at[k] = f.at("poloha").at(k).get<float>();
+			place.at.facing = f.value("otoceni", 0.0f);
+			if (f.contains(kinds) && f.at(kinds).is_array()) {
+				for (const auto &kind : f.at(kinds)) {
+					if (kind.is_string()) place.kinds.push_back(kind.get<std::string>());
+					if (kind.is_object() && kind.contains("postava") && kind.at("postava").is_string()) place.kinds.push_back(kind.at("postava").get<std::string>());
+				}
+			}
+			if (!place.kinds.empty()) into.push_back(std::move(place));
+		}
+	};
+	ThreeDForestPart as_read;
+	/* The palm plantation's parts are the ground of their tiles, each a face over the whole tile at its foot (the
+	 * colleague's hra/3d/TROPY-PLANTAZ-PRO-HRU.md: the red soil, the path, the clearing's grass): the game's ground under
+	 * them, at the same height, showed through it and flickered (the player, 3. 11.: "we do not need that underlay, we
+	 * have the meadow"). The forest's parts lie on the game's ground, their path not over the whole tile. */
+	as_read.whole_ground = kind == "plantaz";
+	figures("holky", as_read.girls);
+	figures("houby", as_read.mushrooms);
+	places("zvirata", "druhy", as_read.animals);
+	places("noc_postavy", "postavy", as_read.ghosts);
+	ReadStandingVehicles(e, as_read.vehicles);
+	ThreeDObject trees_read;
+	ReadBuildingFigures(e, trees_read);
+	/* Its fire, where the embers glow at night ("svetlo_00" of its night, the colleague's forester's cabin): a spit
+	 * can be put over it there (the player, 29. 10.: "a grill in the forest: E at the fireplace, a menu to grill a lamb,
+	 * a piglet, a calf"; "leave the fireplace in the forest, take only the spit"; "the spit and the forks, over the
+	 * fireplace, and done; the grill the same everywhere"): the trestles of the pitch's grill without its bricks (its
+	 * bricks 0.75 m from its middle along the spit, its trestles 1 m, the colleague's domy/hospoda.py gril()) and the
+	 * spit in them as there (dum_20_stadion "akce" "rozen": its rod 1.01 m up in the forks, sized 1.08). */
+	std::vector<float> fire;
+	/* The palm plantation's hut the forest cabin with its fire too (the player, 3. 11.: "take the hut from the forest ...
+	 * outside away with the brick grill, and again take it whole from the forest, the fireplace, the spit, with what E
+	 * does"). */
+	{
+		GlbMesh mesh;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = "svetlo_00";
+		o.point_prefix = "svetlo_00";
+		o.points = &fire;
+		ReadGlbMesh(folder + file, mesh, o);
+	}
+
+	/* Turned about the middle of the tile by quarter turns: exactly, no rounding of the sines. */
+	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE) / 2;
+	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
+	for (int k = 0; k < 4; k++) {
+		const float cs = static_cast<float>(COS[k]), sn = static_cast<float>(SIN[k]);
+		auto turn = [&](ThreeDObjectFigure &f) {
+			const float dx = f.at[0] - middle, dy = f.at[1] - middle;
+			f.at[0] = middle + dx * cs - dy * sn;
+			f.at[1] = middle + dx * sn + dy * cs;
+			f.facing = std::fmod(f.facing + k * 90.0f, 360.0f);
+		};
+		ThreeDObject obj;
+		obj.file = file;
+		obj.name = fmt::format("{}/{}", name, k * 90);
+		obj.glb_path = folder + file;
+		obj.variants = 0; // no house's
+		obj.scene_turns = static_cast<int8_t>(k);
+		obj.forest_trees = e.value("pouziti_stromu", std::string()) == "les";
+		/* Of its file without some nodes ("bez_uzlu"), its materials dressed otherwise ("textury_materialu"), parts of
+		 * other files laid in ("scena_navic"): the forest cabin on the palm plantation without its high seat and logs,
+		 * on the clearing's grass, and the high seat at the plantation's edge (the player, 3. 11.). */
+		if (e.contains("bez_uzlu") && e.at("bez_uzlu").is_array()) {
+			for (const auto &n : e.at("bez_uzlu")) {
+				if (n.is_string()) obj.left_out.push_back(n.get<std::string>());
+			}
+		}
+		ReadMaterialPictures(e, folder, obj);
+		if (e.contains("scena_navic") && e.at("scena_navic").is_array()) {
+			for (const auto &m : e.at("scena_navic")) {
+				if (!m.is_object() || !m.contains("soubor") || !m.at("soubor").is_string() || !m.contains("uzly") || !m.at("uzly").is_array()) continue;
+				ThreeDSceneMore more;
+				more.glb_path = folder + m.at("soubor").get<std::string>();
+				for (const auto &n : m.at("uzly")) {
+					if (n.is_string()) more.nodes.push_back(n.get<std::string>());
+				}
+				more.turn = m.value("otoceni", 0.0f);
+				if (m.contains("poloha") && m.at("poloha").is_array() && m.at("poloha").size() == 3) {
+					for (int i = 0; i < 3; i++) more.at[i] = m.at("poloha").at(i).get<float>();
+				}
+				obj.scene_more.push_back(std::move(more));
+			}
+		}
+		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+		obj.addon_places = trees_read.addon_places;
+		for (ThreeDObjectFigure &f : obj.addon_places) turn(f);
+		/* Its interior and the wings of its doors as a house's, turned as it is (the colleague's forest cabin). */
+		ReadInterior(e, folder, obj, true, static_cast<int8_t>(k));
+		ForestPartRead &r = _forest_parts_read[part][k];
+		r.ground = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(obj));
+		r.rest = as_read;
+		for (ThreeDObjectFigure &f : r.rest.girls) turn(f);
+		for (ThreeDObjectFigure &f : r.rest.mushrooms) turn(f);
+		for (ThreeDObjectFigure &f : r.rest.vehicles) turn(f);
+		for (ThreeDForestPlace &p : r.rest.animals) turn(p.at);
+		for (ThreeDForestPlace &p : r.rest.ghosts) turn(p.at);
+		if (fire.size() >= 3) {
+			ThreeDObjectFigure at;
+			at.at[0] = fire[0];
+			at.at[1] = fire[1];
+			turn(at);
+			r.rest.fire[0] = at.at[0];
+			r.rest.fire[1] = at.at[1];
+			/* The trestles alone, an object of their add-on without a file of its own (as a street lamp, MakeStreetLamps()). */
+			ThreeDObject grill;
+			grill.name = fmt::format("{}/{}/kozy", name, k * 90);
+			grill.variants = 0; // no house's
+			ThreeDObjectFigure &stand = grill.addon_places.emplace_back(at);
+			stand.figure = "gril_090fce5f";
+			stand.beyond = THREE_D_FIRE_TRESTLES_M;
+			r.grill = _three_d_objects.size();
+			_three_d_objects.push_back(std::move(grill));
+			for (int animal = 0; animal < THREE_D_GRILL_ANIMALS; animal++) {
+				ThreeDObjectFigure &spit = r.rest.spit[animal];
+				spit = at;
+				spit.figure = THREE_D_FIRE_SPIT;
+				spit.at[2] = THREE_D_FIRE_SPIT_UP_M;
+				spit.scale = THREE_D_FIRE_SPIT_SCALE;
+				spit.frame = animal;
+			}
+			/* Its fire burning, as every fireplace's (THREE_D_FIRE_FLAMES): on the embers, by day and by night. */
+			ThreeDObjectFigure &flames = r.rest.fire_flames.emplace_back(at);
+			flames.figure = THREE_D_FIRE_FLAMES;
+			flames.scale = THREE_D_FIRE_FLAMES_SCALE;
+			flames.frame = -1;
+		}
+	}
+}
+
+static void ReadThreeDObjects();
+
+/** A part of the forest with a clearing by its "dil" ("zem", "cesta", "paseka", "paseka_srub"), turned by so many quarter turns; nullptr none. */
+static const ThreeDForestPart *GetThreeDForestPart(std::string_view part, int turn)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static std::map<std::string, std::array<ThreeDForestPart, 4>, std::less<>> resolved;
+	static bool made = false;
+	if (!made) {
+		/* The objects by their places, now that all the indices are read and the list stays as it is. */
+		made = true;
+		for (const auto &[name, turns] : _forest_parts_read) {
+			Debug(misc, 1, "3D objects: forest part {}: {} trees, {} girls, {} mushrooms, {} places of game, {} of ghosts", name,
+					turns[0].ground != SIZE_MAX ? _three_d_objects[turns[0].ground].addon_places.size() : 0,
+					turns[0].rest.girls.size(), turns[0].rest.mushrooms.size(), turns[0].rest.animals.size(), turns[0].rest.ghosts.size());
+			for (int k = 0; k < 4; k++) {
+				ThreeDForestPart &p = resolved[name][k];
+				p = turns[k].rest;
+				p.ground = turns[k].ground != SIZE_MAX ? &_three_d_objects[turns[k].ground] : nullptr;
+				p.grill = turns[k].grill != SIZE_MAX ? &_three_d_objects[turns[k].grill] : nullptr;
+				p.standing = p.vehicles;
+				p.standing.insert(p.standing.end(), p.fire_flames.begin(), p.fire_flames.end());
+				p.with_girls = p.girls;
+				p.with_girls.insert(p.with_girls.end(), p.standing.begin(), p.standing.end());
+			}
+		}
+	}
+	auto it = resolved.find(part);
+	return it == resolved.end() ? nullptr : &it->second[turn & 3];
+}
+
+/**
+ * The side of the forest with a clearing its path comes from: the side with the most road beside it (the colleague's
+ * hra/3d/LES-PRO-HRU.md, "the path comes from the side of the road"), a side of its own by chance without a road.
+ */
+static DiagDirection GameForestPathSide(const Industry *ind)
+{
+	const TileIndex corner = ind->location.tile;
+	const int w = ind->location.w, h = ind->location.h;
+	int best = 0;
+	DiagDirection side = static_cast<DiagDirection>(GB(ind->random, 3, 2));
+	for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		int roads = 0;
+		const bool along_x = d == DiagDirection::SE || d == DiagDirection::NW;
+		for (int i = 0; i < (along_x ? w : h); i++) {
+			const int x = d == DiagDirection::NE ? -1 : d == DiagDirection::SW ? w : i;
+			const int y = d == DiagDirection::NW ? -1 : d == DiagDirection::SE ? h : i;
+			const TileIndex t = TileAddWrap(corner, x, y);
+			if (t != INVALID_TILE && IsTileType(t, TileType::Road)) roads++;
+		}
+		if (roads > best) {
+			best = roads;
+			side = d;
+		}
+	}
+	return side;
+}
+
+/** The fruit plantation of the original game (IT_FRUIT_PLANTATION of table/build_industry.h): the palm plantation of the tropics. */
+static constexpr IndustryType ORIGINAL_FRUIT_PLANTATION = 19;
+
+/**
+ * What part of the palm plantation lies on a tile of it, turned how (the colleague's hra/3d/TROPY-PLANTAZ-PRO-HRU.md:
+ * "the palm plantation will be nice as the forest, a clearing, a reed hut, a grill"; the player, 1. 11.: it is the
+ * fruit plantation of the game, its look only): laid as the forest, on its 5 x 4 tiles -- the clearing on 2 x 2 of the
+ * middle, at the side the path comes from, each turned with its north corner out, the hut on one of them (the forest
+ * cabin since 3. 11.); the path on a tile of the edge from the side of the road into the clearing; the forest cabin's
+ * high seat on the middle tile of the edge across; the plantation elsewhere. The game's own palm plantation
+ * (IT_PALM_PLANTATION, in every climate, the player, 2. 11.) so, and the original fruit plantation standing in a game
+ * saved before it took its place. Nullptr for a tile of anything else, of a set, or when the parts are not there (the
+ * base set's tile drawn then, pv_gfx_116).
+ */
+static const ThreeDForestPart *ThreeDPalmPlantationPartAt(TileIndex tile)
+{
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if ((gfx >= NEW_INDUSTRYTILEOFFSET && gfx != GFX_PALM_PLANTATION) || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+	const Industry *ind = Industry::GetByTile(tile);
+	if ((ind->type != ORIGINAL_FRUIT_PLANTATION && ind->type != IT_PALM_PLANTATION) || GetIndustrySpec(ind->type)->grf_prop.HasGrfFile()) return nullptr;
+	const int w = ind->location.w, h = ind->location.h;
+	if (w < 4 || h < 4) return nullptr;
+	const int dx = static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile));
+	const int dy = static_cast<int>(TileY(tile)) - static_cast<int>(TileY(ind->location.tile));
+	if (dx < 0 || dy < 0 || dx >= w || dy >= h) return nullptr;
+	const DiagDirection side = GameForestPathSide(ind);
+	/* The clearing's north tile: by the edge the path comes in from, in the middle otherwise. */
+	const int cx = side == DiagDirection::SW ? w - 3 : side == DiagDirection::NE ? 1 : (w - 2) / 2;
+	const int cy = side == DiagDirection::SE ? h - 3 : side == DiagDirection::NW ? 1 : (h - 2) / 2;
+	if (dx >= cx && dx <= cx + 1 && dy >= cy && dy <= cy + 1) {
+		static constexpr int TURNS[2][2] = {{0, 3}, {1, 2}};
+		const bool hut = (dx - cx) + 2 * (dy - cy) == static_cast<int>(GB(ind->random, 0, 2));
+		return GetThreeDForestPart(hut ? "plantaz:palouk_srub" : "plantaz:palouk", TURNS[dx - cx][dy - cy]);
+	}
+	bool path = false;
+	int turn = 0;
+	const int kx = cx + static_cast<int>(GB(ind->random, 2, 1)), ky = cy + static_cast<int>(GB(ind->random, 2, 1));
+	switch (side) {
+		case DiagDirection::NE: path = dy == ky && dx < cx; break;
+		case DiagDirection::SW: path = dy == ky && dx > cx + 1; break;
+		case DiagDirection::NW: path = dx == kx && dy < cy; turn = 1; break;
+		case DiagDirection::SE: path = dx == kx && dy > cy + 1; turn = 1; break;
+		default: break;
+	}
+	if (path) return GetThreeDForestPart("plantaz:cesta", turn);
+	/* The forest cabin's high seat in the middle of the edge across from the path, its platform out at the edge (the
+	 * part's -x side turned so): from it one looks out of the plantation into the distance (the player, 3. 11.). */
+	int seat_x = 0, seat_y = 0, seat_turn = 0;
+	switch (side) {
+		case DiagDirection::NE: seat_x = w - 1; seat_y = h / 2; seat_turn = 2; break;
+		case DiagDirection::SW: seat_x = 0; seat_y = h / 2; seat_turn = 0; break;
+		case DiagDirection::NW: seat_x = w / 2; seat_y = h - 1; seat_turn = 3; break;
+		case DiagDirection::SE: seat_x = w / 2; seat_y = 0; seat_turn = 1; break;
+		default: break;
+	}
+	if (dx == seat_x && dy == seat_y) {
+		if (const ThreeDForestPart *seat = GetThreeDForestPart("plantaz:zem_posed", seat_turn); seat != nullptr) return seat;
+	}
+	return GetThreeDForestPart("plantaz:zem", (dx * 3 + dy * 5 + static_cast<int>(GB(ind->random, 5, 2))) & 3);
+}
+
+/**
+ * What part of the forest with a clearing lies on a tile of it, turned how (the colleague's hra/3d/LES-PRO-HRU.md):
+ * the clearing on the four middle tiles, each turned with its north corner out of the clearing, the forester's cabin on
+ * one of them; the path on a tile of the edge from the side of the road into the clearing; the forest floor elsewhere,
+ * turned as its place says (its ground runs on over the edges however it is turned). The palm plantation's parts so too
+ * (ThreeDPalmPlantationPartAt()). Nullptr for any other tile.
+ */
+const ThreeDForestPart *ThreeDGameForestPartAt(TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::Industry)) return nullptr;
+	if (GetIndustryGfx(tile) != GFX_GAME_FOREST) return ThreeDPalmPlantationPartAt(tile);
+	const Industry *ind = Industry::GetByTile(tile);
+	const int dx = static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile));
+	const int dy = static_cast<int>(TileY(tile)) - static_cast<int>(TileY(ind->location.tile));
+	if (dx < 0 || dy < 0 || dx > 3 || dy > 3) return nullptr;
+	if (dx >= 1 && dx <= 2 && dy >= 1 && dy <= 2) {
+		/* The north corner out: (1, 1) as it is, (2, 1) a quarter turn, (2, 2) a half, (1, 2) three quarters. */
+		static constexpr int TURNS[2][2] = {{0, 3}, {1, 2}};
+		const bool cabin = (dx - 1) + 2 * (dy - 1) == static_cast<int>(GB(ind->random, 0, 2));
+		return GetThreeDForestPart(cabin ? "paseka_srub" : "paseka", TURNS[dx - 1][dy - 1]);
+	}
+	const int k = 1 + static_cast<int>(GB(ind->random, 2, 1));
+	bool path = false;
+	int turn = 0;
+	switch (GameForestPathSide(ind)) {
+		case DiagDirection::NE: path = dx == 0 && dy == k; break;
+		case DiagDirection::SW: path = dx == 3 && dy == k; break;
+		case DiagDirection::NW: path = dy == 0 && dx == k; turn = 1; break;
+		case DiagDirection::SE: path = dy == 3 && dx == k; turn = 1; break;
+		default: break;
+	}
+	if (path) return GetThreeDForestPart("cesta", turn);
+	return GetThreeDForestPart("zem", (dx * 3 + dy * 5 + static_cast<int>(GB(ind->random, 5, 2))) & 3);
+}
+
+/** A picture of a surface of the land ("druh": "povrch"): its file, and over how many tiles each way it runs ("dlazdic"). */
+struct ThreeDSurfaceFile {
+	std::string file;
+	int tiles = 1;
+};
+/** The pictures of the surfaces of the land by their "povrch". */
+static std::map<std::string, ThreeDSurfaceFile, std::less<>> _three_d_surfaces;
+
+/**
+ * The picture of a surface of the land by its "povrch" of the index ("trava": our grass of the temperate climate,
+ * objekty/nase/trava_mirna.png, drawn on the game's grass, DrawOurGrass()), its levels halved down to a pixel;
+ * nullptr without it.
+ * @param[out] tiles over how many tiles each way the picture runs
+ */
+ThreeDTextureLevels GetThreeDSurface(std::string_view surface, int &tiles)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_surfaces.find(surface);
+	if (it == _three_d_surfaces.end()) return nullptr;
+	tiles = it->second.tiles;
+	return TextureLevelsOfFile(it->second.file, 0);
+}
+
+/** The grills over the forests' fires (SetThreeDForestGrill()): the animal on each spit by the tile of its fire; never saved, as the doors open. */
+static std::map<TileIndex, int> _three_d_forest_grills;
+
+/** The animal grilled over the fire of the part of a forest on a tile (a frame of the spit, ThreeDForestPart::spit), -1 none. */
+int ThreeDForestGrill(TileIndex tile)
+{
+	auto it = _three_d_forest_grills.find(tile);
+	if (it == _three_d_forest_grills.end()) return -1;
+	/* The fireplace of a walker's tent grills so too (the player, 7. 11.: "our fireplace with E to grill", WalkerTent). */
+	if (WalkerTentAt(tile) != nullptr) return it->second;
+	const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
+	return forest != nullptr && forest->grill != nullptr ? it->second : -1;
+}
+
+/** An animal put on the spit over the fire on a tile (-1: eaten, the grill gone with it), the map drawn again there. */
+void SetThreeDForestGrill(TileIndex tile, int animal)
+{
+	if (animal < 0 || animal >= THREE_D_GRILL_ANIMALS) {
+		_three_d_forest_grills.erase(tile);
+	} else {
+		_three_d_forest_grills[tile] = animal;
+	}
+	MarkTileDirtyByTile(tile);
+}
+
+/** The tile of the forest's fire, or a walker's tent's (WalkerTentFireNear()), nearest a world point within reach of it (world units), INVALID_TILE none. */
+TileIndex ThreeDForestFireNear(double x, double y, double reach)
+{
+	TileIndex best = WalkerTentFireNear(x, y, reach);
+	if (double fx, fy; best != INVALID_TILE && WalkerTentFireAt(best, fx, fy)) reach = std::hypot(fx - x, fy - y);
+	const int tx = static_cast<int>(x / TILE_SIZE), ty = static_cast<int>(y / TILE_SIZE);
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			if (tx + dx < 0 || ty + dy < 0 || tx + dx > static_cast<int>(Map::MaxX()) || ty + dy > static_cast<int>(Map::MaxY())) continue;
+			const TileIndex tile = TileXY(tx + dx, ty + dy);
+			const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
+			if (forest == nullptr || forest->grill == nullptr) continue;
+			const double d = std::hypot(TileX(tile) * TILE_SIZE + forest->fire[0] * OBJECT_UNITS_PER_METRE - x, TileY(tile) * TILE_SIZE + forest->fire[1] * OBJECT_UNITS_PER_METRE - y);
+			if (d < reach) {
+				reach = d;
+				best = tile;
+			}
+		}
+	}
+	return best;
+}
+
+/** A tile of the original industries ("druh": "prumysl_dlazdice"): its ground, its parts placed, its plants, for each of its gfx. */
+static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std::string, IndustryPartMesh> &parts)
+{
+	OriginalIndustryTile tile;
+	tile.ground = e.value("podklad", std::string());
+	const std::string name = e.value("jmeno", std::string("prumysl_dlazdice"));
+	int bx = 1, by = 1;
+	if (e.contains("blok") && e.at("blok").is_array() && e.at("blok").size() == 2) {
+		bx = std::clamp(e.at("blok").at(0).get<int>(), 1, 8);
+		by = std::clamp(e.at("blok").at(1).get<int>(), 1, 8);
+	}
+	if (e.contains("soucast_bloku") && e.at("soucast_bloku").is_object()) {
+		const auto &m = e.at("soucast_bloku");
+		tile.member = true;
+		if (m.contains("posun") && m.at("posun").is_array() && m.at("posun").size() == 2) {
+			tile.anchor_dx = m.at("posun").at(0).get<int>();
+			tile.anchor_dy = m.at("posun").at(1).get<int>();
+		}
+	}
+	if (e.contains("dily") && e.at("dily").is_array()) {
+		for (const auto &d : e.at("dily")) {
+			if (!d.is_object() || !d.contains("dil") || !d.contains("poloha") || !d.at("poloha").is_array() || d.at("poloha").size() != 3) continue;
+			const std::string part = d.at("dil").get<std::string>();
+			float at[3];
+			for (int k = 0; k < 3; k++) at[k] = d.at("poloha").at(k).get<float>();
+			auto it = parts.find(part);
+			if (it == parts.end() && d.value("sada", std::string()) == "naklady") {
+				/* A piece of the shared loads standing on the tile (the colleague's hra/3d/RAFINERIE-PRO-HRU.md: the pallets of
+				 * drums on the refinery's yard), the same the lorries carry: a figure as the vehicles of the sets stand,
+				 * "naklad:<piece>|<part>=<RRGGBB>" (GetThreeDStandingVehicle()), its part coloured as "barva_casti" says. */
+				ThreeDObjectFigure f;
+				for (int k = 0; k < 3; k++) f.at[k] = at[k];
+				f.facing = d.value("otoceni", 0.0f);
+				f.scale = std::clamp(d.value("meritko", 1.0f), 0.05f, 20.0f);
+				f.figure = "naklad:" + part;
+				if (d.contains("barva_casti") && d.at("barva_casti").is_object()) {
+					for (const auto &[cast, colour] : d.at("barva_casti").items()) {
+						if (colour.is_string()) f.figure += "|" + cast + "=" + colour.get<std::string>();
+					}
+				}
+				tile.vehicles.push_back(f);
+				tile.vehicles_again.push_back(std::move(f));
+				tile.buildings = true;
+				continue;
+			}
+			if (it == parts.end()) {
+				/* A part of another set, a whole tile as it is (the haystack, the shed of the fields): found by its name
+				 * when every set is read. Placed elsewhere or turned it would need its mesh, which is not kept. */
+				if (d.contains("sada") && at[0] == 0 && at[1] == 0 && at[2] == 0 && d.value("otoceni", 0.0f) == 0 && d.value("meritko", 1.0f) == 1) {
+					tile.whole.push_back(part);
+					tile.buildings = true;
+				} else {
+					Debug(misc, 0, "3D objects {}: no part {}", name, part);
+				}
+				continue;
+			}
+			tile.parts.push_back(_three_d_objects.size());
+			tile.buildings = true;
+			_three_d_objects.push_back(PlaceIndustryPart(it->second, name + "/" + part, at, d.value("otoceni", 0.0f), d.value("meritko", 1.0f), bx, by));
+		}
+	}
+	/* Its add-ons ("doplnky", as a house's: the shared trees and bushes of the colleague's STROMY-SPOLECNE-PRO-HRU.md):
+	 * one object of them alone, without a file of its own (as a street lamp, MakeStreetLamps()). */
+	if (e.contains("doplnky")) {
+		ThreeDObject addons;
+		addons.name = name + "/doplnky";
+		addons.variants = 0; // no house's
+		addons.tiles_x = bx;
+		addons.tiles_y = by;
+		addons.forest_trees = e.value("pouziti_stromu", std::string()) == "les";
+		ReadBuildingFigures(e, addons);
+		if (!addons.addon_places.empty()) {
+			tile.parts.push_back(_three_d_objects.size());
+			_three_d_objects.push_back(std::move(addons));
+		}
+	}
+	ReadStandingVehicles(e, tile.vehicles, &tile.vehicles_again);
+	ThreeDObject plants;
+	plants.name = name + "/rostliny";
+	plants.variants = 0; // no house's
+	ReadPlants(e, plants);
+	if (!plants.plants.empty()) {
+		tile.plants = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(plants));
+	}
+	if (e.contains("gfx") && e.at("gfx").is_array()) {
+		for (const auto &g : e.at("gfx")) {
+			if (!_original_industry_tiles.emplace(static_cast<IndustryGfx>(g.get<int>()), tile).second) Debug(misc, 0, "3D objects {}: gfx {} has two records", name, g.get<int>());
+		}
+	}
+}
+
+/** The nodes of the pieces of a 3D bridge's model, by ThreeDBridgePiece. */
+static constexpr std::string_view BRIDGE_PIECE_NODES[] = {"stred", "stred_a", "stred_b", "konec", "hlava", "pilir", "pilir_pata", "hlava_svah"};
+static_assert(std::size(BRIDGE_PIECE_NODES) == to_underlying(ThreeDBridgePiece::Count));
+static_assert(THREE_D_AQUEDUCT == MAX_BRIDGES);
+
+/** The pieces of the 3D bridges by the game's bridge type (the aqueducts' after them, THREE_D_AQUEDUCT), piece and quarter turn: their objects in _three_d_objects, SIZE_MAX none. */
+using BridgePieceObjects = std::array<std::array<std::array<size_t, 4>, to_underlying(ThreeDBridgePiece::Count)>, MAX_BRIDGES + 1>;
+static BridgePieceObjects _three_d_bridge_pieces = [] {
+	BridgePieceObjects none;
+	for (auto &type : none) {
+		for (auto &piece : type) piece.fill(SIZE_MAX);
+	}
+	return none;
+}();
+/** The same pieces for the map (GetThreeDBridgePiece(), map): a level of the map's land is 3 m, not the eyes' 5. */
+static BridgePieceObjects _three_d_bridge_map_pieces = _three_d_bridge_pieces;
+
+/** How much higher a ramp's and a pillar's piece of a bridge stand than their model: a level of the land, 5 m (EYE_LEVEL_STRETCH). */
+static constexpr float BRIDGE_LEVEL_M = 5.0f;
+/** A level of the map's land, metres (TILE_HEIGHT of OBJECT_HEIGHT_PER_METRE): the pieces for the map squashed to it. */
+static constexpr float BRIDGE_MAP_LEVEL_M = static_cast<float>(TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE);
+
+/** How many materials the retaining walls are of: bricks [0], stone [1], concrete [2] (zdi_5m.py, beton_5m.py). */
+static constexpr size_t BRIDGE_WALL_MATERIALS = 3;
+/** Of those the concrete: the bridges' own concrete too (LayBridgeConcrete()). */
+static constexpr size_t BRIDGE_WALL_CONCRETE = 2;
+/** The pillars of the bridges in the bricks [0], the stone [1] or the concrete [2] of the retaining walls (BridgeHasMasonryPillars()): their pieces as _three_d_bridge_pieces, only the pillar's and its foot's. */
+static std::array<BridgePieceObjects, BRIDGE_WALL_MATERIALS> _three_d_bridge_wall_pieces = {_three_d_bridge_pieces, _three_d_bridge_pieces, _three_d_bridge_pieces};
+/** The same pieces for the map. */
+static std::array<BridgePieceObjects, BRIDGE_WALL_MATERIALS> _three_d_bridge_wall_map_pieces = _three_d_bridge_wall_pieces;
+
+/**
+ * Whether the pillars of one of the game's bridge types are of masonry, in the bricks or the stone of the retaining walls
+ * (the player, 5. 11.: "a texture on the bridges' pillars, the bricks and the stone of the fills of the slopes", the
+ * aqueducts' too): not the wooden bridge's, nor the suspension bridges' ("the suspension ones have steel pillars").
+ */
+static bool BridgeHasMasonryPillars(uint type)
+{
+	return type != 0 && (type < 3 || type > 5);
+}
+
+static bool ImageSizeOfHead(std::span<const uint8_t> head, int &w, int &h);
+
+/** A face of the retaining walls (zed_lic_cihly, zed_lic_kamen, zed_lic_beton of our set objekty/nase, zdi_5m.py, beton_5m.py) as the material of a bridge's pillars. */
+struct BridgeWallPicture {
+	ThreeDTextureBytes png;  ///< its picture, shared with the walls' (InternThreeDTextureBytes())
+	uint32_t flat = 0;       ///< its material's colour
+	int w = 0;               ///< the picture's width, texels
+	double w_m = BRIDGE_LEVEL_M; ///< how wide the picture is in the world, metres (the board's width)
+	double h_m = BRIDGE_LEVEL_M; ///< and how high: a level of the land from the eyes
+};
+
+/**
+ * The faces of the retaining walls, bricks [0], stone [1] and concrete [2], read once for all the bridges: from our set
+ * beside the bridges' (".../objekty/mosty/" -> ".../objekty/nase/"); one not there, those pillars as their model has them.
+ */
+static const std::array<std::optional<BridgeWallPicture>, BRIDGE_WALL_MATERIALS> &BridgeWallPictures(const std::string &bridges_folder)
+{
+	static std::array<std::optional<BridgeWallPicture>, BRIDGE_WALL_MATERIALS> pictures;
+	static bool read = false;
+	if (read) return pictures;
+	read = true;
+	std::string_view f = bridges_folder;
+	if (!f.empty() && f.back() == PATHSEPCHAR) f.remove_suffix(1);
+	const size_t sep = f.find_last_of(PATHSEPCHAR);
+	if (sep == std::string_view::npos) return pictures;
+	const std::string ours = fmt::format("{}nase{}", f.substr(0, sep + 1), PATHSEPCHAR);
+	static constexpr std::string_view FILES[BRIDGE_WALL_MATERIALS] = {"zed_lic_cihly.glb", "zed_lic_kamen.glb", "zed_lic_beton.glb"};
+	for (size_t k = 0; k < pictures.size(); k++) {
+		GlbMesh mesh;
+		if (!ReadGlbMesh(ours + std::string(FILES[k]), mesh) || mesh.textures.empty()) {
+			Debug(misc, 0, "3D bridges: {}{} not read, the pillars without it", ours, FILES[k]);
+			continue;
+		}
+		const size_t t = mesh.png_texture >= 0 ? static_cast<size_t>(mesh.png_texture) : (mesh.tri_tex.empty() ? 0 : mesh.tri_tex[0]);
+		if (t >= mesh.textures.size() || mesh.textures[t].png == nullptr) continue;
+		BridgeWallPicture p;
+		p.png = mesh.textures[t].png;
+		p.flat = mesh.textures[t].flat;
+		int h = 0;
+		if (!ImageSizeOfHead(std::span<const uint8_t>(*p.png).first(std::min<size_t>(p.png->size(), 32)), p.w, h) || p.w <= 0) continue;
+		/* The board: a picture over it (its UV 0 to 1), its width along x and its height up z. */
+		float x0 = std::numeric_limits<float>::max(), x1 = -x0, z0 = x0, z1 = -x0;
+		for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+			x0 = std::min(x0, mesh.pos[i]);
+			x1 = std::max(x1, mesh.pos[i]);
+			z0 = std::min(z0, mesh.pos[i + 2]);
+			z1 = std::max(z1, mesh.pos[i + 2]);
+		}
+		if (x1 - x0 > 0.5f) p.w_m = x1 - x0;
+		if (z1 - z0 > 0.5f) p.h_m = z1 - z0;
+		pictures[k] = std::move(p);
+	}
+	return pictures;
+}
+
+/**
+ * A pillar's piece of a bridge in the picture of a face of the retaining walls: each face laid with it by its own axis
+ * as the walls are -- on the sides along the face from the left as one looks at it from outside (DrawEyeRetainingWalls()
+ * of viewport.cpp), from the top of the level down, a picture a level high; on the tops and the bottoms along x and
+ * y --, the picture again every w_m and h_m metres, so a pillar's pieces stacked go on into each other. A building's
+ * texture is not repeated (off it nothing, EYE_BUILDING_FRAGMENT of three_d_gpu.cpp): each triangle cut where the
+ * picture begins again, every piece's u and v within it, a hair from its edges. Its corners its own, the normals with
+ * them.
+ */
+static GlbMesh MasonryMesh(const GlbMesh &from, double w_m, double h_m)
+{
+	struct Corner {
+		float p[3];
+		float n[3];
+		double u, v;
+	};
+	auto mix = [](const Corner &a, const Corner &b, double f) {
+		Corner c;
+		for (int k = 0; k < 3; k++) {
+			c.p[k] = static_cast<float>(a.p[k] + (b.p[k] - a.p[k]) * f);
+			c.n[k] = static_cast<float>(a.n[k] + (b.n[k] - a.n[k]) * f);
+		}
+		c.u = a.u + (b.u - a.u) * f;
+		c.v = a.v + (b.v - a.v) * f;
+		return c;
+	};
+	/* A polygon's part on one side of the line u (or v) = at, the side above it or below. */
+	auto cut = [&mix](const std::vector<Corner> &poly, bool v, double at, bool above) {
+		std::vector<Corner> out;
+		for (size_t k = 0; k < poly.size(); k++) {
+			const Corner &a = poly[k], &b = poly[(k + 1) % poly.size()];
+			const double da = ((v ? a.v : a.u) - at) * (above ? 1 : -1), db = ((v ? b.v : b.u) - at) * (above ? 1 : -1);
+			if (da >= 0) out.push_back(a);
+			if ((da >= 0) != (db >= 0)) out.push_back(mix(a, b, da / (da - db)));
+		}
+		return out;
+	};
+	/* Within the picture a hair from its edges: a texel past them is none. */
+	static constexpr double EDGE = 1.0 / 1024;
+	auto inside = [](double t) { return static_cast<float>(EDGE + std::clamp(t, 0.0, 1.0) * (1 - 2 * EDGE)); };
+	static constexpr double EPS = 1e-6;
+	const bool normals = from.nrm.size() == from.pos.size();
+	GlbMesh out;
+	for (size_t t = 0; t + 2 < from.tri.size(); t += 3) {
+		std::vector<Corner> poly(3);
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = from.tri[t + k];
+			for (int a = 0; a < 3; a++) {
+				poly[k].p[a] = from.pos[i * 3 + a];
+				poly[k].n[a] = normals ? from.nrm[i * 3 + a] : 0.0f;
+			}
+		}
+		/* Its face's normal: by its corners' order, the other way where its normals say so (TriangleFacing()). */
+		const float *a = poly[0].p, *b = poly[1].p, *c = poly[2].p;
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+		if (gx * gx + gy * gy + gz * gz < 1e-12) continue;
+		if (normals) {
+			double s = 0;
+			for (const Corner &k : poly) s += gx * k.n[0] + gy * k.n[1] + gz * k.n[2];
+			if (s < 0) {
+				gx = -gx;
+				gy = -gy;
+			}
+		}
+		const bool flat = std::abs(gz) >= std::abs(gx) && std::abs(gz) >= std::abs(gy);
+		for (Corner &k : poly) {
+			if (flat) {
+				k.u = k.p[0] / w_m;
+				k.v = k.p[1] / w_m;
+			} else {
+				/* To the right of a face facing (nx, ny) is (-ny, nx), as the walls'. */
+				k.u = (std::abs(gx) >= std::abs(gy) ? (gx > 0 ? k.p[1] : -k.p[1]) : (gy > 0 ? -k.p[0] : k.p[0])) / w_m;
+				k.v = -k.p[2] / h_m;
+			}
+		}
+		double u0 = std::numeric_limits<double>::max(), u1 = -u0, v0 = u0, v1 = -u0;
+		for (const Corner &k : poly) {
+			u0 = std::min(u0, k.u);
+			u1 = std::max(u1, k.u);
+			v0 = std::min(v0, k.v);
+			v1 = std::max(v1, k.v);
+		}
+		const double i0 = std::floor(u0 + EPS), i1 = std::max(i0 + 1, std::ceil(u1 - EPS));
+		const double j0 = std::floor(v0 + EPS), j1 = std::max(j0 + 1, std::ceil(v1 - EPS));
+		for (double i = i0; i < i1; i++) {
+			const std::vector<Corner> strip = cut(cut(poly, false, i, true), false, i + 1, false);
+			if (strip.size() < 3) continue;
+			for (double j = j0; j < j1; j++) {
+				const std::vector<Corner> piece = cut(cut(strip, true, j, true), true, j + 1, false);
+				if (piece.size() < 3) continue;
+				const uint32_t first = static_cast<uint32_t>(out.pos.size() / 3);
+				for (const Corner &k : piece) {
+					out.pos.insert(out.pos.end(), k.p, k.p + 3);
+					if (normals) {
+						const float len = std::sqrt(k.n[0] * k.n[0] + k.n[1] * k.n[1] + k.n[2] * k.n[2]);
+						for (int m = 0; m < 3; m++) out.nrm.push_back(len > 0 ? k.n[m] / len : 0.0f);
+					}
+					out.uv.push_back(inside(k.u - i));
+					out.uv.push_back(inside(k.v - j));
+				}
+				for (uint32_t k = 1; k + 1 < piece.size(); k++) out.tri.insert(out.tri.end(), {first, first + k, first + k + 1});
+			}
+		}
+	}
+	return out;
+}
+
+/** A pillar's piece placed (PlaceIndustryPart() of a MasonryMesh()) dressed in a face of the walls: its other material, the only one. */
+static void DressInMasonry(ThreeDObject &piece, const BridgeWallPicture &wall)
+{
+	piece.texture_of = SIZE_MAX;
+	piece.material_pngs = {wall.png};
+	piece.material_flats = {wall.flat};
+	piece.material_levels.assign(1, nullptr);
+	piece.tri_tex.assign(piece.tri.size() / 3, 1);
+	piece.corner_tex.assign(piece.pos.size() / 3, 1);
+	piece.texels_per_unit = static_cast<float>(wall.w / (wall.w_m * OBJECT_UNITS_PER_METRE));
+}
+
+/**
+ * The flat upright faces of concrete of a bridge's piece (ThreeDObject::decal_faces): its triangles of concrete (all of
+ * them, or those of tri_tex 1) that stand upright, gathered by their plane -- the way they face, to 2 degrees, and how
+ * far out, to 5 cm --, each plane a rectangle from its leftmost to its rightmost and from its foot to its top, kept
+ * where it is at least a metre wide, 70 cm high and filled by its triangles at least to 70 % (not the opening of an
+ * arch); placed as PlaceIndustryPart() places the piece.
+ * @param mesh the piece's mesh, metres, its normals telling its triangles' outside
+ * @param all every triangle of concrete; else those of tri_tex 1 (LayBridgeConcrete())
+ */
+static std::vector<ThreeDObject::DecalFace> ConcreteDecalFaces(const GlbMesh &mesh, bool all, const float at[3], float turn)
+{
+	struct Plane {
+		double hx = 0, hy = 0, d = 0, area = 0;
+		double t0 = std::numeric_limits<double>::max(), t1 = -std::numeric_limits<double>::max();
+		double z0 = std::numeric_limits<double>::max(), z1 = -std::numeric_limits<double>::max();
+	};
+	std::map<std::pair<int, int>, Plane> planes;
+	const bool normals = mesh.nrm.size() == mesh.pos.size();
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (!all && (t / 3 >= mesh.tri_tex.size() || mesh.tri_tex[t / 3] == 0)) continue;
+		const float *a = &mesh.pos[mesh.tri[t] * 3], *b = &mesh.pos[mesh.tri[t + 1] * 3], *c = &mesh.pos[mesh.tri[t + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+		const double len = std::sqrt(gx * gx + gy * gy + gz * gz);
+		if (len < 1e-9) continue;
+		if (normals) {
+			double s = 0;
+			for (int k = 0; k < 3; k++) {
+				const float *n = &mesh.nrm[mesh.tri[t + k] * 3];
+				s += gx * n[0] + gy * n[1] + gz * n[2];
+			}
+			if (s < 0) {
+				gx = -gx;
+				gy = -gy;
+				gz = -gz;
+			}
+		}
+		if (std::abs(gz / len) > 0.25) continue;
+		const double h = std::hypot(gx, gy), hx = gx / h, hy = gy / h;
+		int angle = static_cast<int>(std::lround(std::atan2(hy, hx) * 90.0 / M_PI));
+		if (angle == -90) angle = 90;
+		const double d = hx * a[0] + hy * a[1];
+		Plane &p = planes[{angle, static_cast<int>(std::lround(d / 0.05))}];
+		const double area = len / 2;
+		p.hx += hx * area;
+		p.hy += hy * area;
+		p.d += d * area;
+		p.area += area;
+		for (const float *q : {a, b, c}) {
+			const double along = -hy * q[0] + hx * q[1];
+			p.t0 = std::min(p.t0, along);
+			p.t1 = std::max(p.t1, along);
+			p.z0 = std::min<double>(p.z0, q[2]);
+			p.z1 = std::max<double>(p.z1, q[2]);
+		}
+	}
+	std::vector<ThreeDObject::DecalFace> faces;
+	const double r = turn * M_PI / 180.0, cs = std::cos(r), sn = std::sin(r);
+	for (const auto &[key, p] : planes) {
+		const double w = p.t1 - p.t0, h = p.z1 - p.z0;
+		if (w < 1.0 || h < 0.7 || p.area < 0.7 * w * h) continue;
+		const double hl = std::hypot(p.hx, p.hy);
+		if (hl <= 0) continue;
+		const double hx = p.hx / hl, hy = p.hy / hl, d = p.d / p.area;
+		auto place_x = [&](double x, double y) { return static_cast<float>((at[0] + x * cs - y * sn) * OBJECT_UNITS_PER_METRE); };
+		auto place_y = [&](double x, double y) { return static_cast<float>((at[1] + x * sn + y * cs) * OBJECT_UNITS_PER_METRE); };
+		/* Its left end, as one looks at it from outside, is at its least along (-hy, hx), as the walls' (MasonryMesh()). */
+		const double lx = hx * d - hy * p.t0, ly = hy * d + hx * p.t0, rx = hx * d - hy * p.t1, ry = hy * d + hx * p.t1;
+		faces.push_back({static_cast<float>(hx * cs - hy * sn), static_cast<float>(hx * sn + hy * cs), place_x(lx, ly), place_y(lx, ly), place_x(rx, ry), place_y(rx, ry),
+				static_cast<float>((at[2] + p.z0) * OBJECT_HEIGHT_PER_METRE), static_cast<float>((at[2] + p.z1) * OBJECT_HEIGHT_PER_METRE)});
+	}
+	return faces;
+}
+
+/** The concrete of the bridges' models: the warm grey cell of their shared atlas (the others its paint, the deck, the steel). */
+static const Colour BRIDGE_CONCRETE_CELL(0xA8, 0xA6, 0xA0);
+/**
+ * The aqueduct's trough laid in the same concrete (the player's test6: its walls plain beige planes, "jo" to the concrete
+ * of the ship tunnel's mouth): the cells of its stone and of its cornice ("kamen", "rimsa"; its dark bottom "dno" as it
+ * is). Its pillars are of the walls' masonry as the other bridges'.
+ */
+static const std::array<Colour, 2> AQUEDUCT_CONCRETE_CELLS = {Colour(0xB8, 0xAC, 0x96), Colour(0x92, 0x88, 0x76)};
+
+/**
+ * A bridge's piece with its concrete laid in the concrete of the walls (zed_lic_beton, beton_5m.py; the player, test2:
+ * "the grey concrete I don't like", the plain grey deck of the girder bridge, the grey of the suspension bridge): its
+ * triangles that draw from the atlas's concrete cell (BRIDGE_CONCRETE_CELL) laid by the world as the pillars of masonry
+ * are (MasonryMesh()), after the others as they are; tri_tex 1 the concrete's, 0 the model's own (DressInConcrete()).
+ * @param cells the atlas's cells laid so (BRIDGE_CONCRETE_CELL; the aqueduct's AQUEDUCT_CONCRETE_CELLS)
+ * @return whether it has concrete
+ */
+static bool LayBridgeConcrete(GlbMesh &mesh, double w_m, double h_m, std::span<const Colour> cells)
+{
+	const size_t t = mesh.png_texture >= 0 ? static_cast<size_t>(mesh.png_texture) : (mesh.tri_tex.empty() ? 0 : mesh.tri_tex[0]);
+	if (t >= mesh.textures.size() || mesh.textures[t].png == nullptr || mesh.uv.size() / 2 != mesh.pos.size() / 3) return false;
+	std::vector<ThreeDObjectTexture> levels;
+	DecodeTextureLevels(*mesh.textures[t].png, levels, mesh.textures[t].flat, false);
+	if (levels.empty() || levels[0].px.empty() || levels[0].w <= 0 || levels[0].h <= 0) return false;
+	const ThreeDObjectTexture &atlas = levels[0];
+	auto is_concrete = [&](size_t tri) {
+		double u = 0, v = 0;
+		for (int k = 0; k < 3; k++) {
+			u += mesh.uv[mesh.tri[tri + k] * 2] / 3.0;
+			v += mesh.uv[mesh.tri[tri + k] * 2 + 1] / 3.0;
+		}
+		const int x = std::clamp(static_cast<int>(std::floor((u - std::floor(u)) * atlas.w)), 0, atlas.w - 1);
+		const int y = std::clamp(static_cast<int>(std::floor((v - std::floor(v)) * atlas.h)), 0, atlas.h - 1);
+		const Colour c(atlas.px[static_cast<size_t>(y) * atlas.w + x]);
+		return std::ranges::any_of(cells, [&c](const Colour &cell) { return std::abs(c.r - cell.r) <= 8 && std::abs(c.g - cell.g) <= 8 && std::abs(c.b - cell.b) <= 8; });
+	};
+	/* Its triangles in two meshes, each with its own corners. */
+	GlbMesh rest, concrete;
+	const bool normals = mesh.nrm.size() == mesh.pos.size();
+	auto take = [&](GlbMesh &to, size_t tri, bool uv) {
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = mesh.tri[tri + k];
+			to.tri.push_back(static_cast<uint32_t>(to.pos.size() / 3));
+			to.pos.insert(to.pos.end(), mesh.pos.begin() + i * 3, mesh.pos.begin() + i * 3 + 3);
+			if (normals) to.nrm.insert(to.nrm.end(), mesh.nrm.begin() + i * 3, mesh.nrm.begin() + i * 3 + 3);
+			if (uv) to.uv.insert(to.uv.end(), mesh.uv.begin() + i * 2, mesh.uv.begin() + i * 2 + 2);
+		}
+	};
+	for (size_t tri = 0; tri + 2 < mesh.tri.size(); tri += 3) take(is_concrete(tri) ? concrete : rest, tri, true);
+	if (concrete.tri.empty()) return false;
+	const GlbMesh laid = MasonryMesh(concrete, w_m, h_m);
+	if (laid.tri.empty()) return false;
+	/* The model's own first, then the concrete. */
+	const uint32_t base = static_cast<uint32_t>(rest.pos.size() / 3);
+	mesh.pos = std::move(rest.pos);
+	mesh.nrm = std::move(rest.nrm);
+	mesh.uv = std::move(rest.uv);
+	mesh.tri = std::move(rest.tri);
+	const size_t own = mesh.tri.size() / 3;
+	mesh.pos.insert(mesh.pos.end(), laid.pos.begin(), laid.pos.end());
+	if (normals) mesh.nrm.insert(mesh.nrm.end(), laid.nrm.begin(), laid.nrm.end());
+	mesh.uv.insert(mesh.uv.end(), laid.uv.begin(), laid.uv.end());
+	for (uint32_t i : laid.tri) mesh.tri.push_back(base + i);
+	mesh.tri_tex.assign(own, 0);
+	mesh.tri_tex.resize(mesh.tri.size() / 3, 1);
+	/* (A bridge's piece has no groups, marks nor glass of its triangles: those of the triangles as read would not fit.) */
+	mesh.tri_group.clear();
+	mesh.tri_mark.clear();
+	mesh.tri_glass.clear();
+	return true;
+}
+
+/**
+ * A bridge's piece placed (PlaceIndustryPart()) with its concrete laid (LayBridgeConcrete()) in the walls' concrete:
+ * its other material, its model's texture the rest; each its own level of detail from the eyes -- the small atlas of
+ * the model at the concrete's would be a texel of all its colours.
+ */
+static void DressInConcrete(ThreeDObject &piece, const GlbMesh &mesh, const BridgeWallPicture &wall)
+{
+	piece.material_pngs = {wall.png};
+	piece.material_flats = {wall.flat};
+	piece.material_levels.assign(1, nullptr);
+	piece.material_texels_per_unit = {static_cast<float>(wall.w / (wall.w_m * OBJECT_UNITS_PER_METRE))};
+	piece.tri_tex = mesh.tri_tex;
+	piece.corner_tex.assign(piece.pos.size() / 3, 0);
+	for (size_t t = 0; t < mesh.tri_tex.size() && t * 3 + 2 < mesh.tri.size(); t++) {
+		if (mesh.tri_tex[t] == 0) continue;
+		for (int k = 0; k < 3; k++) piece.corner_tex[mesh.tri[t * 3 + k]] = 1;
+	}
+}
+
+/**
+ * A 3D bridge ("druh": "most", the colleague's hra/3d/MOSTY-3D-PRO-HRU.md): one model whose named nodes are its pieces
+ * (BRIDGE_PIECE_NODES), in true metres, +x along the bridge from x 0 to a tile's length, y across from its middle, z 0
+ * the top of the deck; one texture, its part "barva" painted the colour of each of the game's bridges it is ("mosty",
+ * "barva_mostu"). Each piece an object of its own for each of those bridges and each quarter turn about the middle of
+ * its tile: its texture the model's, its paint that bridge's colour of the palette (ThreeDObject::variant_paint). A
+ * ramp ("hlava", z -5 to 0) and a pillar's pieces (0 to -5) stand a level higher, their foot at z 0: where they stand
+ * is a level lower (EyeBridgePieces()).
+ */
+static void ReadBridge(const nlohmann::json &e, const std::string &folder)
+{
+	/* An aqueduct's record ("akvadukt": true, the colleague's hra/3d/PROSBA-AKVADUKTY.md) stands for all aqueducts,
+	 * unpainted; another for the game's bridges it names ("mosty"). */
+	const bool aqueduct = e.value("akvadukt", false);
+	if (!e.contains("soubor") || !e.at("soubor").is_string()) return;
+	if (!aqueduct && (!e.contains("mosty") || !e.at("mosty").is_array())) return;
+	const std::string file = e.at("soubor").get<std::string>();
+	const std::string path = folder + file;
+	ThreeDObject holder;
+	holder.file = file;
+	holder.name = e.value("jmeno", file);
+	holder.variants = 0; // no house's
+	if (!ReadGlb(path, holder)) {
+		Debug(misc, 0, "3D bridge {}: {} not read", holder.name, path);
+		return;
+	}
+	ReadColourParts(e, folder, holder);
+	const size_t holder_at = _three_d_objects.size();
+	std::array<std::optional<IndustryPartMesh>, to_underlying(ThreeDBridgePiece::Count)> meshes;
+	for (size_t p = 0; p < meshes.size(); p++) {
+		IndustryPartMesh pm;
+		if (!ReadGlbMesh(path, pm.mesh, true, {}, 0, BRIDGE_PIECE_NODES[p]) || pm.mesh.tri.empty()) continue;
+		if (p == to_underlying(ThreeDBridgePiece::HeadSlope)) {
+			/* An aqueduct's head on its slope: at its outer edge (x 0, the canal's side) the ends of its slab and of its dark
+			 * bottom under the level of the trough's top (z 0) are in the land there, the canal's bank. From the eyes the
+			 * depth hid them but the bottom's dark edge (a dark line across the water); on the map nothing hides what is
+			 * under the land and they stood over the canal's water as a wall across the trough's end (the player's test6, 2
+			 * and 3: "the canal joined to the aqueduct, nothing changed"). Left out, the canal's water runs on into the trough. */
+			const std::vector<float> &pos = pm.mesh.pos;
+			DropTrianglesIf(pm.mesh, [&](size_t t) {
+				for (int k = 0; k < 3; k++) {
+					const size_t c = pm.mesh.tri[t * 3 + k] * 3;
+					if (pos[c] > 0.01f || pos[c + 2] > 0.001f) return false;
+				}
+				return true;
+			});
+		}
+		pm.facing = TriangleFacing(pm.mesh);
+		pm.holder = holder_at;
+		meshes[p] = std::move(pm);
+	}
+	if (!meshes[to_underlying(ThreeDBridgePiece::Middle)].has_value()) {
+		Debug(misc, 0, "3D bridge {}: no node stred", holder.name);
+		return;
+	}
+	/* A pillar's piece is stacked a level apart under the next (EyeBridgePieces() of viewport.cpp): one shorter than a
+	 * level reaches down to the next one's top, its top where it is -- the suspension bridge's is 4.2 m, z -5 to -0.8,
+	 * and the pillar of a high bridge stood in pieces with gaps between them (the player, test2: "the pillars are short and
+	 * there is a gap between them when it is several levels high"). Its normals as stretched. */
+	if (auto &pillar = meshes[to_underlying(ThreeDBridgePiece::Pillar)]; pillar.has_value() && pillar->mesh.pos.size() >= 3) {
+		std::vector<float> &pos = pillar->mesh.pos;
+		float z0 = pos[2], z1 = pos[2];
+		for (size_t i = 2; i < pos.size(); i += 3) {
+			z0 = std::min(z0, pos[i]);
+			z1 = std::max(z1, pos[i]);
+		}
+		if (z1 - z0 > 0.1f && z1 - z0 < BRIDGE_LEVEL_M - 0.01f) {
+			const float stretch = BRIDGE_LEVEL_M / (z1 - z0);
+			for (size_t i = 2; i < pos.size(); i += 3) pos[i] = z1 + (pos[i] - z1) * stretch;
+			for (size_t i = 0; i + 2 < pillar->mesh.nrm.size(); i += 3) {
+				float *n = &pillar->mesh.nrm[i];
+				n[2] /= stretch;
+				const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+				if (len > 0) for (int k = 0; k < 3; k++) n[k] /= len;
+			}
+			Debug(misc, 1, "3D bridge {}: its pillar's piece {:.2f} m high stretched to a level, z {:.2f} to {:.2f}", holder.name, z1 - z0, z1 - BRIDGE_LEVEL_M, z1);
+		}
+	}
+	/* Its concrete in the walls' concrete (LayBridgeConcrete()), the pillar's as stretched; the map's then squashed as laid. */
+	const auto &concrete = BridgeWallPictures(folder)[BRIDGE_WALL_CONCRETE];
+	std::array<bool, to_underlying(ThreeDBridgePiece::Count)> has_concrete{};
+	if (concrete.has_value()) {
+		for (size_t p = 0; p < meshes.size(); p++) {
+			const std::span<const Colour> cells = aqueduct ? std::span<const Colour>(AQUEDUCT_CONCRETE_CELLS) : std::span<const Colour>(&BRIDGE_CONCRETE_CELL, 1);
+			if (!meshes[p].has_value() || !LayBridgeConcrete(meshes[p]->mesh, concrete->w_m, concrete->h_m, cells)) continue;
+			meshes[p]->facing = TriangleFacing(meshes[p]->mesh);
+			has_concrete[p] = true;
+			Debug(misc, 1, "3D bridge {}: {} in concrete, {} of its {} triangles", holder.name, BRIDGE_PIECE_NODES[p], std::ranges::count(meshes[p]->mesh.tri_tex, 1), meshes[p]->mesh.tri_tex.size());
+		}
+	}
+	/* For the map (the player, 4. 11.: "bridges and aqueducts from above and at 0 too"): each piece squashed from the
+	 * eyes' level of 5 m to the map's of 3, its normals as squashed (a slope steeper, its normal flatter). */
+	std::array<std::optional<IndustryPartMesh>, to_underlying(ThreeDBridgePiece::Count)> map_meshes;
+	const float squash = BRIDGE_MAP_LEVEL_M / BRIDGE_LEVEL_M;
+	auto squashed = [squash](IndustryPartMesh pm) {
+		for (size_t i = 2; i < pm.mesh.pos.size(); i += 3) pm.mesh.pos[i] *= squash;
+		for (size_t i = 0; i + 2 < pm.mesh.nrm.size(); i += 3) {
+			float *n = &pm.mesh.nrm[i];
+			n[2] /= squash;
+			const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (len > 0) for (int k = 0; k < 3; k++) n[k] /= len;
+		}
+		return pm;
+	};
+	for (size_t p = 0; p < meshes.size(); p++) {
+		if (meshes[p].has_value()) map_meshes[p] = squashed(*meshes[p]);
+	}
+	/* Its pillar and the pillar's foot of masonry (BridgeHasMasonryPillars()): in the bricks [0], the stone [1] and the
+	 * concrete [2] of the walls, the eyes' [0] and the map's [1] -- the map's squashed as laid, a picture still a level of
+	 * the land high. */
+	static constexpr ThreeDBridgePiece PILLAR_PIECES[2] = {ThreeDBridgePiece::Pillar, ThreeDBridgePiece::PillarFoot};
+	std::array<std::array<std::array<std::optional<IndustryPartMesh>, 2>, 2>, BRIDGE_WALL_MATERIALS> masonry;
+	const nlohmann::json types = aqueduct ? nlohmann::json::array({THREE_D_AQUEDUCT}) : e.at("mosty");
+	bool any_masonry = false;
+	for (const auto &n : types) any_masonry |= n.is_number_integer() && n.get<int>() >= 0 && BridgeHasMasonryPillars(n.get<int>());
+	if (any_masonry) {
+		const auto &walls = BridgeWallPictures(folder);
+		for (size_t w = 0; w < walls.size(); w++) {
+			if (!walls[w].has_value()) continue;
+			for (size_t k = 0; k < 2; k++) {
+				const auto &from = meshes[to_underlying(PILLAR_PIECES[k])];
+				if (!from.has_value()) continue;
+				IndustryPartMesh pm;
+				pm.mesh = MasonryMesh(from->mesh, walls[w]->w_m, walls[w]->h_m);
+				if (pm.mesh.tri.empty()) continue;
+				pm.facing = TriangleFacing(pm.mesh);
+				masonry[w][k][1] = squashed(pm);
+				masonry[w][k][0] = std::move(pm);
+			}
+		}
+	}
+	const std::string name = holder.name;
+	const std::vector<ThreeDObjectColourPart> colours = holder.colours;
+	_three_d_objects.push_back(std::move(holder));
+	const double half = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2;
+	for (const auto &n : types) {
+		if (!n.is_number_integer() || n.get<int>() < 0 || n.get<int>() > static_cast<int>(aqueduct ? THREE_D_AQUEDUCT : MAX_BRIDGES - 1)) continue;
+		const int type = n.get<int>();
+		/* Its colour of the palette: the one "barva_mostu" gives it. */
+		int8_t paint = 0;
+		if (!colours.empty() && e.contains("barva_mostu") && e.at("barva_mostu").is_object()) {
+			const auto &by = e.at("barva_mostu");
+			const std::string key = fmt::format("{}", type);
+			const std::optional<uint32_t> c = by.contains(key) && by.at(key).is_string() ? ParseIndexColour(by.at(key).get<std::string>()) : std::nullopt;
+			const auto at = c.has_value() ? std::ranges::find(colours[0].palette, *c) : colours[0].palette.end();
+			if (at != colours[0].palette.end()) {
+				paint = static_cast<int8_t>(at - colours[0].palette.begin());
+			} else {
+				Debug(misc, 0, "3D bridge {}: the colour of bridge {} is not in its palette", name, type);
+			}
+		}
+		for (size_t p = 0; p < meshes.size(); p++) {
+			if (!meshes[p].has_value()) continue;
+			const bool lower = p == to_underlying(ThreeDBridgePiece::Head) || p == to_underlying(ThreeDBridgePiece::Pillar) || p == to_underlying(ThreeDBridgePiece::PillarFoot);
+			for (int q = 0; q < 4; q++) {
+				/* Turned about the middle of the tile: the point (half, 0) of the model there. */
+				const double a = q * M_PI / 2;
+				const float at[3] = {static_cast<float>(half - half * std::cos(a)), static_cast<float>(half - half * std::sin(a)), lower ? BRIDGE_LEVEL_M : 0.0f};
+				ThreeDObject piece = PlaceIndustryPart(*meshes[p], fmt::format("{}/{} {} {}", name, BRIDGE_PIECE_NODES[p], type, q * 90), at, q * 90.0f, 1.0f, 1, 1);
+				piece.colours = colours;
+				piece.variant_paint = {paint, paint};
+				if (has_concrete[p]) {
+					DressInConcrete(piece, meshes[p]->mesh, *concrete);
+					piece.decal_faces = ConcreteDecalFaces(meshes[p]->mesh, false, at, q * 90.0f);
+					if (q == 0) Debug(misc, 1, "3D bridge {}: {} for type {}, {} faces of concrete for the spalls", name, BRIDGE_PIECE_NODES[p], type, piece.decal_faces.size());
+				}
+				_three_d_bridge_pieces[type][p][q] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(piece));
+				/* The map's: every piece a map's level higher, stood a level lower (EyeBridgePieces() of viewport.cpp,
+				 * map), so that its box on the map reaches down to the arches under its deck. */
+				const float map_at[3] = {at[0], at[1], BRIDGE_MAP_LEVEL_M};
+				ThreeDObject map_piece = PlaceIndustryPart(*map_meshes[p], fmt::format("{}/{} {} {} mapa", name, BRIDGE_PIECE_NODES[p], type, q * 90), map_at, q * 90.0f, 1.0f, 1, 1);
+				map_piece.colours = colours;
+				map_piece.variant_paint = {paint, paint};
+				if (has_concrete[p]) DressInConcrete(map_piece, map_meshes[p]->mesh, *concrete);
+				_three_d_bridge_map_pieces[type][p][q] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(map_piece));
+			}
+		}
+		/* Its pillars of masonry: in each of the walls' pictures, unpainted. */
+		if (!BridgeHasMasonryPillars(type)) continue;
+		const auto &walls = BridgeWallPictures(folder);
+		for (size_t w = 0; w < walls.size(); w++) {
+			for (size_t k = 0; k < 2; k++) {
+				const size_t p = to_underlying(PILLAR_PIECES[k]);
+				for (int map = 0; map < 2; map++) {
+					if (!walls[w].has_value() || !masonry[w][k][map].has_value()) continue;
+					for (int q = 0; q < 4; q++) {
+						const double a = q * M_PI / 2;
+						const float at[3] = {static_cast<float>(half - half * std::cos(a)), static_cast<float>(half - half * std::sin(a)), map != 0 ? BRIDGE_MAP_LEVEL_M : BRIDGE_LEVEL_M};
+						static constexpr std::string_view MATERIALS[BRIDGE_WALL_MATERIALS] = {"cihly", "kamen", "beton"};
+						ThreeDObject piece = PlaceIndustryPart(*masonry[w][k][map], fmt::format("{}/{} {} {} {}{}", name, BRIDGE_PIECE_NODES[p], type, q * 90, MATERIALS[w], map != 0 ? " mapa" : ""), at, q * 90.0f, 1.0f, 1, 1);
+						DressInMasonry(piece, *walls[w]);
+						if (w == BRIDGE_WALL_CONCRETE && map == 0) piece.decal_faces = ConcreteDecalFaces(masonry[w][k][map]->mesh, true, at, q * 90.0f);
+						(map != 0 ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[w][type][p][q] = _three_d_objects.size();
+						_three_d_objects.push_back(std::move(piece));
+					}
+				}
+			}
+		}
+	}
+}
+
+/**
+ * A piece of the 3D bridge of one of the game's bridge types (ReadBridge()), turned by quarters about the middle of its
+ * tile; never waiting for the indices (ThreeDObjectsIndexRead()). The inner pieces and the end without their own the
+ * middle piece, the pillar's foot without its own the pillar's.
+ * @param map the map's piece: squashed to the map's level of 3 m, each a map's level higher than the eyes' piece
+ * @param wall a pillar's piece of masonry (BridgeHasMasonryPillars()) in the bricks 0, the stone 1 or the concrete 2 of
+ *             the retaining walls; -1, or a bridge whose pillars are not, as its model has it
+ * @return nullptr when that bridge has no 3D pieces, or not that one
+ */
+const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map, int wall)
+{
+	if (type > THREE_D_AQUEDUCT || !ThreeDObjectsIndexRead()) return nullptr;
+	/* The original bridges wanted there (ThreeDGroupShown(); the player, 8. 11.: the bridges a group of their own, no
+	 * more with the houses). */
+	if (!ThreeDGroupShown(ThreeDGroup::Bridges)) return nullptr;
+	const int q = quarter_turns & 3;
+	if (wall >= 0 && static_cast<size_t>(wall) < BRIDGE_WALL_MATERIALS && (piece == ThreeDBridgePiece::Pillar || piece == ThreeDBridgePiece::PillarFoot)) {
+		const auto &walled = (map ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[wall][type];
+		size_t k = walled[to_underlying(piece)][q];
+		if (k == SIZE_MAX) k = walled[to_underlying(ThreeDBridgePiece::Pillar)][q];
+		if (k < _three_d_objects.size()) return &_three_d_objects[k];
+	}
+	const auto &pieces = (map ? _three_d_bridge_map_pieces : _three_d_bridge_pieces)[type];
+	size_t k = pieces[to_underlying(piece)][q];
+	if (k == SIZE_MAX && (piece == ThreeDBridgePiece::MiddleA || piece == ThreeDBridgePiece::MiddleB || piece == ThreeDBridgePiece::End)) k = pieces[to_underlying(ThreeDBridgePiece::Middle)][q];
+	if (k == SIZE_MAX && piece == ThreeDBridgePiece::PillarFoot) k = pieces[to_underlying(ThreeDBridgePiece::Pillar)][q];
+	return k < _three_d_objects.size() ? &_three_d_objects[k] : nullptr;
+}
+
+/** The pictures of our straight piece of track (objekty/nase/koleje.py) for the arcs (GetThreeDTrackArc()): read of its file once. */
+struct TrackArcMaterials {
+	bool tried = false;
+	ThreeDTextureBytes bed;     ///< "nasep": the stones with the sleepers and the rails' lines, a side, the top, the other side
+	ThreeDTextureBytes sleeper; ///< "prazec": the sleeper's wood or concrete
+	uint32_t rail = 0;          ///< "kolejnice": the rails' colour (Colour::data)
+	uint32_t head = 0;          ///< "hlava": their heads' top, worn bright
+};
+static TrackArcMaterials _track_arc_materials[2]; // wooden sleepers, concrete
+
+/** The pictures of the straight piece of a kind (ThreeDVehicleObject::file of the figure kolej_rovna_*), nullptr without them. */
+static const TrackArcMaterials *TrackArcMaterialsOf(bool concrete)
+{
+	TrackArcMaterials &m = _track_arc_materials[concrete ? 1 : 0];
+	if (!m.tried) {
+		m.tried = true;
+		const ThreeDVehicleObject *fig = GetThreeDFigure(concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+		GlbMesh mesh;
+		if (fig != nullptr && ReadGlbMesh(fig->file, mesh, true)) {
+			for (const GlbTexture &t : mesh.textures) {
+				if (t.name.ends_with("_nasep")) {
+					m.bed = t.png;
+				} else if (t.name.ends_with("_prazec")) {
+					m.sleeper = t.png;
+				} else if (t.name.ends_with("_kolejnice")) {
+					m.rail = t.flat;
+				} else if (t.name.ends_with("_hlava")) {
+					m.head = t.flat;
+				}
+			}
+		}
+		if (m.bed == nullptr || m.sleeper == nullptr) Debug(misc, 0, "3D track: no pictures of {} for the arcs", concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+	}
+	return m.bed != nullptr && m.sleeper != nullptr ? &m : nullptr;
+}
+
+/** An arc of our track made (GetThreeDTrackArc()), kept by the shape of its centre line; let go of when not drawn for a while. */
+struct TrackArcMade {
+	std::unique_ptr<ThreeDObject> obj;
+	std::chrono::steady_clock::time_point used;
+};
+static std::unordered_map<uint64_t, TrackArcMade> _track_arcs;
+
+static bool LazyPending(const void *of);
+
+/**
+ * Our track along an arc of a round curve (round_track.h; the player, 8. 11.: "the curves in 3D, yes", "make the track
+ * like the fishing rod's line, a thick square rope"): drawn along the arc's centre line in one, not in pieces -- the
+ * block of the embankment (its top and its two sides), each rail a bar (its top and its two sides) --, the sleepers
+ * boxes across it at the straight piece's spacing. The pictures of the straight piece (objekty/nase/koleje.py: the
+ * stones with the sleepers and the rails' lines drawn in them along the piece, the sleeper's wood or concrete, the
+ * rails' colours), laid by the length along the arc, so that the picture's sleepers are under the boxes. An object
+ * made here, as the pieces of the bridges are (PlaceIndustryPart()), in the world's units from the tile's north corner,
+ * its foot the tile's ground (a round tile is flat); drawn as a house is, from above and from the eyes.
+ * @param concrete concrete sleepers (an electrified track)
+ * @return nullptr: the piece is not drawn round (straight within its tile), or the pictures are not there
+ */
+const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete)
+{
+	/* The straight piece's measures (koleje.py), metres; across as wide as the track is (ThreeDTrackWidth(): the wide
+	 * one with the vehicles at the original size), its pictures the same (the wide piece's are the narrow one's
+	 * stretched across). */
+	const double width = ThreeDTrackWidth();
+	static constexpr double BED_H = 0.12, SLEEPER_OVER = 0.06, PLATE = 0.02;
+	static constexpr double RAIL_W = 0.072, RAIL_TALL = 0.172;
+	const double BED_W = 3.4 * width, SLEEPER_L = 2.6 * width, GAUGE = 1.435 * width;
+	static constexpr int SLEEPERS_A_TILE = 25; // round(the tile's 14.84 m / 0.6)
+	static constexpr double TEX_W = 88, TEX_SIDE = 4; // the bed's picture: a side, the top (80), the other side
+	const double sleeper_w = concrete ? 0.28 : 0.26;
+	const TrackArcMaterials *mats = TrackArcMaterialsOf(concrete);
+	if (mats == nullptr) return nullptr;
+	/* Its centre line, about every half metre: none for a piece straight within its tile. */
+	const double units = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
+	std::vector<RoundTrackPoint> line = RoundTrackCentreLine(tile, track, 0.5 * units);
+	if (line.size() < 2) return nullptr;
+
+	uint64_t key = 14695981039346656037ull;
+	auto mix = [&key](uint64_t v) {
+		key ^= v;
+		key *= 1099511628211ull;
+	};
+	mix(tile.base());
+	mix(to_underlying(track));
+	mix(concrete ? 1 : 0);
+	mix(static_cast<uint64_t>(std::lround(width * 100)));
+	for (const RoundTrackPoint &p : line) {
+		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.x * 64))));
+		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.y * 64))));
+	}
+	const auto now = std::chrono::steady_clock::now();
+	if (auto it = _track_arcs.find(key); it != _track_arcs.end()) {
+		it->second.used = now;
+		return it->second.obj.get();
+	}
+	/* Many kept: those not drawn for a minute let go of, their textures made (none being made in the background). */
+	if (_track_arcs.size() > 256) {
+		for (auto it = _track_arcs.begin(); it != _track_arcs.end();) {
+			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; }) && !LazyPending(it->second.obj.get());
+			if (made && now - it->second.used > std::chrono::seconds(60)) {
+				it = _track_arcs.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+
+	/* The line from the tile's north corner, its length along from its start; cut where the bed's picture begins again
+	 * (every tile's length: a texture is not repeated). */
+	struct At {
+		double x, y;   ///< world units from the tile's north corner
+		double tx, ty; ///< the way along, a unit
+		double s;      ///< the length along to it, world units
+		bool over;     ///< over the straight way of a switch beside (RoundTrackPoint::over)
+	};
+	const double ox = TileX(tile) * TILE_SIZE, oy = TileY(tile) * TILE_SIZE;
+	std::vector<At> at;
+	at.reserve(line.size() + 4);
+	for (const RoundTrackPoint &p : line) {
+		const double s = at.empty() ? 0.0 : at.back().s + std::hypot(p.x - ox - at.back().x, p.y - oy - at.back().y);
+		/* Across a beginning of the picture: a point there, the way of the stretch. */
+		if (!at.empty()) {
+			const double wrap = std::ceil(at.back().s / TILE_SIZE + 1e-9) * TILE_SIZE;
+			if (wrap > at.back().s + 1e-6 && wrap < s - 1e-6) {
+				const double f = (wrap - at.back().s) / (s - at.back().s);
+				const At &a = at.back();
+				at.push_back({a.x + (p.x - ox - a.x) * f, a.y + (p.y - oy - a.y) * f, p.tx, p.ty, wrap, a.over && p.over});
+			}
+		}
+		at.push_back({p.x - ox, p.y - oy, p.tx, p.ty, s, p.over});
+	}
+	const double total = at.back().s;
+
+	auto made = std::make_unique<ThreeDObject>();
+	ThreeDObject &o = *made;
+	o.name = fmt::format("kolej_oblouk_{}_{}{}", tile.base(), to_underlying(track), width > 1.0 ? "_siroka" : "");
+	o.variants = 0; // no house's
+	o.tiles_x = o.tiles_y = 1;
+	/* Its pictures, all its other materials' (none its own): 1 the bed's, 2 the sleeper's, 3 the rails', 4 their heads'. */
+	o.texture_of = SIZE_MAX;
+	o.material_pngs = {mats->bed, mats->sleeper, nullptr, nullptr};
+	o.material_flats = {0, 0, mats->rail, mats->head};
+	o.material_levels.assign(4, nullptr);
+	o.texels_per_unit = static_cast<float>(TEX_W / (BED_W * units));
+	std::vector<float> nrm;
+	/* A face of four corners counter-clockwise seen from outside, its outward normal (the light, which side is seen). */
+	auto quad = [&](uint8_t tex, const std::array<std::array<double, 3>, 4> &p, const std::array<std::array<double, 2>, 4> &uv, double nx, double ny, double nz) {
+		const uint32_t base = static_cast<uint32_t>(o.pos.size() / 3);
+		for (int k = 0; k < 4; k++) {
+			o.pos.insert(o.pos.end(), {static_cast<float>(p[k][0]), static_cast<float>(p[k][1]), static_cast<float>(p[k][2])});
+			o.uv.insert(o.uv.end(), {static_cast<float>(uv[k][0]), static_cast<float>(uv[k][1])});
+			nrm.insert(nrm.end(), {static_cast<float>(nx), static_cast<float>(ny), static_cast<float>(nz)});
+			o.corner_tex.push_back(tex);
+		}
+		for (const auto &t : {std::array<uint32_t, 3>{0, 1, 2}, std::array<uint32_t, 3>{0, 2, 3}}) {
+			const auto &a = p[t[0]], &b = p[t[1]], &c = p[t[2]];
+			const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+			const double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+			const double d = gx * nx + gy * ny + gz * nz;
+			o.tri.insert(o.tri.end(), {base + t[0], base + t[1], base + t[2]});
+			o.tri_tex.push_back(tex);
+			o.facing.push_back(d > 0 ? 1 : (d < 0 ? -1 : 0));
+		}
+	};
+	/* The bed's picture across: its left side, its top, its right side (half a pixel in from its edges). */
+	const double sl = 0.5 / TEX_W, t0 = TEX_SIDE / TEX_W, t1 = (TEX_W - TEX_SIDE) / TEX_W, sr = (TEX_W - 0.5) / TEX_W;
+	const double half_bed = BED_W / 2 * units, bed_top = BED_H * hpm;
+	const double rail_c = (GAUGE / 2 + RAIL_W / 2) * units, rail_hw = RAIL_W / 2 * units;
+	const double rail_z0 = (BED_H + SLEEPER_OVER) * hpm, rail_z1 = (BED_H + SLEEPER_OVER + PLATE + RAIL_TALL) * hpm;
+	/* Over the straight way of a switch (At::over): the straight way's line -- the arc leaves it at the arc's end that
+	 * is over it, along it there -- and how far aside of it a point is, across the straight way. The straight piece's
+	 * bed and sleepers are there; of the arc's own only what lies outside them is made: its bed from the straight
+	 * bed's edge out to its own outer edge, and of each sleeper the piece beyond the straight way's sleepers (the
+	 * player, 14. 11., a switch from the eyes: the branch's rails hung over the grass beside the straight bed; "the
+	 * gravel may go on till it would stick out on the other side, such a rule ... put a few sleepers there, quarter
+	 * sleepers or something under that rail"). */
+	const At &main_at = at.front().over ? at.front() : at.back();
+	const double main_nx = -main_at.ty, main_ny = main_at.tx;
+	auto aside = [&](double x, double y) { return (x - main_at.x) * main_nx + (y - main_at.y) * main_ny; };
+	/* From which offset across the arc (towards its outer side, as `side` says) it is outside the straight way's strip of a half-width. */
+	auto outside_from = [&](double x, double y, double nx, double ny, double half, int &side) {
+		const double e = aside(x, y);
+		side = e >= 0 ? 1 : -1;
+		const double c = std::max(0.5, nx * main_nx + ny * main_ny);
+		return (half - std::abs(e)) / c;
+	};
+	for (size_t i = 0; i + 1 < at.size(); i++) {
+		const At &a = at[i], &b = at[i + 1];
+		if (b.s - a.s < 1e-6) continue;
+		/* Across at each end by its own way, so that the stretches meet; the sides lit by the stretch's. */
+		const double anx = -a.ty, any = a.tx, bnx = -b.ty, bny = b.tx;
+		const double mnx = (anx + bnx) / 2, mny = (any + bny) / 2, ml = std::max(std::hypot(mnx, mny), 1e-9);
+		const double snx = mnx / ml, sny = mny / ml;
+		const double v0 = std::fmod(a.s, TILE_SIZE) / TILE_SIZE, v1 = v0 + (b.s - a.s) / TILE_SIZE;
+		auto across = [&](const At &p, double nx, double ny, double off, double z) { return std::array<double, 3>{p.x + nx * off, p.y + ny * off, z}; };
+		/* Over the straight way of a switch the straight piece's bed and sleepers are there already: only the rails, on
+		 * them (the player: "the little step too"). */
+		const bool over = a.over && b.over;
+		/* The bed: its top, its left side (+n), its right side. */
+		if (!over) quad(1, {across(a, anx, any, half_bed, bed_top), across(b, bnx, bny, half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top), across(a, anx, any, -half_bed, bed_top)},
+				{{{t0, v0}, {t0, v1}, {t1, v1}, {t1, v0}}}, 0, 0, 1);
+		if (!over) quad(1, {across(a, anx, any, half_bed, 0), across(b, bnx, bny, half_bed, 0), across(b, bnx, bny, half_bed, bed_top), across(a, anx, any, half_bed, bed_top)},
+				{{{sl, v0}, {sl, v1}, {t0, v1}, {t0, v0}}}, snx, sny, 0);
+		if (!over) quad(1, {across(b, bnx, bny, -half_bed, 0), across(a, anx, any, -half_bed, 0), across(a, anx, any, -half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top)},
+				{{{sr, v1}, {sr, v0}, {t1, v0}, {t1, v1}}}, -snx, -sny, 0);
+		if (over) {
+			/* Its bed outside the straight way's: from there to its own outer edge, and that edge's side. */
+			int sa, sb;
+			const double fa = std::clamp(outside_from(a.x, a.y, anx, any, half_bed, sa), -half_bed, half_bed);
+			const double fb = std::clamp(outside_from(b.x, b.y, bnx, bny, half_bed, sb), -half_bed, half_bed);
+			if (sa == sb && (fa < half_bed - 1e-6 || fb < half_bed - 1e-6)) {
+				const double sg = sa;
+				auto tu = [&](double off) { return t0 + (t1 - t0) * (half_bed - off) / (2 * half_bed); };
+				/* A hair under the straight bed's edge, so that no gap shows between them. */
+				const double ia = std::max(-half_bed, fa - 0.02 * units), ib = std::max(-half_bed, fb - 0.02 * units);
+				if (sg > 0) {
+					quad(1, {across(a, anx, any, half_bed, bed_top), across(b, bnx, bny, half_bed, bed_top), across(b, bnx, bny, ib, bed_top), across(a, anx, any, ia, bed_top)},
+							{{{t0, v0}, {t0, v1}, {tu(ib), v1}, {tu(ia), v0}}}, 0, 0, 1);
+					quad(1, {across(a, anx, any, half_bed, 0), across(b, bnx, bny, half_bed, 0), across(b, bnx, bny, half_bed, bed_top), across(a, anx, any, half_bed, bed_top)},
+							{{{sl, v0}, {sl, v1}, {t0, v1}, {t0, v0}}}, snx, sny, 0);
+				} else {
+					quad(1, {across(a, anx, any, -ia, bed_top), across(b, bnx, bny, -ib, bed_top), across(b, bnx, bny, -half_bed, bed_top), across(a, anx, any, -half_bed, bed_top)},
+							{{{tu(-ia), v0}, {tu(-ib), v1}, {t1, v1}, {t1, v0}}}, 0, 0, 1);
+					quad(1, {across(b, bnx, bny, -half_bed, 0), across(a, anx, any, -half_bed, 0), across(a, anx, any, -half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top)},
+							{{{sr, v1}, {sr, v0}, {t1, v0}, {t1, v1}}}, -snx, -sny, 0);
+				}
+			}
+		}
+		/* The rails: each its two sides and its head's top. */
+		for (int side : {-1, 1}) {
+			const double c = side * rail_c;
+			const std::array<std::array<double, 2>, 4> flat{{{0.5, 0.5}, {0.5, 0.5}, {0.5, 0.5}, {0.5, 0.5}}};
+			quad(3, {across(a, anx, any, c + rail_hw, rail_z0), across(b, bnx, bny, c + rail_hw, rail_z0), across(b, bnx, bny, c + rail_hw, rail_z1), across(a, anx, any, c + rail_hw, rail_z1)}, flat, snx, sny, 0);
+			quad(3, {across(b, bnx, bny, c - rail_hw, rail_z0), across(a, anx, any, c - rail_hw, rail_z0), across(a, anx, any, c - rail_hw, rail_z1), across(b, bnx, bny, c - rail_hw, rail_z1)}, flat, -snx, -sny, 0);
+			quad(4, {across(a, anx, any, c + rail_hw, rail_z1), across(b, bnx, bny, c + rail_hw, rail_z1), across(b, bnx, bny, c - rail_hw, rail_z1), across(a, anx, any, c - rail_hw, rail_z1)}, flat, 0, 0, 1);
+		}
+	}
+	/* The sleepers: at the picture's, every 25th of a tile's length from the start, each across the way there. */
+	const double step = static_cast<double>(TILE_SIZE) / SLEEPERS_A_TILE;
+	const double half_w = sleeper_w / 2 * units, half_l = SLEEPER_L / 2 * units, z0 = (BED_H - 0.01) * hpm, z1 = (BED_H + SLEEPER_OVER) * hpm;
+	size_t seg = 0;
+	for (double s = step / 2; s < total; s += step) {
+		while (seg + 2 < at.size() && at[seg + 1].s < s) seg++;
+		const At &a = at[seg], &b = at[seg + 1];
+		const double f = b.s > a.s ? std::clamp((s - a.s) / (b.s - a.s), 0.0, 1.0) : 0.0;
+		const double cx = a.x + (b.x - a.x) * f, cy = a.y + (b.y - a.y) * f;
+		double dx = b.x - a.x, dy = b.y - a.y;
+		const double dl = std::max(std::hypot(dx, dy), 1e-9);
+		dx /= dl;
+		dy /= dl;
+		const double nx = -dy, ny = dx;
+		/* Its corners: along it (its width) and across (its length), as koleje.py's sleeper(): u along its length, v across. */
+		auto p = [&](double along, double acr, double z) { return std::array<double, 3>{cx + dx * along + nx * acr, cy + dy * along + ny * acr, z}; };
+		/* From hi (towards +n) to lo across the way: the whole sleeper, or a piece of it; the picture as far along as the piece is. */
+		auto sleeper = [&](double hi, double lo) {
+			const double u0 = (half_l - hi) / (2 * half_l), u1 = (half_l - lo) / (2 * half_l);
+			quad(2, {p(-half_w, hi, z1), p(half_w, hi, z1), p(half_w, lo, z1), p(-half_w, lo, z1)}, {{{u0, 0}, {u0, 1}, {u1, 1}, {u1, 0}}}, 0, 0, 1);
+			quad(2, {p(half_w, hi, z0), p(half_w, lo, z0), p(half_w, lo, z1), p(half_w, hi, z1)}, {{{u0, 1}, {u1, 1}, {u1, 0.75}, {u0, 0.75}}}, dx, dy, 0);
+			quad(2, {p(-half_w, lo, z0), p(-half_w, hi, z0), p(-half_w, hi, z1), p(-half_w, lo, z1)}, {{{u1, 1}, {u0, 1}, {u0, 0.75}, {u1, 0.75}}}, -dx, -dy, 0);
+			quad(2, {p(-half_w, hi, z0), p(half_w, hi, z0), p(half_w, hi, z1), p(-half_w, hi, z1)}, {{{0, 1}, {0.05, 1}, {0.05, 0}, {0, 0}}}, nx, ny, 0);
+			quad(2, {p(half_w, lo, z0), p(-half_w, lo, z0), p(-half_w, lo, z1), p(half_w, lo, z1)}, {{{1, 1}, {0.95, 1}, {0.95, 0}, {1, 0}}}, -nx, -ny, 0);
+		};
+		if (a.over && b.over) {
+			/* Over the straight way: the piece of it beyond the straight way's sleepers, when that is a quarter of a
+			 * metre and more -- under the arc's outer rail. */
+			int side;
+			const double from = outside_from(cx, cy, nx, ny, half_l, side) + 0.03 * units;
+			if (half_l - from < 0.25 * units) continue;
+			if (side > 0) {
+				sleeper(half_l, std::max(-half_l, from));
+			} else {
+				sleeper(-std::max(-half_l, from), -half_l);
+			}
+			continue;
+		}
+		sleeper(half_l, -half_l);
+	}
+	o.light = CornerLight(nrm);
+	o.top = static_cast<float>(rail_z1);
+	const ThreeDObject *out = made.get();
+	_track_arcs.emplace(key, TrackArcMade{std::move(made), now});
+	return out;
+}
+
+/** The wires of a tile made (GetThreeDWires()), kept by what they are; let go of when not drawn for a while. */
+static std::unordered_map<uint64_t, TrackArcMade> _three_d_wires;
+
+/**
+ * The wires of our catenary on a tile from above (DrawThreeDCatenary() of rail_cmd.cpp; the player, 8. 11.: "the wires
+ * as the fishing rod's line, simple wires"): each a thin square rope -- a flat band and an upright band across each
+ * other, seen from both sides --, as thick as a pixel and a half at the zoom it is drawn at, so that from above it is a
+ * line however far; the contact wire copper, the carrier wire darker. An object made here, standing at the tile's north
+ * corner, drawn as a house is (AddThreeDTileObject()).
+ * @param wires each wire's ends, world units from the tile's north corner and units of height over the height it stands at
+ * @param thick how thick, world units
+ */
+const ThreeDObject *GetThreeDWires(TileIndex tile, std::span<const ThreeDWire> wires, double thick)
+{
+	if (wires.empty()) return nullptr;
+	uint64_t key = 14695981039346656037ull;
+	auto mix = [&key](uint64_t v) {
+		key ^= v;
+		key *= 1099511628211ull;
+	};
+	mix(tile.base());
+	mix(static_cast<uint64_t>(std::lround(thick * 64)));
+	for (const ThreeDWire &w : wires) {
+		for (float v : {w.x0, w.y0, w.z0, w.x1, w.y1, w.z1}) mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(v * 64))));
+		mix(w.kind);
+	}
+	const auto now = std::chrono::steady_clock::now();
+	if (auto it = _three_d_wires.find(key); it != _three_d_wires.end()) {
+		it->second.used = now;
+		return it->second.obj.get();
+	}
+	if (_three_d_wires.size() > 1024) {
+		for (auto it = _three_d_wires.begin(); it != _three_d_wires.end();) {
+			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; }) && !LazyPending(it->second.obj.get());
+			if (made && now - it->second.used > std::chrono::seconds(60)) {
+				it = _three_d_wires.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+	auto made = std::make_unique<ThreeDObject>();
+	ThreeDObject &o = *made;
+	o.name = fmt::format("trakce_draty_{}", tile.base());
+	o.variants = 0; // no house's
+	o.tiles_x = o.tiles_y = 1;
+	/* Its colours, its other materials' (none its own): 1 the contact wire's, 2 the carrier wire's. */
+	o.texture_of = SIZE_MAX;
+	o.material_pngs = {nullptr, nullptr};
+	o.material_flats = {Colour(92, 70, 52).data, Colour(54, 56, 58).data};
+	o.material_levels.assign(2, nullptr);
+	std::vector<float> nrm;
+	const double h = thick / 2;
+	for (const ThreeDWire &w : wires) {
+		const double dx = w.x1 - w.x0, dy = w.y1 - w.y0, len = std::hypot(dx, dy);
+		if (len < 1e-6) continue;
+		const double nx = -dy / len * h, ny = dx / len * h;
+		const uint8_t tex = w.kind == 0 ? 1 : 2;
+		/* The flat band across it, the upright band along it: two quads, each seen from both sides. */
+		const std::array<std::array<double, 3>, 4> flat{{{w.x0 + nx, w.y0 + ny, w.z0}, {w.x1 + nx, w.y1 + ny, w.z1}, {w.x1 - nx, w.y1 - ny, w.z1}, {w.x0 - nx, w.y0 - ny, w.z0}}};
+		const std::array<std::array<double, 3>, 4> upright{{{w.x0, w.y0, w.z0 - h}, {w.x1, w.y1, w.z1 - h}, {w.x1, w.y1, w.z1 + h}, {w.x0, w.y0, w.z0 + h}}};
+		for (const auto *q : {&flat, &upright}) {
+			const uint32_t base = static_cast<uint32_t>(o.pos.size() / 3);
+			const bool up = q == &upright;
+			for (const auto &p : *q) {
+				o.pos.insert(o.pos.end(), {static_cast<float>(p[0]), static_cast<float>(p[1]), static_cast<float>(p[2])});
+				o.uv.insert(o.uv.end(), {0.5f, 0.5f});
+				nrm.insert(nrm.end(), {up ? static_cast<float>(nx / h) : 0.0f, up ? static_cast<float>(ny / h) : 0.0f, up ? 0.0f : 1.0f});
+				o.corner_tex.push_back(tex);
+			}
+			o.tri.insert(o.tri.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+			o.tri_tex.insert(o.tri_tex.end(), {tex, tex});
+			o.facing.insert(o.facing.end(), {0, 0});
+		}
+		o.top = std::max({o.top, w.z0 + static_cast<float>(h), w.z1 + static_cast<float>(h)});
+	}
+	if (o.tri.empty()) return nullptr;
+	o.light = CornerLight(nrm);
+	const ThreeDObject *out = made.get();
+	_three_d_wires.emplace(key, TrackArcMade{std::move(made), now});
+	return out;
+}
+
+/** A pasture's parts as read (ReadPasture()), by their places in _three_d_objects; resolved by GetThreeDPasture(). */
+static struct {
+	size_t ground = SIZE_MAX;
+	std::array<size_t, 4> fence{SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
+	std::array<size_t, 4> gate{SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
+	std::vector<size_t> extras;
+	std::vector<ThreeDObjectFigure> places;
+	std::array<std::string, 3> kinds;
+	std::array<int, 3> count{};
+	bool read = false;
+} _pasture_read;
+
+/**
+ * The pasture of the farms ("druh": "pole", "pole": "pastvina", the colleague's pv_pole_pastvina,
+ * hra/3d/PASTVINY-OKNA-ROZHLEDNA-PRO-HRU.md): the ground of a tile of it ("podklad"), its fence along each side of a
+ * tile ("plot" "hrana", a part lying along x from the tile's north corner, turned onto the other sides) and with the
+ * gap of the way in ("otvor"), the shelter and the trough ("doplnky_pole"), each its own object placed on a tile; the
+ * places of the animals on a tile ("zvirata") and of which kinds ("druhy_zvirat", "zvirat_na_policko").
+ */
+static void ReadPasture(const nlohmann::json &e, const std::map<std::string, IndustryPartMesh> &parts)
+{
+	const std::string name = e.value("jmeno", std::string("pastvina"));
+	const float side = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE);
+	auto place = [&](const std::string &part, float x, float y, float turn) -> size_t {
+		auto it = parts.find(part);
+		if (it == parts.end()) {
+			Debug(misc, 0, "3D objects {}: no part {}", name, part);
+			return SIZE_MAX;
+		}
+		const float at[3] = {x, y, 0};
+		_three_d_objects.push_back(PlaceIndustryPart(it->second, fmt::format("{}/{} {:.0f},{:.0f} {:.0f}", name, part, x, y, turn), at, turn, 1.0f, 1, 1));
+		return _three_d_objects.size() - 1;
+	};
+	_pasture_read = {};
+	_pasture_read.read = true;
+	if (e.contains("podklad") && e.at("podklad").is_string()) _pasture_read.ground = place(e.at("podklad").get<std::string>(), 0, 0, 0);
+	if (e.contains("plot") && e.at("plot").is_object()) {
+		const auto &f = e.at("plot");
+		/* Along each side of a tile, by DiagDirection: NE (x 0), SE (y the tile's side), SW (x so), NW (y 0). */
+		static constexpr float AT[4][3] = {{0, 0, 90}, {0, 1, 0}, {1, 0, 90}, {0, 0, 0}};
+		for (int d = 0; d < 4; d++) {
+			if (f.contains("hrana") && f.at("hrana").is_string()) _pasture_read.fence[d] = place(f.at("hrana").get<std::string>(), AT[d][0] * side, AT[d][1] * side, AT[d][2]);
+			if (f.contains("otvor") && f.at("otvor").is_string()) _pasture_read.gate[d] = place(f.at("otvor").get<std::string>(), AT[d][0] * side, AT[d][1] * side, AT[d][2]);
+		}
+	}
+	if (e.contains("doplnky_pole") && e.at("doplnky_pole").is_array()) {
+		for (const auto &d : e.at("doplnky_pole")) {
+			if (!d.is_object() || !d.contains("dil") || !d.contains("poloha") || !d.at("poloha").is_array() || d.at("poloha").size() < 2) continue;
+			const size_t k = place(d.at("dil").get<std::string>(), d.at("poloha").at(0).get<float>(), d.at("poloha").at(1).get<float>(), d.value("otoceni", 0.0f));
+			if (k != SIZE_MAX) _pasture_read.extras.push_back(k);
+		}
+	}
+	if (e.contains("zvirata") && e.at("zvirata").is_array()) {
+		for (const auto &z : e.at("zvirata")) {
+			if (!z.is_object() || !z.contains("poloha") || !z.at("poloha").is_array() || z.at("poloha").size() < 2) continue;
+			ThreeDObjectFigure &f = _pasture_read.places.emplace_back();
+			f.at[0] = z.at("poloha").at(0).get<float>();
+			f.at[1] = z.at("poloha").at(1).get<float>();
+			f.facing = z.value("otoceni", 0.0f);
+			f.scale = e.value("meritko_zvirat", 1.0f);
+		}
+	}
+	if (e.contains("druhy_zvirat") && e.at("druhy_zvirat").is_array()) {
+		for (size_t k = 0; k < std::min<size_t>(3, e.at("druhy_zvirat").size()); k++) {
+			_pasture_read.kinds[k] = e.at("druhy_zvirat").at(k).get<std::string>();
+			_pasture_read.count[k] = 2;
+			if (e.contains("zvirat_na_policko") && e.at("zvirat_na_policko").is_object()) _pasture_read.count[k] = std::clamp(e.at("zvirat_na_policko").value(_pasture_read.kinds[k], 2), 0, 8);
+		}
+	}
+}
+
+/** The pasture of the farms (ReadPasture()), nullptr none in the sets. */
+const ThreeDPasture *GetThreeDPasture()
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static ThreeDPasture resolved;
+	static bool made = false;
+	if (!_pasture_read.read) return nullptr;
+	if (!made) {
+		/* The objects by their places, now that all the indices are read and the list stays as it is. */
+		made = true;
+		auto at = [](size_t k) -> const ThreeDObject * { return k < _three_d_objects.size() ? &_three_d_objects[k] : nullptr; };
+		resolved.ground = at(_pasture_read.ground);
+		for (int d = 0; d < 4; d++) {
+			resolved.fence[d] = at(_pasture_read.fence[d]);
+			resolved.gate[d] = at(_pasture_read.gate[d]);
+		}
+		for (size_t k : _pasture_read.extras) resolved.extras.push_back(at(k));
+		resolved.places = _pasture_read.places;
+		resolved.kinds = _pasture_read.kinds;
+		resolved.count = _pasture_read.count;
+	}
+	return &resolved;
+}
+
+/** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
+/**
+ * The lamps of the colleague's set "lampy" by the towns' streets: where the game has its street lights
+ * (GetThreeDStreetLamp()) the lamp on its wooden post in the clay towns, David H.'s lamp with its arm elsewhere (the
+ * colleague's hra/3d/LAMPY-MESTO-PRO-HRU.md; the player, 4. 11.: "the other lamp goes where the socialist one does
+ * not, into the centre"; the game's street lights are in the towns' centres); the socialist one, socík, on the outer
+ * streets (GetThreeDEdgeLamp()).
+ */
+static constexpr std::string_view STREET_LAMPS[] = {"lampa_na_sloupu", "lampa_david_h", "lampa_socik"};
+/** Socík's place in STREET_LAMPS. */
+static constexpr int EDGE_LAMP_KIND = 2;
+
+/**
+ * The street lamps (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md, point 4: "lamps along the roads and
+ * streets, where exactly the game decides"): where the game has its own street lights -- the roadside of the towns'
+ * paved streets (Roadside::StreetLights), at the four places of a tile its sprites stand at, by the middle of an edge --
+ * the lamp on its post, its arm over the street towards the tile's middle. An object of that add-on alone at each of
+ * the places, for each lamp (no file of its own: Read() lays the add-on into it), drawn as the buildings are.
+ */
+static void MakeStreetLamps()
+{
+	_three_d_street_lamps.clear();
+	static constexpr int PLACES[][2] = {{1, 8}, {14, 8}, {8, 1}, {8, 14}};
+	for (int kind = 0; kind < static_cast<int>(std::size(STREET_LAMPS)); kind++) {
+		const std::string_view name = STREET_LAMPS[kind];
+		if (!_three_d_addons.contains(name)) continue;
+		for (const auto &[dx, dy] : PLACES) {
+			ThreeDObject lamp;
+			lamp.name = fmt::format("{} {},{}", name, dx, dy);
+			lamp.variants = 0;
+			lamp.street = true;
+			ThreeDObjectFigure &place = lamp.addon_places.emplace_back();
+			place.figure = std::string(name);
+			place.at[0] = static_cast<float>(dx / OBJECT_UNITS_PER_METRE);
+			place.at[1] = static_cast<float>(dy / OBJECT_UNITS_PER_METRE);
+			place.facing = static_cast<float>(std::atan2(8.0 - dy, 8.0 - dx) * 180.0 / M_PI);
+			_three_d_street_lamps.emplace(kind * 256 + dx * 16 + dy, _three_d_objects.size());
+			_three_d_objects.push_back(std::move(lamp));
+		}
+	}
+}
+
+/** The communist bench at a bus stop (the colleague's lavicka_parkova of "doplnky"). */
+static constexpr std::string_view BUS_STOP_BENCH = "lavicka_parkova";
+/** The sign of a bus stop (the colleague's zastavka_znacka of "zastavky"). */
+static constexpr std::string_view BUS_STOP_SIGN = "zastavka_znacka";
+
+/**
+ * The bus stops (the player, 4. 11.: "we'll put it at the bus stop with the BUS sign, that will be the stop"; "the
+ * shelters aren't there, they needn't be"): for each pavement of a drive-through bus stop -- where the game draws a
+ * shelter, 3 of 16 units deep along the tile's edge -- the communist bench with its back to the outer edge, facing
+ * the road, and the BUS sign by the road past its end, facing the road too (its plate seen along the road). An
+ * object of the two add-ons alone for each of the four shelters (no file of its own), drawn as the street lamps.
+ */
+static void MakeBusStops()
+{
+	_three_d_bus_stops.clear();
+	const bool bench = _three_d_addons.contains(BUS_STOP_BENCH);
+	const bool sign = _three_d_addons.contains(BUS_STOP_SIGN);
+	if (!bench && !sign) return;
+	/* Along the pavement and from its outer edge, units: the bench a little aside of the girls' places
+	 * (DrawBusStopWithGirls()); the sign by the road's edge just past the bench's end (the player, 4. 11.: "the bus stop
+	 * sign goes past the bench", "along the road past the bench"), not before it nor behind its back. */
+	static constexpr double BENCH_ALONG = 9.5, BENCH_IN = 1.2, SIGN_ALONG = 12.0, SIGN_IN = 2.5;
+	static constexpr struct {
+		SpriteID shelter;
+		int ax, ay; ///< a place's x and y from (along, in): +1 along, -1 the other way, 2 in, -2 in from the far edge
+		float facing;
+	} PAVEMENTS[] = {
+		{SPR_BUS_STOP_DT_X_W, 1, 2, 90.0f},   // road along x, the pavement at y 0..3
+		{SPR_BUS_STOP_DT_X_E, -1, -2, 270.0f}, // road along x, the pavement at y 13..16
+		{SPR_BUS_STOP_DT_Y_W, -2, 1, 180.0f},  // road along y, the pavement at x 13..16
+		{SPR_BUS_STOP_DT_Y_E, 2, -1, 0.0f},    // road along y, the pavement at x 0..3
+	};
+	auto coordinate = [](int how, double along, double in) {
+		switch (how) {
+			case 1: return along;
+			case -1: return TILE_SIZE - along;
+			case 2: return in;
+			default: return TILE_SIZE - in;
+		}
+	};
+	for (const auto &p : PAVEMENTS) {
+		ThreeDObject stop;
+		stop.name = fmt::format("zastavka {}", p.shelter);
+		stop.variants = 0;
+		stop.street = true;
+		auto place = [&](std::string_view name, double along, double in) {
+			ThreeDObjectFigure &f = stop.addon_places.emplace_back();
+			f.figure = std::string(name);
+			f.at[0] = static_cast<float>(coordinate(p.ax, along, in) / OBJECT_UNITS_PER_METRE);
+			f.at[1] = static_cast<float>(coordinate(p.ay, along, in) / OBJECT_UNITS_PER_METRE);
+			f.facing = p.facing;
+		};
+		if (bench) place(BUS_STOP_BENCH, BENCH_ALONG, BENCH_IN);
+		if (sign) place(BUS_STOP_SIGN, SIGN_ALONG, SIGN_IN);
+		_three_d_bus_stops.emplace(p.shelter, _three_d_objects.size());
+		_three_d_objects.push_back(std::move(stop));
+	}
+}
+
+/**
+ * The layouts of the stones of the rocky land (the colleague's hra/3d/KAMENI-PRO-HRU.md, "druh" "kameni"): its
+ * "varianty", each a list of stones -- the add-on ("kamen"), its middle ("poloha", metres from the tile's north
+ * corner), its turn ("otoceni") and size ("meritko") --, and each stone's footprint from its add-on's record in the same
+ * index ("rozmer_m").
+ * @param e the record
+ * @param list its index
+ */
+static void ReadRockLayouts(const nlohmann::json &e, const nlohmann::json &list)
+{
+	if (!e.contains("varianty") || !e.at("varianty").is_array()) return;
+	auto number = [](const nlohmann::json &j, float fallback) { return j.is_number() ? j.get<float>() : fallback; };
+	auto extent_of = [&](const std::string &name) {
+		std::array<float, 4> extent{-0.5f, 0.5f, -0.5f, 0.5f};
+		for (const auto &s : list) {
+			if (!s.is_object() || s.value("jmeno", std::string()) != name || !s.contains("rozmer_m") || !s.at("rozmer_m").is_object()) continue;
+			const auto &size = s.at("rozmer_m");
+			for (int k = 0; k < 2; k++) {
+				const char *axis = k == 0 ? "x" : "y";
+				if (!size.contains(axis) || !size.at(axis).is_array() || size.at(axis).size() != 2) continue;
+				extent[k * 2] = number(size.at(axis).at(0), extent[k * 2]);
+				extent[k * 2 + 1] = number(size.at(axis).at(1), extent[k * 2 + 1]);
+			}
+		}
+		return extent;
+	};
+	_three_d_rock_layouts.clear();
+	for (const auto &layout : e.at("varianty")) {
+		if (!layout.is_array()) continue;
+		std::vector<ThreeDRockStone> stones;
+		for (const auto &s : layout) {
+			if (!s.is_object() || !s.contains("kamen") || !s.at("kamen").is_string() || !s.contains("poloha") || !s.at("poloha").is_array() || s.at("poloha").size() < 2) continue;
+			ThreeDRockStone &stone = stones.emplace_back();
+			stone.name = s.at("kamen").get<std::string>();
+			stone.x = number(s.at("poloha").at(0), 0.0f);
+			stone.y = number(s.at("poloha").at(1), 0.0f);
+			stone.turn = s.contains("otoceni") ? number(s.at("otoceni"), 0.0f) : 0.0f;
+			stone.scale = std::clamp(s.contains("meritko") ? number(s.at("meritko"), 1.0f) : 1.0f, 0.1f, 5.0f);
+			stone.extent = extent_of(stone.name);
+		}
+		if (!stones.empty()) _three_d_rock_layouts.push_back(std::move(stones));
+	}
+}
+
+/**
+ * The tiles of the rocky land (the player: "groups of stones lying about the map ... more variants we get by laying the
+ * pieces otherwise"): for each layout of the stones (ReadRockLayouts()) and each slope of a tile an object of the stones
+ * alone (no file of its own: Read() lays the add-ons into it), drawn as the buildings are. Each stone level, not tipped
+ * with the slope, as low as the land is lowest under it -- its 0.12 m dug in kept it from hanging over a slope on its
+ * lower side (3.3 m long on a slope rising 3 m a tile, a third of a metre) --, sunk into the land on its upper side.
+ */
+static void MakeRockTiles()
+{
+	_three_d_rock_tiles.clear();
+	if (_three_d_rock_layouts.empty()) return;
+	std::vector<Slope> slopes;
+	for (uint8_t s = SLOPE_FLAT; s < SLOPE_ELEVATED; s++) slopes.push_back(static_cast<Slope>(s));
+	slopes.insert(slopes.end(), {SLOPE_STEEP_W, SLOPE_STEEP_S, SLOPE_STEEP_E, SLOPE_STEEP_N});
+	const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	for (size_t layout = 0; layout < _three_d_rock_layouts.size(); layout++) {
+		for (const Slope slope : slopes) {
+			/* The land's height over the tile's lowest corner at a point, metres. */
+			auto land = [&](double x, double y) {
+				return GetPartialZF(std::clamp(x, 0.0, side) * OBJECT_UNITS_PER_METRE, std::clamp(y, 0.0, side) * OBJECT_UNITS_PER_METRE, slope) / OBJECT_HEIGHT_PER_METRE;
+			};
+			ThreeDObject rocks;
+			rocks.name = fmt::format("skalnata_zem {} svah{}", layout, to_underlying(slope));
+			rocks.variants = 0;
+			for (const ThreeDRockStone &stone : _three_d_rock_layouts[layout]) {
+				if (!_three_d_addons.contains(stone.name)) continue;
+				/* The lowest of the land under it: its middle and the edge of the round inside its footprint. */
+				const double turn = stone.turn * M_PI / 180.0, c = std::cos(turn), s = std::sin(turn);
+				const double mx = (stone.extent[0] + stone.extent[1]) / 2, my = (stone.extent[2] + stone.extent[3]) / 2;
+				const double rx = (stone.extent[1] - stone.extent[0]) / 2, ry = (stone.extent[3] - stone.extent[2]) / 2;
+				double low = land(stone.x, stone.y);
+				for (int k = 0; k < 16; k++) {
+					const double px = (mx + rx * std::cos(k * M_PI / 8)) * stone.scale, py = (my + ry * std::sin(k * M_PI / 8)) * stone.scale;
+					low = std::min(low, land(stone.x + px * c - py * s, stone.y + px * s + py * c));
+				}
+				ThreeDObjectFigure &place = rocks.addon_places.emplace_back();
+				place.figure = stone.name;
+				place.at[0] = stone.x;
+				place.at[1] = stone.y;
+				place.at[2] = static_cast<float>(low);
+				place.facing = stone.turn;
+				place.scale = stone.scale;
+			}
+			if (rocks.addon_places.empty()) continue;
+			_three_d_rock_tiles.emplace(std::make_pair(layout, slope), _three_d_objects.size());
+			_three_d_objects.push_back(std::move(rocks));
+		}
+	}
+}
+
+/** Our planter behind a rail depot (objekty/nase kvetinac_hranaty), and the plants in it. */
+static constexpr std::string_view DEPOT_PLANTER = "kvetinac_hranaty";
+static constexpr std::string_view DEPOT_PLANTER_PLANT = "kytka_mari_kosata";
+static constexpr float DEPOT_PLANTER_X = 0.27f;    ///< its middle from the tile's back edge, metres: the depot's back wall begins at 0.55
+static constexpr float DEPOT_PLANTER_SOIL = 0.82f; ///< the top of its soil, metres
+static constexpr float DEPOT_PLANTER_PLANT_M = 2.4f; ///< how tall each plant is, metres
+
+/**
+ * The planter behind a rail depot (the player, test6: "the depot has a roof, so it cannot be stretched to the edge of
+ * the tile; let us cover those rails with a tall prism -- a big square planter with grass in it ... tufts of grass and
+ * three nice big marijuana plants"): our long planter with its grass (an add-on, laid into the depot's shape) on the
+ * strip between the depot's back wall and the tile's back edge, where the rails of the tile showed, and three big
+ * marijuana plants in it (the depot's plants). Made opening to +x as the depot's file, turned with its scene.
+ * @param turns the depot's quarter turns about the middle of its tile (ReadDepot())
+ */
+static void AddDepotPlanter(ThreeDObject &obj, int turns)
+{
+	const float mid = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE / 2);
+	/* A point of the frame opening to +x where the scene turned puts it (TurnGlbMeshQuarters(): x' = 2 middle - y, y' = x). */
+	auto place = [&](ThreeDObjectFigure &f, float x, float y, float z, float facing) {
+		for (int k = 0; k < turns; k++) {
+			const float nx = 2 * mid - y;
+			y = x;
+			x = nx;
+		}
+		f.at[0] = x;
+		f.at[1] = y;
+		f.at[2] = z;
+		f.facing = facing + 90.0f * turns;
+	};
+	ThreeDObjectFigure &pot = obj.addon_places.emplace_back();
+	pot.figure = DEPOT_PLANTER;
+	place(pot, DEPOT_PLANTER_X, mid, 0.0f, 0.0f);
+	/* Two metres apart along it, each turned otherwise. */
+	static constexpr std::array<std::pair<float, float>, 3> PLANTS = {{{-2.0f, 30.0f}, {0.0f, 150.0f}, {2.0f, 260.0f}}};
+	for (const auto &[along, facing] : PLANTS) {
+		ThreeDObjectFigure &plant = obj.plants.emplace_back();
+		plant.figure = DEPOT_PLANTER_PLANT;
+		plant.scale = DEPOT_PLANTER_PLANT_M;
+		place(plant, DEPOT_PLANTER_X, mid + along, DEPOT_PLANTER_SOIL, facing);
+	}
+}
+
+/**
+ * A depot of the colleague's objekty/depa (hra/3d/DEPA-PRO-HRU.md; the player, 2. 11.: "a fine object of the depot in
+ * the style of OpenTTD, not boxy"; 10. 11.: "depots, the garage and the ship depot"): one tile (a ship depot two along
+ * x), its origin the north corner, built opening to +x (south-west); an object of its whole scene for each way it opens,
+ * turned about the middle of its (north) tile by quarter turns -- to south-east 90 degrees, north-east 180, north-west
+ * 270; a ship depot along y 90 (its "osa_y") --, solid, without the wings of its gates and doors: open, as the
+ * sprites' (the gates opening as a vehicle comes are to come). Its colours, the company's ("barva_firmy"), its night.
+ */
+static void ReadDepot(const nlohmann::json &e, const std::string &folder)
+{
+	const std::string type = e.value("typ", std::string());
+	const int transport = type == "zeleznice" ? 0 : type == "silnice" ? 1 : type == "voda" ? 2 : -1;
+	if (transport < 0) return;
+	std::vector<std::pair<int, int>> ways; // the way, its quarter turns
+	if (transport == 2) {
+		ways = {{to_underlying(Axis::X), 0}, {to_underlying(Axis::Y), 1}};
+	} else {
+		ways = {{to_underlying(DiagDirection::SW), 0}, {to_underlying(DiagDirection::SE), 1}, {to_underlying(DiagDirection::NE), 2}, {to_underlying(DiagDirection::NW), 3}};
+	}
+	int tiles_x = 1, tiles_y = 1;
+	if (e.contains("dlazdice") && e.at("dlazdice").is_array() && e.at("dlazdice").size() == 2) {
+		tiles_x = std::clamp(e.at("dlazdice").at(0).is_number_integer() ? e.at("dlazdice").at(0).get<int>() : 1, 1, 4);
+		tiles_y = std::clamp(e.at("dlazdice").at(1).is_number_integer() ? e.at("dlazdice").at(1).get<int>() : 1, 1, 4);
+	}
+	for (const auto &[way, turns] : ways) {
+		ThreeDObject obj;
+		obj.file = e.at("soubor").get<std::string>();
+		obj.name = fmt::format("{}/{}", e.value("jmeno", obj.file), turns * 90);
+		obj.glb_path = folder + obj.file;
+		obj.variants = 0; // no house's
+		obj.scene_turns = static_cast<int8_t>(turns);
+		obj.depot = true;
+		/* Along y its tiles the other way. */
+		obj.tiles_x = static_cast<uint8_t>(turns % 2 == 0 ? tiles_x : tiles_y);
+		obj.tiles_y = static_cast<uint8_t>(turns % 2 == 0 ? tiles_y : tiles_x);
+		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+		ReadMaterialPictures(e, folder, obj);
+		ReadColourParts(e, folder, obj);
+		/* A ship depot's walkways along its long walls ("lavky": their height and their sides across it, as made along
+		 * x), its whole length; along y turned as its mesh (TurnGlbMeshQuarters(): x' = 2 middle - y, y' = x). */
+		if (e.contains("lavky") && e.at("lavky").is_object() && e.at("lavky").contains("y") && e.at("lavky").at("y").is_array()) {
+			const float z = static_cast<float>(e.at("lavky").value("z", 0.0f) * OBJECT_HEIGHT_PER_METRE);
+			const float length = static_cast<float>(tiles_x * TILE_SIZE);
+			for (const auto &side : e.at("lavky").at("y")) {
+				if (!side.is_array() || side.size() != 2 || !side.at(0).is_number() || !side.at(1).is_number()) continue;
+				const float a = static_cast<float>(side.at(0).get<float>() * OBJECT_UNITS_PER_METRE), b = static_cast<float>(side.at(1).get<float>() * OBJECT_UNITS_PER_METRE);
+				if (turns % 2 == 0) {
+					obj.walkways.push_back({0.0f, a, length, b, z});
+				} else {
+					obj.walkways.push_back({static_cast<float>(TILE_SIZE) - b, 0.0f, static_cast<float>(TILE_SIZE) - a, length, z});
+				}
+			}
+		}
+		if (transport == 0) AddDepotPlanter(obj, turns);
+		/* The wings of its gates and doors ("dvere_NN"), each shut and open either way about its hinge, turned with it
+		 * (as a house's, ReadInterior()); a gate ("druh" "vrata") opens out ("otevreni_uhel", its sign the way). */
+		for (const std::string &node : GlbDoorNodes(obj.glb_path)) {
+			std::array<size_t, 3> wings;
+			for (int k = 0; k < 3; k++) {
+				ThreeDObject wing;
+				wing.name = fmt::format("{}/{}{}", obj.name, node, k == 0 ? "" : (k == 1 ? "/+" : "/-"));
+				wing.variants = 0;
+				wing.tiles_x = obj.tiles_x;
+				wing.tiles_y = obj.tiles_y;
+				wing.glb_path = obj.glb_path;
+				wing.door_node = node;
+				wing.door_turn = static_cast<int8_t>(k == 2 ? -1 : k);
+				wing.scene_turns = static_cast<int8_t>(turns);
+				wing.material_from = obj.material_from;
+				wings[k] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(wing));
+			}
+			uint8_t gate = 0;
+			if (e.contains("dvere") && e.at("dvere").is_array()) {
+				for (const auto &d : e.at("dvere")) {
+					if (!d.is_object() || d.value("uzel", std::string()) != node || d.value("druh", std::string()) != "vrata") continue;
+					gate = d.value("otevreni_uhel", 0.0f) < 0 ? 2 : 1;
+				}
+			}
+			obj.door_wings.push_back(wings);
+			obj.gate_ways.push_back(gate);
+		}
+		_three_d_depots[{transport, way}] = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(obj));
+	}
+}
+
+/**
+ * A piece of a station of the colleague's objekty/stanice (hra/3d/STANICE-SMEROVANI-PRO-HRU.md, -PERON-, -RAMPA-): one
+ * tile, its origin the tile's north corner, the track or the road along x (a bay's entrance to +x); read as an add-on
+ * (its colours, the company's), and with it the add-ons standing on it ("doplnky": the platform's benches, as a
+ * house's) and the middle it turns about ("osa_y" "stred").
+ */
+static void ReadStationPiece(const nlohmann::json &e, std::string_view kind)
+{
+	ThreeDStationKind k = ThreeDStationKind::Platform;
+	if (kind == "smerovani") k = ThreeDStationKind::Waypoint;
+	if (kind == "nakladova_rampa") k = e.contains("vjezd") ? ThreeDStationKind::TruckBay : ThreeDStationKind::TruckStop;
+	ThreeDStationPiece piece;
+	piece.name = e.value("jmeno", e.at("soubor").get<std::string>());
+	if (e.contains("osa_y") && e.at("osa_y").is_object() && e.at("osa_y").contains("stred") && e.at("osa_y").at("stred").is_array() && e.at("osa_y").at("stred").size() == 2) {
+		for (int a = 0; a < 2; a++) {
+			if (e.at("osa_y").at("stred").at(a).is_number()) piece.centre[a] = e.at("osa_y").at("stred").at(a).get<float>();
+		}
+	}
+	if (e.contains("doplnky") && e.at("doplnky").is_array()) {
+		for (const auto &a : e.at("doplnky")) {
+			if (!a.is_object() || !a.contains("jmeno") || !a.at("jmeno").is_string() || !a.contains("poloha") || !a.at("poloha").is_array() || a.at("poloha").size() != 3) continue;
+			ThreeDObjectFigure &place = piece.addons.emplace_back();
+			place.figure = a.at("jmeno").get<std::string>();
+			for (int c = 0; c < 3; c++) place.at[c] = a.at("poloha").at(c).is_number() ? a.at("poloha").at(c).get<float>() : 0.0f;
+			place.facing = a.value("otoceni", 0.0f);
+			place.scale = std::clamp(a.value("meritko", 1.0f), 0.05f, 20.0f);
+		}
+	}
+	/* The places of the cargo waiting on its floor (the colleague's hra/3d/STANICE-RAMPA-PRO-HRU.md). */
+	if (e.contains("cekajici_naklad") && e.at("cekajici_naklad").is_object()) {
+		const auto &c = e.at("cekajici_naklad");
+		std::vector<std::string> sides;
+		auto side_of = [&sides](const nlohmann::json &s) {
+			const std::string name = s.value("strana", std::string());
+			auto it = std::ranges::find(sides, name);
+			if (it != sides.end()) return static_cast<uint8_t>(it - sides.begin());
+			sides.push_back(name);
+			return static_cast<uint8_t>(sides.size() - 1);
+		};
+		auto place = [](const nlohmann::json &s, float *at) {
+			if (!s.contains("poloha") || !s.at("poloha").is_array() || s.at("poloha").size() != 3) return false;
+			for (int a = 0; a < 3; a++) at[a] = s.at("poloha").at(a).is_number() ? s.at("poloha").at(a).get<float>() : 0.0f;
+			return true;
+		};
+		if (c.contains("bunky") && c.at("bunky").is_array()) {
+			for (const auto &s : c.at("bunky")) {
+				ThreeDStationPiece::Cell cell{};
+				if (!s.is_object() || !place(s, cell.at)) continue;
+				cell.side = side_of(s);
+				cell.row = s.value("rada", 0);
+				cell.column = s.value("sloupec", 0);
+				cell.turn = s.value("otoceni", 0.0f);
+				piece.cells.push_back(cell);
+			}
+		}
+		if (c.contains("hromady") && c.at("hromady").is_array()) {
+			for (const auto &s : c.at("hromady")) {
+				ThreeDStationPiece::Heap heap{};
+				if (!s.is_object() || !place(s, heap.at) || !s.contains("sloupce") || !s.at("sloupce").is_array()) continue;
+				heap.side = side_of(s);
+				for (const auto &n : s.at("sloupce")) {
+					if (n.is_number_integer()) heap.columns.push_back(n.get<int>());
+				}
+				heap.turn = s.value("otoceni", 0.0f);
+				piece.heaps.push_back(std::move(heap));
+			}
+		}
+		if (c.contains("bunka_m") && c.at("bunka_m").is_array() && c.at("bunka_m").size() == 2) {
+			for (int a = 0; a < 2; a++) {
+				if (c.at("bunka_m").at(a).is_number()) piece.cell_m[a] = std::max(0.1f, c.at("bunka_m").at(a).get<float>());
+			}
+		}
+		piece.floors = std::clamp(c.value("patra", 1), 1, 4);
+		if (c.contains("hromada") && c.at("hromada").is_object()) piece.heap_piece = c.at("hromada").value("objekt", std::string());
+	}
+	_three_d_station_pieces[to_underlying(k)] = std::move(piece);
+}
+
+/**
+ * Its flat faces looking up as its floors (ThreeDObject::flat_floors; a lighthouse: the colleague described its stairs
+ * and floors in words, "podlahy", without nodes "podlaha"): each walked on (FloorAt()) and in no one's way
+ * (passable_tris).
+ */
+static void TakeFlatFloors(ThreeDObject &obj)
+{
+	const size_t n = obj.tri.size() / 3;
+	std::vector<bool> flat(n, false);
+	for (size_t t = 0; t < n; t++) {
+		const float *a = &obj.pos[obj.tri[t * 3] * 3], *b = &obj.pos[obj.tri[t * 3 + 1] * 3], *c = &obj.pos[obj.tri[t * 3 + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = (b[2] - a[2]) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+		const double vx = c[0] - a[0], vy = c[1] - a[1], vz = (c[2] - a[2]) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+		/* Looking up: the triangles keep their outer side counter-clockwise from outside (TakeGlbMesh()). */
+		if (len <= 0 || nz / len < 0.95) continue;
+		flat[t] = true;
+		for (const float *p : {a, b, c}) obj.floor.insert(obj.floor.end(), {p[0], p[1], p[2]});
+	}
+	/* In no one's way: runs of them among the runs already passable (a tree's crown). */
+	std::vector<bool> passable(n, false);
+	for (size_t r = 0; r + 1 < obj.passable_tris.size(); r += 2) {
+		for (uint32_t t = obj.passable_tris[r]; t < obj.passable_tris[r + 1] && t < n; t++) passable[t] = true;
+	}
+	obj.passable_tris.clear();
+	for (size_t t = 0; t < n; t++) {
+		const bool p = passable[t] || flat[t];
+		if (p != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
+	}
+	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(n));
+}
+
+/**
+ * A lighthouse (the colleague's objekty/majaky, hra/3d/MAJAKY-PRO-HRU.md; the player, 10. 11.: "go do the lighthouses"):
+ * its file an add-on without the node that turns ("otaceni" "uzel", the reflector with its night), its foot in the
+ * middle of the tile as it is made (+x forward, the door to south-west); the reflector a figure of its own that turns
+ * (the figures' index), stood where its bottom is.
+ */
+static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
+{
+	ThreeDObject addon;
+	addon.file = e.at("soubor").get<std::string>();
+	addon.name = e.value("jmeno", addon.file);
+	addon.glb_path = folder + addon.file;
+	NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
+	ReadMaterialPictures(e, folder, addon);
+	addon.addon = true;
+	addon.variants = 0;
+	std::string spin_node, spin_night;
+	float spin_z = 0;
+	if (e.contains("otaceni") && e.at("otaceni").is_object()) {
+		spin_node = e.at("otaceni").value("uzel", std::string());
+		spin_night = e.at("otaceni").value("noc_uzel", std::string());
+		const auto &o = e.at("otaceni");
+		if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3 && o.at("stred").at(2).is_number()) spin_z = o.at("stred").at(2).get<float>();
+	}
+	if (!spin_node.empty()) addon.left_out.push_back(spin_node);
+	addon.no_see_through = true;
+	if (!_three_d_addons.emplace(addon.name, _three_d_objects.size()).second) return;
+	const std::string name = addon.name, path = addon.glb_path;
+	_three_d_objects.push_back(std::move(addon));
+
+	ThreeDObject obj;
+	obj.name = "majak/" + name;
+	obj.variants = 0;
+	/* Its beams as a witch's torch (AddThreeDLighthouseLights(); the player, 13. 11.: "make it as the witch has it"):
+	 * where each starts and where it aims, empty nodes of its file under the node that turns ("svitilna_NN",
+	 * "paprsek_NN"), their light in the record ("svetla" "svitilna": "barva", "dosah_m", "uhel"); turning with the
+	 * reflector about the axis through "stred", a turn in "otacka_s" seconds. Nothing of it the game's own. */
+	if (!spin_node.empty() && e.contains("svetla") && e.at("svetla").is_object() && e.at("svetla").contains("svitilna") && e.at("svetla").at("svitilna").is_object()) {
+		const auto &torch = e.at("svetla").at("svitilna");
+		auto colour = torch.contains("barva") && torch.at("barva").is_string() ? ParseInteger<uint32_t>(torch.at("barva").get<std::string>(), 16) : std::nullopt;
+		GlbMesh none;
+		GlbReadOptions po;
+		po.all_nodes = true;
+		po.only_node = "\x01";
+		po.points_only = true;
+		po.point_prefix = "svitilna_";
+		po.points = &obj.beam_from;
+		ReadGlbMesh(path, none, po);
+		po.point_prefix = "paprsek_";
+		po.points = &obj.beam_aim;
+		ReadGlbMesh(path, none, po);
+		if (obj.beam_from.size() != obj.beam_aim.size() || !colour.has_value()) {
+			Debug(misc, 0, "3D lighthouse {}: {} beams and {} aims of them, colour {}: no beams", name, obj.beam_from.size() / 3, obj.beam_aim.size() / 3, colour.has_value() ? "given" : "none");
+			obj.beam_from.clear();
+			obj.beam_aim.clear();
+		} else {
+			obj.beam_colour = Colour(static_cast<uint8_t>(*colour >> 16), static_cast<uint8_t>(*colour >> 8), static_cast<uint8_t>(*colour)).data;
+			obj.beam_reach_m = std::clamp(torch.value("dosah_m", 0.0f), 0.0f, 500.0f);
+			obj.beam_angle = std::clamp(torch.value("uhel", 0.0f), 1.0f, 120.0f);
+			obj.beam_spin_ticks = std::clamp(static_cast<int>(std::lround(e.at("otaceni").value("otacka_s", 10.0) * 1000.0 / MILLISECONDS_PER_TICK)), 1, 100000);
+			const auto &o = e.at("otaceni");
+			if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3) {
+				for (int k = 0; k < 2; k++) obj.beam_centre[k] = o.at("stred").at(k).is_number() ? o.at("stred").at(k).get<float>() : 0.0f;
+			}
+		}
+	}
+	obj.flat_floors = true;
+	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0);
+	ThreeDObjectFigure itself;
+	itself.figure = name;
+	itself.at[0] = itself.at[1] = middle;
+	obj.addon_places.push_back(itself);
+	/* What stands by it, as by a house ("doplnky" add-ons, "postavy" figures and things, "rostliny" plants; the player,
+	 * 13. 11.: the graves of the two colleagues by their lighthouses, a lantern on each, young marijuana and the flowers
+	 * of our grass on them): where in the lighthouse's frame (its middle, as its doors), turned and sized as a house's. */
+	{
+		const size_t addons = obj.addon_places.size(), figures = obj.figures.size(), plants = obj.plants.size();
+		if (e.contains("doplnky") && e.at("doplnky").is_array()) for (const auto &a : e.at("doplnky")) {
+			if (!a.is_object() || !a.contains("jmeno") || !a.at("jmeno").is_string() || !a.contains("poloha") || !a.at("poloha").is_array() || a.at("poloha").size() != 3) continue;
+			ThreeDObjectFigure place;
+			place.figure = a.at("jmeno").get<std::string>();
+			for (int k = 0; k < 3; k++) place.at[k] = a.at("poloha").at(k).get<float>();
+			place.facing = a.value("otoceni", 0.0f);
+			place.scale = std::clamp(a.value("meritko", 1.0f), 0.05f, 20.0f);
+			obj.addon_places.push_back(std::move(place));
+		}
+		if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
+			ThreeDObjectFigure fig;
+			if (ReadFigure(f, fig)) obj.figures.push_back(std::move(fig));
+		}
+		ReadPlants(e, obj);
+		for (size_t i = addons; i < obj.addon_places.size(); i++) obj.addon_places[i].at[0] += middle, obj.addon_places[i].at[1] += middle;
+		for (size_t i = figures; i < obj.figures.size(); i++) obj.figures[i].at[0] += middle, obj.figures[i].at[1] += middle;
+		for (size_t i = plants; i < obj.plants.size(); i++) obj.plants[i].at[0] += middle, obj.plants[i].at[1] += middle;
+	}
+	/* Its doors ("dvere": where in the lighthouse's frame, the way out): Mat goes in and out there (ThreeDPeopleDoorsAt()). */
+	if (e.contains("dvere") && e.at("dvere").is_array()) {
+		for (const auto &d : e.at("dvere")) {
+			if (!d.is_object() || !d.contains("poloha") || !d.contains("smer")) continue;
+			const auto &at = d.at("poloha"), &out = d.at("smer");
+			if (!at.is_array() || at.size() < 2 || !out.is_array() || out.size() < 2) continue;
+			ThreeDObjectDoor door;
+			for (int k = 0; k < 2; k++) {
+				door.at[k] = middle + at.at(k).get<float>();
+				door.out[k] = out.at(k).get<float>();
+			}
+			door.width = d.value("sirka", 1.0f);
+			obj.doors.push_back(door);
+		}
+	}
+	if (!spin_node.empty()) {
+		GlbMesh mesh;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = spin_node;
+		std::vector<std::string> skip;
+		if (!spin_night.empty()) skip.push_back(spin_night);
+		o.skip_nodes = &skip;
+		float bottom = 0;
+		if (ReadGlbMesh(path, mesh, o) && mesh.pos.size() >= 3) {
+			bottom = mesh.pos[2];
+			for (size_t i = 2; i < mesh.pos.size(); i += 3) bottom = std::min(bottom, mesh.pos[i]);
+		}
+		ThreeDObjectFigure reflector;
+		reflector.figure = name + "/reflektor";
+		reflector.at[0] = reflector.at[1] = middle;
+		reflector.at[2] = bottom;
+		obj.figures.push_back(reflector);
+		/* At night its reflectors lit (the player, test6: "the bulb shines and the two reflectors turning about it do
+		 * not"): the node of their night ("noc_uzel": the glow of the lenses) turning with it, a figure of
+		 * its own drawn only at night, its middle at the height of the lamp ("stred") -- as its file has it under the
+		 * reflector, not as high again (its node moved by the reflector's height twice). */
+		if (!spin_night.empty()) {
+			GlbMesh lit;
+			GlbReadOptions lo;
+			lo.all_nodes = true;
+			lo.only_node = spin_night;
+			if (ReadGlbMesh(path, lit, lo) && lit.pos.size() >= 3) {
+				float low = lit.pos[2], high = lit.pos[2];
+				for (size_t i = 2; i < lit.pos.size(); i += 3) {
+					low = std::min(low, lit.pos[i]);
+					high = std::max(high, lit.pos[i]);
+				}
+				ThreeDObjectFigure lenses;
+				lenses.figure = name + "/reflektor_noc";
+				lenses.at[0] = lenses.at[1] = middle;
+				lenses.at[2] = spin_z - (high - low) / 2;
+				lenses.night = true;
+				obj.figures.push_back(lenses);
+			}
+		}
+	}
+	_three_d_lighthouses.push_back(_three_d_objects.size());
+	_three_d_objects.push_back(std::move(obj));
+}
+
+/** How far a station's piece is turned standing a way (MakeStationObjects()): along y -90 degrees, a bay by its entrance. */
+static float StationWayTurn(ThreeDStationKind kind, int way)
+{
+	if (kind == ThreeDStationKind::TruckBay) {
+		switch (static_cast<DiagDirection>(way)) {
+			case DiagDirection::NE: return 180.0f;
+			case DiagDirection::SE: return 90.0f;
+			case DiagDirection::NW: return -90.0f;
+			default: return 0.0f;
+		}
+	}
+	return way == to_underlying(Axis::Y) ? -90.0f : 0.0f;
+}
+
+/**
+ * The stations' objects (the player: "a 3D waypoint, a platform without a shelter, a loading bay without a booth"): for
+ * each piece of a station (ReadStationPiece()) and each way it stands an object of it and its add-ons alone, drawn as
+ * the buildings are -- along x as it is made, along y turned by -90 degrees about its middle (its "osa_y"); a bay its
+ * entrance to +x (south-west) as it is made, to south-east turned by 90, north-east 180, north-west -90.
+ */
+static void MakeStationObjects()
+{
+	_three_d_station_objects.clear();
+	for (uint8_t k = 0; k < to_underlying(ThreeDStationKind::End); k++) {
+		const std::optional<ThreeDStationPiece> &piece = _three_d_station_pieces[k];
+		if (!piece.has_value() || !_three_d_addons.contains(piece->name)) continue;
+		const ThreeDStationKind kind = static_cast<ThreeDStationKind>(k);
+		/* By the way it stands: an axis (X, Y), or a bay's entrance (DiagDirection: NE, SE, SW, NW). */
+		std::vector<int> ways = {to_underlying(Axis::X), to_underlying(Axis::Y)};
+		if (kind == ThreeDStationKind::TruckBay) ways = {to_underlying(DiagDirection::NE), to_underlying(DiagDirection::SE), to_underlying(DiagDirection::SW), to_underlying(DiagDirection::NW)};
+		for (const int way : ways) {
+			const float turn = StationWayTurn(kind, way);
+			ThreeDObject obj;
+			obj.name = fmt::format("{} {}", piece->name, way);
+			obj.variants = 0;
+			/* Each place turned about the middle: where its foot goes, and its own turn. */
+			const double a = turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+			auto turned = [&](ThreeDObjectFigure f) {
+				const double dx = f.at[0] - piece->centre[0], dy = f.at[1] - piece->centre[1];
+				f.at[0] = static_cast<float>(piece->centre[0] + dx * c - dy * s);
+				f.at[1] = static_cast<float>(piece->centre[1] + dx * s + dy * c);
+				f.facing += turn;
+				return f;
+			};
+			ThreeDObjectFigure itself;
+			itself.figure = piece->name;
+			obj.addon_places.push_back(turned(itself));
+			for (const ThreeDObjectFigure &f : piece->addons) obj.addon_places.push_back(turned(f));
+			_three_d_station_objects.emplace(std::make_pair(kind, way), _three_d_objects.size());
+			_three_d_objects.push_back(std::move(obj));
+		}
+	}
+}
+
+/**
+ * The thread reading the indices from the start of the game (StartReadingThreeDObjects()), joined by the first that
+ * needs them before they are read (ReadThreeDObjects()), at the latest when the game ends -- before the lists it fills
+ * go (made after them, so let go of before them).
+ */
+static struct ThreeDObjectsReader {
+	std::thread thread;
+	std::mutex mutex; ///< who reads them, waits for them or starts the thread
+	~ThreeDObjectsReader()
+	{
+		if (this->thread.joinable()) this->thread.join();
+	}
+} _three_d_objects_reader;
+
+static void ReadThreeDObjectsNow();
+
+/** The indices read, now: by the thread reading them (waited for) or else here; nothing while this thread reads them. */
+static void ReadThreeDObjects()
+{
+	if (_three_d_objects_reading) return;
+	std::lock_guard lock(_three_d_objects_reader.mutex);
+	if (_three_d_objects_reader.thread.joinable()) _three_d_objects_reader.thread.join();
+	if (!_three_d_objects_read) ReadThreeDObjectsNow();
+}
+
+/**
+ * The indices of the objects read on a thread of their own, from the start of the game: on the player's phone the
+ * first block of the map waited for them ten seconds (the player, 26. 10.: "what is that long loading of one block,
+ * 10 s"), the industries' parts read from their .glb with the index -- in the rig 150 of 173 ms. The map draws its
+ * buildings as their sprites till they are read (ThreeDObjectsIndexRead()); what else asks for them waits.
+ */
+void StartReadingThreeDObjects()
+{
+	std::lock_guard lock(_three_d_objects_reader.mutex);
+	if (_three_d_objects_read || _three_d_objects_reader.thread.joinable()) return;
+	StartNewThread(&_three_d_objects_reader.thread, "ottd:3d-index", &ReadThreeDObjectsNow);
+}
+
+/** The thread reading the indices done (the tars and the folders it reads are scanned anew after it). */
+void WaitForReadingThreeDObjects()
+{
+	std::lock_guard lock(_three_d_objects_reader.mutex);
+	if (_three_d_objects_reader.thread.joinable()) _three_d_objects_reader.thread.join();
+}
+
+/**
+ * Whether the indices are read, never waiting for them: the map asks it, and draws the buildings as their sprites
+ * till they are; asked first here, they are started reading (the rig reads them at once).
+ */
+bool ThreeDObjectsIndexRead()
+{
+	if (_three_d_objects_read) return true;
+	if (_three_d_load_at_once) {
+		ReadThreeDObjects();
+		return true;
+	}
+	StartReadingThreeDObjects();
+	return false;
+}
+
+static void ReadThreeDObjectsNow()
+{
+	_three_d_objects_reading = true;
+	ForgetMarginsFilled(MarginsOf::Buildings);
+	GlbFilesScope files;
+	const auto start = std::chrono::steady_clock::now();
+	std::vector<std::string> indices = FindObjectIndices();
+	for (const std::string &index : indices) {
+		std::vector<uint8_t> text = ReadWholeFile(index);
+		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
+		try {
+			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
+			ReadDiary(fmt::format("index {}: {} záznamů", index, list.size()), false);
+			const std::map<std::string, IndustryPartMesh> parts = ReadIndustryParts(list, folder);
+			for (const auto &e : list) {
+				const std::string kind = e.value("druh", std::string("dum"));
+				if (kind == "pole" && e.value("pole", std::string()) == "pastvina") {
+					ReadPasture(e, parts);
+					continue;
+				}
+				if (kind == "prumysl" || kind == "pole") {
+					ReadIndustryObject(e, folder, kind == "pole");
+					continue;
+				}
+				if (kind == "prumysl_dlazdice") {
+					ReadOriginalIndustryTile(e, parts);
+					continue;
+				}
+				if (kind == "most") {
+					ReadBridge(e, folder);
+					continue;
+				}
+				if (kind == "kameni") {
+					ReadRockLayouts(e, list);
+					continue;
+				}
+				if (kind == "depo" && e.contains("soubor") && e.at("soubor").is_string()) {
+					ReadDepot(e, folder);
+					continue;
+				}
+				if (kind == "les" || kind == "plantaz") {
+					ReadForestPart(e, folder, kind);
+					continue;
+				}
+				if (kind == "povrch" && e.contains("soubor") && e.at("soubor").is_string() && e.contains("povrch") && e.at("povrch").is_string()) {
+					/* A picture of a surface of the land (the grass of the temperate climate, GetThreeDSurface()). */
+					const int tiles = e.contains("dlazdic") && e.at("dlazdic").is_number_integer() ? std::clamp(e.at("dlazdic").get<int>(), 1, 64) : 1;
+					_three_d_surfaces.emplace(e.at("povrch").get<std::string>(), ThreeDSurfaceFile{folder + e.at("soubor").get<std::string>(), tiles});
+					continue;
+				}
+				if (kind == "majak") {
+					if (e.contains("soubor") && e.at("soubor").is_string()) ReadLighthouse(e, folder);
+					continue;
+				}
+				const bool station_piece = kind == "peron" || kind == "smerovani" || kind == "nakladova_rampa";
+				if (station_piece && e.contains("soubor") && e.at("soubor").is_string()) ReadStationPiece(e, kind);
+				if ((kind == "doplnek" || kind == "objekt" || station_piece) && e.contains("soubor") && e.at("soubor").is_string()) {
+					/* An add-on of the buildings (a parasol, a bench): one file, its foot at the origin, facing +x, read
+					 * the first time a building with it is drawn (LayAddons()); never a house of its own (variants 0).
+					 * An object of the colleague's on its own ("objekt": the sign of a bus stop) in the same frame, as
+					 * one the game places itself (MakeBusStops()). */
+					ThreeDObject addon;
+					addon.file = e.at("soubor").get<std::string>();
+					addon.name = e.value("jmeno", addon.file);
+					addon.glb_path = folder + addon.file;
+					NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
+					ReadMaterialPictures(e, folder, addon);
+					ReadColourParts(e, folder, addon);
+					ReadTreeColours(e, folder, addon);
+					addon.trunk_r = std::clamp(e.value("kmen_r", 0.0f), 0.0f, 5.0f);
+					addon.addon = true;
+					addon.variants = 0;
+					if (!_three_d_addons.emplace(addon.name, _three_d_objects.size()).second) {
+						Debug(misc, 0, "3D objects: add-on {} has two records, the first is used", addon.name);
+						continue;
+					}
+					_three_d_objects.push_back(std::move(addon));
+					continue;
+				}
+				if (kind != "dum") continue;
+				ThreeDObject obj;
+				obj.file = e.at("soubor").get<std::string>();
+				obj.name = e.value("jmeno", obj.file);
+				if (e.contains("nahrazuje_grf") && e.contains("nahrazuje_house_grf")) {
+					/* A house of a set (NewGRF): the set's id as the game prints it ("524A450B", the Mars houses, the
+					 * colleague's hra/3d/objekty/mars/) and the house's number in the set. */
+					std::string text = e.at("nahrazuje_grf").get<std::string>();
+					auto printed = ParseInteger<uint32_t>(text, 16);
+					if (!printed.has_value()) continue;
+					obj.grfid = std::byteswap(*printed);
+					obj.grf_house = static_cast<uint16_t>(e.at("nahrazuje_house_grf").get<int>());
+					obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
+					obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
+					if (e.contains("varianty")) {
+						obj.variants = 0;
+						for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
+					}
+					obj.glb_path = folder + obj.file;
+					NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+					ReadMaterialPictures(e, folder, obj);
+					ReadColourParts(e, folder, obj);
+					ReadBuildingFigures(e, obj);
+					ReadBuildingTitle(e, obj);
+					ReadInterior(e, folder, obj);
+					_three_d_objects.push_back(std::move(obj));
+					continue;
+				}
+				if (!e.contains("nahrazuje_house")) continue;
+				/* The house it is: a number, or a list -- a sub-arctic house below the snow line and the same one above
+				 * it, the second dressed in the snowy texture named by "snih" beside the .glb, over the same UVs
+				 * (the colleague's hra/3d/ODPOVED-OBJEKTY.md, the other climates). */
+				std::vector<HouseID> houses;
+				const auto &which = e.at("nahrazuje_house");
+				if (which.is_array()) {
+					for (const auto &h : which) houses.push_back(static_cast<HouseID>(h.get<int>()));
+				} else {
+					houses.push_back(static_cast<HouseID>(which.get<int>()));
+				}
+				if (houses.empty()) continue;
+				obj.house = houses.front();
+				obj.theme = ParseIndexTheme(e);
+				obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
+				obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
+				if (e.contains("varianty")) {
+					obj.variants = 0;
+					for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
+				}
+				/* Its shape and texture read the first time it is drawn (ThreeDObject::Read()). */
+				obj.glb_path = folder + obj.file;
+				NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+				ReadMaterialPictures(e, folder, obj);
+				ReadColourParts(e, folder, obj);
+				ReadBuildingFigures(e, obj);
+				ReadBuildingTitle(e, obj);
+				ReadInterior(e, folder, obj);
+				const std::string snow = houses.size() > 1 && e.contains("snih") ? folder + e.at("snih").get<std::string>() : std::string();
+				for (size_t k = 1; k < houses.size(); k++) {
+					/* The same shape for the next house of the list; the last ones (above the snow) in the snowy texture. */
+					ThreeDObject other = obj;
+					other.house = houses[k];
+					other.name = obj.name + (snow.empty() ? "" : " snih");
+					other.snow_path = snow;
+					_three_d_objects.push_back(std::move(other));
+				}
+				_three_d_objects.push_back(std::move(obj));
+			}
+		} catch (const std::exception &ex) {
+			Debug(misc, 0, "3D objects {}: {}", index, ex.what());
+			ReadDiary(fmt::format("index {}: {} (zbytek indexu se nečetl)", index, ex.what()), true);
+		}
+	}
+	MakeStreetLamps();
+	MakeBusStops();
+	MakeRockTiles();
+	MakeStationObjects();
+	for (size_t i = 0; i < _three_d_objects.size(); i++) {
+		const ThreeDObject &o = _three_d_objects[i];
+		if (o.industry != 0xFF && (o.variant_paint[0] >= 0 || o.variant_paint[1] >= 0)) {
+			/* One object for both of its variants by colour: it, and not the old one of each (kept in the set a while). */
+			for (int8_t v = 0; v < 2; v++) {
+				if (o.variant_paint[v] >= 0) _three_d_industry_objects.insert_or_assign(std::make_pair(o.industry, v), i);
+			}
+		} else if (o.industry != 0xFF && !_three_d_industry_objects.emplace(std::make_pair(o.industry, o.industry_variant), i).second) {
+			const auto it = _three_d_industry_objects.find(std::make_pair(o.industry, o.industry_variant));
+			const ThreeDObject &first = _three_d_objects[it->second];
+			if (o.industry_variant < 0 && first.variant_paint[0] < 0 && first.variant_paint[1] < 0 && !_three_d_industry_objects.contains(std::make_pair(o.industry, static_cast<int8_t>(1)))) {
+				/* Two looks of one industry (the dragon farm a castle or a ruin, the player, 26. 10.: "we have two
+				 * dragon farms"): each industry one of them by its random bit 0, as the statue its stone or bronze. */
+				_three_d_industry_objects.emplace(std::make_pair(o.industry, static_cast<int8_t>(0)), it->second);
+				_three_d_industry_objects.emplace(std::make_pair(o.industry, static_cast<int8_t>(1)), i);
+			} else if (first.variant_paint[0] < 0 && first.variant_paint[1] < 0) {
+				Debug(misc, 0, "3D objects: industry {} variant {} has two records, {} is not drawn", o.industry_name, o.industry_variant, o.name);
+			}
+		}
+		for (const std::string &name : o.shared_with) {
+			const IndustryType type = IndexIndustryType(name);
+			if (type == 0xFF) {
+				Debug(misc, 1, "3D object {}: the game has no industry {} to share it", o.name, name);
+			} else {
+				_three_d_shared_industry_objects.emplace(type, i);
+			}
+		}
+		if (!o.field_part.empty()) _three_d_field_parts.emplace(o.field_part, i);
+		for (uint slot = 0; slot < 4; slot++) {
+			if (!(o.variants & (1 << slot))) continue;
+			/* One building on a house and variant, the first record of the index (the colleague's
+			 * hra/3d/PROSBA-0x1F-JEDEN-DUM.md): a second one is told of, never drawn over it. */
+			bool first;
+			size_t drawn;
+			if (o.grfid != 0) {
+				auto [it, added] = _three_d_grf_house_objects.emplace(std::make_tuple(o.grfid, o.grf_house, slot), i);
+				first = added;
+				drawn = it->second;
+			} else {
+				auto [it, added] = _three_d_house_objects.emplace(std::make_tuple(o.theme, o.house, slot), i);
+				first = added;
+				drawn = it->second;
+			}
+			if (!first) Debug(misc, 0, "3D objects: house {:#04x} variant {} has two records, {} is drawn and {} not", o.grfid != 0 ? o.grf_house : o.house, slot, _three_d_objects[drawn].name, o.name);
+		}
+	}
+	Debug(misc, 1, "3D objects: {} read from {} index(es) in {} ms, the houses' shapes as they are drawn", _three_d_objects.size(), indices.size(), std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+	if (indices.empty()) {
+		ReadDiary("žádný index baseset/decouple/objekty/<sada>/objekty.json se nenašel, všechny domy jsou krabice", true);
+	} else {
+		std::set<HouseID> plain, themed;
+		for (const auto &[key, i] : _three_d_house_objects) (std::get<0>(key) == 0 ? plain : themed).insert(std::get<1>(key));
+		std::set<std::pair<uint32_t, uint16_t>> grf;
+		for (const auto &[key, i] : _three_d_grf_house_objects) grf.emplace(std::get<0>(key), std::get<1>(key));
+		ReadDiary(fmt::format("celkem {} objektů z {} indexů; 3D model má {} domů hry, {} domů tematických měst a {} domů z GRF", _three_d_objects.size(), indices.size(), plain.size(), themed.size(), grf.size()), false);
+	}
+	_three_d_objects_reading = false;
+	_three_d_objects_read = true;
+}
+
+/**
+ * A set's id as the index writes it: four characters as in the set ("MAXb", the colleague's Sergej) or eight hex
+ * digits as the game prints it ("524A450B"), into the id as the game keeps it (read from the set little-endian).
+ */
+static std::optional<uint32_t> ParseIndexGrfId(const std::string &text)
+{
+	if (text.size() == 8) {
+		auto printed = ParseInteger<uint32_t>(text, 16);
+		if (printed.has_value()) return std::byteswap(*printed);
+	}
+	if (text.size() == 4) {
+		return static_cast<uint32_t>(static_cast<uint8_t>(text[0])) | (static_cast<uint32_t>(static_cast<uint8_t>(text[1])) << 8) |
+				(static_cast<uint32_t>(static_cast<uint8_t>(text[2])) << 16) | (static_cast<uint32_t>(static_cast<uint8_t>(text[3])) << 24);
+	}
+	return std::nullopt;
+}
+
+/** A number of the index: a JSON number, or a string in decimal or "0x" hex ("0x0100", an engine's number in its set). */
+static std::optional<uint32_t> ParseIndexNumber(const nlohmann::json &value)
+{
+	if (value.is_number_integer()) return value.get<uint32_t>();
+	if (!value.is_string()) return std::nullopt;
+	std::string text = value.get<std::string>();
+	if (text.starts_with("0x") || text.starts_with("0X")) return ParseInteger<uint32_t>(std::string_view(text).substr(2), 16);
+	return ParseInteger<uint32_t>(text, 10);
+}
+
+/** A colour an index gives as "RRGGBB" (or "#RRGGBB"), as Colour::data; nullopt not one. */
+std::optional<uint32_t> ParseIndexColour(std::string_view text)
+{
+	if (text.starts_with('#')) text.remove_prefix(1);
+	const std::optional<uint32_t> rgb = text.size() == 6 ? ParseInteger<uint32_t>(text, 16) : std::nullopt;
+	if (!rgb.has_value()) return std::nullopt;
+	return Colour(static_cast<uint8_t>(*rgb >> 16), static_cast<uint8_t>(*rgb >> 8), static_cast<uint8_t>(*rgb)).data;
+}
+
+/** The vehicle type an index names: "vlak", "auto", "lod", "letadlo" (or the game's own words). */
+static VehicleType ParseIndexVehicleType(const std::string &text)
+{
+	if (text == "vlak" || text == "train") return VehicleType::Train;
+	if (text == "auto" || text == "silnice" || text == "silnicni" || text == "road") return VehicleType::Road;
+	if (text == "lod" || text == "ship") return VehicleType::Ship;
+	if (text == "letadlo" || text == "aircraft") return VehicleType::Aircraft;
+	return VehicleType::Invalid;
+}
+
+/** The room about an animal standing on a bed with others (ThreeDLoadPiece::size), metres each way. */
+static constexpr float LOAD_ANIMAL_ROOM_M = 0.2f;
+
+/** A cargo's label as the game has it ('BRCK'), from its four letters in an index; 0 none. */
+static uint32_t ParseLoadLabel(const nlohmann::json &value)
+{
+	if (!value.is_string()) return 0;
+	const std::string text = value.get<std::string>();
+	if (text.size() != 4) return 0;
+	return static_cast<uint32_t>(static_cast<uint8_t>(text[0])) << 24 | static_cast<uint32_t>(static_cast<uint8_t>(text[1])) << 16 |
+			static_cast<uint32_t>(static_cast<uint8_t>(text[2])) << 8 | static_cast<uint32_t>(static_cast<uint8_t>(text[3]));
+}
+
+/** The bed of the loads of a state's body ("loze", ThreeDLoadBed). */
+static void ReadLoadBed(const nlohmann::json &e, ThreeDLoadBed &bed)
+{
+	if (!e.is_object()) return;
+	bed.floor = e.value("dno", 0.0f);
+	for (const char *axis : {"x", "y"}) {
+		if (!e.contains(axis) || !e.at(axis).is_array() || e.at(axis).size() != 2 || !e.at(axis).at(0).is_number() || !e.at(axis).at(1).is_number()) continue;
+		float *to = axis[0] == 'x' ? bed.x : bed.y;
+		to[0] = std::min(e.at(axis).at(0).get<float>(), e.at(axis).at(1).get<float>());
+		to[1] = std::max(e.at(axis).at(0).get<float>(), e.at(axis).at(1).get<float>());
+	}
+	bed.sides = std::max(0.0f, e.value("bocnice", 0.0f));
+	bed.top = e.value("max_vyska", 0.0f);
+}
+
+/**
+ * A piece of the shared loads ("druh": "naklad", the colleague's objekty/naklady): a file of its own, coloured over
+ * its mask ("barvy") by the cargo -- each colour of its table ("naklady") a state of its figure, as a vehicle's paint
+ * --, or an animal of "zvirata" standing ("uzel" its frame); and the figures of the game on its seats ("posadka":
+ * the girls on a bench, the player, 27. 10.: "the game will have the girls of the loads and the bench they sit on"),
+ * without a file of its own only them (the girls standing on a lorry's back).
+ */
+static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, const std::string &package)
+{
+	ThreeDLoadPiece piece;
+	piece.name = e.value("jmeno", std::string());
+	if (piece.name.empty()) return;
+	piece.package = package;
+	if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+		for (int k = 0; k < 3; k++) piece.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
+	}
+	if (e.contains("skladani") && e.at("skladani").is_object()) {
+		const auto &how = e.at("skladani");
+		piece.layers = std::clamp(how.value("max_vrstev", 1), 1, 8);
+		if (how.contains("otaceni") && how.at("otaceni").is_array()) {
+			for (const auto &turn : how.at("otaceni")) {
+				if (turn.is_number() && std::abs(std::remainder(turn.get<double>(), 180.0)) > 45.0) piece.quarter_turn = true;
+			}
+		}
+	}
+	if (e.contains("posadka")) ReadCrew(e.at("posadka"), piece.seats, true);
+	ThreeDVehicleObject fig;
+	if (e.contains("soubor") && e.at("soubor").is_string()) {
+		fig.package = package;
+		fig.file = folder + e.at("soubor").get<std::string>();
+		NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+		fig.name = "naklady/" + piece.name;
+		fig.thing = true;
+		if (e.contains("barvy") && e.at("barvy").is_array() && !e.at("barvy").empty() && e.at("barvy").at(0).is_object()) {
+			const auto &b = e.at("barvy").at(0);
+			if (b.contains("maska") && b.at("maska").is_string()) fig.paint.mask_file = folder + b.at("maska").get<std::string>();
+			fig.paint.start = std::clamp(b.value("zacatek", 0), 0, 255);
+			if (b.contains("cast") && b.at("cast").is_string()) piece.paint_part = b.at("cast").get<std::string>();
+		}
+		piece.figure = fig.name;
+	} else if (e.value("sada", std::string()) == "zvirata" && e.contains("objekt") && e.at("objekt").is_string()) {
+		/* An animal's frame by its node ("pase_00": the pose "pase", its first frame); its size the animal's. */
+		piece.animal = e.at("objekt").get<std::string>();
+		const std::string node = e.value("uzel", std::string("pase_00"));
+		const size_t last = node.find_last_not_of("0123456789");
+		const std::string prefix = last == std::string::npos ? std::string() : node.substr(0, last + 1);
+		piece.frame = last + 1 < node.size() ? ParseInteger<int>(node.substr(last + 1), 10).value_or(0) : 0;
+		piece.figure = piece.animal + "/" + (prefix.ends_with("_") ? prefix.substr(0, prefix.size() - 1) : prefix);
+	} else if (piece.seats.empty()) {
+		return;
+	}
+	/* Its colours by the cargo: each a state of the figure, the paint's colour over its mask. */
+	if (e.contains("naklady") && e.at("naklady").is_array()) {
+		for (const auto &n : e.at("naklady")) {
+			if (!n.is_object()) continue;
+			const uint32_t label = ParseLoadLabel(n.value("naklad", nlohmann::json()));
+			if (label != 0) piece.cargoes.push_back(label);
+			if (!n.contains("barva") || !n.at("barva").is_string() || fig.file.empty()) continue;
+			std::string c = n.at("barva").get<std::string>();
+			if (c.starts_with("#")) c = c.substr(1);
+			auto rgb = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
+			if (label == 0 || !rgb.has_value()) continue;
+			ThreeDVehicleState st;
+			st.colour = Colour(static_cast<uint8_t>(*rgb >> 16), static_cast<uint8_t>(*rgb >> 8), static_cast<uint8_t>(*rgb)).data;
+			st.given = ThreeDVehicleState::GIVEN_COLOUR;
+			int step = 0;
+			for (size_t k = 0; k < fig.states.size(); k++) {
+				if (fig.states[k].colour == st.colour) step = static_cast<int>(k) + 1;
+			}
+			if (step == 0) {
+				fig.states.push_back(st);
+				step = static_cast<int>(fig.states.size());
+			}
+			piece.colours.emplace_back(label, step);
+		}
+	}
+	/* A heap of a bulk cargo on a loading bay (the colleague's hromada_nakladu): its colour by the cargo
+	 * ("barva_podle_nakladu"), each a state as those of the table, for no vehicle's load. */
+	if (e.contains("barva_podle_nakladu") && e.at("barva_podle_nakladu").is_object() && !fig.file.empty()) {
+		for (const auto &[label_text, colour] : e.at("barva_podle_nakladu").items()) {
+			const uint32_t label = ParseLoadLabel(nlohmann::json(label_text));
+			const std::optional<uint32_t> c = colour.is_string() ? ParseIndexColour(colour.get<std::string>()) : std::nullopt;
+			if (label == 0 || !c.has_value()) continue;
+			ThreeDVehicleState st;
+			st.colour = *c;
+			st.given = ThreeDVehicleState::GIVEN_COLOUR;
+			int step = 0;
+			for (size_t k = 0; k < fig.states.size(); k++) {
+				if (fig.states[k].colour == st.colour) step = static_cast<int>(k) + 1;
+			}
+			if (step == 0) {
+				fig.states.push_back(st);
+				step = static_cast<int>(fig.states.size());
+			}
+			piece.colours.emplace_back(label, step);
+		}
+	}
+	if (!fig.file.empty()) _figure_objects.push_back(std::move(fig));
+	_load_pieces.push_back(std::move(piece));
+}
+
+/**
+ * Read a set of motions ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md): its file, the kind of
+ * bones ("kostra"), the hips' height they are made for ("vyska_kycli"), and of each motion ("pohyby") how it goes
+ * round ("smycka", "doba_s", "snimku"), how far it walks ("krok_m") and the thing a bone holds in it ("predmet").
+ */
+static void ReadMotionSet(const nlohmann::json &e, const std::string &folder, const std::string &package)
+{
+	if (!e.contains("soubor") || !e.contains("kostra") || !e.at("kostra").is_string() || !e.contains("pohyby") || !e.at("pohyby").is_object()) return;
+	ThreeDMotionSet set;
+	set.package = package;
+	set.file = folder + e.at("soubor").get<std::string>();
+	set.kind = e.at("kostra").get<std::string>();
+	set.hips = std::clamp(e.value("vyska_kycli", 1.0f), 0.1f, 10.0f);
+	for (const auto &[name, p] : e.at("pohyby").items()) {
+		ThreeDMotionSet::Motion m;
+		m.name = name;
+		if (p.is_object()) {
+			m.loop = p.value("smycka", false);
+			const float seconds = std::clamp(p.value("doba_s", 0.0f), 0.0f, 60.0f);
+			m.frames = std::clamp(p.value("snimku", seconds > 0 ? static_cast<int>(std::lround(seconds * 12)) : 1), 1, 64);
+			if (m.frames > 1 && seconds > 0) m.frame_ticks = std::max(1, static_cast<int>(std::lround(seconds * 1000 / MILLISECONDS_PER_TICK / m.frames)));
+			m.walk_m = std::clamp(p.value("krok_m", 0.0f), 0.0f, 100.0f);
+			if (p.contains("predmet") && p.at("predmet").is_object()) {
+				const auto &h = p.at("predmet");
+				if (h.contains("soubor") && h.at("soubor").is_string() && h.contains("kost") && h.at("kost").is_string()) {
+					m.held_file = folder + h.at("soubor").get<std::string>();
+					m.held_bone = h.at("kost").get<std::string>();
+					if (h.contains("poloha") && h.at("poloha").is_array() && h.at("poloha").size() == 3) {
+						for (int k = 0; k < 3; k++) m.held_at[k] = h.at("poloha").at(k).get<float>();
+					}
+					if (h.contains("rotace") && h.at("rotace").is_array() && h.at("rotace").size() == 4) {
+						for (int k = 0; k < 4; k++) m.held_turn[k] = h.at("rotace").at(k).get<float>();
+					}
+				}
+			}
+		}
+		set.motions.push_back(std::move(m));
+	}
+	if (!set.motions.empty()) _motion_sets.push_back(std::move(set));
+}
+
+/**
+ * The figures of the humanoids (ThreeDHumanoid) in their motions: of each, "<jmeno>/<pohyb>" for every motion of its
+ * kind -- of its own package's first, then of the vehicles' packages (their seats' poses, found first for their crews,
+ * GetThreeDFigure()) -- and "<jmeno>" alone standing ("stoji", else its first motion; else as it is in its file).
+ */
+static void MakeHumanoidFigures()
+{
+	for (const ThreeDHumanoid &h : _humanoids) {
+		std::string first;
+		for (const bool own : {true, false}) {
+			for (const ThreeDMotionSet &set : _motion_sets) {
+				if (set.kind != h.kind || (set.package == h.figure.package) != own) continue;
+				for (const ThreeDMotionSet::Motion &m : set.motions) {
+					ThreeDVehicleObject one = h.figure;
+					one.name = h.figure.name + "/" + m.name;
+					one.package = set.package;
+					one.skeleton_anim = m.name;
+					one.motion_file = set.file;
+					one.motion_scale = h.hips / set.hips;
+					one.frames = m.frames;
+					one.frame_ticks = m.frame_ticks;
+					one.loop = m.loop;
+					one.walk_step = m.walk_m * one.motion_scale;
+					/* (A figure of frames walks by them: the frames of the motion, though of bones, not of nodes.) */
+					if (one.frames >= 2) one.frame_prefix = m.name + "_";
+					one.held_file = m.held_file;
+					one.held_bone = m.held_bone;
+					std::copy_n(m.held_at, 3, one.held_at);
+					std::copy_n(m.held_turn, 4, one.held_turn);
+					if (first.empty()) first = one.name;
+					_figure_objects.push_back(std::move(one));
+				}
+			}
+		}
+		/* Standing: of its own package's motions first. */
+		const ThreeDVehicleObject *posed = nullptr;
+		for (const ThreeDVehicleObject &f : _figure_objects) {
+			if (f.name == h.figure.name + "/stoji" && (posed == nullptr || f.package == h.figure.package)) posed = &f;
+		}
+		if (posed == nullptr && !first.empty()) {
+			auto it = std::ranges::find(_figure_objects, first, &ThreeDVehicleObject::name);
+			if (it != _figure_objects.end()) posed = &*it;
+		}
+		ThreeDVehicleObject standing = posed != nullptr ? *posed : h.figure;
+		if (posed == nullptr) standing.skeleton_file.clear();
+		standing.name = h.figure.name;
+		standing.package = h.figure.package;
+		_figure_objects.push_back(std::move(standing));
+	}
+}
+
+/** Read the vehicles of the indices ("druh": "vozidlo"); their .glb are read when they are first drawn. */
+/**
+ * The add-ons among the trees of each town theme's land split into plants and trees (_three_d_theme_guests_split): a
+ * plant is one that stands under trees somewhere too ("podrost": the banana plants and monsteras), a tree one that does
+ * not (the palms). Once all the indices are read, as an add-on's records come in any order.
+ */
+static void SplitThemeGuests()
+{
+	auto under_somewhere = [](const std::string &name) {
+		for (const auto &plants : _three_d_map_undergrowth) {
+			if (std::ranges::any_of(plants, [&name](const ThreeDMapTree &t) { return t.name == name; })) return true;
+		}
+		for (const auto &[theme, plants] : _three_d_theme_undergrowth) {
+			if (std::ranges::find(plants, name) != plants.end()) return true;
+		}
+		return false;
+	};
+	for (const auto &[theme, guests] : _three_d_theme_guests) {
+		auto &split = _three_d_theme_guests_split[theme];
+		for (const std::string &name : guests) split[under_somewhere(name) ? 1 : 0].push_back(name);
+	}
+}
+
+static void ReadThreeDVehicleObjects()
+{
+	_vehicle_objects_read = true;
+	ForgetMarginsFilled(MarginsOf::Vehicles);
+	GlbFilesScope files;
+	/* The colours the yards of the industries give the pieces of the loads standing there ("barva_casti" of a part of
+	 * "sada" "naklady", the colleague's hra/3d/RAFINERIE-PRO-HRU.md): the piece, its part, the colour (Colour::data). */
+	std::vector<std::tuple<std::string, std::string, uint32_t>> yard_colours;
+	for (const std::string &index : FindObjectIndices()) {
+		std::vector<uint8_t> text = ReadWholeFile(index);
+		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
+		std::string package = PackageOf(index);
+		try {
+			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
+			for (const auto &e : list) {
+				if (e.value("druh", std::string()) == "prumysl_dlazdice" && e.contains("dily") && e.at("dily").is_array()) {
+					for (const auto &d : e.at("dily")) {
+						if (!d.is_object() || d.value("sada", std::string()) != "naklady" || !d.contains("dil") || !d.at("dil").is_string() || !d.contains("barva_casti") || !d.at("barva_casti").is_object()) continue;
+						for (const auto &[cast, colour] : d.at("barva_casti").items()) {
+							const std::optional<uint32_t> c = colour.is_string() ? ParseIndexColour(colour.get<std::string>()) : std::nullopt;
+							if (c.has_value()) yard_colours.emplace_back(d.at("dil").get<std::string>(), cast, *c);
+						}
+					}
+				}
+				if (e.value("druh", std::string()) == "naklad") {
+					ReadLoadPiece(e, folder, package);
+					continue;
+				}
+				if (e.value("druh", std::string("dum")) == "efekt" && e.contains("soubor")) {
+					/* An effect (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md, the fireworks): frames as a figure's,
+					 * metres, unlit when it has no normals; a material of it coloured from a palette by the game. */
+					ThreeDVehicleObject fx;
+					fx.package = package;
+					fx.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fx.file, MarginsOf::Vehicles);
+					fx.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.contains("animace") && e.at("animace").is_object()) {
+						const auto &a = e.at("animace");
+						fx.frame_prefix = a.value("uzly", std::string("snimek_"));
+						fx.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						if (fx.frames < 2) fx.frame_prefix.clear();
+					}
+					if (e.contains("barvy") && e.at("barvy").is_array() && !e.at("barvy").empty()) {
+						const auto &b = e.at("barvy").at(0);
+						fx.tint_material = b.value("material", std::string());
+						if (b.contains("paleta") && b.at("paleta").is_array()) {
+							for (const auto &c : b.at("paleta")) {
+								auto n = c.is_string() ? ParseInteger<uint32_t>(c.get<std::string>(), 16) : std::nullopt;
+								if (n.has_value()) fx.tint_palette.push_back(Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data);
+							}
+						}
+					}
+					_effect_objects.push_back(std::move(fx));
+					continue;
+				}
+				const std::string figure_kind = e.value("druh", std::string("dum"));
+				if (figure_kind == "majak" && e.contains("soubor") && e.at("soubor").is_string() && e.contains("otaceni") && e.at("otaceni").is_object()) {
+					/* A lighthouse's reflector (ReadLighthouse()): the node that turns ("otaceni" "uzel") without its night
+					 * ("noc_uzel"), stood on the ground, a turn in "otacka_s" seconds about the axis ("osa") through "stred". */
+					const auto &o = e.at("otaceni");
+					ThreeDVehicleObject fig;
+					fig.package = package;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>()) + "/reflektor";
+					fig.thing = true;
+					fig.only_node = o.value("uzel", std::string("reflektor"));
+					if (o.contains("noc_uzel") && o.at("noc_uzel").is_string()) fig.skip_nodes.push_back(o.at("noc_uzel").get<std::string>());
+					fig.to_ground = true;
+					fig.spin_ticks = std::clamp(static_cast<int>(std::lround(o.value("otacka_s", 10.0) * 1000.0 / MILLISECONDS_PER_TICK)), 1, 100000);
+					const std::string axis = o.value("osa", std::string("z"));
+					fig.spin_axis[0] = axis == "x" ? 1.0f : 0.0f;
+					fig.spin_axis[1] = axis == "y" ? 1.0f : 0.0f;
+					fig.spin_axis[2] = axis == "z" ? 1.0f : 0.0f;
+					if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3) {
+						for (int k = 0; k < 2; k++) fig.spin_centre[k] = o.at("stred").at(k).is_number() ? o.at("stred").at(k).get<float>() : 0.0f;
+					}
+					/* Its night (the lenses' glow and the beams) a figure of its own turning alike, drawn only at night
+					 * (ReadLighthouse()). */
+					if (o.contains("noc_uzel") && o.at("noc_uzel").is_string()) {
+						ThreeDVehicleObject lit;
+						lit.package = fig.package;
+						lit.file = fig.file;
+						lit.name = e.value("jmeno", e.at("soubor").get<std::string>()) + "/reflektor_noc";
+						lit.thing = true;
+						lit.only_node = o.at("noc_uzel").get<std::string>();
+						lit.to_ground = true;
+						lit.spin_ticks = fig.spin_ticks;
+						std::copy(std::begin(fig.spin_axis), std::end(fig.spin_axis), std::begin(lit.spin_axis));
+						std::copy(std::begin(fig.spin_centre), std::end(fig.spin_centre), std::begin(lit.spin_centre));
+						_figure_objects.push_back(std::move(fig));
+						_figure_objects.push_back(std::move(lit));
+						continue;
+					}
+					_figure_objects.push_back(std::move(fig));
+					continue;
+				}
+				if (figure_kind == "pohyby") {
+					ReadMotionSet(e, folder, package);
+					continue;
+				}
+				if ((figure_kind == "doplnek" || figure_kind.starts_with("zed_") || figure_kind == "vuz_rez") && e.contains("soubor") && e.at("soubor").is_string()) {
+					/* An add-on of the buildings a figure too, a thing as big as the building it stands by: one of a
+					 * building's event stands only on its days ("akce" "doplnky": the new stadium's grill and barrel by
+					 * the fire Tatra, the player 29. 10.: "Mat with the grill in the middle of the pitch by the Tatra",
+					 * "and the barrel of beer too"); one laid into the building ("doplnky") is always there. A piece of
+					 * a retaining wall ("zed_lic", "zed_koruna", "zed_pilir", "zed_zabradli", the colleague's
+					 * objekty/vyplne) so too: its shape and texture laid along the walls of the foundations
+					 * (DrawEyeRetainingWalls() of viewport.cpp). */
+					ThreeDVehicleObject fig;
+					fig.package = package;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					fig.thing = true;
+					/* A tree of the map (the player, 1. 11.: "the trees replace all the trees of the game ... the forest,
+					 * about the houses and about the towns"; "tropical plants in the clay towns and the towns of the
+					 * sub-tropical climate"): it stands for the kinds of trees its "stromy_mapy" names, and those of
+					 * "stromy_mapy_dalsi", drawn on their tiles (DrawThemedTrees() of tree_cmd.cpp). */
+					if (e.contains("stromy_mapy")) ReadMapTrees(e.at("stromy_mapy"), fig.name);
+					ReadTreeFigurePaint(e, folder, fig);
+					ReadFigurePalette(e, folder, fig);
+					/* An ivy (the colleague's hra/3d/VYPLNE-ZDI-POPINAVKY-PRO-HRU.md): on the faces of the retaining walls
+					 * ("kde" "zed_lic") and on the walls of the houses ("zed_domu"), hanging from the wall's top edge
+					 * ("uchyceni" "visi_od_hrany") or anywhere on it ("kdekoli"). */
+					if (e.contains("popinavka") && e.at("popinavka").is_object()) {
+						const auto &p = e.at("popinavka");
+						ThreeDIvy ivy;
+						ivy.name = fig.name;
+						ivy.hangs = p.value("uchyceni", std::string()) == "visi_od_hrany";
+						if (p.contains("kde") && p.at("kde").is_array()) {
+							for (const auto &where : p.at("kde")) {
+								if (!where.is_string()) continue;
+								if (where.get<std::string>() == "zed_lic") ivy.on_retaining_walls = true;
+								if (where.get<std::string>() == "zed_domu") ivy.on_houses = true;
+							}
+						}
+						if (ivy.on_retaining_walls || ivy.on_houses) _three_d_ivies.push_back(std::move(ivy));
+					}
+					/* A graffiti (the player, test2): on the concrete of the retaining walls, under the ivies (DrawEyeRetainingWalls()). */
+					if (figure_kind == "zed_grafiti") _three_d_graffiti.push_back(fig.name);
+					/* A place where the concrete has spalled off (the player, 7. 11.): on the concrete at random, as the graffiti. */
+					if (figure_kind == "zed_odprysk") _three_d_concrete_spalls.push_back(fig.name);
+					/* A piece of rust (the player, 7. 11.): laid on the flat faces of an old vehicle (ThreeDWear). */
+					if (figure_kind == "vuz_rez") _three_d_rust_pieces.push_back(fig.name);
+					if (e.contains("sirka_m") && e.contains("vyska_m")) {
+						_three_d_board_sizes[fig.name] = {std::clamp(e.value("sirka_m", 1.0f), 0.05f, 20.0f), std::clamp(e.value("vyska_m", 1.0f), 0.05f, 20.0f)};
+					}
+					if (e.contains("stromy_mapy_dalsi") && e.at("stromy_mapy_dalsi").is_array()) {
+						for (const auto &more : e.at("stromy_mapy_dalsi")) ReadMapTrees(more, fig.name);
+					}
+					_figure_objects.push_back(std::move(fig));
+					continue;
+				}
+				if ((figure_kind == "tvor" || figure_kind == "carodejnice") && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object()) {
+					/* A creature: each of its animations a figure of its own, "<jmeno>/<animace>". A witch so too, the
+					 * glass of her lights and their places read from each frame. */
+					const bool witch = figure_kind == "carodejnice";
+					ThreeDCreature creature;
+					creature.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+						for (int k = 0; k < 3; k++) creature.size[k] = e.at("rozmer_m").at(k).get<float>();
+					}
+					for (const auto &[anim, a] : e.at("animace").items()) {
+						if (!a.is_object()) continue;
+						ThreeDVehicleObject fig;
+						fig.package = package;
+						fig.file = folder + e.at("soubor").get<std::string>();
+						NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+						if (e.contains("textura") && e.at("textura").is_string()) fig.paint_file = folder + e.at("textura").get<std::string>();
+						fig.name = creature.Figure(anim);
+						fig.frame_prefix = a.value("uzly", anim + "_");
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+						fig.loop = a.value("smycka", true);
+						fig.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
+						fig.frame_lights = witch;
+						if (fig.frames < 2) fig.frame_prefix.clear();
+						/* With its bones ("kostra") and an animation of the same name there: a frame a tick, the round
+						 * as long as the frames' was. */
+						if (e.contains("kostra") && e.at("kostra").is_string() && fig.frames >= 2) {
+							const std::string bones = folder + e.at("kostra").get<std::string>();
+							const GlbSkeleton *sk = ReadGlbSkeleton(bones);
+							if (sk != nullptr && sk->Find(anim) != nullptr) {
+								fig.skeleton_file = bones;
+								fig.skeleton_anim = anim;
+								fig.frames = std::min(fig.frames * fig.frame_ticks, 4096);
+								fig.frame_ticks = 1;
+							}
+						}
+						_figure_objects.push_back(std::move(fig));
+						creature.animations.push_back(anim);
+					}
+					if (creature.animations.empty()) continue;
+					if (!witch) {
+						_creatures.push_back(std::move(creature));
+						continue;
+					}
+					/* Her size, and her lights as the index has them (the colleague's hra/3d/PROSBA-CARODEJNICE.md). */
+					ThreeDWitch w;
+					w.name = creature.name;
+					w.animations = std::move(creature.animations);
+					std::copy(std::begin(creature.size), std::end(creature.size), std::begin(w.size));
+					w.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
+					auto colour_of = [](const nlohmann::json &l) -> uint32_t {
+						auto n = l.contains("barva") && l.at("barva").is_string() ? ParseInteger<uint32_t>(l.at("barva").get<std::string>(), 16) : std::nullopt;
+						return n.has_value() ? Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data : 0;
+					};
+					if (e.contains("svetla") && e.at("svetla").is_object()) {
+						const auto &lights = e.at("svetla");
+						if (lights.contains("lucerna") && lights.at("lucerna").is_object()) {
+							w.lantern_colour = colour_of(lights.at("lucerna"));
+							w.lantern_reach_m = std::clamp(lights.at("lucerna").value("dosah_m", 0.0f), 0.0f, 50.0f);
+						}
+						if (lights.contains("svitilna") && lights.at("svitilna").is_object()) {
+							w.torch_colour = colour_of(lights.at("svitilna"));
+							w.torch_reach_m = std::clamp(lights.at("svitilna").value("dosah_m", 0.0f), 0.0f, 100.0f);
+							w.torch_angle = std::clamp(lights.at("svitilna").value("uhel", 0.0f), 1.0f, 120.0f);
+						}
+					}
+					if (!_witches_replaced.contains(w.name)) _witches.push_back(std::move(w));
+					continue;
+				}
+				if (figure_kind == "ufo" && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object() && e.at("animace").contains("let")) {
+					/* A flying saucer (the colleague's hra/3d/PROSBA-UFO.md): its flight a figure of frames without its beam
+					 * and its sheep, each of those a figure of its node alone; what it is for and how it shines. */
+					ThreeDUfo u;
+					u.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+						for (int k = 0; k < 3; k++) u.size[k] = e.at("rozmer_m").at(k).get<float>();
+					}
+					auto when = [&](std::string_view w) {
+						if (w == "katastrofa") u.disaster = true;
+						if (w == "noc") u.night = true;
+					};
+					if (e.contains("kdy") && e.at("kdy").is_string()) when(e.at("kdy").get<std::string>());
+					if (e.contains("kdy") && e.at("kdy").is_array()) {
+						for (const auto &w : e.at("kdy")) {
+							if (w.is_string()) when(w.get<std::string>());
+						}
+					}
+					u.night_scale = std::clamp(e.value("meritko", 1.0f), 0.1f, 20.0f);
+					if (e.contains("katastrofa") && e.at("katastrofa").is_object()) {
+						const auto &d = e.at("katastrofa");
+						if (d.contains("male_ufo") && d.at("male_ufo").is_object()) u.small_scale = std::clamp(d.at("male_ufo").value("meritko", 1.0f), 0.1f, 20.0f);
+						if (d.contains("velke_ufo") && d.at("velke_ufo").is_object()) u.big_scale = std::clamp(d.at("velke_ufo").value("meritko", 2.0f), 0.1f, 20.0f);
+					}
+					if (e.contains("noc") && e.at("noc").is_object()) u.night_lift_m = std::clamp(e.at("noc").value("vyska_m", 13.0f), 1.0f, 200.0f);
+					std::vector<std::string> apart;
+					if (e.contains("paprsek") && e.at("paprsek").is_object()) {
+						const auto &b = e.at("paprsek");
+						u.has_beam = true;
+						u.beam_len_m = std::clamp(b.value("delka_m", 12.0f), 0.5f, 200.0f);
+						u.beam_from_z = std::clamp(b.value("od_z", -1.0f), -50.0f, 50.0f);
+						const std::string node = b.value("uzel", std::string("paprsek"));
+						ThreeDVehicleObject beam;
+						beam.package = package;
+						beam.file = folder + e.at("soubor").get<std::string>();
+						beam.name = u.Figure("paprsek");
+						beam.only_node = node;
+						_figure_objects.push_back(std::move(beam));
+						apart.push_back(node);
+						if (b.contains("konec") && b.at("konec").is_string()) apart.push_back(b.at("konec").get<std::string>());
+					}
+					if (e.contains("ovce") && e.at("ovce").is_object()) {
+						const std::string node = e.at("ovce").value("uzel", std::string("ovce"));
+						u.has_sheep = true;
+						ThreeDVehicleObject sheep;
+						sheep.package = package;
+						sheep.file = folder + e.at("soubor").get<std::string>();
+						sheep.name = u.Figure("ovce");
+						sheep.only_node = node;
+						_figure_objects.push_back(std::move(sheep));
+						apart.push_back(node);
+					}
+					const auto &a = e.at("animace").at("let");
+					ThreeDVehicleObject fly;
+					fly.package = package;
+					fly.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fly.file, MarginsOf::Vehicles);
+					fly.name = u.Figure("let");
+					fly.frame_prefix = a.value("uzly", std::string("let_"));
+					fly.frames = std::clamp(a.value("snimku", 0), 0, 64);
+					fly.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+					fly.loop = a.value("smycka", true);
+					fly.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
+					if (fly.frames < 2) fly.frame_prefix.clear();
+					fly.skip_nodes = std::move(apart);
+					_figure_objects.push_back(std::move(fly));
+					auto colour_of = [](const nlohmann::json &l) -> uint32_t {
+						auto n = l.contains("barva") && l.at("barva").is_string() ? ParseInteger<uint32_t>(l.at("barva").get<std::string>(), 16) : std::nullopt;
+						return n.has_value() ? Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data : 0;
+					};
+					if (e.contains("svetla") && e.at("svetla").is_object()) {
+						const auto &lights = e.at("svetla");
+						if (lights.contains("paprsek") && lights.at("paprsek").is_object()) {
+							u.beam_colour = colour_of(lights.at("paprsek"));
+							u.beam_reach_m = std::clamp(lights.at("paprsek").value("dosah_m", 0.0f), 0.0f, 200.0f);
+							u.beam_angle = std::clamp(lights.at("paprsek").value("uhel", 14.0f), 1.0f, 120.0f);
+						}
+						if (lights.contains("lem") && lights.at("lem").is_object()) {
+							u.rim_colour = colour_of(lights.at("lem"));
+							u.rim_reach_m = std::clamp(lights.at("lem").value("dosah_m", 0.0f), 0.0f, 100.0f);
+						}
+					}
+					if (e.contains("posadka") && e.at("posadka").is_array() && !e.at("posadka").empty() && e.at("posadka").at(0).is_object()) {
+						u.crew = e.at("posadka").at(0).value("postava", std::string());
+					}
+					_ufos.push_back(std::move(u));
+					continue;
+				}
+				/* A nurse of a church ("role" "sestricka", the player 28. 10.: "the nurses will sell a monthly health
+				 * insurance before the church; when I pay, they will walk with me a month and heal the wounds of the
+				 * bogeymen"): one of the animals, as the sellers of dogs are; the one on the bones a humanoid besides. */
+				const bool nurse = figure_kind == "postava" && e.value("role", std::string()) == "sestricka";
+				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac")) || nurse;
+				/* An animal or a plant of the water (the colleague's objekty/voda, "vodni_zvire", "vodni_rostlina"): a figure as
+				 * a thing is, painted a colour of its palette ("barvy": the discus and the goldfish of the sea, the sea's
+				 * plants), the fish on the rod among them; an animal's poses ("pozy") on its bones, each a figure. */
+				if ((figure_kind == "vodni_zvire" || figure_kind == "vodni_rostlina") && e.contains("soubor") && e.at("soubor").is_string()) {
+					ThreeDVehicleObject fig;
+					fig.package = package;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					fig.thing = true;
+					ReadFigurePalette(e, folder, fig);
+					float size[3] = {};
+					if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+						for (size_t k = 0; k < 3; k++) {
+							if (e.at("rozmer_m")[k].is_number()) size[k] = std::clamp(e.at("rozmer_m")[k].get<float>(), 0.0f, 100.0f);
+						}
+					}
+					const bool sea = e.value("voda", std::string()) == "more";
+					const bool glows = e.value("v_noci_sviti", false);
+					const float scale = std::clamp(e.value("meritko", 1.0f), 0.1f, 20.0f);
+					if (figure_kind == "vodni_rostlina") {
+						ThreeDWaterPlant p;
+						p.name = fig.name;
+						p.sea = sea;
+						p.glows = glows;
+						p.by_bank = e.value("u_brehu", false);
+						p.leaf_m = std::clamp(e.value("vyska_listu_m", 0.0f), 0.0f, 50.0f);
+						p.scale = scale;
+						std::copy(std::begin(size), std::end(size), p.size);
+						/* A water lily on the map, where the water is not seen through: its leaves at the surface alone. */
+						if (p.leaf_m > 0) {
+							ThreeDVehicleObject leaves = fig;
+							leaves.name = fig.name + "/hladina";
+							leaves.keep_above = std::max(0.0f, p.leaf_m - 0.3f);
+							_figure_objects.push_back(std::move(leaves));
+						}
+						std::erase_if(_water_plants, [&](const ThreeDWaterPlant &w) { return w.name == p.name; });
+						_water_plants.push_back(std::move(p));
+						_figure_objects.push_back(std::move(fig));
+						continue;
+					}
+					ThreeDWaterAnimal a;
+					a.name = fig.name;
+					a.sea = sea;
+					a.on_rod = e.value("na_prut", false);
+					a.glows = glows;
+					a.scale = scale;
+					std::copy(std::begin(size), std::end(size), a.size);
+					if (e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
+						const auto &poses = e.at("pozy");
+						auto posed = [&](const std::string &pose, const nlohmann::json &p, const std::string &name) {
+							ThreeDVehicleObject one = fig;
+							one.name = name;
+							one.skeleton_file = fig.file;
+							one.skeleton_anim = p.is_object() && p.contains("animace") && p.at("animace").is_string() ? p.at("animace").get<std::string>() : pose;
+							one.frames = p.is_object() ? std::clamp(p.value("snimku", 1), 1, 64) : 1;
+							one.frame_ticks = p.is_object() ? std::clamp(p.value("tiku", 1), 1, 1000) : 1;
+							one.loop = p.is_object() ? p.value("smycka", true) : true;
+							one.walk_step = p.is_object() ? std::clamp(p.value("krok_m", 0.0f), 0.0f, 100.0f) : 0.0f;
+							if (one.frames >= 2) one.frame_prefix = pose + "_";
+							_figure_objects.push_back(std::move(one));
+						};
+						for (const auto &[pose, p] : poses.items()) {
+							posed(pose, p, fig.name + "/" + pose);
+							a.poses.push_back(pose);
+						}
+						const std::string first = poses.contains("plave") ? std::string("plave") : poses.contains("stoji") ? std::string("stoji") : poses.begin().key();
+						posed(first, poses.at(first), fig.name);
+						a.swims = poses.contains("plave");
+					} else {
+						/* Without poses: one flat, far lower than wide, lies on the bed (the starfish, the big octopus with its
+						 * arms spread), the others swim (the shark, the fish on the rod). */
+						a.swims = a.on_rod || !(size[2] < 0.35f * size[1]);
+						_figure_objects.push_back(std::move(fig));
+					}
+					std::erase_if(_water_animals, [&](const ThreeDWaterAnimal &w) { return w.name == a.name; });
+					_water_animals.push_back(std::move(a));
+					continue;
+				}
+				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom" || animal) && e.contains("soubor")) {
+					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
+					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
+					 * its file in the lists of plants ("rostliny"). */
+					ThreeDVehicleObject fig;
+					fig.package = package;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					fig.thing = figure_kind == "predmet";
+					/* The wheat of the fields without its solid stand under the ears (its "<name>_koberec", a block 4 x 4 m):
+					 * the player, test6, "under the plants there is still some rubbish ... away with it"; the blocks stood as
+					 * small squares, in steps on a slope. Its stalks on the field's ground, our grass tinted to its stage. */
+					if (figure_kind == "rostlina" && fig.name.starts_with("pv_psenice_")) fig.skip_materials.push_back(fig.name + "_koberec");
+					/* One pose of a file of several, each a node (the colleague's girls of the lorries, point 11): that node only. */
+					if (e.contains("uzel") && e.at("uzel").is_string()) fig.only_node = e.at("uzel").get<std::string>();
+					/* Without some nodes of its file ("bez_uzlu", as a building's): the jumping fox's block of snow it
+					 * stood on in its model (the player, 4. 11.: "that is her ice, not ours, take the ice away"). */
+					if (e.contains("bez_uzlu") && e.at("bez_uzlu").is_array()) {
+						for (const auto &n : e.at("bez_uzlu")) {
+							if (n.is_string()) fig.skip_nodes.push_back(n.get<std::string>());
+						}
+					}
+					/* Standing on its lowest corner ("na_zem"): the fox's origin was the bottom of that snow, without it she
+					 * hung in the air. */
+					fig.to_ground = e.value("na_zem", false);
+					/* A node of another's scene as a thing of its own (our fireplace by the walker's tent, the forest
+					 * cabin's "ohniste", the player 7. 11.: "outside by the tent our fireplace with E to grill"): its
+					 * middle at the origin ("na_stred"); only the ends of a thing ("jen_konce_m": the grill's trestles
+					 * without its bricks, as over the forest's fire). */
+					fig.to_middle = e.value("na_stred", false);
+					/* Seen only from the outer side of its faces ("jednostranne"), as glTF has them: the concrete of a ship
+					 * tunnel's mouth, whose faces under the hill behind it are not drawn over the hill (tunel_lodni.py). */
+					fig.one_sided = e.value("jednostranne", false);
+					fig.ends_beyond = std::max(0.0f, e.value("jen_konce_m", 0.0f));
+					/* Only its frames' nodes ("jen_snimky"): the torch's flame without its stick, the fire of the fireplaces. */
+					fig.frames_only = e.value("jen_snimky", false);
+					/* Without some materials of its file ("bez_materialu"), laid along another line ("prohnuti" "z", "do"):
+					 * the fishing rods straight and bent (BendThreeDThingPoint()). */
+					if (e.contains("bez_materialu") && e.at("bez_materialu").is_array()) {
+						for (const auto &n : e.at("bez_materialu")) {
+							if (n.is_string()) fig.skip_materials.push_back(n.get<std::string>());
+						}
+					}
+					if (e.contains("prohnuti") && e.at("prohnuti").is_object()) {
+						auto line = [&](const char *key, std::vector<std::array<float, 2>> &into) {
+							const auto &b = e.at("prohnuti");
+							if (!b.contains(key) || !b.at(key).is_array()) return;
+							for (const auto &p : b.at(key)) {
+								if (p.is_array() && p.size() == 2 && p.at(0).is_number() && p.at(1).is_number()) into.push_back({p.at(0).get<float>(), p.at(1).get<float>()});
+							}
+							if (into.size() < 2) into.clear();
+						};
+						line("z", fig.bend_from);
+						line("do", fig.bend_to);
+					}
+					/* A figure of poses (the player, 18. 10.: "the figures modular, one figure object everywhere with what it
+					 * has to do -- walk, smoke"; hra/3d/POSTAVY-MODULARNI-A-STADION.md): one file with bones ("kostra", else
+					 * "soubor"), each pose ("pozy") an animation of it ("animace", else the pose's name), a figure of its own
+					 * "<jmeno>/<poza>": of one frame it stands so (the animation's first key), of more ("snimku", each held
+					 * "tiku" ticks) it goes round the animation ("smycka" false: once, staying on the last), walking "krok_m"
+					 * a round. The figure by its name alone is its pose "stoji", else its first. Placed with "poza" beside
+					 * "postava" (FigureNamed()). Its file is read when it is first drawn, not here. */
+					/* A dog, an animal, a ghost, a seller of dogs: what it is, where it is found, how it takes the walker (ThreeDAnimal). */
+					auto note_animal = [&](std::vector<std::string> poses) {
+						if (!animal) return;
+						ThreeDAnimal a;
+						a.name = fig.name;
+						a.kind = nurse ? ThreeDAnimal::Kind::Nurse : figure_kind == "pes" ? ThreeDAnimal::Kind::Dog : figure_kind == "zvire" ? ThreeDAnimal::Kind::Animal : figure_kind == "strasidlo" ? ThreeDAnimal::Kind::Ghost : ThreeDAnimal::Kind::Seller;
+						const std::string temper = e.value("povaha", std::string());
+						a.temper = temper == "utoci" ? ThreeDAnimal::Temper::Attacks : temper == "vyprovokovat" ? ThreeDAnimal::Temper::Provoked : ThreeDAnimal::Temper::Peaceful;
+						auto place = [&](std::string_view where) {
+							if (where == "ulice") a.places |= ThreeDAnimal::STREET;
+							if (where == "dvere") a.places |= ThreeDAnimal::DOOR;
+							if (where == "okoli") a.places |= ThreeDAnimal::ROUND;
+							if (where == "strecha") a.places |= ThreeDAnimal::ROOF;
+							if (where == "koleje") a.places |= ThreeDAnimal::RAIL;
+							if (where == "les") a.places |= ThreeDAnimal::FOREST;
+							if (where == "kostel") a.places |= ThreeDAnimal::CHURCH;
+						};
+						if (e.contains("kde") && e.at("kde").is_string()) place(e.at("kde").get<std::string>());
+						if (e.contains("kde") && e.at("kde").is_array()) {
+							for (const auto &w : e.at("kde")) {
+								if (w.is_string()) place(w.get<std::string>());
+							}
+						}
+						/* Its kind of towns, one or a list of them (the colleague's Putin: "klima": ["mirne", "subarkticke"]). */
+						auto climate = [&](std::string_view c) {
+							if (c == "mirne") a.climate |= ThreeDAnimal::TEMPERATE;
+							if (c == "poust") a.climate |= ThreeDAnimal::DESERT;
+							if (c == "subarkticke") a.climate |= ThreeDAnimal::ARCTIC;
+						};
+						if (e.contains("klima") && e.at("klima").is_string()) climate(e.at("klima").get<std::string>());
+						if (e.contains("klima") && e.at("klima").is_array()) {
+							for (const auto &c : e.at("klima")) {
+								if (c.is_string()) climate(c.get<std::string>());
+							}
+						}
+						a.theme = ParseIndexTheme(e);
+						a.night = e.value("kdy", std::string()) == "noc";
+						a.day = e.value("kdy", std::string()) == "den";
+						a.sold = e.value("prodej", false);
+						a.flies = e.value("leta", false);
+						a.price = std::clamp(e.value("cena", 0), 0, 10000000);
+						if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+							for (int k = 0; k < 3; k++) a.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
+						}
+						if (e.contains("rozmer_nakladu") && e.at("rozmer_nakladu").is_array() && e.at("rozmer_nakladu").size() == 3) {
+							for (int k = 0; k < 3; k++) {
+								if (e.at("rozmer_nakladu").at(k).is_number()) a.load_size[k] = std::max(0.05f, e.at("rozmer_nakladu").at(k).get<float>());
+							}
+						}
+						a.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
+						/* How high its origin floats over the ground, true metres: "vznaseni_m" (the colleague's ghost and
+						 * phantom of the forest, hra/3d/STRASIDLA-LES-ROZEN-PRO-HRU.md), before it "vyska_m" of a ghost. Of
+						 * the people "vyska_m" is how tall they are (the nurses floated 1.7 m over the church's steps). */
+						a.hover_m = std::clamp(e.value("vznaseni_m", a.kind == ThreeDAnimal::Kind::Ghost ? e.value("vyska_m", 0.0f) : 0.0f), 0.0f, 50.0f);
+						/* In place of a night flyer of the indices (the player, 22. 10.: "the ghost in the bedsheet should not
+						 * attack, it should float along the street like the walkers"): that one out of the sky. */
+						if (e.contains("nahrazuje") && e.at("nahrazuje").is_string()) {
+							const std::string replaced = e.at("nahrazuje").get<std::string>();
+							_witches_replaced.insert(replaced);
+							std::erase_if(_witches, [&](const ThreeDWitch &w) { return w.name == replaced; });
+						}
+						if (e.contains("nazev") && e.at("nazev").is_object()) {
+							a.title_cs = e.at("nazev").value("cs", std::string());
+							a.title_en = e.at("nazev").value("en", a.title_cs);
+							if (a.title_cs.empty()) a.title_cs = a.title_en;
+						}
+						if (a.title_en.empty()) a.title_cs = a.title_en = a.name;
+						a.poses = std::move(poses);
+						_animals.push_back(std::move(a));
+					};
+					/* A ghost's poses of frames ("animace" by the pose, the colleague's mushroom warrior: "chuze" with
+					 * "uzly" "chuze_"), as a creature's: a figure each, "<jmeno>/<poza>", the figure by its name alone
+					 * its rest ("klid", else its first). */
+					if (animal && !e.contains("pozy") && e.contains("animace") && e.at("animace").is_object() && !e.at("animace").empty() && e.at("animace").begin()->is_object()) {
+						std::vector<std::string> names;
+						for (const auto &[pose, a] : e.at("animace").items()) {
+							if (!a.is_object()) continue;
+							ThreeDVehicleObject one = fig;
+							one.name = fig.name + "/" + pose;
+							one.frame_prefix = a.value("uzly", pose + "_");
+							one.frames = std::clamp(a.value("snimku", 0), 0, 64);
+							one.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+							one.loop = a.value("smycka", true);
+							one.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
+							if (one.frames < 2) one.frame_prefix.clear();
+							_figure_objects.push_back(std::move(one));
+							names.push_back(pose);
+						}
+						if (names.empty()) continue;
+						const std::string rest = fig.name + "/" + (std::ranges::find(names, "klid") != names.end() ? std::string("klid") : names.front());
+						for (size_t k = _figure_objects.size(); k-- > 0;) {
+							if (_figure_objects[k].name != rest) continue;
+							ThreeDVehicleObject one = _figure_objects[k];
+							one.name = fig.name;
+							_figure_objects.push_back(std::move(one));
+							break;
+						}
+						note_animal(std::move(names));
+						continue;
+					}
+					/* A figure of a kind of bones ("kostra" its name, not a file: the colleague's humanoids), posed by the
+					 * motions of its kind once all the indices are read (MakeHumanoidFigures()). */
+					if (figure_kind == "postava" && (!animal || nurse) && !e.contains("pozy") && e.contains("kostra") && e.at("kostra").is_string()) {
+						fig.skeleton_file = fig.file;
+						/* The nurse on the bones walks and stands as the motions of her kind ("chuze", "stoji"). */
+						if (nurse) note_animal({"chuze", "stoji"});
+						_humanoids.push_back({std::move(fig), e.at("kostra").get<std::string>(), std::clamp(e.value("vyska_kycli", 1.0f), 0.1f, 10.0f)});
+						continue;
+					}
+					if ((figure_kind == "postava" || animal) && e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
+						/* "kostra" a file of its bones, or the kind of them (the colleague's four-legged "ctyrnozec", the
+						 * player 31. 10.: "a shared skeleton for the animals with four legs, like the horse", as the
+						 * humanoids' "humanoid"): then its bones are its own file's. */
+						const std::string skeleton = e.contains("kostra") && e.at("kostra").is_string() ? e.at("kostra").get<std::string>() : std::string();
+						const bool kind_named = !skeleton.empty() && !skeleton.ends_with(".glb");
+						const std::string bones = folder + (skeleton.empty() || kind_named ? e.at("soubor").get<std::string>() : skeleton);
+						const float hips = std::clamp(e.value("vyska_kycli", 1.0f), 0.1f, 10.0f);
+						const auto &poses = e.at("pozy");
+						auto posed = [&](const std::string &pose, const nlohmann::json &p, const std::string &name) {
+							ThreeDVehicleObject one = fig;
+							one.name = name;
+							one.skeleton_file = bones;
+							one.skeleton_anim = p.is_object() && p.contains("animace") && p.at("animace").is_string() ? p.at("animace").get<std::string>() : pose;
+							one.frames = p.is_object() ? std::clamp(p.value("snimku", 1), 1, 64) : 1;
+							one.frame_ticks = p.is_object() ? std::clamp(p.value("tiku", 1), 1, 1000) : 1;
+							one.loop = p.is_object() ? p.value("smycka", true) : true;
+							one.walk_step = p.is_object() ? std::clamp(p.value("krok_m", 0.0f), 0.0f, 100.0f) : 0.0f;
+							if (kind_named) one.bone_kind = skeleton;
+							one.hips = hips;
+							/* (A figure of frames walks by them: the frames of the pose, though of bones, not of nodes.) */
+							if (one.frames >= 2) one.frame_prefix = pose + "_";
+							_figure_objects.push_back(std::move(one));
+						};
+						std::vector<std::string> names;
+						for (const auto &[pose, p] : poses.items()) {
+							posed(pose, p, fig.name + "/" + pose);
+							names.push_back(pose);
+						}
+						const std::string first = poses.contains("stoji") ? std::string("stoji") : poses.contains("klid") ? std::string("klid") : poses.begin().key();
+						posed(first, poses.at(first), fig.name);
+						note_animal(std::move(names));
+						continue;
+					}
+					note_animal({});
+					if (fig.thing) {
+						/* A thing's states, each a whole thing in a node of its own (the colleague's bow, "volno" and
+						 * "napnuto"; the crossbow, "natazeno" and "vystreleno"): a figure each, "<jmeno>/<stav>", that node
+						 * only. And its sounds ("zvuky": the string drawn, the shot), files beside it. */
+						if (e.contains("stavy") && e.at("stavy").is_object()) {
+							for (const auto &[state, about] : e.at("stavy").items()) {
+								ThreeDVehicleObject one = fig;
+								one.name = fig.name + "/" + state;
+								one.only_node = state;
+								_figure_objects.push_back(std::move(one));
+							}
+						}
+						if (e.contains("zvuky") && e.at("zvuky").is_object()) {
+							for (const auto &[sound, file] : e.at("zvuky").items()) {
+								if (file.is_string()) _thing_sounds[fig.name + "/" + sound] = folder + file.get<std::string>();
+							}
+						}
+					}
+					if (e.value("druh", std::string()) == "rostlina") {
+						fig.name = e.at("soubor").get<std::string>();
+						if (fig.name.ends_with(".glb")) fig.name.resize(fig.name.size() - 4);
+					}
+					if (e.contains("animace") && e.at("animace").is_object()) {
+						/* It moves: its frames are nodes of the file, drawn one at a time, a frame every so many ticks. */
+						const auto &a = e.at("animace");
+						fig.frame_prefix = a.value("uzly", std::string("snimek_"));
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+						if (fig.frames < 2) fig.frame_prefix.clear();
+						if (a.contains("chuze") && a.at("chuze").is_object()) fig.walk_step = std::clamp(a.at("chuze").value("krok_m", 0.0f), 0.0f, 10.0f);
+					}
+					/* A light (the colleague's torch and lantern): its glass ("noc") drawn with it, lit by its flame; and
+					 * a weapon that shoots rockets, a figure of it shot (its loaded rocket, "raketa_v_hlavni", left out). */
+					if (fig.thing && e.value("kategorie", std::string()) == "svetlo") {
+						fig.night_glass = true;
+						/* Its light as the index has it (the colleague's torch, 23. 10.: "the fire lights about, 10 m, it flickers"). */
+						if (e.contains("svetlo") && e.at("svetlo").is_object()) {
+							const auto &l = e.at("svetlo");
+							auto n = l.contains("barva") && l.at("barva").is_string() ? ParseInteger<uint32_t>(l.at("barva").get<std::string>(), 16) : std::nullopt;
+							if (n.has_value()) fig.light_colour = *n & 0xFFFFFF;
+							fig.light_reach_m = std::clamp(l.value("dosah_m", 0.0f), 0.0f, 50.0f);
+							fig.light_flickers = l.value("blika", false);
+						}
+					}
+					/* A thing glowing at night (the colleague's glowing mushrooms, "kdy": "noc" with "noc"): its glass
+					 * part of it, lit; and a mushroom to pick among the mushrooms, its glowing one beside it. */
+					if (fig.thing && e.value("kdy", std::string()) == "noc" && e.contains("noc")) fig.night_glass = true;
+					if (fig.thing && e.value("kategorie", std::string()) == "houba") {
+						const bool glowing = e.value("kdy", std::string()) == "noc";
+						std::string base = fig.name;
+						if (glowing && base.ends_with("_svitici")) base.resize(base.size() - std::string_view("_svitici").size());
+						auto it = std::ranges::find(_mushrooms, base, &ThreeDMushroom::name);
+						if (it == _mushrooms.end()) {
+							ThreeDMushroom m;
+							m.name = base;
+							_mushrooms.push_back(std::move(m));
+							it = std::prev(_mushrooms.end());
+						}
+						if (glowing) {
+							it->night = fig.name;
+						} else {
+							it->theme = ParseIndexTheme(e);
+							it->height_m = std::clamp(e.value("vyska_m", 0.1f), 0.01f, 5.0f);
+							if (e.contains("nazev") && e.at("nazev").is_object()) {
+								it->title_cs = e.at("nazev").value("cs", std::string());
+								it->title_en = e.at("nazev").value("en", it->title_cs);
+							}
+						}
+					}
+					if (fig.thing && e.value("strelba", std::string()) == "raketa") {
+						ThreeDVehicleObject shot = fig;
+						shot.name = fig.name + "/prazdny";
+						shot.skip_nodes = {"raketa_v_hlavni"};
+						_figure_objects.push_back(std::move(shot));
+					}
+					/* A light's flame (the colleague's torch and lantern, "plamen"): its frames, the rest of it in each. */
+					if (fig.thing && e.contains("plamen") && e.at("plamen").is_object()) {
+						const auto &a = e.at("plamen");
+						fig.frame_prefix = a.value("uzly", std::string("plamen_"));
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+						if (fig.frames < 2) fig.frame_prefix.clear();
+					}
+					/* A thing that turns (the colleague's hra/3d/PROSBA-HOSPODA.md, the spit: "we will turn it"): about an
+					 * axis through a point, a turn in so many ticks, smoothly; and its frames ("stridani", the pig, the
+					 * calf and the lamb) one after another, each for so many turns. */
+					if (e.contains("otaceni") && e.at("otaceni").is_object()) {
+						const auto &o = e.at("otaceni");
+						fig.spin_ticks = std::clamp(o.value("tiku_na_otacku", 0), 0, 100000);
+						if (o.contains("osa") && o.at("osa").is_array() && o.at("osa").size() == 3) {
+							for (int k = 0; k < 3; k++) fig.spin_axis[k] = o.at("osa").at(k).get<float>();
+						}
+						if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3) {
+							for (int k = 0; k < 3; k++) fig.spin_centre[k] = o.at("stred").at(k).get<float>();
+						}
+						const float len = std::sqrt(fig.spin_axis[0] * fig.spin_axis[0] + fig.spin_axis[1] * fig.spin_axis[1] + fig.spin_axis[2] * fig.spin_axis[2]);
+						if (len < 1e-6f) {
+							fig.spin_ticks = 0;
+						} else {
+							for (float &c : fig.spin_axis) c /= len;
+						}
+					}
+					if (e.contains("stridani") && e.at("stridani").is_object()) {
+						const auto &a = e.at("stridani");
+						fig.frame_prefix = a.value("uzly", std::string("snimek_"));
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(std::max(1, fig.spin_ticks) * std::max(1, a.value("otocek", 1)), 1, 1000000);
+						if (fig.frames < 2) fig.frame_prefix.clear();
+					}
+					/* A tree of a town theme (the clay town's mushrooms): among the trees the theme's towns have on their land;
+					 * with its night ("noc": the colleague's mushrooms glowing under their caps) a figure "<jmeno>/noc" with it
+					 * lit, drawn at night. */
+					if (figure_kind == "strom" && e.contains("noc") && e.at("noc").is_object()) {
+						ThreeDVehicleObject night = fig;
+						night.name = fig.name + "/noc";
+						night.night_glass = true;
+						_figure_objects.push_back(std::move(night));
+					}
+					if (figure_kind == "strom") {
+						const uint8_t theme = ParseIndexTheme(e);
+						if (theme != 0) {
+							auto &trees = _three_d_theme_trees[theme];
+							if (std::ranges::find(trees, fig.name) == trees.end()) {
+								trees.push_back(fig.name);
+								const bool glows = e.contains("noc") && e.at("noc").is_object();
+								_three_d_theme_trees_night[theme].push_back(glows ? fig.name + "/noc" : fig.name);
+							}
+						}
+					}
+					_figure_objects.push_back(std::move(fig));
+					continue;
+				}
+				/* A vehicle of a set: "vozidlo", or "auto" (the colleague's Tatras, hra/3d/PROSBA-TATRA-613-CIVILNI.md) or
+				 * "lod" (his boats, hra/3d/LODE-3D-PRO-HRU.md: "druh" "lod", "typ" "lod") with the set's id; an "auto"
+				 * without one is a car of the game's own that drives about by itself (later), a "lod" without one a boat
+				 * of the sets of things. */
+				const std::string kind = e.value("druh", std::string("dum"));
+				const bool driving = kind == "auto" && !e.contains("grf") && e.contains("jizda") && e.at("jizda").is_object();
+				const bool of_set = (kind == "auto" || kind == "lod") && e.contains("grf");
+				if (kind != "vozidlo" && !of_set && !driving) continue;
+				ThreeDVehicleObject obj;
+				obj.package = package;
+				if (e.contains("soubor") && e.at("soubor").is_string()) {
+					obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					obj.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, obj.file, MarginsOf::Vehicles);
+				} else if (e.contains("objekt") && e.at("objekt").is_string() && e.contains("jmeno") && e.at("jmeno").is_string()) {
+					/* An animal of a set as it is (the colleague's horses of the Special 3D v4: "sada_objektu" "zvirata",
+					 * "objekt" "kun_sedlo"): its figure in its gaits, its file the figure's once all are read. */
+					obj.name = e.at("jmeno").get<std::string>();
+					obj.body = e.at("objekt").get<std::string>();
+				} else {
+					continue;
+				}
+				obj.type = ParseIndexVehicleType(e.value("typ", std::string(kind == "auto" ? "silnice" : kind == "lod" ? "lod" : "vlak")));
+				auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
+				if (obj.type == VehicleType::Invalid || (!grfid.has_value() && !driving)) {
+					Debug(misc, 0, "3D vehicle {}: no type or set", obj.name);
+					continue;
+				}
+				if (driving) {
+					/* A car of the game's own, no set's: it drives by itself between the houses named, stop to stop. */
+					const auto &j = e.at("jizda");
+					if (j.value("k", std::string()) != "dum" || !j.contains("nahrazuje_house")) continue;
+					obj.drive_house = static_cast<HouseID>(j.at("nahrazuje_house").get<int>());
+					obj.drive_kmh = std::clamp(j.value("rychlost_kmh", 60.0f), 5.0f, 200.0f);
+					obj.drive_stand = std::clamp(j.value("stoji_tiku", 400), 0, 100000);
+					obj.pieces.push_back(0);
+				} else {
+					obj.grfid = *grfid;
+				}
+				if (e.contains("clanky")) {
+					for (const auto &piece : e.at("clanky")) {
+						auto n = ParseIndexNumber(piece);
+						if (n.has_value()) obj.pieces.push_back(static_cast<uint16_t>(*n));
+					}
+				}
+				if (!driving && obj.pieces.empty() && e.contains("motor")) {
+					auto n = ParseIndexNumber(e.at("motor"));
+					if (n.has_value()) obj.pieces.push_back(static_cast<uint16_t>(*n));
+				}
+				if (obj.pieces.empty()) {
+					Debug(misc, 0, "3D vehicle {}: no engine", obj.name);
+					continue;
+				}
+				/* The lengths of its pieces in its set its object's length is for (the colleague's lorries: the snout 4 and
+				 * the lorry 8, a trailer 8 and its bumper 4): its metres to a length of its set, the set saying how long
+				 * each piece is now (ThreeDVehicleObjectPieceLengthOf()). */
+				if (e.contains("delky_clanku_grf") && e.at("delky_clanku_grf").is_array() && e.at("delky_clanku_grf").size() == obj.pieces.size()) {
+					for (const auto &l : e.at("delky_clanku_grf")) obj.grf_lengths.push_back(l.is_number_integer() ? std::clamp(l.get<int>(), 1, static_cast<int>(VEHICLE_LENGTH)) : static_cast<int>(VEHICLE_LENGTH));
+				}
+				if (e.contains("rozmer_m") && e.at("rozmer_m").is_object()) obj.length_m = std::clamp(e.at("rozmer_m").value("delka", 0.0f), 0.0f, 200.0f);
+				if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && !e.at("rozmer_m").empty() && e.at("rozmer_m").at(0).is_number()) obj.length_m = std::clamp(e.at("rozmer_m").at(0).get<float>(), 0.0f, 200.0f);
+				/* The piece it hangs from: the middle one, the first, or the one named. The middle of an even count of
+				 * pieces is the one the middle of its length is in (a lorry: its snout 4, itself 8 -- the lorry). */
+				std::string anchor = e.contains("kotva") && e.at("kotva").is_string() ? e.at("kotva").get<std::string>() : "stred";
+				obj.anchor = anchor == "prvni" || anchor == "predni" ? 0 : (static_cast<int>(obj.pieces.size()) - 1) / 2;
+				if (anchor == "stred" && !obj.grf_lengths.empty()) {
+					int total = 0, at = 0;
+					for (int l : obj.grf_lengths) total += l;
+					for (size_t k = 0; k < obj.grf_lengths.size(); k++) {
+						if (2 * (at + obj.grf_lengths[k]) > total) {
+							obj.anchor = static_cast<int>(k);
+							break;
+						}
+						at += obj.grf_lengths[k];
+					}
+				}
+				if (e.contains("kotva") && e.at("kotva").is_number_integer()) obj.anchor = std::clamp(e.at("kotva").get<int>(), 0, static_cast<int>(obj.pieces.size()) - 1);
+				/* Its couplings: where the one after it hangs, where it hangs from the one before. */
+				if (e.contains("spojeni") && e.at("spojeni").is_object()) {
+					auto point = [&](const char *key, bool &has, float *at) {
+						const auto &s = e.at("spojeni");
+						if (!s.contains(key) || !s.at(key).is_array() || s.at(key).size() != 3) return;
+						for (int k = 0; k < 3; k++) at[k] = s.at(key).at(k).get<float>();
+						has = true;
+					};
+					point("vpredu", obj.has_couple_front, obj.couple_front);
+					point("vzadu", obj.has_couple_back, obj.couple_back);
+				}
+				if (e.contains("maska_podrobnosti") && e.at("maska_podrobnosti").is_string()) obj.detail_file = folder + e.at("maska_podrobnosti").get<std::string>();
+				/* No "meritko": the object is in true metres, and the size it is drawn at is its set's parameter
+				 * ("velikost") or else the game's setting (the player, 14. 10.: "the game can make it bigger, so there
+				 * need not be two files"). */
+				if (e.contains("textura") && e.at("textura").is_string()) obj.paint_file = folder + e.at("textura").get<std::string>();
+				if (e.contains("kabina") && e.at("kabina").is_array() && e.at("kabina").size() == 3) {
+					for (int k = 0; k < 3; k++) obj.cab[k] = e.at("kabina").at(k).get<float>();
+					obj.has_cab = true;
+				}
+				/* The helmsman of a boat (the colleague's hra/3d/LODE-3D-PRO-HRU.md, "ridic"): his eyes the cab's when it has
+				 * no "kabina", and where he stands or sits -- the walker there on the deck when he lets go of the wheel. */
+				if (e.contains("ridic") && e.at("ridic").is_object()) {
+					const auto &helmsman = e.at("ridic");
+					auto point = [&](const char *key, float (&out)[3]) {
+						if (!helmsman.contains(key) || !helmsman.at(key).is_array() || helmsman.at(key).size() != 3) return false;
+						for (int k = 0; k < 3; k++) out[k] = helmsman.at(key).at(k).get<float>();
+						return true;
+					};
+					if (!obj.has_cab) obj.has_cab = point("oko", obj.cab);
+					obj.has_helm = point("poloha", obj.helm);
+				}
+				/* Its rooms and the figures on it and in them (ReadBoatRooms()). */
+				if (obj.type == VehicleType::Ship) ReadBoatRooms(e, folder, package, obj);
+				/* A boat's hull under its waterline, and a submarine's dive (the player, test4: "we have no buttons up and
+				 * down to steer the submarine"; the colleague's hra/3d/PROSBA-LODE-TEST4.md): ShipDiveM(). */
+				if (e.contains("ponor_m") && e.at("ponor_m").is_number()) obj.draught_m = std::clamp(e.at("ponor_m").get<float>(), 0.0f, 50.0f);
+				/* Its height, a boat's over its waterline the room it needs in a ship tunnel (ShipFitsTunnel()). */
+				if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3 && e.at("rozmer_m")[2].is_number()) {
+					obj.height_m = std::clamp(e.at("rozmer_m")[2].get<float>(), 0.0f, 200.0f);
+				}
+				if (e.contains("ponoreni_m") && e.at("ponoreni_m").is_number()) obj.dive_m = std::clamp(e.at("ponoreni_m").get<float>(), 0.0f, 100.0f);
+				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
+				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */
+				if (e.contains("svetla") && e.at("svetla").is_object()) {
+					const auto &lights = e.at("svetla");
+					obj.lights_off = lights.contains("vychozi") && lights.at("vychozi").is_string() && lights.at("vychozi").get<std::string>() == "off";
+				}
+				/* The paint: its mask, how it fades with age, a colour by number. */
+				if (e.contains("lak") && e.at("lak").is_object()) {
+					const auto &lak = e.at("lak");
+					if (lak.contains("maska") && lak.at("maska").is_string()) obj.paint.mask_file = folder + lak.at("maska").get<std::string>();
+					auto colour = [](const nlohmann::json &v) -> std::optional<uint32_t> {
+						if (!v.is_string()) return std::nullopt;
+						std::string t = v.get<std::string>();
+						if (t.starts_with("#")) t = t.substr(1);
+						auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+						if (!n.has_value()) return std::nullopt;
+						return Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+					};
+					if (lak.contains("cil")) {
+						auto c = colour(lak.at("cil"));
+						if (c.has_value()) {
+							obj.paint.fades = true;
+							obj.paint.target = *c;
+						}
+					}
+					obj.paint.start = std::clamp(lak.value("zacatek", 0), 0, 255);
+					if (lak.contains("barva")) {
+						auto c = colour(lak.at("barva"));
+						if (c.has_value()) {
+							obj.paint.coloured = true;
+							obj.paint.colour = *c;
+						}
+					}
+					if (obj.paint.mask_file.empty()) obj.paint.fades = obj.paint.coloured = false;
+				}
+				if (e.contains("barva") && !obj.paint.mask_file.empty()) {
+					/* The colour by number may stand beside "lak" too. */
+					const auto &v = e.at("barva");
+					if (v.is_string()) {
+						std::string t = v.get<std::string>();
+						if (t.starts_with("#")) t = t.substr(1);
+						auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+						if (n.has_value()) {
+							obj.paint.coloured = true;
+							obj.paint.colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+						}
+					}
+				}
+				/* The crew: figures riding in it, never fading. */
+				if (e.contains("posadka")) ReadCrew(e.at("posadka"), obj.crew, false);
+				/* The parts a state shows (the colleague's hra/3d/PROSBA-V3S-3D.md): each node of each add-on, then each
+				 * group of the crew; part 0 is what is always drawn. */
+				obj.part_names.assign(1, std::string());
+				if (e.contains("doplnky") && e.at("doplnky").is_array()) {
+					for (const auto &a : e.at("doplnky")) {
+						if (!a.is_object() || !a.contains("soubor") || !a.at("soubor").is_string()) continue;
+						ThreeDVehicleAddon addon;
+						addon.key = a.at("soubor").get<std::string>();
+						addon.file = folder + addon.key;
+						/* The add-ons' files are the vehicle's record's, its "okraje_textur" theirs too (or their own). */
+						NoteMarginsFilled(e, addon.file, MarginsOf::Vehicles);
+						NoteMarginsFilled(a, addon.file, MarginsOf::Vehicles);
+						if (a.contains("poloha") && a.at("poloha").is_array() && a.at("poloha").size() == 3) {
+							for (int k = 0; k < 3; k++) addon.at[k] = a.at("poloha").at(k).get<float>();
+						}
+						if (a.contains("uzly") && a.at("uzly").is_array()) {
+							for (const auto &n : a.at("uzly")) {
+								if (n.is_string()) addon.nodes.push_back(n.get<std::string>());
+							}
+						}
+						if (a.contains("barva") && a.at("barva").is_object()) {
+							const auto &b = a.at("barva");
+							if (b.contains("maska") && b.at("maska").is_string()) addon.mask_file = folder + b.at("maska").get<std::string>();
+							addon.start = std::clamp(b.value("zacatek", 0), 0, 255);
+						}
+						if (a.contains("maska_podrobnosti") && a.at("maska_podrobnosti").is_string()) addon.detail_file = folder + a.at("maska_podrobnosti").get<std::string>();
+						for (const std::string &n : addon.nodes) obj.part_names.push_back(addon.key + "/" + n);
+						obj.addons.push_back(std::move(addon));
+					}
+				}
+				if (e.contains("posadky") && e.at("posadky").is_object()) {
+					for (const auto &[group, list] : e.at("posadky").items()) {
+						std::vector<ThreeDVehicleCrew> crew;
+						ReadCrew(list, crew, false);
+						obj.part_names.push_back("posadky/" + group);
+						obj.crew_groups.emplace_back(group, std::move(crew));
+					}
+				}
+				/* The record's own crew a part too: drawn in every state but one standing empty (EmptyStateOf()). */
+				if (!obj.crew.empty()) obj.part_names.push_back("posadka");
+				/* The animals running behind it ("doprovod" of a state, the colleague's hra/3d/PROSBA-KUN-DOBYTEK.md): a
+				 * part each, the same animal at the same place one part however many states name it. Its "sada_objektu"
+				 * is where the horse's own figure is looked for too: the vehicle's package, else the game's sets. */
+				auto companion_of = [](const nlohmann::json &d) -> std::optional<ThreeDVehicleCompanion> {
+					if (!d.is_object() || !d.contains("objekt") || !d.at("objekt").is_string()) return std::nullopt;
+					ThreeDVehicleCompanion c;
+					c.animal = d.at("objekt").get<std::string>();
+					c.behind = std::clamp(d.value("za_m", 1.0f), -20.0f, 20.0f);
+					c.aside = std::clamp(d.value("bok_m", 0.0f), -20.0f, 20.0f);
+					c.scale = std::clamp(d.value("meritko", 1.0f), 0.05f, 20.0f);
+					c.key = fmt::format("doprovod/{}/{}/{}/{}", c.animal, c.behind, c.aside, c.scale);
+					return c;
+				};
+				if (e.contains("stavy") && e.at("stavy").is_array()) {
+					for (const auto &st : e.at("stavy")) {
+						if (!st.is_object() || !st.contains("doprovod")) continue;
+						auto c = companion_of(st.at("doprovod"));
+						if (!c.has_value() || std::ranges::find(obj.part_names, c->key) != obj.part_names.end()) continue;
+						obj.part_names.push_back(c->key);
+						obj.companions.push_back(std::move(*c));
+					}
+				}
+				/* The wings of its doors that open out ("dvere", "druh" "vyklopne"): two parts each, shut and open
+				 * (ThreeDVehicleDoor). Other kinds ("pant" of a depot's gate) are not a vehicle's. */
+				if (e.contains("dvere") && e.at("dvere").is_array()) {
+					for (const auto &d : e.at("dvere")) {
+						if (!d.is_object() || d.value("druh", std::string()) != "vyklopne" || !d.contains("uzel") || !d.at("uzel").is_string()) continue;
+						if (!d.contains("posun") || !d.at("posun").is_array() || d.at("posun").size() != 2) continue;
+						ThreeDVehicleDoor door;
+						door.node = d.at("uzel").get<std::string>();
+						for (int a = 0; a < 2; a++) door.shift[a] = std::clamp(d.at("posun").at(a).get<float>(), -5.0f, 5.0f);
+						obj.part_names.push_back("dvere/" + door.node);
+						obj.part_names.push_back("dvere/" + door.node + "/otevrene");
+						obj.doors.push_back(std::move(door));
+						if (obj.doors.size() >= 32) break;
+					}
+				}
+				if (obj.part_names.size() > ThreeDParts::COUNT) {
+					Debug(misc, 0, "3D vehicle {}: {} parts shown by the states, only {} can be", obj.name, obj.part_names.size() - 1, ThreeDParts::COUNT - 1);
+					obj.part_names.resize(ThreeDParts::COUNT);
+				}
+				auto part_of = [&](const std::string &name) {
+					auto it = std::ranges::find(obj.part_names, name);
+					return it == obj.part_names.end() || it == obj.part_names.begin() ? 0 : static_cast<int>(it - obj.part_names.begin());
+				};
+				for (ThreeDVehicleDoor &d : obj.doors) {
+					d.shut_part = static_cast<uint8_t>(part_of("dvere/" + d.node));
+					d.open_part = static_cast<uint8_t>(part_of("dvere/" + d.node + "/otevrene"));
+				}
+				/* A wing without its two parts (past the parts a state can show) stays as the model has it. */
+				std::erase_if(obj.doors, [](const ThreeDVehicleDoor &d) { return d.shut_part == 0 || d.open_part == 0; });
+				/* The groups of the crew one of which sits at the driver's seat (the colleague's hra/3d/TATRY-V3-PRO-HRU.md:
+				 * Mat driving the fire Tatra): where a state shows one, the record's driver is not drawn (PartsOf()). */
+				for (const auto &[group, list] : obj.crew_groups) {
+					const int part = part_of("posadky/" + group);
+					if (part > 0 && std::ranges::any_of(list, [](const ThreeDVehicleCrew &c) { return c.driver_seat; })) obj.seat_groups.Set(part);
+				}
+				obj.crew_record_part = part_of("posadka");
+				for (ThreeDVehicleCompanion &c : obj.companions) c.part = static_cast<uint8_t>(part_of(c.key));
+				std::erase_if(obj.companions, [](const ThreeDVehicleCompanion &c) { return c.part == 0; });
+				/* The wheels of its own model that turn as it goes, the front ones steering. */
+				if (e.contains("kola_v_modelu") && e.at("kola_v_modelu").is_array()) {
+					for (const auto &k : e.at("kola_v_modelu")) {
+						if (!k.is_object() || !k.contains("uzel") || !k.contains("stred") || !k.at("stred").is_array() || k.at("stred").size() != 3) continue;
+						ThreeDModelWheel w;
+						w.node = k.at("uzel").get<std::string>();
+						if (k.contains("soubor") && k.at("soubor").is_string()) w.addon = k.at("soubor").get<std::string>();
+						for (int a = 0; a < 3; a++) w.centre[a] = k.at("stred").at(a).get<float>();
+						w.radius = std::clamp(k.value("polomer_m", 0.5f), 0.05f, 5.0f);
+						w.steers = k.value("rizeni", false);
+						w.max_angle = std::clamp(k.value("max_uhel", 35.0f), 0.0f, 80.0f);
+						obj.model_wheels.push_back(std::move(w));
+						if (obj.model_wheels.size() >= 254) break;
+					}
+				}
+				/* Its windows: see-through. */
+				if (e.contains("sklo") && e.at("sklo").is_object()) {
+					obj.glass_node = e.at("sklo").value("uzel", std::string());
+					obj.glass_alpha = std::clamp(e.at("sklo").value("alfa", 0.15f), 0.0f, 1.0f);
+				}
+				/* Its places of graffiti (the colleague's hra/3d/GRAFITI-VAGONY-PRO-HRU.md): empty nodes of its file at their
+				 * middles on its sides, sprayed as it ages (ThreeDWear). */
+				if (e.contains("grafiti") && e.at("grafiti").is_array()) {
+					for (const auto &g : e.at("grafiti")) {
+						if (!g.is_object() || !g.contains("uzel") || !g.at("uzel").is_string()) continue;
+						ThreeDGraffitiPlace place;
+						place.node = g.at("uzel").get<std::string>();
+						place.w = std::clamp(g.value("sirka_m", 1.0f), 0.1f, 30.0f);
+						place.h = std::clamp(g.value("vyska_m", 1.0f), 0.1f, 10.0f);
+						obj.graffiti_places.push_back(std::move(place));
+						if (obj.graffiti_places.size() >= 255) break;
+					}
+				}
+				obj.graffiti_from = static_cast<uint8_t>(std::clamp(e.value("grafiti_od_let", 3), 0, 200));
+				obj.graffiti_every = static_cast<uint8_t>(std::clamp(e.value("grafiti_po_letech", 3), 1, 200));
+				/* The states its GRF picks by its sprites ("stavy"): a colour of the paint, how far it has faded and rusted. */
+				if (e.contains("stavy") && e.at("stavy").is_array()) {
+					for (const auto &st : e.at("stavy")) {
+						if (!st.is_object()) continue;
+						ThreeDVehicleState state;
+						if (st.contains("sprity")) {
+							if (!st.at("sprity").is_array() || st.at("sprity").size() != 2) continue;
+							auto first = ParseIndexNumber(st.at("sprity").at(0)), last = ParseIndexNumber(st.at("sprity").at(1));
+							if (!first.has_value() || !last.has_value() || *last < *first) continue;
+							state.first = *first;
+							state.last = *last;
+						} else {
+							/* A set without the GRF's sprites (the colleague's "kabina 148 hasici": the fire Tatra standing on
+							 * the pitch, the player 29. 10.: "the fire Tatra's cab is missing"): no sprite of the GRF picks
+							 * it, only its name does (StateNamed()). */
+							if (!st.contains("sada") || !st.at("sada").is_string()) continue;
+							state.first = 1;
+							state.last = 0;
+						}
+						if (st.contains("barva") && st.at("barva").is_string()) {
+							std::string t = st.at("barva").get<std::string>();
+							if (t.starts_with("#")) t = t.substr(1);
+							auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+							if (n.has_value()) state.colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+							state.given |= ThreeDVehicleState::GIVEN_COLOUR;
+						}
+						state.fade = std::clamp(st.value("lak", 0.0f), 0.0f, 1.0f);
+						state.rust = std::clamp(st.value("rez", 0.0f), 0.0f, 1.0f);
+						if (st.contains("lak")) state.given |= ThreeDVehicleState::GIVEN_FADE;
+						if (st.contains("rez")) state.given |= ThreeDVehicleState::GIVEN_RUST;
+						/* Its layer of the GRF's sprites; the whole object turned. */
+						state.layer = std::clamp(st.value("vrstva", 0), 0, 255);
+						/* The piece whose sets it is of (the colleague's wagons: "the middle's sets decide"). */
+						if (st.contains("clanek") && st.at("clanek").is_string()) {
+							const std::string piece = st.at("clanek").get<std::string>();
+							state.piece = piece == "hlava" ? 0 : piece == "stred" ? 1 : piece == "zad" ? 2 : -1;
+							obj.states_of_anchor = true;
+						}
+						if (st.contains("otoceni") && st.at("otoceni").is_number()) {
+							state.turn = static_cast<float>(std::remainder(st.at("otoceni").get<double>(), 360.0));
+							state.given |= ThreeDVehicleState::GIVEN_TURN;
+						}
+						/* The node of each add-on it shows, the colour each takes, the group of the crew it shows. */
+						if (st.contains("doplnky") && st.at("doplnky").is_object()) {
+							state.addon_parts.assign(obj.addons.size(), -1);
+							for (const auto &[file, node] : st.at("doplnky").items()) {
+								const int part = node.is_string() ? part_of(file + "/" + node.get<std::string>()) : 0;
+								if (part > 0) state.parts.Set(part);
+								for (size_t a = 0; a < obj.addons.size(); a++) {
+									if (obj.addons[a].key == file) state.addon_parts[a] = static_cast<int16_t>(part);
+								}
+							}
+						}
+						if (st.contains("barvy_doplnku") && st.at("barvy_doplnku").is_object()) {
+							state.addon_colours.assign(obj.addons.size(), 0);
+							for (const auto &[file, value] : st.at("barvy_doplnku").items()) {
+								if (!value.is_string()) continue;
+								std::string c = value.get<std::string>();
+								if (c.starts_with("#")) c = c.substr(1);
+								auto n = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
+								for (size_t a = 0; a < obj.addons.size(); a++) {
+									if (n.has_value() && obj.addons[a].key == file) state.addon_colours[a] = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+								}
+							}
+						}
+						if (st.contains("sada") && st.at("sada").is_string()) state.set_name = st.at("sada").get<std::string>();
+						/* The pieces of the shared loads its set carries, and the bed of the body it shows. */
+						if (st.contains("naklad") && st.at("naklad").is_object()) {
+							const auto &load = st.at("naklad");
+							std::string piece = load.value("kus", std::string());
+							/* Its own colour, before its cargo's (the V3S's red and grey bricks, either of BRCK and BDMT). */
+							uint32_t colour = 0;
+							if (load.contains("barva") && load.at("barva").is_string()) {
+								std::string c = load.at("barva").get<std::string>();
+								if (c.starts_with("#")) c = c.substr(1);
+								auto n = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
+								if (n.has_value()) colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+							}
+							/* One piece on its own place (a container on the front or the back of a flat wagon), else as many
+							 * as are loaded, side by side on the bed. */
+							const nlohmann::json place = load.value("misto", nlohmann::json());
+							if (place.is_array() && place.size() >= 2 && place[0].is_number() && place[1].is_number()) {
+								if (!piece.empty()) state.placed_loads.push_back({piece, colour, {place[0].get<float>(), place[1].get<float>()}});
+							} else {
+								state.load_piece = std::move(piece);
+								state.load_colour = colour;
+							}
+						}
+						if (st.contains("loze")) ReadLoadBed(st.at("loze"), state.bed);
+						if (st.contains("posadka") && st.at("posadka").is_string()) {
+							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
+							if (part > 0) state.parts.Set(part);
+							state.crew_part = part;
+						}
+						if (st.contains("doprovod")) {
+							if (auto c = companion_of(st.at("doprovod")); c.has_value()) {
+								if (const int part = part_of(c->key); part > 0) state.parts.Set(part);
+							}
+						}
+						/* As many as the record has: the steps are ints, the key of a picture holds them in 16 bits with
+						 * the states made of them after them (PictureRequest()). Once read only 255: the colleague's
+						 * two-wheeled cart has 281 (hra/3d/CHYBA-SPECIAL-255-STAVU.md), and the cute cartoon girl
+						 * pushing it, its last 26, was never found -- the bare cart drawn as if pulled. */
+						/* The wings it opens ("dvere_otevrene"; the Karosa standing loading at a stop), the others shut. */
+						if (st.contains("dvere_otevrene") && st.at("dvere_otevrene").is_array()) {
+							for (const auto &n : st.at("dvere_otevrene")) {
+								if (!n.is_string()) continue;
+								for (size_t d = 0; d < obj.doors.size(); d++) {
+									if (obj.doors[d].node == n.get<std::string>()) state.open_doors |= 1u << d;
+								}
+							}
+						}
+						obj.states.push_back(state);
+						if (obj.states.size() >= MAX_VEHICLE_STATES) break;
+					}
+				}
+				/* The rust: a second mask over the body's texture, rusting with age after the paint has faded. */
+				if (e.contains("rez") && e.at("rez").is_object()) {
+					const auto &rez = e.at("rez");
+					if (rez.contains("maska") && rez.at("maska").is_string()) obj.rust.mask_file = folder + rez.at("maska").get<std::string>();
+					if (rez.contains("cil") && rez.at("cil").is_string()) {
+						std::string t = rez.at("cil").get<std::string>();
+						if (t.starts_with("#")) t = t.substr(1);
+						auto n = t.size() == 6 ? ParseInteger<uint32_t>(t, 16) : std::nullopt;
+						if (n.has_value()) obj.rust.target = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+					}
+					if (rez.contains("postupne") && rez.at("postupne").is_object()) {
+						obj.rust.gradual = true;
+						obj.rust.ramp = std::clamp(rez.at("postupne").value("nabeh", 0.25f), 0.01f, 1.0f);
+					}
+					/* Its pieces, each vehicle rusting in its own order (the colleague's rust of 15. 10., hra/3d/PROSBA-VOZIDLA-3D.md;
+					 * the player, 9. 11.: "make the chance"): a pixel of piece k starts at the moment the vehicle drew for k between
+					 * its "od" and "do", later by its delay times "zpozdeni_podil", all rust in "nabeh" (ThreeDVehicleRust). */
+					if (rez.contains("kusy") && rez.at("kusy").is_string()) {
+						obj.rust.pieces_file = folder + rez.at("kusy").get<std::string>();
+						if (rez.contains("zpozdeni") && rez.at("zpozdeni").is_string()) obj.rust.delay_file = folder + rez.at("zpozdeni").get<std::string>();
+						obj.rust.delay_share = std::clamp(rez.value("zpozdeni_podil", 0.35f), 0.0f, 1.0f);
+						obj.rust.gradual = true;
+						obj.rust.ramp = std::clamp(rez.value("nabeh", 0.25f), 0.01f, 1.0f);
+						/* "seznam": a file beside (its pieces' list), or the list itself; without it each piece between 0 and 1. */
+						nlohmann::json list = nlohmann::json::array();
+						if (rez.contains("seznam") && rez.at("seznam").is_string()) {
+							const std::vector<uint8_t> text = ReadWholeFile(folder + rez.at("seznam").get<std::string>());
+							try {
+								if (!text.empty()) list = nlohmann::json::parse(text.begin(), text.end());
+							} catch (const nlohmann::json::exception &ex) {
+								Debug(misc, 0, "3D objects: {} rez seznam: {}", obj.name, ex.what());
+							}
+						} else if (rez.contains("seznam") && rez.at("seznam").is_array()) {
+							list = rez.at("seznam");
+						}
+						obj.rust.spans.assign(THREE_D_RUST_PIECES, list.is_array() && !list.empty() ? std::pair<float, float>{-1.0f, -1.0f} : std::pair<float, float>{0.0f, 1.0f});
+						if (list.is_array()) {
+							for (const auto &k : list) {
+								if (!k.is_object() || !k.contains("cislo")) continue;
+								const auto n = ParseIndexNumber(k.at("cislo"));
+								if (!n.has_value() || *n < 1 || *n >= THREE_D_RUST_PIECES) continue;
+								const float from = std::clamp(k.value("od", 0.0f), 0.0f, 1.0f), to = std::clamp(k.value("do", 1.0f), 0.0f, 1.0f);
+								obj.rust.spans[*n] = {from, std::max(from, to)};
+							}
+						}
+					}
+					if (obj.rust.target == 0) {
+						obj.rust.mask_file.clear();
+						obj.rust.pieces_file.clear();
+					}
+				}
+				/* The size as a parameter of its set: each value the scale it draws at; else the game's setting. */
+				if (e.contains("velikost") && e.at("velikost").is_object()) {
+					const auto &size = e.at("velikost");
+					auto param = size.contains("parametr") ? ParseIndexNumber(size.at("parametr")) : std::nullopt;
+					if (param.has_value() && *param < 0x80 && size.contains("hodnoty") && size.at("hodnoty").is_object()) {
+						for (const auto &[value, scale] : size.at("hodnoty").items()) {
+							auto v = ParseInteger<uint32_t>(value, 10);
+							if (v.has_value() && scale.is_number() && scale.get<float>() > 0.1f) obj.size.values.emplace_back(*v, std::clamp(scale.get<float>(), 0.25f, 4.0f));
+						}
+						if (!obj.size.values.empty()) obj.size.param = static_cast<int>(*param);
+					}
+				}
+				/* Wheels from a file of their own: one wheel at every place, mirrored to the other side. */
+				if (e.contains("kola") && e.at("kola").is_array()) {
+					for (const auto &k : e.at("kola")) {
+						if (!k.is_object() || !k.contains("soubor") || !k.contains("polohy")) continue;
+						ThreeDVehicleWheels w;
+						w.file = folder + k.at("soubor").get<std::string>();
+						NoteMarginsFilled(e, w.file, MarginsOf::Vehicles);
+						w.both_sides = k.value("oba_boky", true);
+						for (const auto &p : k.at("polohy")) {
+							if (!p.is_array() || p.size() != 3) continue;
+							w.at.push_back({p.at(0).get<float>(), p.at(1).get<float>(), p.at(2).get<float>()});
+						}
+						if (!w.at.empty()) obj.wheels.push_back(std::move(w));
+					}
+				}
+				if (driving) {
+					_driving_objects.push_back(std::move(obj));
+				} else {
+					_vehicle_objects.push_back(std::move(obj));
+				}
+			}
+		} catch (const std::exception &ex) {
+			Debug(misc, 0, "3D vehicles {}: {}", index, ex.what());
+		}
+	}
+	/* The engines of MSTS the player put in newgrf/simtrains/ (simtrains.h): each the one engine of the GRF made of
+	 * it, drawn from its model. */
+	for (const SimtrainsEngine &e : FindSimtrainsEngines()) {
+		ThreeDVehicleObject obj;
+		obj.name = e.name;
+		obj.package = e.folder;
+		obj.file = e.shape;
+		obj.type = VehicleType::Train;
+		obj.grfid = e.grfid;
+		/* A long one is articulated (ReadSize()): its parts are pieces, the model hung from the middle one. */
+		for (int k = 0; k < e.parts; k++) obj.pieces.push_back(static_cast<uint16_t>(SIMTRAINS_ENGINE_ID + k));
+		obj.anchor = (e.parts - 1) / 2;
+		if (e.has_cab) {
+			std::copy(std::begin(e.cab), std::end(e.cab), obj.cab);
+			obj.has_cab = true;
+		}
+		/* Its cab of MSTS: the driver's eye where the cab has it (simtrains_cab.h). */
+		obj.msts_cab = e.cvf;
+		if (!e.cvf.empty() && ReadSimtrainsCabEye(e.cvf, obj.cab)) obj.has_cab = true;
+		_vehicle_objects.push_back(std::move(obj));
+	}
+	/* The cars of the mods of BeamNG (beamng.h): each configuration the road vehicles of the GRF of its folder made of
+	 * it, drawn from its model, one of its mod's paints each car (the player, 16. 10.: "the colour of the mod"). */
+	for (const BeamngVehicle &b : FindBeamngVehicles()) {
+		ThreeDVehicleObject obj;
+		obj.name = b.name;
+		obj.package = b.Package();
+		obj.file = BeamngObjectFile(b, -1);
+		obj.type = VehicleType::Road;
+		obj.grfid = b.grfid;
+		/* Each car of the purchase list made of the configuration (the 1203's makes over the years) drawn from it. */
+		for (const BeamngModel &m : b.models) obj.pieces.push_back(m.id);
+		/*
+		 * The paint fading with age as our cars' do (the colleague's hra/3d/BLEDNUTI-1203-PRO-HRU.md, the player: "all
+		 * must fade"): in whole years from its purchase, each a twentieth of the way to halfway to a faded off-white,
+		 * then no more. The paint alone, as the mod paints it; its glass, chrome, lights and the girl at the wheel not.
+		 */
+		static constexpr int BEAMNG_FADE_YEARS = 20;
+		static constexpr uint8_t FADED[3] = {0xB8, 0xB8, 0xB2};
+		auto faded = [](uint32_t colour, int year) {
+			const Colour c(colour);
+			const uint8_t from[3] = {c.r, c.g, c.b};
+			uint8_t now[3];
+			for (int k = 0; k < 3; k++) {
+				const int to = (from[k] + FADED[k] + 1) / 2;
+				now[k] = static_cast<uint8_t>(from[k] + static_cast<int>(std::lround((to - from[k]) * static_cast<double>(year) / BEAMNG_FADE_YEARS)));
+			}
+			return Colour(now[0], now[1], now[2], c.a).data;
+		};
+		/* Our 1203s: the paints the player chooses in the configurator (BeamngVehicle::body_paints), the tarp's apart, an
+		 * add-on over all of its own material, fading as the body (BLEDNUTI-1203-PRO-HRU.md: "the tarp fades too"). */
+		std::vector<uint32_t> bodies = b.paints, tarps = {0};
+		if (!b.body_paints.empty()) {
+			bodies.clear();
+			for (const BeamngVehicle::Choice &c : b.body_paints) {
+				bodies.push_back(c.colour);
+				obj.paint_names.push_back(c.name);
+			}
+		}
+		if (!b.body_paints.empty() && !b.tarp_paints.empty()) {
+			tarps.clear();
+			for (const BeamngVehicle::Choice &c : b.tarp_paints) {
+				tarps.push_back(c.colour);
+				obj.tarp_names.push_back(c.name);
+			}
+		}
+		/* The tarp and the wooden bed, each an add-on over all of its own materials (BeamngMesh::own_paints, in their order). */
+		if (!b.body_paints.empty()) {
+			for (const char *key : {"plachta", "korba"}) {
+				ThreeDVehicleAddon own;
+				own.key = key;
+				own.whole = true;
+				obj.addons.push_back(std::move(own));
+			}
+		}
+		for (uint32_t colour : bodies) {
+			for (uint32_t tarp_colour : tarps) {
+				for (int year = 0; year <= BEAMNG_FADE_YEARS; year++) {
+					ThreeDVehicleState st;
+					st.colour = faded(colour, year);
+					st.given = ThreeDVehicleState::GIVEN_COLOUR;
+					if (!b.body_paints.empty()) st.addon_colours = {tarp_colour != 0 ? faded(tarp_colour, year) : 0u, b.bed_paint != 0 ? faded(b.bed_paint, year) : 0u};
+					/* A flatbed's bed, the pieces of its cargo on it (the player, 27. 10.: "ingame naklady dej na valniky 1203 1500"). */
+					if (b.has_bed) {
+						st.bed.floor = b.bed_floor;
+						std::copy(std::begin(b.bed_x), std::end(b.bed_x), st.bed.x);
+						std::copy(std::begin(b.bed_y), std::end(b.bed_y), st.bed.y);
+						st.bed.sides = b.bed_sides;
+						st.bed.top = b.bed_top;
+					}
+					obj.states.push_back(st);
+				}
+			}
+		}
+		obj.paint_random = true;
+		obj.paint_years = BEAMNG_FADE_YEARS + 1;
+		obj.loads_by_cargo = b.has_bed;
+		/* Its tarp, over a load of a cargo the shared loads have no piece of (the player, 27. 10.: "když poveze naklad
+		 * ktery nemame grafiku připravenou tak plná s plachtou"). */
+		if (b.has_tarp) {
+			obj.part_names = {std::string(), "plachta"};
+			obj.cover_part = BeamngMesh::PART_TARP;
+		}
+		if (b.has_cab) {
+			std::copy(std::begin(b.cab), std::end(b.cab), obj.cab);
+			obj.has_cab = true;
+		}
+		/* College Girl at the wheel of our Škoda 1203 only (the player, 26. 10.: "let College Girl drive", "in every car
+		 * one sits differently, put her only into the 1203"): the colleague's girl sitting at a wheel, her origin where she
+		 * sits, her eyes about 0.72 m over it and a little ahead of her hips. */
+		if (b.has_cab && StrEqualsIgnoreCase(b.id, "S1203")) {
+			ThreeDVehicleCrew driver;
+			driver.figure = "college_girl_za_volantem";
+			driver.at[0] = b.cab[0] - 0.1f;
+			driver.at[1] = b.cab[1];
+			driver.at[2] = b.cab[2] - 0.72f;
+			obj.crew.push_back(std::move(driver));
+		}
+		/* Each make of our 1203 an object of its own: its front as the make has it (ReadBeamngShape()), the Škoda's
+		 * round lights, the TAZ's square ones; their pictures shared. */
+		if (std::ranges::any_of(b.models, [](const BeamngModel &m) { return m.make >= 0; })) {
+			for (const BeamngModel &m : b.models) {
+				ThreeDVehicleObject of_make = obj;
+				of_make.name = m.name;
+				of_make.file = BeamngObjectFile(b, m.make);
+				of_make.pieces = {m.id};
+				_vehicle_objects.push_back(std::move(of_make));
+			}
+			continue;
+		}
+		_vehicle_objects.push_back(std::move(obj));
+	}
+	/* A piece is the first object's that has it -- unless another package of the same set lies beside the GRF loaded. */
+	for (size_t i = 0; i < _vehicle_objects.size(); i++) {
+		const ThreeDVehicleObject &o = _vehicle_objects[i];
+		const bool here = PackageBesideLoadedGrf(o.package, o.grfid);
+		for (size_t k = 0; k < o.pieces.size(); k++) {
+			auto [it, added] = _vehicle_object_pieces.emplace(VehiclePieceKey(o.grfid, o.type, o.pieces[k]), std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k)));
+			/* A piece of several objects of the same package: all of them, the pieces around it to tell which. */
+			if (!added && _vehicle_objects[it->second.first].package == o.package) {
+				auto &all = _vehicle_object_shared_pieces[it->first];
+				if (all.empty()) all.push_back(it->second);
+				all.emplace_back(static_cast<uint32_t>(i), static_cast<int>(k));
+				continue;
+			}
+			if (added || !here || PackageBesideLoadedGrf(_vehicle_objects[it->second.first].package, o.grfid)) continue;
+			Debug(misc, 1, "3D vehicles: {} of {} beside its loaded GRF, not of {}", o.name, o.package, _vehicle_objects[it->second.first].package);
+			/* The objects of the old package sharing it are not its any more: the next of this package to have it starts
+			 * the list anew with this one (the colleague: of the old package's A and B and the new one's A and B, the new
+			 * A was missing from the list, and the piece was always drawn as it). */
+			_vehicle_object_shared_pieces.erase(it->first);
+			it->second = std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k));
+		}
+	}
+	/* The objects sharing a piece only of the package the piece is taken of: of an older package of the set read first
+	 * (Nakladaky_Tatra_3D-v2 beside -v4), the first piece of a semi-trailer was taken to the old one's semi-trailer of
+	 * the same pieces, the one listed first, its other pieces to the new one's. */
+	for (auto it = _vehicle_object_shared_pieces.begin(); it != _vehicle_object_shared_pieces.end();) {
+		const std::string &package = _vehicle_objects[_vehicle_object_pieces[it->first].first].package;
+		std::erase_if(it->second, [&package](const std::pair<uint32_t, int> &s) { return _vehicle_objects[s.first].package != package; });
+		it = it->second.size() > 1 ? std::next(it) : _vehicle_object_shared_pieces.erase(it);
+	}
+	/* An animal on a bed takes the room its record gives it ("rozmer_nakladu"), else its size and some room about it
+	 * (the colleague: "with a gap"). */
+	for (ThreeDLoadPiece &piece : _load_pieces) {
+		if (piece.animal.empty()) continue;
+		for (const ThreeDAnimal &a : _animals) {
+			if (a.name != piece.animal) continue;
+			const bool given = a.load_size[0] > 0 && a.load_size[1] > 0 && a.load_size[2] > 0;
+			piece.size[0] = given ? a.load_size[0] : a.size[0] + LOAD_ANIMAL_ROOM_M;
+			piece.size[1] = given ? a.load_size[1] : a.size[1] + LOAD_ANIMAL_ROOM_M;
+			piece.size[2] = given ? a.load_size[2] : a.size[2];
+		}
+		/* An animal posed by its bones: the node the piece names ("pase_00") is its mesh at rest, not a frame of a pose
+		 * (the colleague's cow on the bones of the four-legged, hra/3d/ZVER-NA-KOSTRE-PRO-HRU.md: "without animation it
+		 * stands with its head up, as the frame pase_00 did") -- a figure of that node alone. */
+		auto posed = std::ranges::find(_figure_objects, piece.figure, &ThreeDVehicleObject::name);
+		if (posed == _figure_objects.end() || posed->skeleton_file.empty()) continue;
+		const std::string node = fmt::format("{}_{:02}", piece.figure.substr(piece.animal.size() + 1), piece.frame);
+		ThreeDVehicleObject still = *posed;
+		still.name = piece.animal + "/" + node;
+		still.skeleton_file.clear();
+		still.skeleton_anim.clear();
+		still.bone_kind.clear();
+		still.frame_prefix.clear();
+		still.frames = 0;
+		still.frame_ticks = 1;
+		still.walk_step = 0;
+		still.only_node = node;
+		piece.figure = still.name;
+		piece.frame = 0;
+		if (std::ranges::find(_figure_objects, still.name, &ThreeDVehicleObject::name) == _figure_objects.end()) _figure_objects.push_back(std::move(still));
+	}
+	/* The colours the vehicles' states give their pieces ("naklad" "barva"): each a state of the piece's figure. */
+	auto own_colour = [](std::string_view name, uint32_t colour) {
+		if (colour == 0 || name.empty()) return;
+		auto piece = std::ranges::find(_load_pieces, name, &ThreeDLoadPiece::name);
+		if (piece == _load_pieces.end() || std::ranges::any_of(piece->own_colours, [colour](const auto &c) { return c.first == colour; })) return;
+		auto fig = std::ranges::find(_figure_objects, piece->figure, &ThreeDVehicleObject::name);
+		if (fig == _figure_objects.end() || fig->paint.mask_file.empty()) return;
+		int step = 0;
+		for (size_t k = 0; k < fig->states.size(); k++) {
+			if (fig->states[k].colour == colour) step = static_cast<int>(k) + 1;
+		}
+		if (step == 0) {
+			ThreeDVehicleState st;
+			st.colour = colour;
+			st.given = ThreeDVehicleState::GIVEN_COLOUR;
+			fig->states.push_back(st);
+			step = static_cast<int>(fig->states.size());
+		}
+		piece->own_colours.emplace_back(colour, step);
+	};
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		for (const ThreeDVehicleState &s : o.states) {
+			own_colour(s.load_piece, s.load_colour);
+			for (const ThreeDPlacedLoad &placed : s.placed_loads) own_colour(placed.piece, placed.colour);
+		}
+	}
+	/* And those of the yards, of the part its colours paint. */
+	for (const auto &[name, cast, colour] : yard_colours) {
+		auto piece = std::ranges::find(_load_pieces, name, &ThreeDLoadPiece::name);
+		if (piece == _load_pieces.end() || piece->paint_part != cast) {
+			Debug(misc, 0, "3D loads: no piece {} with part {} for a yard's colour", name, cast);
+			continue;
+		}
+		own_colour(name, colour);
+	}
+	/* The straw of the bales on a farm's field after the harvest (the field's type 8, FieldBales()). */
+	for (const std::string_view bale : {FIELD_BALE_ROUND, FIELD_BALE_SQUARE}) own_colour(bale, *ParseIndexColour(FIELD_BALE_STRAW));
+	MakeHumanoidFigures();
+	SplitThemeGuests();
+	/* The vehicles that are animals of a set: the file of their figure (its textures, its margins). */
+	for (ThreeDVehicleObject &o : _vehicle_objects) {
+		if (o.body.empty()) continue;
+		const ThreeDVehicleObject *fig = GetThreeDFigure(o.body, o.package);
+		if (fig == nullptr) {
+			Debug(misc, 0, "3D vehicle {}: no figure {} in the sets", o.name, o.body);
+			continue;
+		}
+		o.file = fig->file;
+		/* Its shape a frame of a gait (GetShape(int)): BODY_GAITS of BODY_GAIT_FRAMES each. */
+		o.frames = static_cast<int>(BODY_GAITS.size()) * ThreeDVehicleObject::BODY_GAIT_FRAMES;
+		/* Posed by the card as its gaits' figures where they all are on bones (OnBones()): else each frame of each gait
+		 * was posed by the processor and kept, 1.6 MB a frame (the player's #331: 386 of them, 604 MB). */
+		o.body_on_bones = true;
+		for (int gait = 0; gait < static_cast<int>(BODY_GAITS.size()); gait++) {
+			int frame = gait * ThreeDVehicleObject::BODY_GAIT_FRAMES;
+			const ThreeDVehicleObject *g = o.BodyAt(frame);
+			if (g == nullptr || g->skeleton_file.empty()) o.body_on_bones = false;
+		}
+	}
+	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());
+}
+
+/** A piece of the shared loads by its name ("kus" of a state's "naklad"), nullptr none. */
+const ThreeDLoadPiece *GetThreeDLoadPiece(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDLoadPiece &p : _load_pieces) {
+		if (p.name == name) return &p;
+	}
+	return nullptr;
+}
+
+/**
+ * The piece of the shared loads of a cargo, for a vehicle no GRF picks one for (ThreeDVehicleObject::loads_by_cargo,
+ * a flatbed of BeamNG): the first whose table ("naklady") has the cargo and of which its bed takes one at least.
+ * @return nullptr none
+ */
+const ThreeDLoadPiece *GetThreeDLoadPieceOfCargo(uint32_t label, const ThreeDLoadBed &bed)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (label == 0) return nullptr;
+	for (const ThreeDLoadPiece &p : _load_pieces) {
+		if (std::ranges::find(p.cargoes, label) != p.cargoes.end() && ThreeDLoadCapacity(p, bed) > 0) return &p;
+	}
+	return nullptr;
+}
+
+/** How the pieces of a kind lie on a bed (ThreeDLoadCapacity()): along it or across, how many each way, how many layers. */
+struct LoadGrid {
+	bool across = false;
+	int along = 0, side = 0, layers = 0;
+	float la = 0, lb = 0; ///< a piece's length along the bed and across it
+};
+
+static LoadGrid LoadGridOf(const ThreeDLoadPiece &p, const ThreeDLoadBed &bed)
+{
+	LoadGrid g;
+	if (!bed.Given() || p.size[0] <= 0 || p.size[1] <= 0 || p.size[2] <= 0) return g;
+	/* The animals only between sides (the colleague: "only on beds with sides"). */
+	if (!p.animal.empty() && bed.sides <= 0) return g;
+	const float length = bed.x[1] - bed.x[0], width = bed.y[1] - bed.y[0];
+	auto fit = [](float room, float piece) { return static_cast<int>(std::floor(room / piece + 1e-4f)); };
+	/* Whichever way more lie side by side: along the bed, or across it where the piece may be turned. */
+	const int straight = fit(length, p.size[0]) * fit(width, p.size[1]);
+	const int turned = p.quarter_turn ? fit(length, p.size[1]) * fit(width, p.size[0]) : 0;
+	g.across = turned > straight;
+	g.la = g.across ? p.size[1] : p.size[0];
+	g.lb = g.across ? p.size[0] : p.size[1];
+	g.along = fit(length, g.la);
+	g.side = fit(width, g.lb);
+	/* The first layer always (a pallet of crates is a hair higher than the slats of the flatbed), the others only as
+	 * far as they go under its top. */
+	g.layers = p.layers;
+	if (bed.top > bed.floor) g.layers = std::min(g.layers, std::max(1, fit(bed.top - bed.floor, p.size[2])));
+	g.layers = std::max(1, g.layers);
+	return g;
+}
+
+/** How many pieces of a kind a bed takes: whole ones side by side, as many layers as they go up to its top. */
+int ThreeDLoadCapacity(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed)
+{
+	const LoadGrid g = LoadGridOf(piece, bed);
+	return g.along * g.side * g.layers;
+}
+
+/**
+ * Where so many pieces lie on a bed (the colleague: "whole pieces, never stretched, as many as are loaded"): in rows
+ * across it from its front, the grid in the middle of the bed, the first layer full before the next.
+ */
+void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, int count, std::vector<ThreeDLoadPlace> &out)
+{
+	out.clear();
+	const LoadGrid g = LoadGridOf(piece, bed);
+	const int per_layer = g.along * g.side;
+	count = std::min(count, per_layer * g.layers);
+	if (count <= 0) return;
+	const float front = bed.x[1] - (bed.x[1] - bed.x[0] - g.along * g.la) / 2 - g.la / 2;
+	const float right = bed.y[0] + (bed.y[1] - bed.y[0] - g.side * g.lb) / 2 + g.lb / 2;
+	for (int k = 0; k < count; k++) {
+		const int layer = k / per_layer, in = k % per_layer;
+		out.push_back({{front - (in / g.side) * g.la, right + (in % g.side) * g.lb, bed.floor + layer * piece.size[2]}, g.across ? 90.0f : 0.0f});
+	}
+}
+
+/** The state of a piece's figure in a colour a vehicle's state gives it, else in the colour of a cargo (its table "naklady"); 0 its own colours. */
+int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label, uint32_t colour)
+{
+	for (const auto &[c, step] : piece.own_colours) {
+		if (colour != 0 && c == colour) return step;
+	}
+	for (const auto &[l, step] : piece.colours) {
+		if (l == label) return step;
+	}
+	return 0;
+}
+
+/**
+ * The size of a set's vehicle objects as its parameter ("velikost"), the first of its objects that has one.
+ * @param grfid the set's id
+ * @return nullptr when none of its objects has it
+ */
+const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	const ThreeDVehicleSize *first = nullptr;
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		if (o.grfid != grfid || o.size.param < 0) continue;
+		/* Of the package beside the GRF loaded, when there are more (an old and a new version). */
+		if (PackageBesideLoadedGrf(o.package, grfid)) return &o.size;
+		if (first == nullptr) first = &o.size;
+	}
+	return first;
+}
+
+/**
+ * The 3D object an engine is drawn as, if there is one.
+ * @param engine the engine (of a piece)
+ * @param[out] piece which of the object's pieces it is
+ */
+const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (_vehicle_object_pieces.empty()) return nullptr;
+	const Engine *e = Engine::GetIfValid(engine);
+	if (e == nullptr || e->grf_prop.grffile == nullptr) return nullptr;
+	auto it = _vehicle_object_pieces.find(VehiclePieceKey(e->grf_prop.grfid, e->type, e->grf_prop.local_id));
+	if (it == _vehicle_object_pieces.end()) return nullptr;
+	if (piece != nullptr) *piece = it->second.second;
+	return &_vehicle_objects[it->second.first];
+}
+
+/**
+ * The details the player chooses on an engine the game makes, not a set (vehicle_config.h): the paints of our 1203s
+ * (BeamngVehicle::body_paints, tarp_paints), each a detail of the configurator; empty for any other.
+ */
+std::vector<VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine)
+{
+	std::vector<VehicleConfigAspect> aspects;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, nullptr);
+	if (obj == nullptr || obj->paint_names.empty()) return aspects;
+	auto add = [&aspects](std::string name, const std::vector<std::string> &options) {
+		VehicleConfigAspect &a = aspects.emplace_back();
+		a.name = std::move(name);
+		for (const std::string &o : options) a.options.push_back({o, false});
+	};
+	add("Karoserie", obj->paint_names);
+	if (!obj->tarp_names.empty()) add("Plachta", obj->tarp_names);
+	return aspects;
+}
+
+/** The key of a vehicle's piece in _vehicle_object_pieces, 0 for none of a set. */
+static uint64_t PieceKeyOf(const Vehicle *v)
+{
+	const Engine *e = v != nullptr ? Engine::GetIfValid(v->engine_type) : nullptr;
+	if (e == nullptr || e->grf_prop.grffile == nullptr) return 0;
+	return VehiclePieceKey(e->grf_prop.grfid, e->type, e->grf_prop.local_id);
+}
+
+/**
+ * The object a piece of a vehicle on the map is of, and which of its pieces it is: as its engine says
+ * (GetThreeDVehicleObject()) -- unless the engine is a piece of several objects (the colleague's lorries: the ends of
+ * the trains of lorries behind each of five semi-trailers, PROSBA-NAKLADAKY-TATRA-3D.md point 3: "take them to the
+ * semi-trailer that goes before them"), and then the one whose pieces the pieces before and after it are.
+ * @param v the piece, a part of an articulated vehicle or a wagon
+ * @param[out] piece which of the object's pieces it is
+ */
+const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece)
+{
+	if (v == nullptr) return nullptr;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, piece);
+	if (obj == nullptr || _vehicle_object_shared_pieces.empty()) return obj;
+	auto all = _vehicle_object_shared_pieces.find(PieceKeyOf(v));
+	if (all == _vehicle_object_shared_pieces.end()) return obj;
+	/* The one whose pieces before and after match the vehicle's the furthest. */
+	int best_score = -1;
+	for (const auto &[index, k] : all->second) {
+		const ThreeDVehicleObject &o = _vehicle_objects[index];
+		int score = 0;
+		const Vehicle *u = v;
+		for (int b = k - 1; b >= 0; b--) {
+			u = u->Previous();
+			if (u == nullptr || PieceKeyOf(u) != VehiclePieceKey(o.grfid, o.type, o.pieces[b])) break;
+			score++;
+		}
+		u = v;
+		for (size_t f = k + 1; f < o.pieces.size(); f++) {
+			u = u->Next();
+			if (u == nullptr || PieceKeyOf(u) != VehiclePieceKey(o.grfid, o.type, o.pieces[f])) break;
+			score++;
+		}
+		if (score > best_score) {
+			best_score = score;
+			obj = &o;
+			if (piece != nullptr) *piece = k;
+		}
+	}
+	return obj;
+}
+
+/**
+ * Forget the vehicles and figures read from the indices, to read them again the next time one is looked for: the
+ * GRFs are loaded anew (GfxInitSpriteMem()), and the packages beside them may have come or gone since -- read the
+ * first time early, before the game had looked through the tars of the NewGRF folders, they had none.
+ */
+void ResetThreeDVehicleObjects()
+{
+	_vehicle_objects.clear();
+	_figure_objects.clear();
+	_motion_sets.clear();
+	_humanoids.clear();
+	_load_pieces.clear();
+	_effect_objects.clear();
+	_driving_objects.clear();
+	_vehicle_object_pieces.clear();
+	_vehicle_object_shared_pieces.clear();
+	_three_d_theme_trees.clear();
+	_three_d_theme_trees_night.clear();
+	_three_d_theme_undergrowth.clear();
+	_three_d_theme_guests.clear();
+	_three_d_theme_guests_split.clear();
+	_three_d_house_plants.clear();
+	_three_d_house_palms.clear();
+	_three_d_house_plants_made = false;
+	for (auto &trees : _three_d_map_trees) trees.clear();
+	for (auto &plants : _three_d_map_undergrowth) plants.clear();
+	_creatures.clear();
+	_witches.clear();
+	_witches_replaced.clear();
+	_ufos.clear();
+	_animals.clear();
+	_mushrooms.clear();
+	_water_animals.clear();
+	_water_plants.clear();
+	_thing_sounds.clear();
+	_thing_places.clear();
+	_three_d_ivies.clear();
+	_three_d_graffiti.clear();
+	_three_d_concrete_spalls.clear();
+	_three_d_rust_pieces.clear();
+	_three_d_board_sizes.clear();
+	_vehicle_objects_read = false;
+}
+
+/**
+ * A vehicle of the packages by its record's name ("jmeno": a building's event names the fire Tatra so), nullptr none:
+ * of two packages of the same set (v2 and v3 of the Tatras in the folder) the one beside its GRF loaded, as the
+ * engines take it.
+ */
+const ThreeDVehicleObject *GetThreeDVehicleObjectNamed(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	const ThreeDVehicleObject *first = nullptr;
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		if (o.name != name) continue;
+		if (PackageBesideLoadedGrf(o.package, o.grfid)) return &o;
+		if (first == nullptr) first = &o;
+	}
+	return first;
+}
+
+/** All the vehicles' models of the indices (for the rig). */
+const std::vector<ThreeDVehicleObject> &GetThreeDVehicleObjects()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _vehicle_objects;
+}
+
+/** The cars of the game's own that drive about by themselves (three_d_walkers.h). */
+const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _driving_objects;
+}
+
+/** An effect of the indices by its name ("druh": "efekt"), or nullptr. */
+const ThreeDVehicleObject *GetThreeDEffect(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDVehicleObject &f : _effect_objects) {
+		if (f.name == name) return &f;
+	}
+	return nullptr;
+}
+
+/** A figure of the indices by its name ("druh": "postava"), or nullptr; one of the package given first (a vehicle's crew). */
+/** The passages of the creatures from one animation to the next, made as they are asked for (GetThreeDFigure()). */
+static std::map<std::string, std::unique_ptr<ThreeDVehicleObject>, std::less<>> _passages;
+
+/** How many ticks a creature passes from one animation to the next (GetThreeDFigure()). */
+static constexpr int CREATURE_BLEND_TICKS = 8;
+
+/**
+ * A place of a thing of the indices: an empty node of its file (the colleague's things: "uchyt" where the hand holds
+ * it, "zarez_napnuto" where the arrow's nock sits on the string drawn), metres in the thing's frame.
+ * @param thing the thing ("jmeno", or "<jmeno>/<stav>": the same file)
+ * @param node the node
+ * @return where, or nothing when the thing or the node is not there
+ */
+static void BendThreeDThingPoint(const ThreeDVehicleObject &o, float *point, float *normal);
+
+std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node)
+{
+	const std::string key = fmt::format("{}/{}", thing, node);
+	auto known = _thing_places.find(key);
+	if (known != _thing_places.end()) return known->second;
+	std::optional<std::array<float, 3>> found;
+	const ThreeDVehicleObject *fig = GetThreeDFigure(thing);
+	if (fig != nullptr) {
+		GlbMesh mesh;
+		std::vector<float> points;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = fig->only_node.empty() ? std::string_view(node) : std::string_view(fig->only_node);
+		o.point_prefix = node;
+		o.points = &points;
+		ReadGlbMesh(fig->file, mesh, o);
+		if (points.size() >= 3) {
+			/* A rod bent or straightened: its grip and its tip where its shape has them (BendThreeDThingPoint()). */
+			BendThreeDThingPoint(*fig, points.data(), nullptr);
+			found = std::array<float, 3>{points[0], points[1], points[2]};
+		}
+	}
+	_thing_places.emplace(key, found);
+	return found;
+}
+
+/**
+ * A sound of a thing of the indices ("zvuky": the bow's string drawn, "napnuti", and its shot, "vystrel"), read once
+ * (GetGameOwnSound()).
+ * @return the sound, or nothing when the thing has none so named or its file cannot be read
+ */
+std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_view sound)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _thing_sounds.find(fmt::format("{}/{}", thing, sound));
+	if (it == _thing_sounds.end()) return std::nullopt;
+	const std::string &path = it->second;
+	if (path.starts_with(IN_TAR)) return GetGameOwnSound(path.substr(IN_TAR.size()), Subdirectory::NewGrf);
+	if (path.starts_with(IN_BASESET_TAR)) return GetGameOwnSound(path.substr(IN_BASESET_TAR.size()), Subdirectory::Baseset);
+	return GetGameOwnSound(path, Subdirectory::None);
+}
+
+/** The ivies of the add-ons (ThreeDIvy), read with the figures. */
+std::span<const ThreeDIvy> GetThreeDIvies()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_ivies;
+}
+
+/** The graffiti of the walls, read with the figures. */
+std::span<const std::string> GetThreeDGraffiti()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_graffiti;
+}
+
+/** The spalled places of the concrete, read with the figures. */
+std::span<const std::string> GetThreeDConcreteSpalls()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_concrete_spalls;
+}
+
+/** The pieces of rust of old vehicles, read with the figures. */
+std::span<const std::string> GetThreeDRustPieces()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_rust_pieces;
+}
+
+/** How big a board laid on a face is ("sirka_m", "vyska_m" of a graffiti, a spalled place, a piece of rust), metres; 1 x 1 not known. */
+std::pair<float, float> GetThreeDBoardSize(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _three_d_board_sizes.find(std::string(name));
+	return it != _three_d_board_sizes.end() ? it->second : std::pair<float, float>{1.0f, 1.0f};
+}
+
+const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	/* A creature's passage from one animation to another: "<jmeno>/<from>@<frame>><to>", made the first time. */
+	const size_t at = name.find('@'), to_at = name.find('>');
+	if (at != std::string_view::npos && to_at != std::string_view::npos && at < to_at) {
+		auto it = _passages.find(name);
+		if (it != _passages.end()) return it->second.get();
+		const size_t slash = name.find('/');
+		const auto frame = ParseInteger<int>(name.substr(at + 1, to_at - at - 1), 10);
+		if (slash == std::string_view::npos || slash > at || !frame.has_value()) return nullptr;
+		const ThreeDVehicleObject *from = GetThreeDFigure(name.substr(0, at), package);
+		const ThreeDVehicleObject *to = GetThreeDFigure(std::string(name.substr(0, slash + 1)) + std::string(name.substr(to_at + 1)), package);
+		if (from == nullptr || to == nullptr || from->skeleton_file.empty() || from->skeleton_file != to->skeleton_file || from->motion_file != to->motion_file) return to;
+		auto passage = std::make_unique<ThreeDVehicleObject>();
+		passage->name = std::string(name);
+		passage->package = to->package;
+		passage->file = to->file;
+		passage->paint_file = to->paint_file;
+		passage->type = to->type;
+		passage->skeleton_file = to->skeleton_file;
+		passage->skeleton_anim = to->skeleton_anim;
+		passage->motion_file = to->motion_file;
+		passage->motion_scale = to->motion_scale;
+		passage->held_file = to->held_file;
+		passage->held_bone = to->held_bone;
+		std::copy_n(to->held_at, 3, passage->held_at);
+		std::copy_n(to->held_turn, 4, passage->held_turn);
+		passage->blend_from = from;
+		passage->blend_to = to;
+		passage->blend_from_frame = std::clamp(*frame, 0, std::max(0, from->frames - 1));
+		passage->blend_ticks = CREATURE_BLEND_TICKS;
+		passage->frames = std::max(1, to->frames) * CREATURE_BLEND_TICKS;
+		passage->frame_ticks = 1;
+		passage->loop = to->loop;
+		passage->walk_step = to->walk_step;
+		return _passages.emplace(std::string(name), std::move(passage)).first->second.get();
+	}
+	/* A vehicle's crew from its own package first (the package of a GRF carries its driver). */
+	if (!package.empty()) {
+		for (const ThreeDVehicleObject &f : _figure_objects) {
+			if (f.name == name && f.package == package) return &f;
+		}
+	}
+	for (const ThreeDVehicleObject &f : _figure_objects) {
+		if (f.name == name) return &f;
+	}
+	/* A figure on no skeleton has its poses as figures of their own, "<jmeno>_<poza>" (the colleague's postavy: mat_ridi,
+	 * college_girl_sedi): "<jmeno>/<poza>" is that one (the fire Tatra's driver, "postava" mat, "poza" ridi). */
+	if (const size_t slash = name.find('/'); slash != std::string_view::npos) {
+		return GetThreeDFigure(fmt::format("{}_{}", name.substr(0, slash), name.substr(slash + 1)), package);
+	}
+	return nullptr;
+}
+
+/*
+ * What is made of a vehicle object the first time it is drawn -- its shape read, its textures and its masks decoded,
+ * its simpler shapes, its crew that walks -- is made on two threads: the main one (the view from the eyes, the
+ * sprites, the previews) and the one making the pictures of the vehicles of the map in the background
+ * (three_d_vehicle_object.cpp; the player, 17. 10.: "put a thread in the background"). MakeOnce(): under one lock
+ * whether a thing is made; if not, the first thread to ask makes it outside the lock (a texture of sixteen million
+ * pixels takes half a second) and stores it under the lock, the other waits for it. Nothing made is replaced while
+ * a thread may hold it: what is forgotten (ThreeDVehicleObject::Forget()) is forgotten only while no picture is
+ * being made, and the objects are read anew only after that thread is stopped (ResetThreeDVehicleObjectSprites()).
+ */
+static std::mutex _lazy_mutex;
+static std::condition_variable _lazy_made;
+/** The thread the game started on (the statics are made on it): what MakeOnce() does there holds a frame up. */
+static const std::thread::id _three_d_main_thread = std::this_thread::get_id();
+std::atomic<uint64_t> _three_d_main_made{0};        ///< The diary: the things the main thread made itself (MakeOnce()), a millisecond or more
+std::atomic<int64_t> _three_d_main_made_us{0};      ///< and how long, microseconds
+std::atomic<int64_t> _three_d_main_waited_us{0};    ///< how long it waited for another thread making one
+std::atomic<int64_t> _three_d_main_longest_us{0};   ///< the longest of either
+/** The diary: what kinds of things the main thread made itself (LazyKindName()), how many and how long, microseconds; under _three_d_main_kinds_mutex. */
+static std::mutex _three_d_main_kinds_mutex;
+static std::map<std::string_view, std::pair<uint64_t, int64_t>> _three_d_main_kinds;
+
+/** The next number of a shape or a texture (ThreeDUniqueId): never 0, never one given before. */
+uint64_t ThreeDUniqueId::Next()
+{
+	static std::atomic<uint64_t> next{1};
+	return next++;
+}
+/** The things being made now: the object (or the shape) and which thing of it (LazyThing). */
+static std::set<std::pair<const void *, int>> _lazy_making;
+/** The things asked of the thread in the background and not made yet (MadeOrAsked()). */
+static std::set<std::pair<const void *, int>> _lazy_asked;
+
+/**
+ * Whether a thing of an object is being made or asked of the thread in the background: the object must stay till it is
+ * made (a finer level of a material's texture, ThreeDObject::MaterialTexture(); the pieces of track and wires kept).
+ */
+static bool LazyPending(const void *of)
+{
+	std::lock_guard lock(_lazy_mutex);
+	for (const auto *things : {&_lazy_making, &_lazy_asked}) {
+		auto it = things->lower_bound({of, std::numeric_limits<int>::min()});
+		if (it != things->end() && it->first == of) return true;
+	}
+	return false;
+}
+/** Which thing of an object is made (MakeOnce()): of a vehicle object, of a shape its simpler ones, of a building its textures and shapes. */
+enum LazyThing : int {
+	LAZY_SHAPE = 0,
+	LAZY_WALKING = 1,
+	LAZY_PAINT_MASK = 2,
+	LAZY_RUST_MASK = 3,
+	LAZY_HOUSE_LEVELS = 4,   ///< a building's texture at all its levels
+	LAZY_HOUSE_GLB = 5,      ///< a house's shape and texture from its .glb (ThreeDObject::Read())
+	LAZY_SECOND_MASK = 6,    ///< a tree's second part's mask (ThreeDVehicleObject::second_paint)
+	LAZY_FRAME = 1000,       ///< + the frame
+	LAZY_TEXTURE = 2000,     ///< + the texture's index
+	LAZY_ADDON_MASK = 3000,  ///< + the add-on
+	LAZY_DETAIL_MASK = 4000, ///< + the add-on + 1
+	LAZY_SIMPLER = 5000,     ///< + the level
+	LAZY_HOUSE_SHAPE = 6000, ///< + the level
+	LAZY_HOUSE_MASK = 7000,  ///< + the part painted a colour
+	LAZY_HOUSE_MATERIAL = 8000, ///< + its other material (ThreeDObject::MaterialTexture())
+	LAZY_HOUSE_READY = 9000,    ///< read and painted to be drawn on the map (ThreeDObjectReadyToDraw())
+	LAZY_HOUSE_PAINT = 1 << 20, ///< + the level + 16 times the paint (its halves mixed into sixteen bits)
+	LAZY_BONES = 1 << 24,       ///< + the frame: a figure's frame as the card poses it (ThreeDVehicleObject::GetBones())
+};
+
+/**
+ * Make a thing of an object once, on whichever thread asks for it first; the other waits for it.
+ * @param of the object (or the shape) it is of
+ * @param thing which of its things (LazyThing)
+ * @param made whether it is there: looked at under the lock, so it must not ask for another thing
+ * @param make make it: outside the lock, so it may ask for the others (the shape of a crew's figure)
+ * @param store keep what was made (even nothing, when it could not be made): under the lock, as made()
+ */
+/** How many ThreeDLazyNoWait stand on this thread, and whether a getter missed something since the first did. */
+static thread_local int _lazy_no_wait = 0;
+static thread_local bool _lazy_missed = false;
+
+ThreeDLazyNoWait::ThreeDLazyNoWait()
+{
+	if (_lazy_no_wait++ == 0) _lazy_missed = false;
+}
+
+ThreeDLazyNoWait::~ThreeDLazyNoWait()
+{
+	_lazy_no_wait--;
+}
+
+/** Whether a getter missed something not made yet since it was made (it was asked of the thread in the background). */
+bool ThreeDLazyNoWait::Missed() const
+{
+	return _lazy_missed;
+}
+
+/** A thing of MakeOnce() for the diary (G3 of the plan of the card: what the main thread reads itself, by name). */
+static std::string_view LazyKindName(int thing)
+{
+	if (thing >= LAZY_BONES) return "kosti";
+	if (thing >= LAZY_HOUSE_PAINT) return "dum lak";
+	if (thing >= LAZY_HOUSE_READY) return "dum pripraven";
+	if (thing >= LAZY_HOUSE_MATERIAL) return "dum material";
+	if (thing >= LAZY_HOUSE_MASK) return "dum maska";
+	if (thing >= LAZY_HOUSE_SHAPE) return "dum tvar zjednoduseny";
+	if (thing >= LAZY_SIMPLER) return "tvar zjednoduseny";
+	if (thing >= LAZY_DETAIL_MASK) return "maska podrobnosti";
+	if (thing >= LAZY_ADDON_MASK) return "maska doplnku";
+	if (thing >= LAZY_TEXTURE) return "textura";
+	if (thing >= LAZY_FRAME) return "snimek";
+	switch (thing) {
+		case LAZY_SHAPE: return "tvar";
+		case LAZY_WALKING: return "chuze";
+		case LAZY_PAINT_MASK: return "maska laku";
+		case LAZY_RUST_MASK: return "maska rzi";
+		case LAZY_HOUSE_LEVELS: return "dum textura";
+		case LAZY_HOUSE_GLB: return "dum z glb";
+		case LAZY_SECOND_MASK: return "druha maska";
+		default: return "jine";
+	}
+}
+
+/** The diary: the kinds of things the main thread made itself since asked last, the most time first; started over. */
+std::string TakeThreeDMainKinds()
+{
+	std::vector<std::pair<std::string_view, std::pair<uint64_t, int64_t>>> kinds;
+	{
+		std::lock_guard lock(_three_d_main_kinds_mutex);
+		kinds.assign(_three_d_main_kinds.begin(), _three_d_main_kinds.end());
+		_three_d_main_kinds.clear();
+	}
+	std::ranges::sort(kinds, [](const auto &a, const auto &b) { return a.second.second > b.second.second; });
+	std::string s;
+	for (const auto &[name, d] : kinds) s += fmt::format("{}{} {}x {:.0f} ms", s.empty() ? "" : ", ", name, d.first, d.second / 1000.0);
+	return s.empty() ? std::string("-") : s;
+}
+
+template <typename Made, typename Make, typename Store>
+static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store &&store)
+{
+	/* The diary of the frames: what the main thread made itself or waited for (the player's #329: a click 2 s and more). */
+	const bool main_thread = std::this_thread::get_id() == _three_d_main_thread;
+	const auto started = std::chrono::steady_clock::now();
+	auto note_main = [&](bool made_here) {
+		if (!main_thread) return;
+		const int64_t us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count();
+		if (us < 1000) return;
+		(made_here ? _three_d_main_made_us : _three_d_main_waited_us) += us;
+		if (made_here) {
+			_three_d_main_made++;
+			std::lock_guard kinds_lock(_three_d_main_kinds_mutex);
+			auto &k = _three_d_main_kinds[LazyKindName(thing)];
+			k.first++;
+			k.second += us;
+		}
+		int64_t longest = _three_d_main_longest_us.load();
+		while (us > longest && !_three_d_main_longest_us.compare_exchange_weak(longest, us)) {}
+	};
+	const std::pair<const void *, int> key(of, thing);
+	if (_lazy_no_wait > 0 && !_three_d_load_at_once) {
+		/* Not waited for (ThreeDLazyNoWait): asked of the thread in the background, once, unless it is being made. */
+		{
+			std::lock_guard lock(_lazy_mutex);
+			if (made()) return;
+			_lazy_missed = true;
+			if (_lazy_making.contains(key) || !_lazy_asked.insert(key).second) return;
+		}
+		ThreeDLoadInBackground([of, thing, made = std::decay_t<Made>(made), make = std::decay_t<Make>(make), store = std::decay_t<Store>(store)]() mutable {
+			MakeOnce(of, thing, made, make, store);
+		});
+		return;
+	}
+	std::unique_lock lock(_lazy_mutex);
+	for (bool waited = false;; waited = true) {
+		if (made()) {
+			if (waited) note_main(false);
+			return;
+		}
+		if (_lazy_making.insert(key).second) break;
+		/* Another thread is making it: wait for it. */
+		_lazy_made.wait(lock);
+	}
+	lock.unlock();
+	try {
+		auto result = make();
+		lock.lock();
+		store(std::move(result));
+	} catch (...) {
+		if (!lock.owns_lock()) lock.lock();
+		_lazy_making.erase(key);
+		_lazy_asked.erase(key);
+		_lazy_made.notify_all();
+		throw;
+	}
+	_lazy_making.erase(key);
+	_lazy_asked.erase(key);
+	_lazy_made.notify_all();
+	note_main(true);
+}
+
+/**
+ * Whether a thing of an object is made; if not, it is asked of the thread in the background (once, ThreeDLoadInBackground()),
+ * to be there a frame or two on -- the view from the eyes draws without it meanwhile (the Try... getters).
+ * @param made whether it is there: under the lock, as MakeOnce()'s
+ * @param make the job that makes it (a getter that does)
+ */
+template <typename Made>
+static bool MadeOrAsked(const void *of, int thing, Made &&made, std::function<void()> make)
+{
+	const std::pair<const void *, int> key(of, thing);
+	{
+		std::lock_guard lock(_lazy_mutex);
+		if (made()) return true;
+		if (!_lazy_asked.insert(key).second) return false; // asked already
+	}
+	ThreeDLoadInBackground(std::move(make));
+	if (!_three_d_load_at_once) return false;
+	/* The rig: made now, so it is there. */
+	std::lock_guard lock(_lazy_mutex);
+	return made();
+}
+
+/** The shapes read, by their file and wheels: the paints of a vehicle share one. Read on both threads (MakeOnce()). */
+static std::map<std::string, std::shared_ptr<const ThreeDVehicleShape>> _vehicle_shapes;
+static std::mutex _vehicle_shapes_mutex;
+
+/** The shape read already for a key (MakeShape()), nullptr none. */
+static std::shared_ptr<const ThreeDVehicleShape> KnownVehicleShape(const std::string &key)
+{
+	std::lock_guard lock(_vehicle_shapes_mutex);
+	auto it = _vehicle_shapes.find(key);
+	return it != _vehicle_shapes.end() ? it->second : nullptr;
+}
+
+/**
+ * A shape read let go of the room its lists grew into as it was read (each up to twice what it holds: the vehicles'
+ * shapes took a third more than their corners and triangles).
+ */
+static void ShrinkShape(ThreeDVehicleShape &s)
+{
+	s.pos.shrink_to_fit();
+	s.nrm.shrink_to_fit();
+	s.uv.shrink_to_fit();
+	s.tri.shrink_to_fit();
+	s.tri_tex.shrink_to_fit();
+	s.night_pos.shrink_to_fit();
+	s.night_tri.shrink_to_fit();
+	s.night_colour.shrink_to_fit();
+	s.night_kind.shrink_to_fit();
+	s.tri_part.shrink_to_fit();
+	s.tex_addon.shrink_to_fit();
+	s.tex_glow.shrink_to_fit();
+	s.tex_alpha.shrink_to_fit();
+	s.corner_wheel.shrink_to_fit();
+	s.tri_glass.shrink_to_fit();
+	s.facing.shrink_to_fit();
+	s.night_part.shrink_to_fit();
+	s.lanterns.shrink_to_fit();
+	s.torches.shrink_to_fit();
+	s.torch_aims.shrink_to_fit();
+	s.front_part.shrink_to_fit();
+	s.back_part.shrink_to_fit();
+	s.corner_joints.shrink_to_fit();
+	s.corner_weights.shrink_to_fit();
+}
+
+/** The extent of all the corners of a shape read (ThreeDVehicleShape::all). */
+static void ExtentOfAll(ThreeDVehicleShape &s)
+{
+	if (s.pos.size() < 3) return;
+	for (int k = 0; k < 3; k++) {
+		s.all[k * 2] = std::numeric_limits<float>::infinity();
+		s.all[k * 2 + 1] = -std::numeric_limits<float>::infinity();
+	}
+	for (size_t i = 0; i + 2 < s.pos.size(); i += 3) {
+		for (int k = 0; k < 3; k++) {
+			s.all[k * 2] = std::min(s.all[k * 2], s.pos[i + k]);
+			s.all[k * 2 + 1] = std::max(s.all[k * 2 + 1], s.pos[i + k]);
+		}
+	}
+}
+
+/** Keep a shape read for its key (MakeShape()). */
+static void KeepVehicleShape(const std::string &key, const std::shared_ptr<const ThreeDVehicleShape> &made)
+{
+	std::lock_guard lock(_vehicle_shapes_mutex);
+	_vehicle_shapes.emplace(key, made);
+}
+
+/** How many shapes are kept (the rig). */
+static size_t VehicleShapesKept()
+{
+	std::lock_guard lock(_vehicle_shapes_mutex);
+	return _vehicle_shapes.size();
+}
+
+/** The frame of a figure that moves at a tick of the game: one every frame_ticks, from phase on, round and round. */
+int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
+{
+	if (this->frames < 2) return 0;
+	return static_cast<int>((tick / this->frame_ticks + phase) % this->frames);
+}
+
+/**
+ * The shapes made again with more parts in the place of others (ThreeDVehicleObject::GetShape()): a thread may draw from
+ * those yet, so they are let go of only between the frames (TrimThreeDTextures()). Under _lazy_mutex.
+ */
+static std::vector<std::shared_ptr<const ThreeDVehicleShape>> _shapes_replaced;
+
+/**
+ * A figure of the crew into a vehicle's shape: its shape sized, turned about z and stood at its place, its textures after
+ * the others, its triangles of a part. The driver -- the one sitting at the eye of the cab -- is not drawn from that eye.
+ * A figure bigger than it is ("meritko") stays that big everywhere, the view from the eyes too. A figure that walks is
+ * not of the shape: it is drawn on its own, its frame by the way gone (WalkingCrew()).
+ */
+void ThreeDVehicleObject::AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const
+{
+	const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
+	if (c.on_seat || (fig != nullptr && fig->Walks())) return; // drawn on its own, a frame by the way gone or on the body's seat (WalkingCrew())
+	const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
+	if (fs == nullptr) {
+		Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
+		return;
+	}
+	if ((part == 0 || part == this->crew_record_part) && this->has_cab && std::hypot(c.at[0] - this->cab[0], c.at[1] - this->cab[1]) < 0.4f) part = ThreeDVehicleShape::PART_DRIVER;
+	const size_t first_triangle = made.tri.size() / 3;
+	const bool lit = !made.nrm.empty() && !fs->nrm.empty();
+	if (!lit) made.nrm.clear();
+	uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made.pngs.size(), 255));
+	for (size_t t = 0; t < fs->pngs.size() && made.pngs.size() < 255; t++) {
+		made.pngs.push_back(fs->pngs[t]);
+		made.flats.push_back(fs->flats[t]);
+		made.tex_names.push_back(t < fs->tex_names.size() ? fs->tex_names[t] : std::string());
+		made.tex_glow.push_back(fs->Glow(t));
+		made.tex_alpha.push_back(fs->Alpha(t));
+	}
+	const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a), s = c.scale;
+	uint32_t base = static_cast<uint32_t>(made.pos.size() / 3);
+	for (size_t i = 0; i < fs->pos.size(); i += 3) {
+		made.pos.push_back(c.at[0] + (fs->pos[i] * ca - fs->pos[i + 1] * sa) * s);
+		made.pos.push_back(c.at[1] + (fs->pos[i] * sa + fs->pos[i + 1] * ca) * s);
+		made.pos.push_back(c.at[2] + fs->pos[i + 2] * s);
+		if (lit) {
+			made.nrm.push_back(fs->nrm[i] * ca - fs->nrm[i + 1] * sa);
+			made.nrm.push_back(fs->nrm[i] * sa + fs->nrm[i + 1] * ca);
+			made.nrm.push_back(fs->nrm[i + 2]);
+		}
+	}
+	made.uv.insert(made.uv.end(), fs->uv.begin(), fs->uv.end());
+	for (size_t t = 0; t < fs->tri.size(); t += 3) {
+		made.tri.push_back(base + fs->tri[t]);
+		made.tri.push_back(base + fs->tri[t + 1]);
+		made.tri.push_back(base + fs->tri[t + 2]);
+		made.tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + (t / 3 < fs->tri_tex.size() ? fs->tri_tex[t / 3] : 0))));
+	}
+	if (part == 0 && made.tri_part.empty()) return;
+	made.tri_part.resize(first_triangle, 0);
+	made.tri_part.resize(made.tri.size() / 3, part);
+}
+
+/** The object's shape as it is now, read from its .glb the first time (only what is always drawn); nullptr when it cannot be. A figure that moves: its first frame. */
+const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
+{
+	return this->GetShape(0, 1);
+}
+
+/**
+ * The object's shape with the parts of its states asked for (PartsOf(); on either thread, MakeOnce()). It has only
+ * the parts of the states drawn (the player, 17. 10.: "optimise the whole process with the objects first"): the
+ * colleague's trailer of a Tatra is one object of all its ten bodies, three quarters of a million triangles, and a
+ * state shows one. A part not in it yet is added: the shape is made again with it, the one before kept till nothing
+ * draws from it. A figure that moves: its frame (GetShape(int)).
+ */
+const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame, const ThreeDParts &asked) const
+{
+	if (this->frames >= 2 && (frame > 0 || this->blend_from != nullptr)) return this->GetShape(frame);
+	MarkThreeDUsed(this->used);
+	const ThreeDParts parts = asked | 1;
+	MakeOnce(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || this->shape_parts.Contains(parts)); }, [this, parts] {
+		ThreeDParts want = parts;
+		{
+			std::lock_guard lock(_lazy_mutex);
+			want |= this->shape_parts;
+		}
+		return std::make_pair(this->MakeShape(0, want), want);
+	}, [this](std::pair<std::shared_ptr<const ThreeDVehicleShape>, ThreeDParts> made) {
+		if (this->shape != nullptr) _shapes_replaced.push_back(std::move(this->shape));
+		this->shape = std::move(made.first);
+		this->shape_parts = this->shape != nullptr ? made.second : ThreeDParts{};
+		this->shape_tried = true;
+		if (this->shape != nullptr && this->shape->all[1] > this->shape->all[0]) {
+			std::copy(std::begin(this->shape->all), std::end(this->shape->all), this->extent);
+			this->extent_known = true;
+			this->extent_version++;
+		}
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return this->shape.get();
+}
+
+/**
+ * The extent of all the corners of the object's shape (ThreeDVehicleShape::all) if it was ever read: how big its
+ * sprite is before it is made (ThreeDVehicleObjectSpriteBounds()). Never reads it: asked in the game's tick.
+ * @param[out] version each time it grew another (a part added to the shape)
+ */
+bool ThreeDVehicleObject::KnownExtent(float extent[6], uint32_t *version) const
+{
+	std::lock_guard lock(_lazy_mutex);
+	if (!this->extent_known) return false;
+	std::copy(std::begin(this->extent), std::end(this->extent), extent);
+	if (version != nullptr) *version = this->extent_version;
+	return true;
+}
+
+/** Whether the object's shape was read (or tried): a Try... getter that gives nothing then gives nothing for good. */
+bool ThreeDVehicleObject::ShapeKnown() const
+{
+	std::lock_guard lock(_lazy_mutex);
+	return this->shape != nullptr || this->shape_tried;
+}
+
+/** The object's shape (a frame of it) if it is read already; else nullptr, and it is read in the background (TryGetShape(int, uint64_t)). */
+const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame) const
+{
+	return this->TryGetShape(frame, 1);
+}
+
+/** Whether its shape was read, or tried and could not be (TryGetShape() gives nullptr for both that and not read yet). */
+bool ThreeDVehicleObject::ShapeTried() const
+{
+	std::lock_guard lock(_lazy_mutex);
+	return this->shape_tried;
+}
+
+/**
+ * The object's shape (a frame of it) if it is read already, with the parts asked for if they are added already: the
+ * parts it has not yet are added in the background (MadeOrAsked()), the shape as it is till then; nullptr when there
+ * is none yet. A figure's frame that cannot be read: its shape, as GetShape(int) gives it.
+ */
+const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame, const ThreeDParts &asked) const
+{
+	MarkThreeDUsed(this->used);
+	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) {
+		const ThreeDParts parts = asked | 1;
+		MadeOrAsked(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || this->shape_parts.Contains(parts)); }, [this, parts] { this->GetShape(0, parts); });
+		std::lock_guard lock(_lazy_mutex);
+		return this->shape.get();
+	}
+	frame = std::max(frame, 0);
+	frame %= this->frames;
+	if (!MadeOrAsked(this, LAZY_FRAME + frame, [this, frame] { return static_cast<size_t>(frame) < this->frame_shapes.size() && this->frame_shapes[frame] != nullptr; }, [this, frame] { this->GetShape(frame); })) return nullptr;
+	return this->frame_shapes[frame].get();
+}
+
+/**
+ * The simpler shape of a shape not on bones (MakeSimplerShape()) by meshoptimizer's simplifier (MIT, 3rdparty/meshoptimizer;
+ * the player's point 1 of what is good in Godot, TEMATA 183): its edges collapsed as long as its surface moves no farther
+ * than the error, its pieces smaller than that left out (a bolt, a tuft's blade). Its corners stay where they are, each a
+ * corner of the shape -- their places in the textures, normals and wheels as they were. Corners of one place stay apart
+ * where the shape has them apart -- another place in the texture, another texture, part, glass, side out or wheel --: a
+ * seam the simplifier keeps, so that a triangle keeps its texture and its kind. Where the corners of one place differ in
+ * their normals alone (a model of flat faces), they are one for the simplifier, and each triangle left takes of them the
+ * one facing as it faces.
+ * (The cells of MakeSimplerShape() joined only corners closer than a cell: the colleague's lorries, a Tatra 138 155
+ * thousand triangles from a few metres, the farm's ripe wheat 1.5 thousand each by the hundred; the player's log #355.)
+ * @param error how far its surface may move, metres
+ */
+static std::shared_ptr<ThreeDVehicleShape> MeshoptSimplerShape(const ThreeDVehicleShape &shape, double error)
+{
+	const size_t corners = shape.pos.size() / 3, triangles = shape.tri.size() / 3;
+	auto out = std::make_shared<ThreeDVehicleShape>();
+	if (corners == 0 || triangles == 0) return out;
+	const bool has_nrm = shape.nrm.size() == shape.pos.size(), has_uv = shape.uv.size() == corners * 2;
+	const bool wheels = shape.corner_wheel.size() == corners;
+	/* A triangle's kind: its texture, part, glass and side out. */
+	auto kind_of = [&shape](size_t t) {
+		return static_cast<uint32_t>(t < shape.tri_tex.size() ? shape.tri_tex[t] : 0) | static_cast<uint32_t>(t < shape.tri_part.size() ? shape.tri_part[t] : 0) << 8 |
+				static_cast<uint32_t>(t < shape.tri_glass.size() ? shape.tri_glass[t] : 0) << 16 | static_cast<uint32_t>(static_cast<uint8_t>(t < shape.facing.size() ? shape.facing[t] : 0)) << 24;
+	};
+	/* The corners as the simplifier has them: one for each place, place in the texture, wheel and kind of triangle. */
+	using Key = std::array<uint32_t, 7>;
+	struct KeyHash {
+		size_t operator()(const Key &k) const
+		{
+			uint64_t h = 0;
+			for (uint32_t v : k) h = (h ^ v) * 0x9E3779B97F4A7C15ull;
+			return static_cast<size_t>(h ^ (h >> 29));
+		}
+	};
+	std::unordered_map<Key, uint32_t, KeyHash> welded;
+	welded.reserve(corners);
+	std::vector<float> wpos;
+	std::vector<uint32_t> windex(shape.tri.size());
+	std::vector<uint32_t> wkind;
+	/* The corners of the shape of each, the first in wfirst, the next of each in wnext (UINT32_MAX none). */
+	std::vector<uint32_t> wfirst, wnext(shape.tri.size(), UINT32_MAX), wcorner(shape.tri.size());
+	for (size_t t = 0; t < triangles; t++) {
+		const uint32_t k = kind_of(t);
+		for (int c = 0; c < 3; c++) {
+			const uint32_t i = shape.tri[t * 3 + c];
+			Key key{std::bit_cast<uint32_t>(shape.pos[i * 3]), std::bit_cast<uint32_t>(shape.pos[i * 3 + 1]), std::bit_cast<uint32_t>(shape.pos[i * 3 + 2]),
+					has_uv ? std::bit_cast<uint32_t>(shape.uv[i * 2]) : 0u, has_uv ? std::bit_cast<uint32_t>(shape.uv[i * 2 + 1]) : 0u, wheels ? shape.corner_wheel[i] : 0u, k};
+			auto [it, added] = welded.try_emplace(key, static_cast<uint32_t>(wfirst.size()));
+			const uint32_t w = it->second;
+			if (added) {
+				wpos.insert(wpos.end(), {shape.pos[i * 3], shape.pos[i * 3 + 1], shape.pos[i * 3 + 2]});
+				wkind.push_back(k);
+				wfirst.push_back(UINT32_MAX);
+			}
+			windex[t * 3 + c] = w;
+			/* Each corner of the shape once in the list of its welded corner. */
+			bool listed = false;
+			for (uint32_t n = wfirst[w]; n != UINT32_MAX && !listed; n = wnext[n]) listed = wcorner[n] == i;
+			if (!listed) {
+				const size_t slot = t * 3 + c;
+				wcorner[slot] = i;
+				wnext[slot] = wfirst[w];
+				wfirst[w] = static_cast<uint32_t>(slot);
+			}
+		}
+	}
+	std::vector<uint32_t> kept(windex.size());
+	float result_error = 0;
+	const size_t count = meshopt_simplify(kept.data(), windex.data(), windex.size(), wpos.data(), wfirst.size(), 3 * sizeof(float), 0, static_cast<float>(error),
+			meshopt_SimplifyErrorAbsolute, &result_error);
+	/* The triangles left, each corner the shape's of its place facing most as the triangle faces. */
+	std::vector<uint32_t> new_of(corners, UINT32_MAX);
+	auto corner = [&](uint32_t w, const double n[3]) {
+		uint32_t best = wcorner[wfirst[w]];
+		if (has_nrm) {
+			double best_dot = -2;
+			for (uint32_t s = wfirst[w]; s != UINT32_MAX; s = wnext[s]) {
+				const uint32_t i = wcorner[s];
+				const double d = n[0] * shape.nrm[i * 3] + n[1] * shape.nrm[i * 3 + 1] + n[2] * shape.nrm[i * 3 + 2];
+				if (d > best_dot) {
+					best_dot = d;
+					best = i;
+				}
+			}
+		}
+		if (new_of[best] == UINT32_MAX) {
+			new_of[best] = static_cast<uint32_t>(out->pos.size() / 3);
+			out->pos.insert(out->pos.end(), {shape.pos[best * 3], shape.pos[best * 3 + 1], shape.pos[best * 3 + 2]});
+			if (has_nrm) out->nrm.insert(out->nrm.end(), {shape.nrm[best * 3], shape.nrm[best * 3 + 1], shape.nrm[best * 3 + 2]});
+			if (has_uv) out->uv.insert(out->uv.end(), {shape.uv[best * 2], shape.uv[best * 2 + 1]});
+			if (wheels) out->corner_wheel.push_back(shape.corner_wheel[best]);
+		}
+		return new_of[best];
+	};
+	for (size_t t = 0; t + 2 < count; t += 3) {
+		const float *a = &wpos[kept[t] * 3], *b = &wpos[kept[t + 1] * 3], *c = &wpos[kept[t + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double n[3] = {uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx};
+		const double l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+		if (l > 0) for (double &v : n) v /= l;
+		const uint32_t k = wkind[kept[t]];
+		out->tri.insert(out->tri.end(), {corner(kept[t], n), corner(kept[t + 1], n), corner(kept[t + 2], n)});
+		out->tri_tex.push_back(static_cast<uint8_t>(k & 0xFF));
+		if (!shape.tri_part.empty()) out->tri_part.push_back(static_cast<uint8_t>(k >> 8));
+		if (!shape.tri_glass.empty()) out->tri_glass.push_back(static_cast<uint8_t>(k >> 16));
+		if (!shape.facing.empty()) out->facing.push_back(static_cast<int8_t>(static_cast<uint8_t>(k >> 24)));
+	}
+	return out;
+}
+
+/**
+ * The simpler shape of a shape at a level (ThreeDVehicleShape::Simpler()): of 1 cm times two to the level.
+ * @param plant a plant's: its corners joined in the cells, its blades dropped one by one where a cell takes a blade's
+ *              foot -- meshoptimizer keeps a blade of one triangle whole, or with its small pieces left out drops them
+ *              all at once (a tuft of 329 triangles 11 at 4 cm: a bare meadow off a way)
+ */
+static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVehicleShape &shape, int level, bool plant)
+{
+	const double cell = ThreeDVehicleShape::SIMPLER_CELL_M * (1 << level);
+	/* A model not on bones: by meshoptimizer, the surface off by no more than half a cell (about a pixel where the cell is two). */
+	if (shape.corner_joints.empty() && !plant) {
+		std::shared_ptr<ThreeDVehicleShape> out = MeshoptSimplerShape(shape, cell / 2);
+		out->tex_addon = shape.tex_addon;
+		out->tex_glow = shape.tex_glow;
+		out->tex_alpha = shape.tex_alpha;
+		out->glass_alpha = shape.glass_alpha;
+		out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
+		ShrinkShape(*out);
+		Debug(misc, 3, "3D shape simpler at {} cm (meshoptimizer): {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, shape.tri.size() / 3);
+		return out;
+	}
+	const size_t corners = shape.pos.size() / 3;
+	const bool has_nrm = shape.nrm.size() == shape.pos.size(), has_uv = shape.uv.size() == corners * 2;
+	/* Each corner's texture and part: its first triangle's. */
+	std::vector<uint8_t> material(corners, 0), part(corners, 0);
+	for (size_t t = shape.tri.size(); t >= 3; t -= 3) {
+		const uint8_t m = (t - 3) / 3 < shape.tri_tex.size() ? shape.tri_tex[(t - 3) / 3] : 0;
+		const uint8_t p = (t - 3) / 3 < shape.tri_part.size() ? shape.tri_part[(t - 3) / 3] : 0;
+		for (int k = 0; k < 3; k++) {
+			material[shape.tri[t - 3 + k]] = m;
+			part[shape.tri[t - 3 + k]] = p;
+		}
+	}
+	/* The islands of the texture: the corners joined by triangles, a piece of the model drawn from one piece of the
+	 * texture (a file splits its corners where the texture does, at a seam, between the islands of an atlas). */
+	std::vector<uint32_t> island(corners);
+	std::iota(island.begin(), island.end(), 0u);
+	auto root = [&island](uint32_t i) {
+		while (island[i] != i) {
+			island[i] = island[island[i]];
+			i = island[i];
+		}
+		return i;
+	};
+	for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+		const uint32_t a = root(shape.tri[t]);
+		for (int k = 1; k < 3; k++) {
+			const uint32_t b = root(shape.tri[t + k]);
+			if (a != b) island[b] = a;
+		}
+	}
+	/* Corners in one place of the model and of the texture, facing to the same side, are one there: a file of flat
+	 * faces (the colleague's ghost, each of its triangles with three corners of its own) has them apart, so each of
+	 * its triangles was an island of its own, and those smaller than a cell were left out -- the ghost full of holes
+	 * from the eyes. Joined (weld), they are of one island and face the way of all of them together. */
+	std::vector<uint32_t> weld(corners);
+	{
+		struct WeldHash {
+			size_t operator()(const std::array<int64_t, 6> &k) const
+			{
+				uint64_t h = 0;
+				for (int64_t v : k) h = (h ^ static_cast<uint64_t>(v)) * 0x9E3779B97F4A7C15ull;
+				return static_cast<size_t>(h ^ (h >> 29));
+			}
+		};
+		std::unordered_map<std::array<int64_t, 6>, uint32_t, WeldHash> seen;
+		seen.reserve(corners);
+		for (size_t i = 0; i < corners; i++) {
+			std::array<int64_t, 6> k{};
+			for (int a = 0; a < 3; a++) k[a] = std::llround(shape.pos[i * 3 + a] * 1e5);
+			if (has_uv) for (int a = 0; a < 2; a++) k[3 + a] = std::llround(shape.uv[i * 2 + a] * 1e6);
+			/* The side it faces (a sheet's two sides apart, each its own way). */
+			if (has_nrm) k[5] = shape.nrm[i * 3] + shape.nrm[i * 3 + 1] + shape.nrm[i * 3 + 2] >= 0 ? 1 : 0;
+			weld[i] = seen.emplace(k, static_cast<uint32_t>(i)).first->second;
+		}
+	}
+	std::vector<float> weld_nrm(has_nrm ? shape.nrm.size() : 0, 0.0f);
+	for (size_t i = 0; i < corners; i++) {
+		if (weld[i] != i) {
+			const uint32_t a = root(weld[i]), b = root(static_cast<uint32_t>(i));
+			if (a != b) island[b] = a;
+		}
+		if (has_nrm) for (int a = 0; a < 3; a++) weld_nrm[weld[i] * 3 + a] += shape.nrm[i * 3 + a];
+	}
+	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, and their island
+	 * of the texture: corners of one place of the model in two places of the texture (two islands, a seam) joined took
+	 * one's place for both, and the triangles between them drew from anywhere between the islands -- a car black and
+	 * speckled from a few metres on (the player, 17. 10.). Within an island they join: it is one piece of the texture.
+	 * (It was a 128th of the texture before: the colleague's lorries, their corners far apart in their atlases, kept
+	 * 374 of 692 thousand triangles at the farthest zoom.) */
+	/* A figure on bones at rest (ThreeDVehicleShape::corner_joints): corners moved most by other joints apart too -- one
+	 * joined from the arm and the body would be torn between them as the card poses it. */
+	const bool on_bones = shape.corner_joints.size() == corners * 4 && shape.corner_weights.size() == corners * 4;
+	auto main_joint = [&](size_t i) -> uint64_t {
+		if (!on_bones) return 0;
+		int best = 0;
+		for (int k = 1; k < 4; k++) {
+			if (shape.corner_weights[i * 4 + k] > shape.corner_weights[i * 4 + best]) best = k;
+		}
+		return shape.corner_joints[i * 4 + best];
+	};
+	auto apart_of = [&](size_t i) {
+		return static_cast<uint64_t>(part[i]) | static_cast<uint64_t>(i < shape.corner_wheel.size() ? shape.corner_wheel[i] : 0u) << 8 | static_cast<uint64_t>(root(static_cast<uint32_t>(i))) << 16 | main_joint(i) << 48;
+	};
+	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
+	auto key_of = [&](size_t i) {
+		uint64_t k = 0;
+		for (int a = 0; a < 3; a++) k = k * 4096 + static_cast<uint64_t>(static_cast<int64_t>(std::floor(shape.pos[i * 3 + a] / cell)) & 4095);
+		int face = 0;
+		if (has_nrm) {
+			const float nx = weld_nrm[weld[i] * 3], ny = weld_nrm[weld[i] * 3 + 1], nz = weld_nrm[weld[i] * 3 + 2];
+			const float ax = std::abs(nx), ay = std::abs(ny), az = std::abs(nz);
+			face = ax >= ay && ax >= az ? (nx < 0 ? 1 : 2) : (ay >= az ? (ny < 0 ? 3 : 4) : (nz < 0 ? 5 : 6));
+		}
+		return (k * 8 + face) * 256 + material[i];
+	};
+	auto out = std::make_shared<ThreeDVehicleShape>();
+	struct CellHash {
+		size_t operator()(const std::pair<uint64_t, uint64_t> &k) const { return std::hash<uint64_t>{}(k.first * 0x9E3779B97F4A7C15ull ^ k.second); }
+	};
+	std::unordered_map<std::pair<uint64_t, uint64_t>, uint32_t, CellHash> cells;
+	std::vector<uint32_t> joined(corners);
+	std::vector<uint32_t> count;
+	const bool wheels = !shape.corner_wheel.empty();
+	for (size_t i = 0; i < corners; i++) {
+		auto [it, added] = cells.emplace(std::make_pair(key_of(i), apart_of(i)), static_cast<uint32_t>(count.size()));
+		joined[i] = it->second;
+		if (added) {
+			count.push_back(0);
+			out->pos.insert(out->pos.end(), 3, 0.0f);
+			if (has_nrm) out->nrm.insert(out->nrm.end(), 3, 0.0f);
+			if (has_uv) out->uv.insert(out->uv.end(), 2, 0.0f);
+			if (wheels) out->corner_wheel.push_back(shape.corner_wheel[i]);
+			/* Its joints its first corner's (they are all moved most by the same one). */
+			if (on_bones) {
+				out->corner_joints.insert(out->corner_joints.end(), shape.corner_joints.begin() + i * 4, shape.corner_joints.begin() + i * 4 + 4);
+				out->corner_weights.insert(out->corner_weights.end(), shape.corner_weights.begin() + i * 4, shape.corner_weights.begin() + i * 4 + 4);
+			}
+		}
+		const uint32_t c = it->second;
+		count[c]++;
+		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] += shape.pos[i * 3 + a];
+		if (has_nrm) for (int a = 0; a < 3; a++) out->nrm[c * 3 + a] += shape.nrm[i * 3 + a];
+		/* The places in the texture of its corners, all in one small piece of it (apart_of()): their middle. */
+		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] += shape.uv[i * 2 + a];
+	}
+	for (size_t c = 0; c < count.size(); c++) {
+		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] /= count[c];
+		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] /= count[c];
+		if (has_nrm) {
+			float *n = &out->nrm[c * 3];
+			const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (l > 0) for (int a = 0; a < 3; a++) n[a] /= l;
+		}
+	}
+	for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+		const uint32_t a = joined[shape.tri[t]], b = joined[shape.tri[t + 1]], c = joined[shape.tri[t + 2]];
+		if (a == b || b == c || a == c) continue;
+		out->tri.insert(out->tri.end(), {a, b, c});
+		out->tri_tex.push_back(t / 3 < shape.tri_tex.size() ? shape.tri_tex[t / 3] : 0);
+		if (!shape.tri_part.empty()) out->tri_part.push_back(t / 3 < shape.tri_part.size() ? shape.tri_part[t / 3] : 0);
+		if (!shape.tri_glass.empty()) out->tri_glass.push_back(t / 3 < shape.tri_glass.size() ? shape.tri_glass[t / 3] : 0);
+		if (!shape.facing.empty()) {
+			/* Its outer side where its corners are now: one joined with its neighbours may have turned round (a
+			 * sheet's two sides on the same corners, the other side came through). */
+			int8_t f = shape.Facing(t / 3);
+			if (f != 0 && has_nrm) {
+				const float *pa = &out->pos[a * 3], *pb = &out->pos[b * 3], *pc = &out->pos[c * 3];
+				const double ux = pb[0] - pa[0], uy = pb[1] - pa[1], uz = pb[2] - pa[2], vx = pc[0] - pa[0], vy = pc[1] - pa[1], vz = pc[2] - pa[2];
+				const double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+				double side = 0;
+				for (uint32_t k : {a, b, c}) side += gx * out->nrm[k * 3] + gy * out->nrm[k * 3 + 1] + gz * out->nrm[k * 3 + 2];
+				f = side > 0 ? 1 : (side < 0 ? -1 : 0);
+			}
+			out->facing.push_back(f);
+		}
+	}
+	out->tex_addon = shape.tex_addon;
+	out->tex_glow = shape.tex_glow;
+	out->tex_alpha = shape.tex_alpha;
+	out->glass_alpha = shape.glass_alpha;
+	out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
+	ShrinkShape(*out);
+	Debug(misc, 3, "3D shape simpler at {} cm: {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, shape.tri.size() / 3);
+	return out;
+}
+
+/**
+ * A simpler shape of this one for a model drawn small (the view from the eyes; the player, 16. 10.: "save when they
+ * are far, it need not be drawn in detail far"), for a cell of about the size asked for -- 1, 2, 4 ... 64 cm, made the
+ * first time each is asked for (MakeSimplerShape()): a model's surface off by no more than half the cell
+ * (meshoptimizer), a plant's corners joined in the cells. The lights and the textures stay the shape's.
+ * @param cell_m the size of a cell asked for, metres of the model; below 1 cm (a plant's 2 cm) the shape itself
+ * @param plant a plant's (our grass's tufts, the farm's wheat; by the hundred): however few its triangles, its corners
+ *              joined in the cells (MakeSimplerShape())
+ */
+const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, bool plant) const
+{
+	if (!(cell_m >= (plant ? 2 * SIMPLER_CELL_M : SIMPLER_CELL_M)) || (!plant && this->tri.size() < 3 * SIMPLER_FEWEST)) return this;
+	/* Not waited for (ThreeDLazyNoWait; the card drawing the map's figures): the shape itself meanwhile, the simpler one
+	 * made in the background -- nothing of it missing (Missed()), drawn whole it looks the same (the player, 31. 10.:
+	 * "go on with the GPU"; the card gave the walking Mat up for a picture made on the main thread till each frame's
+	 * simpler shape came). */
+	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m, plant);
+	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / SIMPLER_CELL_M))));
+	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
+	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level, plant] { return MakeSimplerShape(*this, level, plant); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
+	return made != nullptr ? made.get() : this;
+}
+
+/** The simpler shape if it is made already; else the shape itself stands in, and the simpler one is made in the background. */
+const ThreeDVehicleShape *ThreeDVehicleShape::TrySimpler(double cell_m, bool plant) const
+{
+	if (!(cell_m >= (plant ? 2 * SIMPLER_CELL_M : SIMPLER_CELL_M)) || (!plant && this->tri.size() < 3 * SIMPLER_FEWEST)) return this;
+	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / SIMPLER_CELL_M))));
+	const std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
+	if (!MadeOrAsked(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, cell_m, plant] { this->Simpler(cell_m, plant); })) return this;
+	return made.get();
+}
+
+/** A frame of a figure that moves (FrameAt()), read the first time it is drawn (MakeOnce()); the others as GetShape(). */
+const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
+{
+	MarkThreeDUsed(this->used);
+	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) return this->GetShape();
+	frame = std::max(frame, 0);
+	frame %= this->frames;
+	MakeOnce(this, LAZY_FRAME + frame, [this, frame] {
+		if (this->frame_shapes.size() < static_cast<size_t>(this->frames)) this->frame_shapes.resize(this->frames);
+		return this->frame_shapes[frame] != nullptr;
+	}, [this, frame] { return this->MakeShape(frame); }, [this, frame](std::shared_ptr<const ThreeDVehicleShape> made) { this->frame_shapes[frame] = std::move(made); });
+	const ThreeDVehicleShape *made = this->frame_shapes[frame].get();
+	if (made != nullptr) return made;
+	/* Not made (being read in the background, the drawing not waiting for it; or it cannot be): a figure that does not
+	 * blend from another motion stands in its still shape (GetShape()). One that does (blend_from) is sent back here by
+	 * GetShape() for its frame 0 -- round and round till the stack ran out (#325, the animals on their skeletons as a
+	 * game was loaded) --: its first frame if that one is made, else nothing this time. */
+	if (this->blend_from == nullptr) return this->GetShape();
+	return frame != 0 && this->frame_shapes[0] != nullptr ? this->frame_shapes[0].get() : nullptr;
+}
+
+/**
+ * A thing held by a bone of a posed figure ("predmet" of a humanoid's motion, the colleague's
+ * hra/3d/KOSTRA-POSTAV-PRO-HRU.md: the big joint in the right hand of one smoking): its mesh where the bone is in the
+ * pose, at its place in the bone's frame, added to the figure's with its textures after the figure's.
+ */
+static void AddHeldThing(const ThreeDVehicleObject &f, const GlbSkeleton &sk, const std::vector<BonePose> &pose, ThreeDVehicleShape &made)
+{
+	const int bone = sk.NodeNamed(f.held_bone);
+	if (bone < 0) return;
+	GlbMesh thing;
+	if (!ReadGlbMesh(f.held_file, thing, true) || thing.pos.empty()) return;
+	if (made.pngs.size() + thing.textures.size() > 255) return;
+	BonePose on;
+	std::copy_n(f.held_at, 3, on.t);
+	std::copy_n(f.held_turn, 4, on.r);
+	const BoneMatrix m = BoneMultiply(sk.Globals(pose)[bone], on.Matrix());
+	const uint32_t base = static_cast<uint32_t>(made.pos.size() / 3);
+	const uint8_t first_texture = static_cast<uint8_t>(made.pngs.size());
+	const bool normals = !made.nrm.empty();
+	const size_t corners = thing.pos.size() / 3;
+	for (size_t i = 0; i < corners; i++) {
+		/* The game's axes (x, y, z up) back into glTF's (x, z, -y), placed, and into the game's again. */
+		const double X = thing.pos[i * 3], Y = thing.pos[i * 3 + 2], Z = -thing.pos[i * 3 + 1];
+		const double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
+		const double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
+		const double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
+		made.pos.insert(made.pos.end(), {static_cast<float>(gx), static_cast<float>(-gz), static_cast<float>(gy)});
+		if (!normals) continue;
+		if (thing.nrm.size() != thing.pos.size()) {
+			made.nrm.insert(made.nrm.end(), {0.0f, 0.0f, 1.0f});
+			continue;
+		}
+		const double nx = thing.nrm[i * 3], ny = thing.nrm[i * 3 + 2], nz = -thing.nrm[i * 3 + 1];
+		double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
+		const double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+		if (l > 0) {
+			hx /= l;
+			hy /= l;
+			hz /= l;
+		}
+		made.nrm.insert(made.nrm.end(), {static_cast<float>(hx), static_cast<float>(-hz), static_cast<float>(hy)});
+	}
+	if (thing.uv.size() == corners * 2) {
+		made.uv.insert(made.uv.end(), thing.uv.begin(), thing.uv.end());
+	} else {
+		made.uv.resize(made.uv.size() + corners * 2, 0.0f);
+	}
+	for (uint32_t c : thing.tri) made.tri.push_back(base + c);
+	for (size_t t = 0; t < thing.tri.size() / 3; t++) made.tri_tex.push_back(static_cast<uint8_t>(first_texture + (t < thing.tri_tex.size() ? thing.tri_tex[t] : 0)));
+	for (const GlbTexture &t : thing.textures) {
+		made.pngs.push_back(t.png);
+		made.flats.push_back(t.flat);
+		made.tex_names.push_back(t.name);
+		made.tex_glow.push_back(t.glow);
+		made.tex_alpha.push_back(t.alpha);
+	}
+}
+
+/**
+ * The pose of a frame of a creature with bones (skeleton_file), as the processor poses its shape (MakePosedShape()) and
+ * the card its bones (MakeBones()): its animation at the frame's time -- a round of the frames is the animation from its
+ * first key to its last; one that does not go round ends on its last. A passage (blend_from) mixes the pose it comes
+ * from and the one it goes to, bone by bone, more of the latter each tick.
+ * @param[out] pose each node's place against its parent
+ * @return its bones, nullptr when they cannot be read
+ */
+static const GlbSkeleton *PoseOfFrame(const ThreeDVehicleObject &f, int frame, std::vector<BonePose> &pose)
+{
+	const GlbSkeleton *sk = ReadGlbSkeleton(f.skeleton_file);
+	if (sk == nullptr) return nullptr;
+	/* The animations: its own, or a humanoid's motions, put on its bones by their names. */
+	const GlbSkeleton *moves = f.motion_file.empty() ? sk : ReadGlbSkeleton(f.motion_file, false);
+	if (moves == nullptr) return nullptr;
+	float scale = f.motion_scale;
+	if (f.motion_file.empty() && !f.bone_kind.empty() && sk->Find(f.skeleton_anim) == nullptr) {
+		/* A motion its own file lacks: the kind's of its bones, put on them by their names (the four-legged ones'
+		 * "ctyrnozec_pohyby", as the humanoids'). */
+		for (const ThreeDMotionSet &set : _motion_sets) {
+			if (set.kind != f.bone_kind) continue;
+			const GlbSkeleton *kind = ReadGlbSkeleton(set.file, false);
+			if (kind == nullptr || kind->Find(f.skeleton_anim) == nullptr) continue;
+			moves = kind;
+			scale = f.hips / set.hips;
+			break;
+		}
+	}
+	/* The time of a frame of a figure, seconds. */
+	auto time_of = [](const ThreeDVehicleObject &of, const GlbSkeleton::Animation *a, int fr) {
+		if (a == nullptr) return 0.0;
+		if (of.frames < 2) return a->start;
+		const double phase = of.loop ? static_cast<double>(fr) / of.frames : static_cast<double>(fr) / (of.frames - 1);
+		return a->start + (a->end - a->start) * std::clamp(phase, 0.0, 1.0);
+	};
+	auto pose_of = [&](const ThreeDVehicleObject &of, const GlbSkeleton::Animation *a, int fr) {
+		std::vector<BonePose> p = moves->Pose(a, time_of(of, a, fr));
+		return moves == sk ? p : sk->Retarget(*moves, p, a, scale);
+	};
+	pose.clear();
+	if (f.blend_from != nullptr && f.blend_to != nullptr && f.blend_ticks > 0) {
+		const int own = frame / f.blend_ticks, tick = frame % f.blend_ticks;
+		const GlbSkeleton::Animation *from = moves->Find(f.blend_from->skeleton_anim), *to = moves->Find(f.blend_to->skeleton_anim);
+		const std::vector<BonePose> a = pose_of(*f.blend_from, from, f.blend_from_frame);
+		const std::vector<BonePose> b = pose_of(*f.blend_to, to, own);
+		const double k = (tick + 1.0) / (f.blend_ticks + 1.0);
+		pose.reserve(a.size());
+		for (size_t i = 0; i < a.size(); i++) pose.push_back(a[i].Mix(b[i], k));
+	} else {
+		pose = pose_of(f, moves->Find(f.skeleton_anim), frame);
+	}
+	return sk;
+}
+
+/** The key a frame of a creature with bones is kept by (MakePosedShape()): the creatures of the same bones and motion share it. */
+static std::string PosedShapeKey(const ThreeDVehicleObject &f, int frame)
+{
+	std::string key = fmt::format("kostra|{}#{}#{}/{}{}", f.skeleton_file, f.skeleton_anim, frame, f.frames, f.loop ? "o" : "-");
+	if (!f.motion_file.empty()) key += fmt::format("#{}x{:.4f}#{}", f.motion_file, f.motion_scale, f.held_file);
+	if (f.blend_from != nullptr) key += fmt::format("<{}#{}/{}x{}", f.blend_from->skeleton_anim, f.blend_from_frame, f.blend_from->frames, f.blend_ticks);
+	return key;
+}
+
+/**
+ * A frame of a creature with bones (skeleton_file) posed by the processor: the mesh in the frame's pose (PoseOfFrame()).
+ * Kept for the creatures of the same bones (the brown and the black dragon). Where the card draws, it poses the frames
+ * itself (MakeBones()): this one is made only where the processor draws them.
+ */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(int frame) const
+{
+	GlbFilesScope files;
+	const std::string key = PosedShapeKey(*this, frame);
+	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
+	std::vector<BonePose> pose;
+	const GlbSkeleton *sk = PoseOfFrame(*this, frame, pose);
+	if (sk == nullptr) return nullptr;
+	auto made = std::make_shared<ThreeDVehicleShape>();
+	sk->Skin(pose, made->pos, made->nrm);
+	/* Its seat (the colleague's horses: the node "sedlo" under the bone Spine1) where it is in the pose, the game's axes. */
+	if (const int seat = sk->NodeNamed("sedlo"); seat >= 0) {
+		const BoneMatrix m = sk->Globals(pose)[seat];
+		made->has_seat = true;
+		made->seat[0] = static_cast<float>(m[12]);
+		made->seat[1] = static_cast<float>(-m[14]);
+		made->seat[2] = static_cast<float>(m[13]);
+	}
+	made->uv.assign(sk->uv.begin(), sk->uv.end());
+	made->tri = sk->tri;
+	made->tri_tex = sk->tri_tex;
+	for (const GlbTexture &t : sk->textures) {
+		made->pngs.push_back(t.png);
+		made->flats.push_back(t.flat);
+		made->tex_names.push_back(t.name);
+		made->tex_glow.push_back(t.glow);
+		made->tex_alpha.push_back(t.alpha);
+	}
+	if (!this->held_file.empty()) AddHeldThing(*this, *sk, pose, *made);
+	/* Its extent as posed (how big it is in the view from the eyes, CabFigure). */
+	if (!made->pos.empty()) {
+		made->x0 = made->y0 = made->z0 = std::numeric_limits<float>::infinity();
+		made->x1 = made->y1 = made->z1 = -std::numeric_limits<float>::infinity();
+		for (size_t i = 0; i + 2 < made->pos.size(); i += 3) {
+			made->x0 = std::min(made->x0, made->pos[i]); made->x1 = std::max(made->x1, made->pos[i]);
+			made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
+			made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
+		}
+	}
+	ShrinkShape(*made);
+	ExtentOfAll(*made);
+	KeepVehicleShape(key, made);
+	return made;
+}
+
+/**
+ * A matrix of glTF's axes in the game's (GlbSkeleton::Skin(): the game's x, y, z are glTF's x, -z, y): a point of the
+ * game's turned into glTF's, placed by the matrix, turned back; its three rows of four.
+ */
+static void GameRowsOf(const BoneMatrix &m, double out[12])
+{
+	static constexpr double TO_GAME[3][3] = {{1, 0, 0}, {0, 0, -1}, {0, 1, 0}};
+	static constexpr double TO_GLTF[3][3] = {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}};
+	for (int r = 0; r < 3; r++) {
+		for (int c = 0; c < 3; c++) {
+			double s = 0;
+			for (int a = 0; a < 3; a++) {
+				for (int b = 0; b < 3; b++) s += TO_GAME[r][a] * m[b * 4 + a] * TO_GLTF[b][c];
+			}
+			out[r * 4 + c] = s;
+		}
+		double t = 0;
+		for (int a = 0; a < 3; a++) t += TO_GAME[r][a] * m[12 + a];
+		out[r * 4 + 3] = t;
+	}
+}
+
+/** The inverse of a matrix that moves, turns and scales (its last row 0, 0, 0, 1); none (a flat one): as it is not, the identity. */
+static BoneMatrix AffineInverse(const BoneMatrix &m)
+{
+	const double a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9], g = m[2], h = m[6], i = m[10];
+	const double det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+	BoneMatrix out{};
+	if (det == 0 || !std::isfinite(det)) {
+		out[0] = out[5] = out[10] = out[15] = 1;
+		return out;
+	}
+	const double inv[3][3] = {
+		{(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det},
+		{(f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det},
+		{(d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det},
+	};
+	for (int r = 0; r < 3; r++) {
+		for (int col = 0; col < 3; col++) out[col * 4 + r] = inv[r][col];
+		out[12 + r] = -(inv[r][0] * m[12] + inv[r][1] * m[13] + inv[r][2] * m[14]);
+	}
+	out[15] = 1;
+	return out;
+}
+
+/**
+ * Where the numbers of a creature's mesh stand at rest, in metres, glTF's axes: its joint that moves the most of it
+ * at rest (its node's place unanimated, by its matrix from the mesh). A mesh packed smaller (gltfpack: its corners
+ * whole numbers to 16383) has its numbers made metres again by the joints' matrices alone -- its shape at rest for the
+ * card (RestShapeOf()) in metres as the shapes posed by the processor, its textures and its detail chosen by its size
+ * (TexelsPerMetre(), Simpler()), the joints moving it from there (MakeBones()) as from the numbers: the same pose.
+ */
+static BoneMatrix RestUnits(const GlbSkeleton &sk)
+{
+	BoneMatrix identity{};
+	identity[0] = identity[5] = identity[10] = identity[15] = 1;
+	if (sk.joints.empty() || sk.inverse_bind.size() < sk.joints.size()) return identity;
+	std::vector<double> weight(sk.joints.size(), 0.0);
+	for (size_t i = 0; i < sk.joint_of.size() && i < sk.weight_of.size(); i++) {
+		for (int k = 0; k < 4; k++) {
+			if (sk.joint_of[i][k] < weight.size()) weight[sk.joint_of[i][k]] += sk.weight_of[i][k];
+		}
+	}
+	const size_t most = std::max_element(weight.begin(), weight.end()) - weight.begin();
+	const std::vector<BoneMatrix> global = sk.Globals(sk.Pose(nullptr, 0));
+	const BoneMatrix d = BoneMultiply(global[sk.joints[most]], sk.inverse_bind[most]);
+	/* Flat (a joint scaled to nothing at rest): the numbers as they are. */
+	const double det = d[0] * (d[5] * d[10] - d[9] * d[6]) - d[4] * (d[1] * d[10] - d[9] * d[2]) + d[8] * (d[1] * d[6] - d[5] * d[2]);
+	return det == 0 || !std::isfinite(det) ? identity : d;
+}
+
+/**
+ * The shape at rest of a creature with bones as the card poses it (ThreeDBonesFrame::rest): its mesh as it is bound to
+ * its joints, in metres as it stands at rest (RestUnits()), the game's axes, each corner with its joints and how much
+ * each moves it (GlbSkeleton::Skin()); a thing it holds (AddHeldThing()) as it is in its own frame, all of it moved by
+ * a joint of its own after the others. One for all the creatures of the same bones and thing.
+ * @param[out] holds whether it holds a thing (its joint after the bones')
+ * @return nullptr: more joints than a corner names (ThreeDVehicleShape::MAX_JOINTS)
+ */
+static std::shared_ptr<const ThreeDVehicleShape> RestShapeOf(const ThreeDVehicleObject &f, const GlbSkeleton &sk, bool &holds)
+{
+	const size_t corners = sk.pos.size() / 3, joints = sk.joints.size();
+	holds = false;
+	if (joints >= ThreeDVehicleShape::MAX_JOINTS) return nullptr;
+	std::string key = fmt::format("kostra-klid|{}", f.skeleton_file);
+	if (!f.held_file.empty()) key += fmt::format("#{}#{}#{},{},{}#{},{},{},{}", f.held_file, f.held_bone, f.held_at[0], f.held_at[1], f.held_at[2], f.held_turn[0], f.held_turn[1], f.held_turn[2], f.held_turn[3]);
+	if (auto known = KnownVehicleShape(key); known != nullptr) {
+		holds = known->pos.size() / 3 > corners;
+		return known;
+	}
+	auto made = std::make_shared<ThreeDVehicleShape>();
+	const bool normals = sk.nrm.size() == corners * 3;
+	made->pos.resize(corners * 3);
+	if (normals) made->nrm.resize(corners * 3);
+	/* In metres as it stands at rest (RestUnits()), not in the numbers of the file. */
+	const BoneMatrix d = RestUnits(sk);
+	for (size_t i = 0; i < corners; i++) {
+		const double X = sk.pos[i * 3], Y = sk.pos[i * 3 + 1], Z = sk.pos[i * 3 + 2];
+		made->pos[i * 3] = static_cast<float>(d[0] * X + d[4] * Y + d[8] * Z + d[12]);
+		made->pos[i * 3 + 1] = static_cast<float>(-(d[2] * X + d[6] * Y + d[10] * Z + d[14]));
+		made->pos[i * 3 + 2] = static_cast<float>(d[1] * X + d[5] * Y + d[9] * Z + d[13]);
+		if (!normals) continue;
+		const double nx = sk.nrm[i * 3], ny = sk.nrm[i * 3 + 1], nz = sk.nrm[i * 3 + 2];
+		double hx = d[0] * nx + d[4] * ny + d[8] * nz, hy = d[1] * nx + d[5] * ny + d[9] * nz, hz = d[2] * nx + d[6] * ny + d[10] * nz;
+		const double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+		if (l > 0) {
+			hx /= l;
+			hy /= l;
+			hz /= l;
+		}
+		made->nrm[i * 3] = static_cast<float>(hx);
+		made->nrm[i * 3 + 1] = static_cast<float>(-hz);
+		made->nrm[i * 3 + 2] = static_cast<float>(hy);
+	}
+	made->uv.assign(sk.uv.begin(), sk.uv.end());
+	made->tri = sk.tri;
+	made->tri_tex = sk.tri_tex;
+	for (const GlbTexture &t : sk.textures) {
+		made->pngs.push_back(t.png);
+		made->flats.push_back(t.flat);
+		made->tex_names.push_back(t.name);
+		made->tex_glow.push_back(t.glow);
+		made->tex_alpha.push_back(t.alpha);
+	}
+	/* Each corner's joints, as Skin() moves it: a joint of no weight, or one the bones have not, none. */
+	made->corner_joints.assign(corners * 4, 0);
+	made->corner_weights.assign(corners * 4, 0.0f);
+	for (size_t i = 0; i < corners && i < sk.joint_of.size() && i < sk.weight_of.size(); i++) {
+		for (int k = 0; k < 4; k++) {
+			const float w = sk.weight_of[i][k];
+			const uint16_t j = sk.joint_of[i][k];
+			if (w == 0 || j >= joints) continue;
+			made->corner_joints[i * 4 + k] = static_cast<uint8_t>(j);
+			made->corner_weights[i * 4 + k] = w;
+		}
+	}
+	/* The thing held, as AddHeldThing() adds it: its corners in its own frame, the game's axes, all of them its joint's. */
+	GlbMesh thing;
+	if (!f.held_file.empty() && sk.NodeNamed(f.held_bone) >= 0 && ReadGlbMesh(f.held_file, thing, true) && !thing.pos.empty() && made->pngs.size() + thing.textures.size() <= 255) {
+		holds = true;
+		const uint32_t base = static_cast<uint32_t>(corners);
+		const uint8_t first_texture = static_cast<uint8_t>(made->pngs.size());
+		const size_t n = thing.pos.size() / 3;
+		made->pos.insert(made->pos.end(), thing.pos.begin(), thing.pos.begin() + n * 3);
+		if (normals) {
+			if (thing.nrm.size() == thing.pos.size()) {
+				made->nrm.insert(made->nrm.end(), thing.nrm.begin(), thing.nrm.end());
+			} else {
+				for (size_t i = 0; i < n; i++) made->nrm.insert(made->nrm.end(), {0.0f, 0.0f, 1.0f});
+			}
+		}
+		if (thing.uv.size() == n * 2) {
+			made->uv.insert(made->uv.end(), thing.uv.begin(), thing.uv.end());
+		} else {
+			made->uv.resize(made->uv.size() + n * 2, 0.0f);
+		}
+		for (uint32_t c : thing.tri) made->tri.push_back(base + c);
+		for (size_t t = 0; t < thing.tri.size() / 3; t++) made->tri_tex.push_back(static_cast<uint8_t>(first_texture + (t < thing.tri_tex.size() ? thing.tri_tex[t] : 0)));
+		for (const GlbTexture &t : thing.textures) {
+			made->pngs.push_back(t.png);
+			made->flats.push_back(t.flat);
+			made->tex_names.push_back(t.name);
+			made->tex_glow.push_back(t.glow);
+			made->tex_alpha.push_back(t.alpha);
+		}
+		for (size_t i = 0; i < n; i++) {
+			made->corner_joints.insert(made->corner_joints.end(), {static_cast<uint8_t>(joints), 0, 0, 0});
+			made->corner_weights.insert(made->corner_weights.end(), {1.0f, 0.0f, 0.0f, 0.0f});
+		}
+	}
+	ShrinkShape(*made);
+	ExtentOfAll(*made);
+	made->x0 = made->all[0]; made->x1 = made->all[1];
+	made->y0 = made->all[2]; made->y1 = made->all[3];
+	made->z0 = made->all[4]; made->z1 = made->all[5];
+	KeepVehicleShape(key, made);
+	return made;
+}
+
+/**
+ * A frame of a creature with bones as the card poses it (GetBones()): the matrices of its joints in the frame's pose
+ * (PoseOfFrame()), and of its shape as the processor would pose it its extent and its seat -- each corner placed as
+ * Skin() places it, nothing kept of them. Its rest nullptr: the card cannot pose it (its frames posed by the processor).
+ */
+std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::MakeBones(int frame) const
+{
+	GlbFilesScope files;
+	auto made = std::make_shared<ThreeDBonesFrame>();
+	std::vector<BonePose> pose;
+	const GlbSkeleton *sk = PoseOfFrame(*this, frame, pose);
+	if (sk == nullptr) return made;
+	bool holds = false;
+	made->rest = RestShapeOf(*this, *sk, holds);
+	if (made->rest == nullptr) return made;
+	const std::vector<BoneMatrix> global = sk->Globals(pose);
+	const size_t joints = sk->joints.size();
+	std::vector<std::array<double, 12>> rows(joints + (holds ? 1 : 0));
+	/* Its rest in metres (RestUnits()): the joints move it from there, as they would move the numbers of the file. */
+	const BoneMatrix from_metres = AffineInverse(RestUnits(*sk));
+	for (size_t k = 0; k < joints; k++) GameRowsOf(BoneMultiply(BoneMultiply(global[sk->joints[k]], sk->inverse_bind[k]), from_metres), rows[k].data());
+	if (holds) {
+		BonePose on;
+		std::copy_n(this->held_at, 3, on.t);
+		std::copy_n(this->held_turn, 4, on.r);
+		GameRowsOf(BoneMultiply(global[sk->NodeNamed(this->held_bone)], on.Matrix()), rows[joints].data());
+	}
+	made->joints.reserve(rows.size() * 12);
+	for (const auto &r : rows) {
+		for (double v : r) made->joints.push_back(static_cast<float>(v));
+	}
+	/* Its extent as posed: each corner where its joints move it. */
+	const ThreeDVehicleShape &rest = *made->rest;
+	const size_t corners = rest.pos.size() / 3;
+	ThreeDVehicleShape &posed = made->posed;
+	if (corners > 0 && rest.corner_joints.size() == corners * 4 && rest.corner_weights.size() == corners * 4) {
+		float e[6] = {std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
+		for (size_t i = 0; i < corners; i++) {
+			double m[12] = {};
+			for (int k = 0; k < 4; k++) {
+				const float w = rest.corner_weights[i * 4 + k];
+				const size_t j = rest.corner_joints[i * 4 + k];
+				if (w == 0 || j >= rows.size()) continue;
+				for (int a = 0; a < 12; a++) m[a] += rows[j][a] * w;
+			}
+			const double x = rest.pos[i * 3], y = rest.pos[i * 3 + 1], z = rest.pos[i * 3 + 2];
+			for (int a = 0; a < 3; a++) {
+				const float v = static_cast<float>(m[a * 4] * x + m[a * 4 + 1] * y + m[a * 4 + 2] * z + m[a * 4 + 3]);
+				e[a * 2] = std::min(e[a * 2], v);
+				e[a * 2 + 1] = std::max(e[a * 2 + 1], v);
+			}
+		}
+		posed.x0 = e[0]; posed.x1 = e[1];
+		posed.y0 = e[2]; posed.y1 = e[3];
+		posed.z0 = e[4]; posed.z1 = e[5];
+		std::copy_n(e, 6, posed.all);
+	}
+	/* Its seat (the colleague's horses: the node "sedlo") where it is in the pose, as MakePosedShape() has it. */
+	if (const int seat = sk->NodeNamed("sedlo"); seat >= 0) {
+		const BoneMatrix &m = global[seat];
+		posed.has_seat = true;
+		posed.seat[0] = static_cast<float>(m[12]);
+		posed.seat[1] = static_cast<float>(-m[14]);
+		posed.seat[2] = static_cast<float>(m[13]);
+	}
+	posed.glass_alpha = rest.glass_alpha;
+	return made;
+}
+
+/** Whether it is a figure on bones (skeleton_file): its frames posed by the card where it draws them (GetBones()). */
+bool ThreeDVehicleObject::OnBones() const
+{
+	return !this->skeleton_file.empty() || this->body_on_bones;
+}
+
+/**
+ * An animal of a set (body): its figure in the gait (BODY_GAITS) at the frame (WalkCode() of three_d_vehicle_object.cpp),
+ * and the frame in that gait.
+ * @param[in,out] frame the animal's frame; the figure's
+ * @return the figure; itself when it is no animal of a set; nullptr when the set has no figure of it
+ */
+const ThreeDVehicleObject *ThreeDVehicleObject::BodyAt(int &frame) const
+{
+	if (this->body.empty()) return this;
+	const size_t gait = std::min<size_t>(static_cast<size_t>(std::max(frame, 0)) / BODY_GAIT_FRAMES, BODY_GAITS.size() - 1);
+	const ThreeDVehicleObject *fig = GetThreeDFigure(this->body + "/" + std::string(BODY_GAITS[gait]), this->package);
+	if (fig == nullptr) fig = GetThreeDFigure(this->body, this->package);
+	frame = std::max(frame, 0) % BODY_GAIT_FRAMES;
+	return fig;
+}
+
+/**
+ * A frame of a figure on bones as the card poses it (ThreeDBonesFrame; the player, 3. 11.: "2 bones"), made the first
+ * time it is drawn (MakeOnce()) -- no shape of the frame posed by the processor.
+ * @return nullptr: not on bones, or not made yet (ThreeDLazyNoWait); its rest nullptr: the card cannot pose it, the
+ *         processor's frames (GetShape(int)) instead
+ */
+std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::GetBones(int frame) const
+{
+	if (!this->OnBones()) return nullptr;
+	/* An animal of a set: the frame of its gait's figure (BodyAt()). */
+	if (!this->body.empty()) {
+		const ThreeDVehicleObject *fig = this->BodyAt(frame);
+		return fig != nullptr && fig != this ? fig->GetBones(frame) : nullptr;
+	}
+	MarkThreeDUsed(this->used);
+	const size_t count = static_cast<size_t>(std::max(1, this->frames));
+	const size_t at = static_cast<size_t>(std::max(frame, 0)) % count;
+	MakeOnce(this, LAZY_BONES + static_cast<int>(at), [this, count, at] {
+		if (this->frame_bones.size() < count) this->frame_bones.resize(count);
+		return this->frame_bones[at] != nullptr;
+	}, [this, at] { return this->MakeBones(static_cast<int>(at)); }, [this, count, at](std::shared_ptr<const ThreeDBonesFrame> made) {
+		if (this->frame_bones.size() < count) this->frame_bones.resize(count);
+		this->frame_bones[at] = std::move(made);
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return at < this->frame_bones.size() ? this->frame_bones[at] : nullptr;
+}
+
+/** A frame of a figure on bones as the card poses it (GetBones()) if it is made already; else nullptr, and it is made in the background. */
+std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::TryGetBones(int frame) const
+{
+	if (!this->OnBones()) return nullptr;
+	if (!this->body.empty()) {
+		const ThreeDVehicleObject *fig = this->BodyAt(frame);
+		return fig != nullptr && fig != this ? fig->TryGetBones(frame) : nullptr;
+	}
+	MarkThreeDUsed(this->used);
+	const size_t count = static_cast<size_t>(std::max(1, this->frames));
+	const size_t at = static_cast<size_t>(std::max(frame, 0)) % count;
+	if (!MadeOrAsked(this, LAZY_BONES + static_cast<int>(at), [this, at] { return at < this->frame_bones.size() && this->frame_bones[at] != nullptr; }, [this, at] { this->GetBones(static_cast<int>(at)); })) return nullptr;
+	std::lock_guard lock(_lazy_mutex);
+	return at < this->frame_bones.size() ? this->frame_bones[at] : nullptr;
+}
+
+/**
+ * A shape at rest of a figure on bones (or a simpler one of it) posed by the processor by a frame's joints, as the card
+ * poses it (MESH_VERTEX of three_d_gpu.cpp): where something meant for the card is drawn by the processor after all.
+ */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDPoseOnProcessor(const ThreeDVehicleShape &rest, const ThreeDBonesFrame &bones)
+{
+	auto made = std::make_shared<ThreeDVehicleShape>(rest);
+	const size_t corners = rest.pos.size() / 3, joints = bones.joints.size() / 12;
+	if (rest.corner_joints.size() != corners * 4 || rest.corner_weights.size() != corners * 4) return made;
+	const bool normals = rest.nrm.size() == rest.pos.size();
+	for (size_t i = 0; i < corners; i++) {
+		float m[12] = {};
+		for (int k = 0; k < 4; k++) {
+			const float w = rest.corner_weights[i * 4 + k];
+			const size_t j = rest.corner_joints[i * 4 + k];
+			if (w == 0 || j >= joints) continue;
+			for (int a = 0; a < 12; a++) m[a] += bones.joints[j * 12 + a] * w;
+		}
+		const float x = rest.pos[i * 3], y = rest.pos[i * 3 + 1], z = rest.pos[i * 3 + 2];
+		for (int a = 0; a < 3; a++) made->pos[i * 3 + a] = m[a * 4] * x + m[a * 4 + 1] * y + m[a * 4 + 2] * z + m[a * 4 + 3];
+		if (!normals) continue;
+		const float nx = rest.nrm[i * 3], ny = rest.nrm[i * 3 + 1], nz = rest.nrm[i * 3 + 2];
+		float n[3];
+		for (int a = 0; a < 3; a++) n[a] = m[a * 4] * nx + m[a * 4 + 1] * ny + m[a * 4 + 2] * nz;
+		const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+		for (int a = 0; a < 3; a++) made->nrm[i * 3 + a] = l > 0 ? n[a] / l : n[a];
+	}
+	made->corner_joints.clear();
+	made->corner_weights.clear();
+	return made;
+}
+
+/** A line of a thing laid along another (ThreeDVehicleObject::bend_from, bend_to): its points (x, z) and how far along it each is. */
+struct BendLine {
+	std::vector<std::array<double, 2>> p;
+	std::vector<double> s;
+
+	/** The line of points, or straight along z so long when there are none. */
+	BendLine(const std::vector<std::array<float, 2>> &points, double straight)
+	{
+		if (points.size() >= 2) {
+			for (const auto &q : points) this->p.push_back({q[0], q[1]});
+		} else {
+			this->p = {{0.0, 0.0}, {0.0, straight}};
+		}
+		this->s.push_back(0);
+		for (size_t i = 1; i < this->p.size(); i++) this->s.push_back(this->s.back() + std::hypot(this->p[i][0] - this->p[i - 1][0], this->p[i][1] - this->p[i - 1][1]));
+	}
+
+	double Length() const { return this->s.back(); }
+
+	/** Its piece where a length along it lies (past its ends, the first and the last). */
+	size_t PieceAt(double along) const
+	{
+		size_t i = 1;
+		while (i + 1 < this->p.size() && this->s[i] < along) i++;
+		return i;
+	}
+
+	/** Its way along piece i (x, z), of length 1. */
+	std::array<double, 2> Way(size_t i) const
+	{
+		const double dx = this->p[i][0] - this->p[i - 1][0], dz = this->p[i][1] - this->p[i - 1][1];
+		const double len = std::max(1e-9, std::hypot(dx, dz));
+		return {dx / len, dz / len};
+	}
+};
+
+/**
+ * A point of a thing laid from its line along another (ThreeDVehicleObject::bend_from, bend_to; the fishing rods,
+ * straight and bent): how far along its own line it is (the nearest piece; past its ends straight on) and how far
+ * aside of it, the same along and aside of the other; across the lines' plane (y) as it was. A direction (normals)
+ * turned as the line turned there.
+ */
+static void BendThreeDThingPoint(const ThreeDVehicleObject &o, float *point, float *normal)
+{
+	if (o.bend_from.empty() && o.bend_to.empty()) return;
+	const BendLine from(o.bend_from, BendLine(o.bend_to, 1.0).Length());
+	const BendLine to(o.bend_to, from.Length());
+	const double x = point[0], z = point[2];
+	/* The nearest piece of its own line, its ends straight on past them. */
+	double best = 1e18, along = 0, aside = 0;
+	for (size_t i = 1; i < from.p.size(); i++) {
+		const auto w = from.Way(i);
+		const double len = from.s[i] - from.s[i - 1];
+		const double rx = x - from.p[i - 1][0], rz = z - from.p[i - 1][1];
+		double t = rx * w[0] + rz * w[1];
+		if (i > 1) t = std::max(t, 0.0);
+		if (i + 1 < from.p.size()) t = std::min(t, len);
+		const double px = from.p[i - 1][0] + w[0] * t, pz = from.p[i - 1][1] + w[1] * t;
+		const double d = std::hypot(x - px, z - pz);
+		if (d < best) {
+			best = d;
+			along = from.s[i - 1] + t;
+			/* Aside: square to the way, +x where the way goes along +z. */
+			aside = (x - px) * w[1] - (z - pz) * w[0];
+		}
+	}
+	const size_t fi = from.PieceAt(along), ti = to.PieceAt(along);
+	const auto fw = from.Way(fi), tw = to.Way(ti);
+	const double t = along - to.s[ti - 1];
+	point[0] = static_cast<float>(to.p[ti - 1][0] + tw[0] * t + aside * tw[1]);
+	point[2] = static_cast<float>(to.p[ti - 1][1] + tw[1] * t - aside * tw[0]);
+	if (normal != nullptr) {
+		/* Turned by the turn of the way there: from fw to tw. */
+		const double c = fw[0] * tw[0] + fw[1] * tw[1], sn = fw[1] * tw[0] - fw[0] * tw[1];
+		const double nx = normal[0], nz = normal[2];
+		normal[0] = static_cast<float>(nx * c + nz * sn);
+		normal[2] = static_cast<float>(-nx * sn + nz * c);
+	}
+}
+
+/**
+ * Make the object's shape (a frame of it): its file, its wheels, its crew, and of its add-ons the nodes of the parts
+ * asked for (GetShape(int, uint64_t)) -- the textures of all its add-ons all the same, in the same order whatever parts
+ * are asked for (a texture is asked for by its index: ThreeDVehicleObject::GetTexture()).
+ * @param parts the parts of its states (PartsOf()), bit n the part n
+ */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame, const ThreeDParts &parts) const
+{
+	GlbFilesScope files;
+	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
+	if (!this->body.empty()) {
+		/* An animal of a set: its figure in the gait at the frame (BodyAt()). */
+		const ThreeDVehicleObject *fig = this->BodyAt(frame);
+		return fig != nullptr ? fig->MakeShape(frame, ThreeDParts{}) : nullptr;
+	}
+	const auto started = std::chrono::steady_clock::now();
+	std::string key = this->file;
+	if (!this->frame_prefix.empty()) key += fmt::format("#{}{}", this->frame_prefix, frame);
+	for (const ThreeDVehicleWheels &w : this->wheels) {
+		key += fmt::format("|{}{}", w.file, w.both_sides ? "*2" : "");
+		for (const auto &at : w.at) key += fmt::format(",{},{},{}", at[0], at[1], at[2]);
+	}
+	for (const ThreeDVehicleCrew &c : this->crew) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
+	for (const auto &[group, list] : this->crew_groups) {
+		key += "|=" + group;
+		for (const ThreeDVehicleCrew &c : list) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
+	}
+	for (const ThreeDVehicleAddon &a : this->addons) {
+		key += fmt::format("|+{}@{},{},{}", a.file, a.at[0], a.at[1], a.at[2]);
+		for (const std::string &n : a.nodes) key += "/" + n;
+	}
+	for (const ThreeDModelWheel &w : this->model_wheels) key += "|o" + w.addon + "/" + w.node;
+	for (const ThreeDVehicleDoor &d : this->doors) key += fmt::format("|d{}@{},{}", d.node, d.shift[0], d.shift[1]);
+	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
+	if (!this->only_node.empty()) key += "|u" + this->only_node;
+	/* Read otherwise, so a shape of its own (the player, #286: the clay town's giant mushroom at night was its day's
+	 * shape, read first, without the glowing underside of its cap): the night kept or left out, a node left out. */
+	if (this->night_glass) key += "|n";
+	if (this->frame_lights) key += "|f";
+	for (const std::string &n : this->skip_nodes) key += "|x" + n;
+	if (this->to_ground) key += "|g";
+	if (this->to_middle) key += "|m";
+	if (this->one_sided) key += "|o";
+	if (this->frames_only) key += "|j";
+	for (const std::string &n : this->skip_materials) key += "|-" + n;
+	for (const auto &p : this->bend_from) key += fmt::format("|<{},{}", p[0], p[1]);
+	for (const auto &p : this->bend_to) key += fmt::format("|>{},{}", p[0], p[1]);
+	if (this->ends_beyond > 0) key += fmt::format("|e{}", this->ends_beyond);
+	if (!std::isnan(this->keep_above)) key += fmt::format("|c{}", this->keep_above);
+	if (!std::isnan(this->floors_over)) key += fmt::format("|w{}", this->floors_over);
+	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
+	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
+	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
+	GlbMesh mesh;
+	if (this->file.starts_with("beamng:")) {
+		/* A car of a mod of BeamNG (beamng.h): its materials as they are, the paint first, white; its lights of the mod.
+		 * One at a time: the zips of the mods are opened as they are read (beamng.cpp), and this may be either thread. */
+		std::lock_guard beamng_lock(_beamng_mutex);
+		const auto [car, make] = BeamngCarOf(this->file);
+		BeamngMesh bm;
+		if (car == nullptr || !ReadBeamngShape(*car, bm, make)) return nullptr;
+		auto made = std::make_shared<ThreeDVehicleShape>();
+		made->pos = std::move(bm.pos);
+		made->nrm = std::move(bm.nrm);
+		made->uv = std::move(bm.uv);
+		made->tri = std::move(bm.tri);
+		made->tri_tex = std::move(bm.tri_tex);
+		made->facing = std::move(bm.tri_facing);
+		if (!bm.tri_part.empty()) {
+			made->tri_part = std::move(bm.tri_part);
+			made->tri_part.resize(made->tri.size() / 3, 0);
+		}
+		/* Pixels as they are, marked so (DecodeTextureLevels()). */
+		auto raw_of = [](int w, int h, const std::vector<uint8_t> &rgba) {
+			std::vector<uint8_t> raw(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
+			for (uint32_t v : {static_cast<uint32_t>(w), static_cast<uint32_t>(h)}) {
+				for (int k = 0; k < 4; k++) raw.push_back(static_cast<uint8_t>(v >> (8 * k)));
+			}
+			raw.insert(raw.end(), rgba.begin(), rgba.end());
+			return raw;
+		};
+		/* A picture's RGBA: as it is, or a PNG's (its colour where it is not seen lost). */
+		auto rgba_of = [](std::vector<uint8_t> &rgba, int &w, int &h, const std::vector<uint8_t> &png) {
+			if (!rgba.empty() || png.empty()) return !rgba.empty();
+			std::vector<ThreeDObjectTexture> levels;
+			DecodeTextureLevels(png, levels, 0, false, nullptr, true);
+			if (levels.empty() || levels[0].w <= 1) return false;
+			w = levels[0].w;
+			h = levels[0].h;
+			rgba.resize(levels[0].px.size() * 4);
+			for (size_t i = 0; i < levels[0].px.size(); i++) {
+				const Colour c(levels[0].px[i]);
+				rgba[i * 4] = c.r;
+				rgba[i * 4 + 1] = c.g;
+				rgba[i * 4 + 2] = c.b;
+				rgba[i * 4 + 3] = c.a;
+			}
+			return true;
+		};
+		for (BeamngMesh::Material &m : bm.materials) {
+			/* BeamNG draws a material's picture whole, its alpha only where the material is see-through (the main_d of the
+			 * Škoda 1203 has a quarter under half: holes in its chrome and rubber here); the glass's how much hides where
+			 * of its "opacityMap" (the player: "weird colours, the windows"). */
+			if (m.alpha < 255 && rgba_of(m.rgba, m.w, m.h, m.png) && rgba_of(m.opacity_rgba, m.ow, m.oh, m.opacity_png)) {
+				for (int y = 0; y < m.h; y++) {
+					const int oy = std::min(m.oh - 1, y * m.oh / m.h);
+					for (int x = 0; x < m.w; x++) m.rgba[(static_cast<size_t>(y) * m.w + x) * 4 + 3] = m.opacity_rgba[(static_cast<size_t>(oy) * m.ow + std::min(m.ow - 1, x * m.ow / m.w)) * 4];
+				}
+				m.png.clear();
+			} else if (m.alpha == 255 && !m.rgba.empty()) {
+				for (size_t i = 3; i < m.rgba.size(); i += 4) m.rgba[i] = 255;
+			}
+			std::vector<uint8_t> png = std::move(m.png);
+			if (png.empty() && !m.rgba.empty()) png = raw_of(m.w, m.h, m.rgba);
+			made->pngs.push_back(InternThreeDTextureBytes(png));
+			made->flats.push_back(m.flat);
+			made->tex_names.push_back(std::move(m.name));
+			made->tex_glow.push_back(0);
+			made->tex_alpha.push_back(m.alpha);
+		}
+		made->paint_whole = true;
+		/*
+		 * The painted materials side by side as the body's texture (BeamngMesh::PaintSource), each its first layer's
+		 * picture, and their paints' masks likewise: the car's colour where its mask is light, at the picture's
+		 * lightness -- as BeamNG lays its paint over its rubber, chrome and lamps -- where before a triangle was either.
+		 */
+		if (!bm.paint_sources.empty() && !made->pngs.empty()) {
+			const int side = BeamngMesh::PaintSide(bm.paint_sources.size());
+			int cell = 64;
+			for (BeamngMesh::PaintSource &p : bm.paint_sources) {
+				rgba_of(p.rgba, p.w, p.h, p.png);
+				rgba_of(p.mask_rgba, p.mw, p.mh, p.mask_png);
+				cell = std::max({cell, p.w, p.h});
+			}
+			cell = std::min(cell, PAINT_CELL_MOST);
+			const int mask_cell = std::max(16, cell / 2);
+			const int w = side * cell, mw = side * mask_cell;
+			std::vector<uint8_t> atlas(static_cast<size_t>(w) * w * 4, 255), mask(static_cast<size_t>(mw) * mw * 4, 255);
+			for (size_t k = 0; k < bm.paint_sources.size(); k++) {
+				const BeamngMesh::PaintSource &p = bm.paint_sources[k];
+				const int cx = static_cast<int>(k) % side, cy = static_cast<int>(k) / side;
+				if (!p.rgba.empty() && p.w > 0 && p.h > 0) {
+					for (int y = 0; y < cell; y++) {
+						const int sy = std::min(p.h - 1, y * p.h / cell);
+						for (int x = 0; x < cell; x++) {
+							const uint8_t *src = &p.rgba[(static_cast<size_t>(sy) * p.w + std::min(p.w - 1, x * p.w / cell)) * 4];
+							uint8_t *dst = &atlas[((static_cast<size_t>(cy) * cell + y) * w + cx * cell + x) * 4];
+							dst[0] = src[0];
+							dst[1] = src[1];
+							dst[2] = src[2];
+						}
+					}
+				}
+				if (!p.mask_rgba.empty() && p.mw > 0 && p.mh > 0) {
+					for (int y = 0; y < mask_cell; y++) {
+						const int sy = std::min(p.mh - 1, y * p.mh / mask_cell);
+						for (int x = 0; x < mask_cell; x++) {
+							const uint8_t m = p.mask_rgba[(static_cast<size_t>(sy) * p.mw + std::min(p.mw - 1, x * p.mw / mask_cell)) * 4];
+							uint8_t *dst = &mask[((static_cast<size_t>(cy) * mask_cell + y) * mw + cx * mask_cell + x) * 4];
+							dst[0] = dst[1] = dst[2] = m;
+						}
+					}
+				}
+			}
+			made->pngs[0] = InternThreeDTextureBytes(raw_of(w, w, atlas));
+			made->paint_mask = InternThreeDTextureBytes(raw_of(mw, mw, mask));
+		}
+		/* The tarp and the bed materials of their own, each of the add-on its colour is given to (ThreeDVehicleAddon::whole). */
+		for (const auto &[tex, which] : bm.own_paints) {
+			if (tex >= made->pngs.size() || which >= this->addons.size() || !this->addons[which].whole) continue;
+			made->tex_addon.resize(made->pngs.size(), -1);
+			made->tex_addon[tex] = static_cast<int8_t>(which);
+		}
+		made->night_pos = std::move(bm.night_pos);
+		made->night_tri = std::move(bm.night_tri);
+		made->night_colour = std::move(bm.night_colour);
+		made->night_kind = std::move(bm.night_kind);
+		made->front_lights = std::move(bm.front_lights);
+		made->back_lights = std::move(bm.back_lights);
+		/* Its crew: College Girl at the wheel (ReadThreeDVehicleObjects()), not drawn from the cab's eye. */
+		for (const ThreeDVehicleCrew &c : this->crew) this->AddCrewFigure(*made, c, 0);
+		made->x0 = made->y0 = made->z0 = 1e9f;
+		made->x1 = made->y1 = made->z1 = -1e9f;
+		for (size_t i = 0; i + 2 < made->pos.size(); i += 3) {
+			made->x0 = std::min(made->x0, made->pos[i]); made->x1 = std::max(made->x1, made->pos[i]);
+			made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
+			made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
+		}
+		Debug(misc, 1, "3D vehicle {}: {} triangles, {} materials, {:.2f}..{:.2f} x {:.2f}..{:.2f} x {:.2f}..{:.2f} m", this->name, made->tri.size() / 3, made->pngs.size(),
+				made->x0, made->x1, made->y0, made->y1, made->z0, made->z1);
+		ShrinkShape(*made);
+		ExtentOfAll(*made);
+		KeepVehicleShape(key, made);
+		return made;
+	}
+	if (this->file.ends_with(".s") || this->file.ends_with(".S")) {
+		/* A model of MSTS (simtrains.h): its textures as they are, RGBA, marked so (DecodeTextureLevels()). */
+		SimtrainsMesh msts;
+		if (!ReadSimtrainsShape(this->file, msts)) return nullptr;
+		mesh.pos = std::move(msts.pos);
+		mesh.nrm = std::move(msts.nrm);
+		mesh.uv = std::move(msts.uv);
+		mesh.tri = std::move(msts.tri);
+		mesh.tri_tex = std::move(msts.tri_tex);
+		for (SimtrainsMesh::Texture &t : msts.textures) {
+			GlbTexture g;
+			g.name = t.name;
+			if (!t.rgba.empty()) {
+				std::vector<uint8_t> raw(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
+				for (uint32_t v : {static_cast<uint32_t>(t.w), static_cast<uint32_t>(t.h)}) {
+					for (int k = 0; k < 4; k++) raw.push_back(static_cast<uint8_t>(v >> (8 * k)));
+				}
+				raw.insert(raw.end(), t.rgba.begin(), t.rgba.end());
+				g.png = InternThreeDTextureBytes(raw);
+			}
+			mesh.textures.push_back(std::move(g));
+		}
+	} else {
+		/* Its glass and the wheels of its model that turn, each its nodes marked (tri_group: 1 the glass, then the wheels). */
+		std::vector<std::string> marked{this->glass_node.empty() ? std::string("\x01") : this->glass_node};
+		/* (A wheel of an add-on is marked in the add-on: a name never found here keeps the numbering of the wheels.) */
+		for (const ThreeDModelWheel &w : this->model_wheels) marked.push_back(w.addon.empty() ? w.node : std::string("\x01"));
+		/* Then the wings of its doors that open out (ThreeDVehicleDoor). */
+		for (const ThreeDVehicleDoor &d : this->doors) marked.push_back(d.node);
+		if (this->frame_lights) {
+			/* A witch's frame: the glass of her lights ("noc_NN" of the frame) read below. */
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.frame_prefix = this->frame_prefix;
+			o.frame = frame;
+			o.only_node = this->only_node;
+			o.skip_night = true;
+			o.groups = &marked;
+			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
+		} else if (!this->skip_nodes.empty() || this->night_glass || this->frames_only || !this->skip_materials.empty()) {
+			/* A node left out (the rocket shot), the lights at night as they are or a light's glass kept, its frames alone,
+			 * materials left out (the short rod's own float and line). */
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.frame_prefix = this->frame_prefix;
+			o.frame = frame;
+			o.frames_only = this->frames_only;
+			if (!this->skip_materials.empty()) o.skip_materials = &this->skip_materials;
+			o.only_node = this->only_node;
+			o.skip_nodes = &this->skip_nodes;
+			o.skip_night = !this->night_glass;
+			o.groups = &marked;
+			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
+		} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, this->only_node, {}, nullptr, "noc", &marked)) {
+			return nullptr;
+		}
+	}
+	auto made = std::make_shared<ThreeDVehicleShape>();
+	if (!this->file.ends_with(".s") && !this->file.ends_with(".S")) {
+		/* Its lights: the glass of "noc" in the colours of its materials, and the places they shine from. A
+		 * witch's of her frame: the glass of its "noc_NN", the places of her lantern and her torch in it. */
+		GlbMesh night, none;
+		if (this->frame_lights) {
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.frame_prefix = this->frame_prefix;
+			o.frame = frame;
+			o.only_night = true;
+			ReadGlbMesh(this->file, night, o);
+			o.only_night = false;
+			o.only_node = "\x01";
+			o.points_only = true;
+			for (auto [prefix, list] : {std::pair{"lucerna_", &made->lanterns}, std::pair{"svitilna_", &made->torches}, std::pair{"paprsek_", &made->torch_aims}}) {
+				o.point_prefix = prefix;
+				o.points = list;
+				ReadGlbMesh(this->file, none, o);
+			}
+			/* A torch without the aim of its beam, or an aim without its torch, shines nowhere. */
+			if (made->torches.size() != made->torch_aims.size()) {
+				Debug(misc, 0, "3D figure {}: frame {} has {} torches and {} aims of their beams", this->name, frame, made->torches.size() / 3, made->torch_aims.size() / 3);
+				made->torches.clear();
+				made->torch_aims.clear();
+			}
+		} else {
+			/* The glass of "noc" and the headlights; the red lights and those for going back first, the places only. */
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.only_node = "noc";
+			o.point_prefix = "svetlo_predni_";
+			o.point_skip = "svetlo_predni_vzad";
+			o.points = &made->front_lights;
+			ReadGlbMesh(this->file, night, o);
+			o.only_node = "\x01";
+			o.points_only = true;
+			for (auto [prefix, skip, list] : {std::tuple{"svetlo_zadni_", "svetlo_zadni_vpred", &made->back_lights}, std::tuple{"svetlo_predni_vzad", "", &made->front_back_lights}, std::tuple{"svetlo_zadni_vpred", "", &made->back_front_lights}}) {
+				o.point_prefix = prefix;
+				o.point_skip = skip;
+				o.points = list;
+				ReadGlbMesh(this->file, none, o);
+			}
+		}
+		made->night_pos = std::move(night.pos);
+		made->night_tri = std::move(night.tri);
+		for (uint8_t t : night.tri_tex) {
+			const GlbTexture *tex = t < night.textures.size() ? &night.textures[t] : nullptr;
+			made->night_colour.push_back(tex != nullptr ? tex->flat : Colour(255, 244, 216).data);
+			made->night_kind.push_back(tex != nullptr ? NightLightKind(tex->name) : 0);
+		}
+		if (made->HasLights()) {
+			Debug(misc, 2, "3D vehicle {}: lights, {} triangles of glass ({} of them for going back first), {} ahead, {} at the back; going back first {} ahead, {} at the back", this->name, made->night_tri.size() / 3,
+					std::ranges::count_if(made->night_kind, [](uint8_t k) { return k >= 2; }), made->front_lights.size() / 3, made->back_lights.size() / 3, made->front_back_lights.size() / 3, made->back_front_lights.size() / 3);
+		}
+	}
+	/* Only its ends ("jen_konce_m"): a triangle with a corner nearer its origin along x is left out, as an add-on's place
+	 * leaves it ("beyond", LayAddons()). Only what is high enough (keep_above, a water lily's leaves): a triangle with a
+	 * corner lower is left out. */
+	if (this->ends_beyond > 0 || !std::isnan(this->keep_above)) {
+		const size_t triangles = mesh.tri.size() / 3;
+		std::vector<uint32_t> tri;
+		std::vector<uint8_t> tri_tex;
+		std::vector<uint16_t> tri_group;
+		for (size_t t = 0; t < triangles; t++) {
+			bool kept = true;
+			for (size_t k = 0; k < 3; k++) {
+				const uint32_t i = mesh.tri[t * 3 + k];
+				if (this->ends_beyond > 0) kept = kept && std::abs(mesh.pos[i * 3]) >= this->ends_beyond;
+				if (!std::isnan(this->keep_above)) kept = kept && mesh.pos[i * 3 + 2] >= this->keep_above;
+			}
+			if (!kept) continue;
+			tri.insert(tri.end(), {mesh.tri[t * 3], mesh.tri[t * 3 + 1], mesh.tri[t * 3 + 2]});
+			if (mesh.tri_tex.size() == triangles) tri_tex.push_back(mesh.tri_tex[t]);
+			if (mesh.tri_group.size() == triangles) tri_group.push_back(mesh.tri_group[t]);
+		}
+		mesh.tri = std::move(tri);
+		if (mesh.tri_tex.size() == triangles) mesh.tri_tex = std::move(tri_tex);
+		if (mesh.tri_group.size() == triangles) mesh.tri_group = std::move(tri_group);
+	}
+	/* Laid along another line ("prohnuti": a rod bent or straightened, BendThreeDThingPoint()). */
+	if (!this->bend_from.empty() || !this->bend_to.empty()) {
+		const bool normals = mesh.nrm.size() == mesh.pos.size();
+		for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) BendThreeDThingPoint(*this, &mesh.pos[i], normals ? &mesh.nrm[i] : nullptr);
+	}
+	if (!std::isnan(this->floors_over)) {
+		/* A boat's rooms (ReadBoatRooms()): their floors under its waterline lifted a little over it -- the water's plane
+		 * lies across the hull, and the yacht's floor under its cockpit lay under it, the sea showing over it. */
+		std::vector<bool> lift(mesh.pos.size() / 3, false);
+		for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+			const float *a = &mesh.pos[mesh.tri[t] * 3], *b = &mesh.pos[mesh.tri[t + 1] * 3], *c = &mesh.pos[mesh.tri[t + 2] * 3];
+			const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+			const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+			const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+			/* Floors, not the keel deep under them (its top would stand out of the water). */
+			if (len <= 0 || nz < 0.9 * len || std::max({a[2], b[2], c[2]}) >= this->floors_over || std::min({a[2], b[2], c[2]}) < this->floors_over - 0.6f) continue;
+			for (size_t k = 0; k < 3; k++) lift[mesh.tri[t + k]] = true;
+		}
+		for (size_t i = 0; i < lift.size(); i++) {
+			if (lift[i]) mesh.pos[i * 3 + 2] = this->floors_over;
+		}
+	}
+	/* The wings of its doors that open out (ThreeDVehicleDoor): each wing's triangles again where it lies open, moved
+	 * by its "posun"; the wing shut its part, open its other (door_of: the door + 1 and whether open). */
+	const size_t wheel_groups = this->model_wheels.size();
+	std::vector<std::pair<uint8_t, bool>> door_of;
+	if (!this->doors.empty() && mesh.tri_group.size() == mesh.tri.size() / 3) {
+		const size_t triangles = mesh.tri.size() / 3;
+		const bool normals = mesh.nrm.size() == mesh.pos.size();
+		const bool uvs = mesh.uv.size() / 2 == mesh.pos.size() / 3;
+		const bool texs = mesh.tri_tex.size() == triangles;
+		door_of.assign(triangles, {0, false});
+		std::map<uint64_t, uint32_t> moved;
+		for (size_t t = 0; t < triangles; t++) {
+			const uint16_t g = mesh.tri_group[t];
+			if (g < 2 + wheel_groups || g - 2 - wheel_groups >= this->doors.size()) continue;
+			const size_t d = g - 2 - wheel_groups;
+			door_of[t] = {static_cast<uint8_t>(d + 1), false};
+			uint32_t copy[3];
+			for (int k = 0; k < 3; k++) {
+				const uint32_t i = mesh.tri[t * 3 + k];
+				auto [it, added] = moved.try_emplace(static_cast<uint64_t>(i) << 8 | d, static_cast<uint32_t>(mesh.pos.size() / 3));
+				if (added) {
+					mesh.pos.insert(mesh.pos.end(), {mesh.pos[i * 3] + this->doors[d].shift[0], mesh.pos[i * 3 + 1] + this->doors[d].shift[1], mesh.pos[i * 3 + 2]});
+					if (normals) mesh.nrm.insert(mesh.nrm.end(), {mesh.nrm[i * 3], mesh.nrm[i * 3 + 1], mesh.nrm[i * 3 + 2]});
+					if (uvs) mesh.uv.insert(mesh.uv.end(), {mesh.uv[i * 2], mesh.uv[i * 2 + 1]});
+				}
+				copy[k] = it->second;
+			}
+			mesh.tri.insert(mesh.tri.end(), {copy[0], copy[1], copy[2]});
+			if (texs) mesh.tri_tex.push_back(mesh.tri_tex[t]);
+			mesh.tri_group.push_back(g);
+			door_of.emplace_back(static_cast<uint8_t>(d + 1), true);
+		}
+	}
+	/* One-sided ("jednostranne"): the side of each triangle facing away left out where it is drawn (TriangleFacing()). */
+	if (this->one_sided) made->facing = TriangleFacing(mesh);
+	made->pos = std::move(mesh.pos);
+	made->nrm = std::move(mesh.nrm);
+	made->uv = std::move(mesh.uv);
+	made->tri = std::move(mesh.tri);
+	made->tri_tex = std::move(mesh.tri_tex);
+	made->own_triangles = static_cast<uint32_t>(made->tri.size() / 3);
+	for (GlbTexture &t : mesh.textures) {
+		made->pngs.push_back(std::move(t.png));
+		made->flats.push_back(t.flat);
+		made->tex_names.push_back(std::move(t.name));
+		made->tex_glow.push_back(t.glow);
+		made->tex_alpha.push_back(t.alpha);
+	}
+	/* The glass and the wheels that turn (the colleague's hra/3d/PROSBA-V3S-3D.md). */
+	made->glass_alpha = this->glass_alpha;
+	if (!mesh.tri_group.empty() && std::ranges::any_of(mesh.tri_group, [](uint16_t g) { return g != 0; })) {
+		made->tri_part.assign(made->tri.size() / 3, 0);
+		for (size_t t = 0; t < mesh.tri_group.size() && t < made->tri_part.size(); t++) {
+			const uint16_t g = mesh.tri_group[t];
+			if (g == 1) {
+				made->tri_part[t] = ThreeDVehicleShape::PART_GLASS;
+			} else if (t < door_of.size() && door_of[t].first != 0) {
+				const ThreeDVehicleDoor &d = this->doors[door_of[t].first - 1];
+				made->tri_part[t] = door_of[t].second ? d.open_part : d.shut_part;
+			} else if (g >= 2 && g < 2 + wheel_groups) {
+				if (made->corner_wheel.empty()) made->corner_wheel.assign(made->pos.size() / 3, 0);
+				for (int k = 0; k < 3; k++) made->corner_wheel[made->tri[t * 3 + k]] = static_cast<uint8_t>(g - 1);
+			}
+		}
+	}
+	/* Each triangle's part as the others are added: those so far are of the body, part 0. */
+	auto mark_part = [&made](uint8_t part, size_t first_triangle) {
+		if (part == 0 && made->tri_part.empty()) return;
+		made->tri_part.resize(first_triangle, 0);
+		made->tri_part.resize(made->tri.size() / 3, part);
+	};
+	/* The wheels of their own files: each place a copy, the other side mirrored (y the other way, its normals too). */
+	size_t wheel_triangles = 0;
+	for (const ThreeDVehicleWheels &w : this->wheels) {
+		GlbMesh wheel;
+		if (!ReadGlbMesh(w.file, wheel, true)) {
+			Debug(misc, 0, "3D vehicle {}: the wheel {} cannot be read", this->name, w.file);
+			continue;
+		}
+		const bool lit = !made->nrm.empty() && !wheel.nrm.empty();
+		if (!lit) made->nrm.clear();
+		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
+		for (GlbTexture &t : wheel.textures) {
+			if (made->pngs.size() >= 255) break;
+			made->pngs.push_back(t.png);
+			made->flats.push_back(t.flat);
+			made->tex_names.push_back(t.name);
+			made->tex_glow.push_back(t.glow);
+			made->tex_alpha.push_back(t.alpha);
+		}
+		for (const auto &at : w.at) {
+			for (int side = 0; side < (w.both_sides && std::abs(at[1]) > 0.001f ? 2 : 1); side++) {
+				const float sy = side == 0 ? 1.0f : -1.0f;
+				uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
+				for (size_t i = 0; i < wheel.pos.size(); i += 3) {
+					made->pos.push_back(at[0] + wheel.pos[i]);
+					made->pos.push_back(sy * (at[1] + wheel.pos[i + 1]));
+					made->pos.push_back(at[2] + wheel.pos[i + 2]);
+					if (lit) {
+						made->nrm.push_back(wheel.nrm[i]);
+						made->nrm.push_back(sy * wheel.nrm[i + 1]);
+						made->nrm.push_back(wheel.nrm[i + 2]);
+					}
+				}
+				made->uv.insert(made->uv.end(), wheel.uv.begin(), wheel.uv.end());
+				for (size_t t = 0; t < wheel.tri.size(); t += 3) {
+					made->tri.push_back(base + wheel.tri[t]);
+					made->tri.push_back(base + wheel.tri[t + 1]);
+					made->tri.push_back(base + wheel.tri[t + 2]);
+					made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + wheel.tri_tex[t / 3])));
+					wheel_triangles++;
+				}
+			}
+		}
+	}
+	/* The crew: each figure's shape sized, turned about z and stood at its place, its textures after the others. The
+	 * driver -- the one sitting at the eye of the cab -- is not drawn from that eye. A figure bigger than it is ("meritko")
+	 * stays that big everywhere, the view from the eyes too. A figure that walks is not of the shape: it is drawn on its
+	 * own, its frame by the way gone (WalkingCrew()). */
+	auto add_crew = [&](const ThreeDVehicleCrew &c, uint8_t part) { this->AddCrewFigure(*made, c, part); };
+	for (const ThreeDVehicleCrew &c : this->crew) add_crew(c, static_cast<uint8_t>(this->crew_record_part));
+	/* What a state shows -- a group of the crew, the load -- is not of the vehicle's size (its length on the map). */
+	const size_t extent_floats = made->pos.size();
+	auto part_of = [&](const std::string &name) {
+		auto p = std::ranges::find(this->part_names, name);
+		return p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= ThreeDParts::COUNT ? uint8_t{0} : static_cast<uint8_t>(p - this->part_names.begin());
+	};
+	for (const auto &[group, list] : this->crew_groups) {
+		const uint8_t part = part_of("posadky/" + group);
+		if (part == 0) continue;
+		/* One at the driver's seat (Mat driving) not drawn from the own cab's eye, as the record's driver is not. */
+		for (const ThreeDVehicleCrew &c : list) add_crew(c, c.driver_seat ? static_cast<uint8_t>(ThreeDVehicleShape::PART_SEAT + part) : part);
+	}
+	/* The add-ons: of each, only the nodes a state may show, each its part, its textures after the others (marked as
+	 * the add-on's, for the colour a state gives it). */
+	made->addons_from = static_cast<uint32_t>(made->tri.size() / 3);
+	for (size_t ai = 0; ai < this->addons.size(); ai++) {
+		const ThreeDVehicleAddon &addon = this->addons[ai];
+		/* Only the nodes a state may show (the others not read at all: a file of the loads has seventy five), without
+		 * the glass of their lamps; their windows ("<dil>_sklo") and their wheels marked (the colleague's
+		 * hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, points 6 and 10). */
+		std::vector<std::string> wheel_nodes;
+		std::vector<uint8_t> wheel_of;
+		for (size_t w = 0; w < this->model_wheels.size(); w++) {
+			if (this->model_wheels[w].addon != addon.key) continue;
+			wheel_nodes.push_back(this->model_wheels[w].node);
+			wheel_of.push_back(static_cast<uint8_t>(std::min<size_t>(w + 1, 255)));
+		}
+		/* Only the nodes of the parts asked for, each with its part (once: the triangles of an add-on are a million);
+		 * the textures of all its nodes, in the order they are met (ReadGlbMesh(): material_groups). */
+		std::vector<std::string> nodes;
+		std::vector<uint8_t> node_part;
+		for (const std::string &node : addon.nodes) {
+			const uint8_t part = part_of(addon.key + "/" + node);
+			if (part == 0 || !parts.Has(part)) continue;
+			nodes.push_back(node);
+			node_part.push_back(part);
+		}
+		GlbReadOptions read;
+		read.all_nodes = true;
+		read.groups = &nodes;
+		read.material_groups = &addon.nodes;
+		read.only_groups = true;
+		read.skip_night = true;
+		read.marks = &wheel_nodes;
+		read.glass_suffix = "_sklo";
+		GlbMesh am;
+		if (!ReadGlbMesh(addon.file, am, read) && am.textures.empty()) {
+			Debug(misc, 0, "3D vehicle {}: the add-on {} cannot be read", this->name, addon.file);
+			continue;
+		}
+		/* The lamps of its parts (point 5): the glass of each part's "noc_<dil>", the places its lights shine from. */
+		{
+			GlbReadOptions lamps;
+			lamps.all_nodes = true;
+			lamps.groups = &nodes;
+			lamps.only_groups = true;
+			lamps.only_night = true;
+			std::vector<float> front, back;
+			std::vector<uint16_t> front_group, back_group;
+			lamps.point_prefix = "svetlo_predni_";
+			lamps.point_skip = "svetlo_predni_vzad";
+			lamps.points = &front;
+			lamps.point_groups = &front_group;
+			GlbMesh night;
+			ReadGlbMesh(addon.file, night, lamps);
+			GlbReadOptions rear = lamps;
+			rear.points_only = true;
+			rear.only_night = false;
+			rear.only_node = "\x01";
+			rear.point_prefix = "svetlo_zadni_";
+			rear.point_skip = "svetlo_zadni_vpred";
+			rear.points = &back;
+			rear.point_groups = &back_group;
+			GlbMesh none;
+			ReadGlbMesh(addon.file, none, rear);
+			auto group_part = [&](uint16_t g) { return g > 0 && g <= node_part.size() ? node_part[g - 1] : uint8_t{0}; };
+			/* The body's own lamps so far: always (part 0). */
+			made->night_part.resize(made->night_tri.size() / 3, 0);
+			made->front_part.resize(made->front_lights.size() / 3, 0);
+			made->back_part.resize(made->back_lights.size() / 3, 0);
+			const uint32_t night_base = static_cast<uint32_t>(made->night_pos.size() / 3);
+			for (size_t i = 0; i + 2 < night.pos.size(); i += 3) {
+				for (int k = 0; k < 3; k++) made->night_pos.push_back(night.pos[i + k] + addon.at[k]);
+			}
+			for (size_t t = 0; t + 2 < night.tri.size(); t += 3) {
+				const uint8_t part = group_part(t / 3 < night.tri_group.size() ? night.tri_group[t / 3] : 0);
+				if (part == 0) continue; // a part no state shows
+				for (int k = 0; k < 3; k++) made->night_tri.push_back(night_base + night.tri[t + k]);
+				const uint8_t tx = night.tri_tex[t / 3];
+				const GlbTexture *tex = tx < night.textures.size() ? &night.textures[tx] : nullptr;
+				made->night_colour.push_back(tex != nullptr ? tex->flat : Colour(255, 244, 216).data);
+				made->night_kind.push_back(tex != nullptr ? NightLightKind(tex->name) : 0);
+				made->night_part.push_back(part);
+			}
+			auto add_points = [&](const std::vector<float> &points, const std::vector<uint16_t> &groups, std::vector<float> &to, std::vector<uint8_t> &to_part) {
+				for (size_t p = 0; p * 3 + 2 < points.size(); p++) {
+					const uint8_t part = group_part(p < groups.size() ? groups[p] : 0);
+					if (part == 0) continue;
+					for (int k = 0; k < 3; k++) to.push_back(points[p * 3 + k] + addon.at[k]);
+					to_part.push_back(part);
+				}
+			};
+			add_points(front, front_group, made->front_lights, made->front_part);
+			add_points(back, back_group, made->back_lights, made->back_part);
+		}
+		/* (An add-on of none of the parts asked for adds its textures only.) */
+		const bool lit = !made->nrm.empty() && !am.nrm.empty();
+		if (!lit && !am.pos.empty()) made->nrm.clear();
+		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
+		made->tex_addon.resize(made->pngs.size(), -1);
+		for (GlbTexture &tx : am.textures) {
+			if (made->pngs.size() >= 255) break;
+			made->pngs.push_back(std::move(tx.png));
+			made->flats.push_back(tx.flat);
+			made->tex_names.push_back(std::move(tx.name));
+			made->tex_glow.push_back(tx.glow);
+			made->tex_alpha.push_back(tx.alpha);
+			made->tex_addon.push_back(static_cast<int8_t>(std::min<size_t>(ai, 127)));
+		}
+		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
+		made->pos.reserve(made->pos.size() + am.pos.size());
+		if (lit) made->nrm.reserve(made->nrm.size() + am.nrm.size());
+		made->tri.reserve(made->tri.size() + am.tri.size());
+		made->tri_tex.reserve(made->tri_tex.size() + am.tri.size() / 3);
+		for (size_t i = 0; i + 2 < am.pos.size(); i += 3) {
+			for (int k = 0; k < 3; k++) made->pos.push_back(am.pos[i + k] + addon.at[k]);
+			if (lit) for (int k = 0; k < 3; k++) made->nrm.push_back(am.nrm[i + k]);
+		}
+		made->uv.insert(made->uv.end(), am.uv.begin(), am.uv.end());
+		for (size_t t = 0; t + 2 < am.tri.size(); t += 3) {
+			const uint16_t g = t / 3 < am.tri_group.size() ? am.tri_group[t / 3] : 0;
+			const uint8_t part = g > 0 && g <= node_part.size() ? node_part[g - 1] : 0;
+			if (part == 0) continue; // a node no state shows
+			const size_t first_triangle = made->tri.size() / 3;
+			for (int k = 0; k < 3; k++) made->tri.push_back(base + am.tri[t + k]);
+			made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + am.tri_tex[t / 3])));
+			mark_part(part, first_triangle);
+			/* Its window: see-through, shown with its part. */
+			if (t / 3 < am.tri_glass.size() && am.tri_glass[t / 3] != 0) {
+				made->tri_glass.resize(first_triangle, 0);
+				made->tri_glass.push_back(1);
+			}
+			/* Its wheel: the corners turn about the wheel's middle (the colleague's point 10). */
+			const uint16_t m = t / 3 < am.tri_mark.size() ? am.tri_mark[t / 3] : 0;
+			if (m > 0 && m <= wheel_of.size()) {
+				if (made->corner_wheel.size() < made->pos.size() / 3) made->corner_wheel.resize(made->pos.size() / 3, 0);
+				for (int k = 0; k < 3; k++) made->corner_wheel[base + am.tri[t + k]] = wheel_of[m - 1];
+			}
+		}
+	}
+	if (!made->tri_glass.empty()) made->tri_glass.resize(made->tri.size() / 3, 0);
+	if (!made->corner_wheel.empty()) made->corner_wheel.resize(made->pos.size() / 3, 0);
+	if (!made->tex_addon.empty()) made->tex_addon.resize(made->pngs.size(), -1);
+	if (!made->tri_part.empty()) made->tri_part.resize(made->tri.size() / 3, 0);
+	made->x0 = made->y0 = made->z0 = 1e9f;
+	made->x1 = made->y1 = made->z1 = -1e9f;
+	for (size_t i = 0; i + 2 < extent_floats; i += 3) {
+		made->x0 = std::min(made->x0, made->pos[i]); made->x1 = std::max(made->x1, made->pos[i]);
+		made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
+		made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
+	}
+	if (this->to_ground && made->z0 < made->z1) {
+		for (size_t i = 2; i < made->pos.size(); i += 3) made->pos[i] -= made->z0;
+		made->z1 -= made->z0;
+		made->z0 = 0;
+	}
+	if (this->to_middle && made->x0 <= made->x1) {
+		const float mx = (made->x0 + made->x1) / 2, my = (made->y0 + made->y1) / 2;
+		for (size_t i = 0; i + 1 < made->pos.size(); i += 3) {
+			made->pos[i] -= mx;
+			made->pos[i + 1] -= my;
+		}
+		made->x0 -= mx;
+		made->x1 -= mx;
+		made->y0 -= my;
+		made->y1 -= my;
+	}
+	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m (bottom {:.2f} m), read in {} ms", this->name,
+			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
+			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0, made->z0,
+			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
+	ShrinkShape(*made);
+	ExtentOfAll(*made);
+	KeepVehicleShape(key, made);
+	return made;
+}
+
+/**
+ * The picture of the model a mask or a paint of its own file lays over (TextureLevelsOfFile()): its body's (the first
+ * texture) or an add-on's, nullptr not known.
+ * @param addon -1 the body, else the add-on
+ */
+static ThreeDTextureBytes PictureUnder(const ThreeDVehicleShape *s, int addon)
+{
+	if (s == nullptr) return nullptr;
+	if (addon < 0) return s->pngs.empty() ? nullptr : s->pngs[0];
+	for (size_t i = 0; i < s->pngs.size() && i < s->tex_addon.size(); i++) {
+		if (s->tex_addon[i] == addon) return s->pngs[i];
+	}
+	return nullptr;
+}
+
+/** The size of a picture from its first bytes: a PNG's header, or the mark of pixels as they are (RAW_TEXTURE_MARK). */
+static bool ImageSizeOfHead(std::span<const uint8_t> head, int &w, int &h)
+{
+	static constexpr uint8_t PNG_SIGNATURE[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+	auto be32 = [&head](size_t at) { return static_cast<uint32_t>(head[at]) << 24 | head[at + 1] << 16 | head[at + 2] << 8 | head[at + 3]; };
+	if (head.size() >= 24 && std::equal(std::begin(PNG_SIGNATURE), std::end(PNG_SIGNATURE), head.begin())) {
+		w = static_cast<int>(std::min<uint32_t>(be32(16), 1 << 16));
+		h = static_cast<int>(std::min<uint32_t>(be32(20), 1 << 16));
+		return w > 0 && h > 0;
+	}
+	const size_t at = RAW_TEXTURE_MARK.size();
+	if (head.size() >= at + 8 && std::equal(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end(), head.begin())) {
+		w = static_cast<int>(std::min<uint32_t>(ReadU32(head, at), 1 << 16));
+		h = static_cast<int>(std::min<uint32_t>(ReadU32(head, at + 4), 1 << 16));
+		return w > 0 && h > 0;
+	}
+	return false;
+}
+
+/**
+ * The textures made again finer in the place of others (KeepTexture()): a thread may draw from those yet, so they are
+ * let go of only between the frames (ThreeDVehicleObject::TrimTextures()). Under _lazy_mutex.
+ */
+static std::vector<ThreeDTextureLevels> _textures_replaced;
+/** The finest level of each texture drawn since the last trimming, by the texture. Under _lazy_mutex. */
+static std::unordered_map<const void *, int> _texture_levels_asked;
+
+/** Keep a texture made in the place of the one there (under _lazy_mutex): that one is kept a while yet. */
+static void KeepTexture(ThreeDTextureLevels &place, ThreeDTextureLevels made)
+{
+	if (place != nullptr && place != made) _textures_replaced.push_back(std::move(place));
+	place = std::move(made);
+}
+
+/** A level of a texture kept, or its finest there when it has not that one (a coarser one); noted as drawn. Under _lazy_mutex. */
+static const ThreeDObjectTexture *LevelOfKept(const ThreeDTextureLevels &place, int level)
+{
+	if (place == nullptr || place->empty()) return nullptr;
+	const std::vector<ThreeDObjectTexture> &lv = *place;
+	level = DrawnLevel(lv, level);
+	auto [it, added] = _texture_levels_asked.try_emplace(&lv, level);
+	if (!added) it->second = std::min(it->second, level);
+	return &lv[std::clamp<int>(level, FinestLevel(lv), static_cast<int>(lv.size()) - 1)];
+}
+
+/**
+ * The shape whose textures are a figure's on bones the card poses (ThreeDGpuPosesBones()): its shape at rest, the
+ * textures of all its frames -- no frame of it posed by the processor for its textures.
+ * @param wait made now if it is not yet, else not waited for (asked in the background)
+ * @param[out] posed_by_card whether it is so (else the object's shape has its textures)
+ * @return nullptr when posed by the card and not made yet
+ */
+static const ThreeDVehicleShape *RestForTextures(const ThreeDVehicleObject &o, bool wait, bool &posed_by_card)
+{
+	posed_by_card = false;
+	if (!o.OnBones() || !ThreeDGpuPosesBones()) return nullptr;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		for (const auto &b : o.frame_bones) {
+			if (b != nullptr && b->rest != nullptr) {
+				posed_by_card = true;
+				return b->rest.get();
+			}
+		}
+	}
+	const std::shared_ptr<const ThreeDBonesFrame> b = wait ? o.GetBones(0) : o.TryGetBones(0);
+	if (b != nullptr && b->rest == nullptr) return nullptr; // the card cannot pose it: its frames the processor's
+	posed_by_card = true;
+	return b != nullptr ? b->rest.get() : nullptr;
+}
+
+/**
+ * The shape the object's textures are of, as its textures are chosen and painted by it (the level of detail, the
+ * paint of its state): a figure on bones the card poses its shape at rest (RestForTextures()), else its shape.
+ * @param wait made now if it is not yet (ThreeDLazyNoWait: asked in the background), else only if it is made already
+ * @return nullptr when there is none yet
+ */
+const ThreeDVehicleShape *ThreeDVehicleObject::TextureShape(bool wait) const
+{
+	bool by_card = false;
+	const ThreeDVehicleShape *rest = RestForTextures(*this, wait, by_card);
+	if (by_card) return rest;
+	return wait ? this->GetShape() : this->TryGetShape();
+}
+
+/**
+ * One of the object's textures at a level of detail, made the first time and again when a finer level is wanted than it
+ * has (the textures by need): the body's (0) is the paint ("textura") when there is one, else the file's; the others
+ * the file's and the wheels'.
+ */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index) const
+{
+	MarkThreeDUsed(this->used);
+	bool by_card = false;
+	const ThreeDVehicleShape *s = RestForTextures(*this, true, by_card);
+	/* Not made yet (ThreeDLazyNoWait): not made of nothing now -- it is asked of the thread in the background. */
+	if (by_card && s == nullptr) return nullptr;
+	if (!by_card) s = this->GetShape();
+	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
+	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_TEXTURE + index, [this, count, index, level] {
+		if (this->levels.size() < count) this->levels.resize(count);
+		return this->levels[index] != nullptr && HasLevel(*this->levels[index], level);
+	}, [this, s, index, level] {
+		ThreeDTextureLevels lv;
+		ThreeDTextureBytes png;
+		uint32_t flat = 0;
+		if (index == 0 && !this->paint_file.empty()) lv = TextureLevelsOfFile(this->paint_file, 0, PictureUnder(s, -1), level);
+		if (lv == nullptr && s != nullptr && static_cast<size_t>(index) < s->pngs.size()) {
+			png = s->pngs[index];
+			flat = s->flats[index];
+		}
+		/* A material "BLEND": its texels' alpha as it is (the saucer's beam fading to the ground). */
+		const bool soft = s != nullptr && s->Alpha(static_cast<size_t>(index)) < 255;
+		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat, level, soft);
+		return lv;
+	}, [this, index](ThreeDTextureLevels made) { KeepTexture(this->levels[index], std::move(made)); });
+	std::lock_guard lock(_lazy_mutex);
+	return static_cast<size_t>(index) < this->levels.size() ? LevelOfKept(this->levels[index], level) : nullptr;
+}
+
+/**
+ * One of the object's textures at a level of detail if it is made already; else made in the background, and till
+ * then its finest level there is (a coarser one), or nullptr when there is none.
+ */
+const ThreeDObjectTexture *ThreeDVehicleObject::TryGetTexture(int level, int index) const
+{
+	MarkThreeDUsed(this->used);
+	bool by_card = false;
+	const ThreeDVehicleShape *s = RestForTextures(*this, false, by_card);
+	if (by_card && s == nullptr) return nullptr;
+	if (!by_card) {
+		s = this->TryGetShape();
+		if (s == nullptr && !this->ShapeKnown()) return nullptr;
+	}
+	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
+	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
+	level = std::max(level, 0);
+	MadeOrAsked(this, LAZY_TEXTURE + index, [this, index, level] { return static_cast<size_t>(index) < this->levels.size() && this->levels[index] != nullptr && HasLevel(*this->levels[index], level); }, [this, level, index] { this->GetTexture(level, index); });
+	std::lock_guard lock(_lazy_mutex);
+	return static_cast<size_t>(index) < this->levels.size() ? LevelOfKept(this->levels[index], level) : nullptr;
+}
+
+/**
+ * The size of one of the object's textures at its finest without making it: of the texture made, else of its picture
+ * (the header of the PNG). How fine a level a picture of the object needs (TexelsPerMetre() of three_d_vehicle_object.cpp).
+ * @return false: not known (1 x 1 then)
+ */
+bool ThreeDVehicleObject::TextureSize(int index, int &w, int &h) const
+{
+	w = h = 1;
+	ThreeDTextureBytes png;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		if (index >= 0 && static_cast<size_t>(index) < this->levels.size() && this->levels[index] != nullptr && !this->levels[index]->empty()) {
+			w = this->levels[index]->front().w;
+			h = this->levels[index]->front().h;
+			return true;
+		}
+		/* The shape read: a figure that moves has its frames' only (they share their pictures). */
+		const ThreeDVehicleShape *s = this->shape.get();
+		for (size_t f = 0; s == nullptr && f < this->frame_shapes.size(); f++) s = this->frame_shapes[f].get();
+		/* A figure on bones the card poses: its shape at rest (the same pictures). */
+		for (size_t f = 0; s == nullptr && f < this->frame_bones.size(); f++) s = this->frame_bones[f] != nullptr ? this->frame_bones[f]->rest.get() : nullptr;
+		if (s != nullptr && index >= 0 && static_cast<size_t>(index) < s->pngs.size()) png = s->pngs[index];
+	}
+	std::vector<uint8_t> head;
+	if (index == 0 && !this->paint_file.empty()) {
+		head = ReadFileHead(this->paint_file, 32);
+	} else if (png != nullptr) {
+		head.assign(png->begin(), png->begin() + std::min<size_t>(png->size(), 32));
+	}
+	return ImageSizeOfHead(head, w, h);
+}
+
+/**
+ * The mask of the pieces of rust of an object ("rez" "kusy", ThreeDVehicleRust::Pieces()), one for all the objects
+ * that have the files: each pixel its piece's number in the red, its delay ("zpozdeni") in the green. Its levels
+ * halved by taking a pixel of each four, not their mean (a piece's number is no amount).
+ * @return nullptr when the pieces cannot be read
+ */
+static ThreeDTextureLevels RustPiecesLevels(const std::string &pieces, const std::string &delay, const ThreeDTextureBytes &of, int finest)
+{
+	static std::map<std::pair<std::string, std::string>, std::weak_ptr<std::vector<ThreeDObjectTexture>>> made_of;
+	const auto key = std::make_pair(pieces, delay);
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = made_of.find(key);
+		if (it != made_of.end()) {
+			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr && HasLevel(*known, finest)) return known;
+		}
+	}
+	const TextureCoverTriangles cover = TextureCover(of);
+	std::vector<ThreeDObjectTexture> k0, d0;
+	const std::vector<uint8_t> kp = ReadWholeFile(pieces);
+	if (!kp.empty()) DecodeTextureLevels(kp, k0, Colour(0, 0, 0).data, false, cover.get());
+	if (k0.empty() || k0[0].w < 1 || k0[0].h < 1) return nullptr;
+	if (!delay.empty()) {
+		const std::vector<uint8_t> dp = ReadWholeFile(delay);
+		if (!dp.empty()) DecodeTextureLevels(dp, d0, Colour(0, 0, 0).data, false, cover.get());
+	}
+	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
+	ThreeDObjectTexture top;
+	top.w = k0[0].w;
+	top.h = k0[0].h;
+	top.px.resize(static_cast<size_t>(top.w) * top.h);
+	const ThreeDObjectTexture *d = !d0.empty() && d0[0].w > 0 && d0[0].h > 0 ? &d0[0] : nullptr;
+	for (int y = 0; y < top.h; y++) {
+		for (int x = 0; x < top.w; x++) {
+			const uint32_t k = k0[0].px[static_cast<size_t>(y) * top.w + x];
+			const uint8_t piece = k == 0 ? 0 : Colour(k).r;
+			uint8_t later = 0;
+			if (d != nullptr) {
+				const int dx = std::min(d->w - 1, x * d->w / top.w), dy = std::min(d->h - 1, y * d->h / top.h);
+				const uint32_t z = d->px[static_cast<size_t>(dy) * d->w + dx];
+				later = z == 0 ? 0 : Colour(z).r;
+			}
+			top.px[static_cast<size_t>(y) * top.w + x] = piece == 0 ? 0 : Colour(piece, later, 0, 255).data;
+		}
+	}
+	made->push_back(std::move(top));
+	while (made->back().w > 1 && made->back().h > 1) {
+		const ThreeDObjectTexture &fine = made->back();
+		ThreeDObjectTexture half;
+		half.w = (fine.w + 1) / 2;
+		half.h = (fine.h + 1) / 2;
+		half.px.resize(static_cast<size_t>(half.w) * half.h);
+		for (int y = 0; y < half.h; y++) {
+			for (int x = 0; x < half.w; x++) half.px[static_cast<size_t>(y) * half.w + x] = fine.px[static_cast<size_t>(std::min(fine.h - 1, 2 * y)) * fine.w + std::min(fine.w - 1, 2 * x)];
+		}
+		made->push_back(std::move(half));
+	}
+	DropFinerLevels(*made, finest);
+	std::lock_guard lock(_texture_bytes_mutex);
+	made_of[key] = made;
+	return made;
+}
+
+/**
+ * The moments the pieces of rust start at for a variant (ThreeDVehicleState::rust_variant): piece k's between its "od"
+ * and "do" by a hash of the variant and k, the same each time; a piece without a span never (2).
+ */
+void ThreeDVehicleRust::Moments(uint32_t variant, std::array<float, THREE_D_RUST_PIECES> &moments) const
+{
+	moments.fill(2.0f);
+	for (int k = 1; k < THREE_D_RUST_PIECES && static_cast<size_t>(k) < this->spans.size(); k++) {
+		const auto [from, to] = this->spans[k];
+		if (from < 0) continue;
+		uint32_t h = (variant + 1) * 0x9E3779B1u ^ static_cast<uint32_t>(k) * 0x85EBCA77u;
+		h ^= h >> 16;
+		h *= 0x7FEB352Du;
+		h ^= h >> 15;
+		h *= 0x846CA68Bu;
+		h ^= h >> 16;
+		moments[k] = from + (to - from) * static_cast<float>(h >> 8) / 16777216.0f;
+	}
+}
+
+/** The rust mask ("rez": "maska") at a level of detail, its grey in the red; of pieces ("kusy") their numbers in the red and their delays in the green; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
+{
+	if (!this->rust.Any()) return nullptr;
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_RUST_MASK, [this, level] { return this->rust_tried && (this->rust_levels == nullptr || HasLevel(*this->rust_levels, level)); }, [this, level] { return this->rust.Pieces() ? RustPiecesLevels(this->rust.pieces_file, this->rust.delay_file, PictureUnder(this->GetShape(), -1), level) : MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
+		KeepTexture(this->rust_levels, std::move(made));
+		this->rust_tried = true;
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return LevelOfKept(this->rust_levels, level);
+}
+
+/** A tree's second part's mask (second_paint, its snow) at a level of detail, its grey in the red; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetSecondMask(int level) const
+{
+	if (this->second_paint.mask_file.empty()) return nullptr;
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_SECOND_MASK, [this, level] { return this->second_tried && (this->second_levels == nullptr || HasLevel(*this->second_levels, level)); }, [this, level] { return MaskLevelsOfFile(this->second_paint.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
+		KeepTexture(this->second_levels, std::move(made));
+		this->second_tried = true;
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return LevelOfKept(this->second_levels, level);
+}
+
+/** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
+{
+	/* Without a file of its own, its shape's (a car of BeamNG: its painted materials' masks side by side). */
+	const ThreeDVehicleShape *s = this->paint.mask_file.empty() ? this->GetShape() : nullptr;
+	if (this->paint.mask_file.empty() && (s == nullptr || s->paint_mask == nullptr)) return nullptr;
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_PAINT_MASK, [this, level] { return this->mask_tried && (this->mask_levels == nullptr || HasLevel(*this->mask_levels, level)); }, [this, s, level] {
+		if (s != nullptr) return ThreeDTextureLevelsOf(s->paint_mask, Colour(0, 0, 0).data, level);
+		return MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1), level);
+	}, [this](ThreeDTextureLevels made) {
+		KeepTexture(this->mask_levels, std::move(made));
+		this->mask_tried = true;
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return LevelOfKept(this->mask_levels, level);
+}
+
+/** An add-on's colour mask ("doplnky" "barva" "maska") at a level of detail, its grey in the red; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int level) const
+{
+	/* Coloured all over (ThreeDVehicleAddon::whole): a texel of white. */
+	static const ThreeDObjectTexture WHOLE{1, 1, {0xFFFFFFFFu}, {}};
+	if (addon < this->addons.size() && this->addons[addon].whole) return &WHOLE;
+	if (addon >= this->addons.size() || this->addons[addon].mask_file.empty()) return nullptr;
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_ADDON_MASK + static_cast<int>(addon), [this, addon, level] {
+		if (this->addon_mask_levels.size() < this->addons.size()) {
+			this->addon_mask_levels.resize(this->addons.size());
+			this->addon_mask_tried.resize(this->addons.size(), false);
+		}
+		return this->addon_mask_tried[addon] && (this->addon_mask_levels[addon] == nullptr || HasLevel(*this->addon_mask_levels[addon], level));
+	}, [this, addon, level] { return MaskLevelsOfFile(this->addons[addon].mask_file, PictureUnder(this->GetShape(), static_cast<int>(addon)), level); }, [this, addon](ThreeDTextureLevels made) {
+		KeepTexture(this->addon_mask_levels[addon], std::move(made));
+		this->addon_mask_tried[addon] = true;
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return addon < this->addon_mask_levels.size() ? LevelOfKept(this->addon_mask_levels[addon], level) : nullptr;
+}
+
+/**
+ * Between the frames (ForgetUnusedThreeDObjects()): of each of the object's textures and masks not trimmed yet the
+ * levels finer than any drawn since the last time let go of -- of one not drawn at all, all but those of 256 texels
+ * and less. Under _lazy_mutex.
+ * @param seen the textures trimmed already (they are shared)
+ * @return the bytes let go of
+ */
+size_t ThreeDVehicleObject::TrimTextures(std::set<const void *> &seen) const
+{
+	size_t freed = 0;
+	auto trim = [&](const ThreeDTextureLevels &place) {
+		if (place == nullptr || place->empty() || !seen.insert(place.get()).second) return;
+		/* Nothing draws from it now (between the frames): its pixels may go. */
+		std::vector<ThreeDObjectTexture> &lv = const_cast<std::vector<ThreeDObjectTexture> &>(*place);
+		int keep = static_cast<int>(lv.size()) - 1;
+		auto it = _texture_levels_asked.find(&lv);
+		if (it != _texture_levels_asked.end()) {
+			keep = std::min(keep, it->second);
+		} else {
+			while (keep > 0 && std::max(lv[keep - 1].w, lv[keep - 1].h) <= 256) keep--;
+		}
+		keep = DrawnLevel(lv, keep);
+		for (int i = 0; i < keep; i++) freed += lv[i].px.capacity() * sizeof(uint32_t);
+		DropFinerLevels(lv, keep);
+	};
+	for (const ThreeDTextureLevels &place : this->levels) trim(place);
+	trim(this->mask_levels);
+	trim(this->rust_levels);
+	trim(this->second_levels);
+	for (const ThreeDTextureLevels &place : this->addon_mask_levels) trim(place);
+	return freed;
+}
+
+/** Between the frames: the textures replaced let go of, those of the vehicles and the figures trimmed (TrimTextures()). */
+static void TrimThreeDTextures()
+{
+	std::lock_guard lock(_lazy_mutex);
+	_textures_replaced.clear();
+	_shapes_replaced.clear();
+	std::set<const void *> seen;
+	size_t freed = 0;
+	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+		for (const ThreeDVehicleObject &v : *list) freed += v.TrimTextures(seen);
+	}
+	_texture_levels_asked.clear();
+	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB of levels finer than drawn let go of", freed / (1024.0 * 1024.0));
+}
+
+/**
+ * A mask of details (ThreeDDetailMask, "maska_podrobnosti"), read whole the first time: its red as the mask index.
+ * @param addon -1 the body's (its first texture), else the add-on's
+ * @return nullptr without one
+ */
+const ThreeDDetailMask *ThreeDVehicleObject::GetDetailMask(int addon) const
+{
+	const size_t at = static_cast<size_t>(addon + 1);
+	if (addon < -1 || at > this->addons.size()) return nullptr;
+	const std::string &file = addon < 0 ? this->detail_file : this->addons[addon].detail_file;
+	if (file.empty()) return nullptr;
+	MakeOnce(this, LAZY_DETAIL_MASK + static_cast<int>(at), [this, at] {
+		if (this->detail_masks.size() <= this->addons.size()) {
+			this->detail_masks.resize(this->addons.size() + 1);
+			this->detail_tried.resize(this->addons.size() + 1, false);
+		}
+		return static_cast<bool>(this->detail_tried[at]);
+	}, [this, &file, addon] {
+		std::shared_ptr<const ThreeDDetailMask> mask = DetailMaskOfFile(file, PictureUnder(this->GetShape(), addon));
+		if (mask == nullptr) Debug(misc, 0, "3D vehicle {}: the mask of details {} cannot be read", this->name, file);
+		return mask;
+	}, [this, at](std::shared_ptr<const ThreeDDetailMask> made) {
+		this->detail_masks[at] = std::move(made);
+		this->detail_tried[at] = true;
+	});
+	return this->detail_masks[at].get();
+}
+
+/** Whether any of its textures has a mask of details: then its states carry the vehicle's colours of its set (ComposeState()). */
+bool ThreeDVehicleObject::HasDetails() const
+{
+	if (!this->detail_file.empty()) return true;
+	return std::ranges::any_of(this->addons, [](const ThreeDVehicleAddon &a) { return !a.detail_file.empty(); });
+}
+
+/**
+ * Its length, metres: "rozmer_m" when the index gives it (a lorry's main file is only its length, PROSBA point 4 --
+ * and the length is asked for every engine of a set the moment it is loaded, long before any is drawn: its add-ons
+ * are not read for it), else its shape's.
+ */
+float ThreeDVehicleObject::Length() const
+{
+	if (this->length_m > 0) return this->length_m;
+	/* A car of BeamNG: as long as its model reaches, its model not read to draw (BeamngLength(): every car is asked when
+	 * a new game starts). */
+	if (this->file.starts_with("beamng:")) {
+		std::lock_guard beamng_lock(_beamng_mutex);
+		const auto [car, make] = BeamngCarOf(this->file);
+		if (car != nullptr) {
+			if (const float length = BeamngLength(*car, make); length > 0) return length;
+		}
+	}
+	const ThreeDVehicleShape *shape = this->GetShape();
+	return shape != nullptr ? shape->x1 - shape->x0 : 0.0f;
+}
+
+/**
+ * The parts drawn in a state (its step, StateStep() of three_d_vehicle_object.cpp: 0 none): what is always drawn (bit
+ * 0) and what the state shows -- an add-on's node, a group of the crew. Without a state no add-on and no group.
+ */
+ThreeDParts ThreeDVehicleObject::PartsOf(int state) const
+{
+	const ThreeDVehicleState *s = this->State(state);
+	ThreeDParts parts = s != nullptr ? s->parts : ThreeDParts{};
+	/* Each wing of its doors shut or, the state opening it, open (ThreeDVehicleDoor); without a state shut. */
+	const uint32_t open = s != nullptr ? s->open_doors : 0;
+	for (size_t d = 0; d < this->doors.size(); d++) parts.Set(((open >> d) & 1) != 0 ? this->doors[d].open_part : this->doors[d].shut_part);
+	if (s != nullptr && s->empty) {
+		/* Standing empty: none of its crew, the record's driver neither (bit 0). */
+		if (s->crew_part > 0) parts.Clear(s->crew_part);
+		return parts;
+	}
+	/* Bit 0: the record's driver drawn -- not where the state's group of the crew takes the driver's seat. */
+	if (s == nullptr || s->crew_part <= 0 || !this->seat_groups.Has(s->crew_part)) parts.Set(0);
+	if (this->crew_record_part > 0) parts.Set(this->crew_record_part);
+	return parts;
+}
+
+/** The first of its states drawn for the GRF's set so named ("sada"), 0 none (as it is). */
+int ThreeDVehicleObject::StateNamed(std::string_view set) const
+{
+	for (size_t i = 0; i < this->states.size(); i++) {
+		if (this->states[i].set_name == set) return static_cast<int>(i + 1);
+	}
+	return 0;
+}
+
+/**
+ * A state as another (0 as it is) but standing empty: none of its crew drawn (the player, 18. 10.: "on the pitch stands
+ * an empty Tatra, without a driver"). Made the first time, a step after its states as ComposeState() makes them.
+ */
+int ThreeDVehicleObject::EmptyStateOf(int step) const
+{
+	ThreeDVehicleState made;
+	if (const ThreeDVehicleState *s = this->State(step); s != nullptr) {
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->empty_steps.find(step);
+		if (it != this->empty_steps.end()) return it->second;
+		made = *s;
+	} else {
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->empty_steps.find(0);
+		if (it != this->empty_steps.end()) return it->second;
+		made.addon_parts.assign(this->addons.size(), -1);
+		made.addon_colours.assign(this->addons.size(), 0);
+	}
+	made.empty = true;
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->empty_steps.emplace(step, 0);
+	if (!added) return it->second;
+	this->composed.push_back(std::move(made));
+	it->second = static_cast<int>(this->states.size() + this->composed.size());
+	return it->second;
+}
+
+/** How far a graffiti is laid off its place on a vehicle's side, metres: as on the walls (EYE_GRAFFITI_OFF_M of viewport.cpp). */
+static constexpr float WEAR_GRAFFITI_OFF_M = 0.03f;
+/** How far a piece of rust is laid off the face, metres: under a graffiti were they on one place. */
+static constexpr float WEAR_RUST_OFF_M = 0.02f;
+/** The cells the flat faces of a vehicle are looked at in, metres. */
+static constexpr float WEAR_CELL_M = 0.05f;
+/** The sides of the squares a piece of rust is looked for a place of, in cells, the biggest first (1 m to 20 cm). */
+static constexpr std::array<int, 5> WEAR_SQUARES = {20, 14, 10, 6, 4};
+/** How many places for rust a vehicle has at most, and how many pieces at its last level: one to so many square metres of its flat faces, 3 to 30. */
+static constexpr size_t WEAR_MAX_SPOTS = 96;
+static constexpr float WEAR_M2_A_PIECE = 1.2f;
+static constexpr uint32_t WEAR_MIN_PIECES = 3, WEAR_MAX_PIECES = 30;
+
+/** A hash of two numbers, the same every run: which place, which board of a vehicle's wear. */
+static uint32_t WearHash(uint32_t a, uint32_t b)
+{
+	uint32_t h = a * 0x9E3779B1u ^ (b + 0x7F4A7C15u + (a << 6) + (a >> 2));
+	h ^= h >> 15;
+	h *= 0x2C1B3C6Du;
+	h ^= h >> 12;
+	h *= 0x297A2D39u;
+	h ^= h >> 15;
+	return h;
+}
+
+/**
+ * Where a vehicle wears (ThreeDWear), from its shape: its places of graffiti -- the empty nodes "grafiti_NN" of its file
+ * its record names, the side by where they lie -- and the places for pieces of rust on the flat upright faces of its
+ * sides and ends (the plan of 7. 11.: "the game finds the flat upright faces itself, as on the bridges"). A face is of
+ * its own file's triangles or its add-ons' (a Tatra of the colleague's is its add-ons: its cab, its chassis, its body)
+ * the state shows (parts), not of its wheels of their own files nor its crew, not of the glass, not of a light of its
+ * own, not see-through, not of a wheel that turns; turned out to a side (|n_y| > 0.97) or an end (|n_x| > 0.97)
+ * and upright, and on that side of its middle (the inner faces of an open wagon's walls are not). The triangles of a
+ * face on one plane laid into cells of WEAR_CELL_M, the places of graffiti taken out, and squares fully on it looked
+ * for, the biggest first, apart from each other.
+ */
+static void FindWearSpots(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, const ThreeDParts &parts, ThreeDWear &out)
+{
+	/* The places of graffiti, by the record's order. */
+	if (!obj.graffiti_places.empty() && !obj.file.ends_with(".s") && !obj.file.ends_with(".S")) {
+		GlbMesh none;
+		std::vector<float> points;
+		std::vector<std::string> names;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = "\x01";
+		o.points_only = true;
+		o.point_prefix = "grafiti_";
+		o.points = &points;
+		o.point_names = &names;
+		ReadGlbMesh(obj.file, none, o);
+		for (const ThreeDGraffitiPlace &place : obj.graffiti_places) {
+			auto it = std::ranges::find(names, place.node);
+			if (it == names.end()) {
+				Debug(misc, 1, "3D vehicle {}: the place of graffiti {} is not in {}", obj.name, place.node, obj.file);
+				continue;
+			}
+			const size_t k = static_cast<size_t>(it - names.begin()) * 3;
+			ThreeDWear::Spot s;
+			for (int a = 0; a < 3; a++) s.at[a] = points[k + a];
+			s.nx = 0;
+			s.ny = points[k + 1] >= 0 ? 1.0f : -1.0f;
+			s.w = place.w;
+			s.h = place.h;
+			out.graffiti.push_back(s);
+		}
+	}
+
+	/* The upright flat triangles of its body, each with the plane it lies on. */
+	struct Flat {
+		int axis;   ///< 0 an end (its normal along x), 1 a side (along y)
+		int sign;   ///< its normal to + or -
+		float plane;
+		size_t t;
+	};
+	std::vector<Flat> flats;
+	const size_t triangles = shape.tri.size() / 3;
+	const size_t own = shape.own_triangles > 0 ? std::min<size_t>(shape.own_triangles, triangles) : triangles;
+	const size_t addons_from = shape.addons_from > 0 ? std::min<size_t>(shape.addons_from, triangles) : triangles;
+	const float xc = (shape.x0 + shape.x1) / 2, yc = (shape.y0 + shape.y1) / 2;
+	const float hx = (shape.x1 - shape.x0) / 2, hy = (shape.y1 - shape.y0) / 2;
+	const bool has_nrm = shape.nrm.size() == shape.pos.size();
+	for (size_t t = 0; t < triangles; t++) {
+		if (t >= own && t < addons_from) continue; // its wheels of their own files and its crew
+		if (shape.IsGlass(t) || !ThreeDVehicleShape::Shown(t < shape.tri_part.size() ? shape.tri_part[t] : 0, parts)) continue;
+		const size_t ti = t < shape.tri_tex.size() ? shape.tri_tex[t] : 0;
+		if (shape.Glow(ti) != 0 || shape.Alpha(ti) < 255) continue;
+		const uint32_t c[3] = {shape.tri[t * 3], shape.tri[t * 3 + 1], shape.tri[t * 3 + 2]};
+		if (!shape.corner_wheel.empty() && (shape.corner_wheel[c[0]] != 0 || shape.corner_wheel[c[1]] != 0 || shape.corner_wheel[c[2]] != 0)) continue;
+		const float *a = &shape.pos[c[0] * 3], *b = &shape.pos[c[1] * 3], *d = &shape.pos[c[2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
+		double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+		if (len < 2e-4) continue; // smaller than a square centimetre
+		nx /= len;
+		ny /= len;
+		nz /= len;
+		/* Its outer side as its normals have it, where it has them. */
+		if (has_nrm) {
+			double sx = 0, sy = 0, sz = 0;
+			for (uint32_t k : c) {
+				sx += shape.nrm[k * 3];
+				sy += shape.nrm[k * 3 + 1];
+				sz += shape.nrm[k * 3 + 2];
+			}
+			if (sx * nx + sy * ny + sz * nz < 0) {
+				nx = -nx;
+				ny = -ny;
+				nz = -nz;
+			}
+		}
+		if (std::abs(nz) > 0.08) continue;
+		Flat f;
+		if (std::abs(ny) > 0.97) {
+			f.axis = 1;
+			f.sign = ny > 0 ? 1 : -1;
+			f.plane = (a[1] + b[1] + d[1]) / 3;
+			if (f.sign * (f.plane - yc) < 0.3f * hy) continue;
+		} else if (std::abs(nx) > 0.97) {
+			f.axis = 0;
+			f.sign = nx > 0 ? 1 : -1;
+			f.plane = (a[0] + b[0] + d[0]) / 3;
+			if (f.sign * (f.plane - xc) < 0.5f * hx) continue;
+		} else {
+			continue;
+		}
+		f.t = t;
+		flats.push_back(f);
+	}
+	std::ranges::sort(flats, [](const Flat &p, const Flat &q) { return std::tie(p.axis, p.sign, p.plane) < std::tie(q.axis, q.sign, q.plane); });
+
+	float flat_area = 0;
+	struct Found {
+		ThreeDWear::Spot spot;
+		int size;
+		uint32_t order;
+	};
+	std::vector<Found> found;
+	for (size_t first = 0; first < flats.size();) {
+		/* A face: the triangles on one plane, within 2.5 cm. */
+		size_t last = first + 1;
+		while (last < flats.size() && flats[last].axis == flats[first].axis && flats[last].sign == flats[first].sign && flats[last].plane - flats[first].plane < 0.025f) last++;
+		const int axis = flats[first].axis, sign = flats[first].sign;
+		float plane = 0, u0 = std::numeric_limits<float>::max(), u1 = -u0, z0 = u0, z1 = -u0;
+		for (size_t k = first; k < last; k++) {
+			plane += flats[k].plane;
+			for (int i = 0; i < 3; i++) {
+				const float *p = &shape.pos[shape.tri[flats[k].t * 3 + i] * 3];
+				const float u = axis == 1 ? p[0] : p[1];
+				u0 = std::min(u0, u);
+				u1 = std::max(u1, u);
+				z0 = std::min(z0, p[2]);
+				z1 = std::max(z1, p[2]);
+			}
+		}
+		plane /= static_cast<float>(last - first);
+		const int cols = static_cast<int>(std::ceil((u1 - u0) / WEAR_CELL_M)), rows = static_cast<int>(std::ceil((z1 - z0) / WEAR_CELL_M));
+		if (cols < WEAR_SQUARES.back() + 2 || rows < WEAR_SQUARES.back() + 2 || cols > 2000 || rows > 400) {
+			first = last;
+			continue;
+		}
+		/* Its cells whose middles a triangle of it covers. */
+		std::vector<uint8_t> on(static_cast<size_t>(cols) * rows, 0);
+		for (size_t k = first; k < last; k++) {
+			float pu[3], pz[3];
+			for (int i = 0; i < 3; i++) {
+				const float *p = &shape.pos[shape.tri[flats[k].t * 3 + i] * 3];
+				pu[i] = ((axis == 1 ? p[0] : p[1]) - u0) / WEAR_CELL_M;
+				pz[i] = (p[2] - z0) / WEAR_CELL_M;
+			}
+			const float area = (pu[1] - pu[0]) * (pz[2] - pz[0]) - (pz[1] - pz[0]) * (pu[2] - pu[0]);
+			if (std::abs(area) < 1e-6f) continue;
+			const int c0 = std::max(0, static_cast<int>(std::floor(std::min({pu[0], pu[1], pu[2]})))), c1 = std::min(cols - 1, static_cast<int>(std::ceil(std::max({pu[0], pu[1], pu[2]}))));
+			const int r0 = std::max(0, static_cast<int>(std::floor(std::min({pz[0], pz[1], pz[2]})))), r1 = std::min(rows - 1, static_cast<int>(std::ceil(std::max({pz[0], pz[1], pz[2]}))));
+			for (int r = r0; r <= r1; r++) {
+				for (int cc = c0; cc <= c1; cc++) {
+					const float qu = cc + 0.5f, qz = r + 0.5f;
+					const float w0 = ((pu[2] - pu[1]) * (qz - pz[1]) - (pz[2] - pz[1]) * (qu - pu[1])) / area;
+					const float w1 = ((pu[0] - pu[2]) * (qz - pz[2]) - (pz[0] - pz[2]) * (qu - pu[2])) / area;
+					if (w0 < -1e-4f || w1 < -1e-4f || 1.0f - w0 - w1 < -1e-4f) continue;
+					on[static_cast<size_t>(r) * cols + cc] = 1;
+				}
+			}
+		}
+		/* How much of a place of graffiti on this side lies on this face (the rig: is it flat). */
+		for (ThreeDWear::Spot &g : out.graffiti) {
+			if (axis != 1 || g.ny != static_cast<float>(sign) || std::abs(g.at[1] - plane) > 0.03f) continue;
+			size_t in = 0, all = 0;
+			for (float z = g.at[2] - g.h / 2 + WEAR_CELL_M / 2; z < g.at[2] + g.h / 2; z += WEAR_CELL_M) {
+				for (float u = g.at[0] - g.w / 2 + WEAR_CELL_M / 2; u < g.at[0] + g.w / 2; u += WEAR_CELL_M) {
+					all++;
+					const int cc = static_cast<int>((u - u0) / WEAR_CELL_M), r = static_cast<int>((z - z0) / WEAR_CELL_M);
+					if (cc >= 0 && cc < cols && r >= 0 && r < rows && on[static_cast<size_t>(r) * cols + cc] != 0) in++;
+				}
+			}
+			if (all > 0) g.flat = std::max(g.flat, static_cast<float>(in) / all);
+		}
+		/* Not where a graffiti is, nor a hand's breadth round it. */
+		for (const ThreeDWear::Spot &g : out.graffiti) {
+			if (axis != 1 || g.ny != static_cast<float>(sign) || std::abs(g.at[1] - plane) > 0.15f) continue;
+			const int gc0 = std::max(0, static_cast<int>(std::floor((g.at[0] - g.w / 2 - 0.1f - u0) / WEAR_CELL_M))), gc1 = std::min(cols - 1, static_cast<int>(std::ceil((g.at[0] + g.w / 2 + 0.1f - u0) / WEAR_CELL_M)));
+			const int gr0 = std::max(0, static_cast<int>(std::floor((g.at[2] - g.h / 2 - 0.1f - z0) / WEAR_CELL_M))), gr1 = std::min(rows - 1, static_cast<int>(std::ceil((g.at[2] + g.h / 2 + 0.1f - z0) / WEAR_CELL_M)));
+			for (int r = gr0; r <= gr1; r++) {
+				for (int cc = gc0; cc <= gc1; cc++) on[static_cast<size_t>(r) * cols + cc] = 0;
+			}
+		}
+		size_t covered = 0;
+		for (uint8_t v : on) covered += v;
+		flat_area += covered * WEAR_CELL_M * WEAR_CELL_M;
+		/* The sums of the cells covered, for a square at once. */
+		std::vector<uint32_t> sum(static_cast<size_t>(cols + 1) * (rows + 1), 0);
+		for (int r = 0; r < rows; r++) {
+			for (int cc = 0; cc < cols; cc++) {
+				sum[static_cast<size_t>(r + 1) * (cols + 1) + cc + 1] = on[static_cast<size_t>(r) * cols + cc] + sum[static_cast<size_t>(r) * (cols + 1) + cc + 1] + sum[static_cast<size_t>(r + 1) * (cols + 1) + cc] - sum[static_cast<size_t>(r) * (cols + 1) + cc];
+			}
+		}
+		auto full = [&](int c, int r, int n) {
+			const size_t w = cols + 1;
+			return sum[(r + n) * w + c + n] + sum[r * w + c] - sum[r * w + c + n] - sum[(r + n) * w + c] == static_cast<uint32_t>(n * n);
+		};
+		/* Squares on it, a cell of it round each to its edge, apart from each other; the biggest first, from places as by
+		 * chance (the same every run). */
+		std::vector<uint8_t> used(on.size(), 0);
+		const uint32_t face_seed = static_cast<uint32_t>(axis * 2 + (sign > 0) + 4 * static_cast<int>(std::lround(plane * 100)));
+		for (int n : WEAR_SQUARES) {
+			const int m = n + 2;
+			if (m > cols || m > rows) continue;
+			std::vector<std::pair<uint32_t, int>> starts;
+			for (int r = 0; r + m <= rows; r++) {
+				for (int cc = 0; cc + m <= cols; cc++) starts.emplace_back(WearHash(face_seed, static_cast<uint32_t>(r * cols + cc)), r * cols + cc);
+			}
+			std::ranges::sort(starts);
+			for (const auto &[h, at] : starts) {
+				if (found.size() >= WEAR_MAX_SPOTS * 4) break;
+				const int r = at / cols, cc = at % cols;
+				if (!full(cc, r, m)) continue;
+				bool free = true;
+				for (int y = r; y < r + m && free; y++) {
+					for (int x = cc; x < cc + m && free; x++) free = used[static_cast<size_t>(y) * cols + x] == 0;
+				}
+				if (!free) continue;
+				for (int y = r; y < r + m; y++) {
+					for (int x = cc; x < cc + m; x++) used[static_cast<size_t>(y) * cols + x] = 1;
+				}
+				const float u = u0 + (cc + m / 2.0f) * WEAR_CELL_M, z = z0 + (r + m / 2.0f) * WEAR_CELL_M;
+				ThreeDWear::Spot s;
+				s.at[0] = axis == 1 ? u : plane;
+				s.at[1] = axis == 1 ? plane : u;
+				s.at[2] = z;
+				s.nx = axis == 0 ? static_cast<float>(sign) : 0.0f;
+				s.ny = axis == 1 ? static_cast<float>(sign) : 0.0f;
+				s.w = s.h = n * WEAR_CELL_M;
+				found.push_back({s, n, h});
+			}
+		}
+		first = last;
+	}
+	/* The biggest first, then as found: as many as any vehicle of it has at most. */
+	std::ranges::stable_sort(found, [](const Found &p, const Found &q) { return p.size > q.size; });
+	for (const Found &f : found) {
+		if (out.rust.size() >= WEAR_MAX_SPOTS) break;
+		out.rust.push_back(f.spot);
+	}
+	out.rust_full = static_cast<uint32_t>(std::min<size_t>(out.rust.size(), std::clamp<uint32_t>(static_cast<uint32_t>(flat_area / WEAR_M2_A_PIECE), WEAR_MIN_PIECES, WEAR_MAX_PIECES)));
+	Debug(misc, 2, "3D vehicle {}: wear: {} places of graffiti, {} places for rust on {:.1f} m2 of flat faces, {} pieces at most", obj.name, out.graffiti.size(), out.rust.size(), flat_area, out.rust_full);
+}
+
+/**
+ * The boards of a wear (ThreeDVehicleState::wear): the graffiti on as many of its places as are sprayed, the places in
+ * an order of the vehicle's variant, each a graffiti of the walls that fits it well -- shrunk to fit, not made bigger --,
+ * of the variant and the place; the pieces of rust, as many as its level gives, on its places in another order of the
+ * variant, each a piece that fits its place (a smaller one where a bigger one would be shrunk under 60 %).
+ */
+void ThreeDWear::Boards(uint32_t wear, std::vector<ThreeDWearBoard> &out) const
+{
+	out.clear();
+	const uint32_t variant = wear & 0xFF, sprayed = (wear >> 8) & 0xFF, rusted = std::min<uint32_t>((wear >> 16) & 0xFF, THREE_D_WEAR_RUST_LEVELS);
+	/* A board of size w x h, sized, its middle on a place, off its face. */
+	auto lay = [&out](const std::string &name, const Spot &s, float scale, float off) {
+		const ThreeDVehicleObject *fig = GetThreeDFigure(name);
+		if (fig == nullptr) return;
+		const auto [w, h] = GetThreeDBoardSize(name);
+		const float turn = std::atan2(s.nx, -s.ny), c = std::cos(turn), sn = std::sin(turn);
+		ThreeDWearBoard &b = out.emplace_back();
+		b.fig = fig;
+		b.at[0] = s.at[0] - c * w * scale / 2 + s.nx * off;
+		b.at[1] = s.at[1] - sn * w * scale / 2 + s.ny * off;
+		b.at[2] = s.at[2] - h * scale / 2;
+		b.turn = turn * 180.0f / static_cast<float>(M_PI);
+		b.scale = scale;
+	};
+	/* The places in an order of the variant. */
+	auto order = [variant](size_t n, uint32_t salt) {
+		std::vector<std::pair<uint32_t, size_t>> o;
+		for (size_t i = 0; i < n; i++) o.emplace_back(WearHash(variant * 7919u + salt, static_cast<uint32_t>(i)), i);
+		std::ranges::sort(o);
+		return o;
+	};
+	const std::span<const std::string> graffiti = GetThreeDGraffiti();
+	if (sprayed > 0 && !graffiti.empty() && !this->graffiti.empty()) {
+		const auto places = order(this->graffiti.size(), 1);
+		for (size_t k = 0; k < places.size() && k < sprayed; k++) {
+			const Spot &s = this->graffiti[places[k].second];
+			/* The graffiti that fit it well: as much of it covered as the best covers, or nearly. */
+			std::vector<std::pair<size_t, float>> fit;
+			float best = 0;
+			for (size_t g = 0; g < graffiti.size(); g++) {
+				const auto [w, h] = GetThreeDBoardSize(graffiti[g]);
+				const float scale = std::min({1.0f, s.w / w, s.h / h});
+				const float covers = w * scale * h * scale / (s.w * s.h);
+				fit.emplace_back(g, scale);
+				best = std::max(best, covers);
+			}
+			std::erase_if(fit, [&](const std::pair<size_t, float> &f) {
+				const auto [w, h] = GetThreeDBoardSize(graffiti[f.first]);
+				return w * f.second * h * f.second / (s.w * s.h) < 0.5f * best;
+			});
+			if (fit.empty()) continue;
+			const auto &[g, scale] = fit[WearHash(variant + 101, static_cast<uint32_t>(places[k].second)) % fit.size()];
+			lay(graffiti[g], s, scale, WEAR_GRAFFITI_OFF_M);
+		}
+	}
+	const std::span<const std::string> pieces = GetThreeDRustPieces();
+	if (rusted > 0 && !pieces.empty() && !this->rust.empty() && this->rust_full > 0) {
+		const uint32_t count = std::max<uint32_t>(1, (this->rust_full * rusted + THREE_D_WEAR_RUST_LEVELS - 1) / THREE_D_WEAR_RUST_LEVELS);
+		const auto places = order(this->rust.size(), 2);
+		for (size_t k = 0; k < places.size() && k < count; k++) {
+			const Spot &s = this->rust[places[k].second];
+			size_t piece = 0;
+			float scale = 0;
+			for (uint32_t attempt = 0; attempt < 8; attempt++) {
+				piece = WearHash(variant + 211, static_cast<uint32_t>(places[k].second * 8 + attempt)) % pieces.size();
+				const auto [w, h] = GetThreeDBoardSize(pieces[piece]);
+				scale = std::min(1.0f, (s.w - 0.02f) / std::max(w, h));
+				if (scale >= 0.6f) break;
+			}
+			if (scale > 0.2f) lay(pieces[piece], s, scale, WEAR_RUST_OFF_M);
+		}
+	}
+}
+
+/**
+ * Where it wears with the parts a state shows (FindWearSpots()), found the first time asked for, once its shape is read
+ * with them; nullptr till then.
+ */
+const ThreeDWear *ThreeDVehicleObject::Wear(const ThreeDParts &parts) const
+{
+	const std::pair<uint64_t, uint64_t> key{parts.bits[0], parts.bits[1]};
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->wear_spots.find(key);
+		if (it != this->wear_spots.end()) return it->second.get();
+	}
+	const ThreeDVehicleShape *shape = this->TryGetShape(0, parts);
+	if (shape == nullptr) return nullptr;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		if (!this->shape_parts.Contains(parts)) return nullptr; // its parts not added yet
+	}
+	auto made = std::make_shared<ThreeDWear>();
+	FindWearSpots(*this, *shape, parts, *made);
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->wear_spots.emplace(key, std::move(made));
+	return it->second.get();
+}
+
+/**
+ * A state as another (0 as it is) but worn as old as the vehicle is (ThreeDVehicleState::wear: the player, 7. 11.,
+ * "graffiti and rust"): its boards laid, as the pieces of a load are (GetThreeDLoadPieces()). Made the first time, a
+ * step after its states as ComposeState() makes them; as it is where nothing of it is laid, or while its shape is not
+ * yet read (new till it is).
+ * @param wear the vehicle's wear, 0 new
+ */
+int ThreeDVehicleObject::WornStateOf(int step, uint32_t wear) const
+{
+	if (wear == 0) return step;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->worn_steps.find({step, wear});
+		if (it != this->worn_steps.end()) return it->second;
+	}
+	const ThreeDWear *spots = this->Wear(this->PartsOf(step));
+	if (spots == nullptr) return step;
+	std::vector<ThreeDWearBoard> boards;
+	spots->Boards(wear, boards);
+	ThreeDVehicleState made;
+	if (!boards.empty()) {
+		if (const ThreeDVehicleState *s = this->State(step); s != nullptr) {
+			std::lock_guard lock(_lazy_mutex);
+			made = *s;
+		} else {
+			made.addon_parts.assign(this->addons.size(), -1);
+			made.addon_colours.assign(this->addons.size(), 0);
+		}
+		made.wear = wear;
+		made.wear_boards = std::move(boards);
+	}
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->worn_steps.emplace(std::make_pair(step, wear), step);
+	if (!added || made.wear == 0) return it->second;
+	this->composed.push_back(std::move(made));
+	it->second = static_cast<int>(this->states.size() + this->composed.size());
+	return it->second;
+}
+
+/**
+ * A state as another but rusting in the order of its pieces a vehicle drew (ThreeDVehicleRust::Pieces(); the player, 9.
+ * 11.: "make the chance"): its variant put in (ThreeDVehicleState::rust_variant), so that its pictures are its own.
+ * Made the first time, a step after its states; as it is where it has not rusted at all.
+ * @param variant the vehicle's of THREE_D_RUST_VARIANTS
+ */
+int ThreeDVehicleObject::RustStateOf(int step, uint32_t variant) const
+{
+	if (!this->rust.Pieces()) return step;
+	variant %= THREE_D_RUST_VARIANTS;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->rust_steps.find({step, variant});
+		if (it != this->rust_steps.end()) return it->second;
+	}
+	ThreeDVehicleState made;
+	bool rusting = false;
+	if (const ThreeDVehicleState *s = this->State(step); s != nullptr && s->rust > 0) {
+		std::lock_guard lock(_lazy_mutex);
+		made = *s;
+		made.rust_variant = static_cast<uint8_t>(1 + variant);
+		rusting = true;
+	}
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->rust_steps.emplace(std::make_pair(step, variant), step);
+	if (!added || !rusting) return it->second;
+	this->composed.push_back(std::move(made));
+	it->second = static_cast<int>(this->states.size() + this->composed.size());
+	return it->second;
+}
+
+/**
+ * A state by its step (StateStep() of three_d_vehicle_object.cpp): 1 to the count of "stavy" those, after them the
+ * states made of the states of layers (ComposeState()); nullptr for 0, none.
+ */
+const ThreeDVehicleState *ThreeDVehicleObject::State(int step) const
+{
+	if (step <= 0) return nullptr;
+	if (static_cast<size_t>(step) <= this->states.size()) return &this->states[step - 1];
+	const size_t k = static_cast<size_t>(step) - this->states.size() - 1;
+	/* The composed ones under the lock: made on the main thread as the pictures are made on theirs (a state once made stays where it is). */
+	std::lock_guard lock(_lazy_mutex);
+	return k < this->composed.size() ? &this->composed[k] : nullptr;
+}
+
+/**
+ * The state of a tree in a use (TreeUse; the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md): its parts in the
+ * colours of the palettes of the use, each part palette[n % its length] -- the same n for all, so the snow goes with
+ * its crown.
+ * @param n the number of its place (a hash of the tile and the tree)
+ * @return its step; 0 as its texture is (a use it is not painted for)
+ */
+int ThreeDVehicleObject::TreeState(TreeUse use, uint32_t n) const
+{
+	const auto [first, count] = this->tree_states[to_underlying(use)];
+	return count == 0 ? 0 : first + static_cast<int>(n % count);
+}
+
+/**
+ * The state of an add-on painted a colour of its palette ("barvy", ReadFigurePalette()): palette[n % its length].
+ * @param n the number of its place (a hash of where it is)
+ * @return its step; 0 as its texture is (none painted so)
+ */
+int ThreeDVehicleObject::PaletteState(uint32_t n) const
+{
+	const auto [first, count] = this->palette_states;
+	return count == 0 ? 0 : first + static_cast<int>(n % count);
+}
+
+/**
+ * The state of the states the GRF picks for the layers of its sprites (the colleague's hra/3d/PROSBA-SPECIAL-3D.md):
+ * the keys of a later layer replace those of an earlier one, the add-ons' nodes ("doplnky") and colours
+ * ("barvy_doplnku") each add-on by itself. Made the first time, kept by the steps of the layers.
+ * The vehicle's colours of its set (callback 1C1, true_colour.h) go into the state made, for its masks of details
+ * (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, point 2): a vehicle in other colours is another state, so
+ * its pictures are made apart (ObjectPicture()) as its sprites are in 2D.
+ * @param layers the step of each layer's state, the first layer first, 0 for a layer of no state
+ * @param true_colours the vehicle's colours (GetVehicleTrueColours()), 0 none
+ * @return its step: the one state itself when only one layer has a state and there are no colours, 0 when there is nothing
+ */
+int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t true_colours, uint64_t load) const
+{
+	int only = 0, count = 0;
+	for (int step : layers) {
+		if (step > 0 && static_cast<size_t>(step) <= this->states.size()) {
+			only = step;
+			count++;
+		}
+	}
+	if (count <= 1 && true_colours == 0 && load == 0) return only;
+	std::lock_guard lock(_lazy_mutex);
+	auto it = this->composed_steps.find({layers, true_colours, load});
+	if (it != this->composed_steps.end()) return it->second;
+	ThreeDVehicleState made;
+	made.true_colours = true_colours;
+	made.addon_parts.assign(this->addons.size(), -1);
+	made.addon_colours.assign(this->addons.size(), 0);
+	for (int step : layers) {
+		if (step <= 0 || static_cast<size_t>(step) > this->states.size()) continue;
+		const ThreeDVehicleState &s = this->states[step - 1];
+		if (s.given & ThreeDVehicleState::GIVEN_COLOUR) made.colour = s.colour;
+		if (s.given & ThreeDVehicleState::GIVEN_FADE) made.fade = s.fade;
+		if (s.given & ThreeDVehicleState::GIVEN_RUST) made.rust = s.rust;
+		if (s.given & ThreeDVehicleState::GIVEN_TURN) made.turn = s.turn;
+		made.given |= s.given;
+		for (size_t a = 0; a < s.addon_parts.size() && a < made.addon_parts.size(); a++) {
+			if (s.addon_parts[a] >= 0) made.addon_parts[a] = s.addon_parts[a];
+		}
+		for (size_t a = 0; a < s.addon_colours.size() && a < made.addon_colours.size(); a++) {
+			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
+		}
+		if (s.crew_part >= 0) made.crew_part = s.crew_part;
+		/* A wing open in any layer is open. */
+		made.open_doors |= s.open_doors;
+		/* The animal running behind it of any layer (the colleague's horse: its layer 1). */
+		for (const ThreeDVehicleCompanion &c : this->companions) {
+			if (s.parts.Has(c.part)) made.parts.Set(c.part);
+		}
+		if (!s.load_piece.empty()) {
+			made.load_piece = s.load_piece;
+			made.load_colour = s.load_colour;
+		}
+		/* Each layer its piece on its place (a blue container in front, a red one behind). */
+		made.placed_loads.insert(made.placed_loads.end(), s.placed_loads.begin(), s.placed_loads.end());
+		if (s.bed.Given()) made.bed = s.bed;
+	}
+	/* How many pieces lie on its bed, of which cargo (ThreeDLoadCode()). */
+	made.load_count = static_cast<uint8_t>(std::min<uint64_t>(load >> 32, 255));
+	made.load_label = static_cast<uint32_t>(load);
+	/* No GRF names the piece: its cargo's. */
+	if (made.load_piece.empty() && this->loads_by_cargo && made.bed.Given()) {
+		if (const ThreeDLoadPiece *piece = GetThreeDLoadPieceOfCargo(made.load_label, made.bed); piece != nullptr) made.load_piece = piece->name;
+	}
+	for (int16_t part : made.addon_parts) {
+		if (part > 0) made.parts.Set(part);
+	}
+	if (made.crew_part > 0) made.parts.Set(made.crew_part);
+	/* Loaded with a cargo of no piece: its cover over it (the tarp of a flatbed of BeamNG). */
+	if (this->cover_part > 0 && made.load_piece.empty() && made.load_count > 0) made.parts.Set(this->cover_part);
+	this->composed.push_back(std::move(made));
+	const int step = static_cast<int>(this->states.size() + this->composed.size());
+	this->composed_steps.emplace(std::make_tuple(layers, true_colours, load), step);
+	return step;
+}
+
+/**
+ * The crew that walks as the vehicle goes (ThreeDWalkingCrew): of its crew and its groups the figures whose frames are
+ * steps ("animace" with "chuze"), each drawn on its own, not in its shape (MakeShape()).
+ */
+const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
+{
+	MakeOnce(this, LAZY_WALKING, [this] { return this->walking_found; }, [this] {
+		std::vector<ThreeDWalkingCrew> found;
+		auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
+			const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
+			if (fig == nullptr || (!fig->Walks() && !c.on_seat)) return;
+			ThreeDWalkingCrew w;
+			w.figure = fig;
+			std::copy(std::begin(c.at), std::end(c.at), w.at);
+			w.turn = c.turn;
+			w.scale = c.scale;
+			w.part = part;
+			w.on_seat = c.on_seat;
+			found.push_back(w);
+		};
+		for (const ThreeDVehicleCrew &c : this->crew) add(c, static_cast<uint8_t>(this->crew_record_part));
+		for (const auto &[group, list] : this->crew_groups) {
+			auto p = std::ranges::find(this->part_names, "posadky/" + group);
+			if (p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= ThreeDParts::COUNT) continue;
+			for (const ThreeDVehicleCrew &c : list) add(c, static_cast<uint8_t>(p - this->part_names.begin()));
+		}
+		/* The animals running behind it: their figure in each gait, the standing one the figure when it has none. */
+		for (const ThreeDVehicleCompanion &c : this->companions) {
+			ThreeDWalkingCrew w;
+			for (size_t g = 0; g < BODY_GAITS.size(); g++) w.gaits[g] = GetThreeDFigure(c.animal + "/" + std::string(BODY_GAITS[g]), this->package);
+			w.figure = w.gaits[0] != nullptr ? w.gaits[0] : GetThreeDFigure(c.animal, this->package);
+			if (w.figure == nullptr) {
+				Debug(misc, 0, "3D vehicle {}: no figure {} running behind it", this->name, c.animal);
+				continue;
+			}
+			w.at[0] = -c.behind;
+			w.at[1] = c.aside;
+			w.scale = c.scale;
+			w.part = c.part;
+			w.behind = true;
+			found.push_back(w);
+		}
+		return found;
+	}, [this](std::vector<ThreeDWalkingCrew> made) {
+		this->walking = std::move(made);
+		this->walking_found = true;
+	});
+	return this->walking;
+}
+
+/**
+ * The figure of this walking one in a frame of its code (ThreeDVehicleObject::CrewFrame()). An animal running behind
+ * the vehicle has its gait in the code too (gait times BODY_GAIT_FRAMES and the frame, as the body's own BodyCode()):
+ * the figure of that gait, the frame left of it; the standing figure when the gait has none.
+ */
+const ThreeDVehicleObject *ThreeDWalkingCrew::FigureAt(int &frame) const
+{
+	if (!this->behind) return this->figure;
+	const size_t gait = static_cast<size_t>(std::max(0, frame)) / ThreeDVehicleObject::BODY_GAIT_FRAMES;
+	frame = std::max(0, frame) % ThreeDVehicleObject::BODY_GAIT_FRAMES;
+	return gait < this->gaits.size() && this->gaits[gait] != nullptr ? this->gaits[gait] : this->figure;
+}
+
+/** The rig: the vehicle objects of the indices, a line each. */
+std::string DescribeThreeDVehicleObjects()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	std::string out = fmt::format("{} vehicle objects", _vehicle_objects.size());
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		std::string pieces;
+		for (uint16_t p : o.pieces) pieces += fmt::format(" {:#06x}", p);
+		std::string engines;
+		std::string lengths;
+		for (uint16_t p : o.pieces) {
+			EngineID id = _engine_mngr.GetID(o.type, p, o.grfid);
+			engines += id == EngineID::Invalid() ? " -" : fmt::format(" {}", id.base());
+			if (id != EngineID::Invalid()) lengths += fmt::format(" {}", ThreeDVehicleObjectPieceLength(id, 8));
+		}
+		out += fmt::format("\n  {} grf {:08X} type {} pieces{} (engines{}) anchor {}{}{}{}", o.name, std::byteswap(o.grfid), to_underlying(o.type), pieces, engines, o.anchor, o.paint_file.empty() ? "" : " paint",
+				o.size.param < 0 ? "" : fmt::format(" size param {}", o.size.param), lengths.empty() ? "" : fmt::format(" lengths{}", lengths));
+		if (!o.paint.mask_file.empty()) out += fmt::format(" paint mask {} fades {} start {}", o.paint.mask_file.substr(o.paint.mask_file.rfind('/') + 1), o.paint.fades, o.paint.start);
+		if (!o.states.empty()) out += fmt::format(" states {}", o.states.size());
+		/* The package it is of, and whether its pieces are drawn from it (of two versions, the one beside the GRF loaded). */
+		auto drawn = o.pieces.empty() ? _vehicle_object_pieces.end() : _vehicle_object_pieces.find(VehiclePieceKey(o.grfid, o.type, o.pieces[0]));
+		const bool used = drawn != _vehicle_object_pieces.end() && &_vehicle_objects[drawn->second.first] == &o;
+		out += fmt::format(" package {}{}", o.package, used ? "" : " (not used)");
+	}
+	return out;
+}
+
+/**
+ * The 3D object of a house of the original game, if there is one.
+ * @param north_house the house of its north tile
+ * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
+ */
+/**
+ * The 3D object of one of the game's own industries ("druh": "prumysl"), or nullptr.
+ * @param variant the statue of bronze (the industry's random bit 0), else of stone
+ */
+const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_industry_objects.find(std::make_pair(type, static_cast<int8_t>(variant ? 1 : 0)));
+	if (it == _three_d_industry_objects.end()) it = _three_d_industry_objects.find(std::make_pair(type, static_cast<int8_t>(-1)));
+	return it == _three_d_industry_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * The object of another kind an industry of the original game shows ("sdili": the refinery the distillery, the player,
+ * 23. 10.: "the refinery and the distillery may share, it is the same plant") and where: on the square of the
+ * industry's own tiles as big as the object nearest its middle, the other tiles its yard (GetThreeDIndustryYard()).
+ * @param[out] square the square's north tile
+ * @return the object, nullptr none or no square of the industry's tiles big enough
+ */
+static const ThreeDObject *SharedIndustryObject(const Industry *ind, TileIndex &square)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_shared_industry_objects.find(ind->type);
+	if (it == _three_d_shared_industry_objects.end() || GetIndustrySpec(ind->type)->grf_prop.HasGrfFile()) return nullptr;
+	const ThreeDObject *obj = &_three_d_objects[it->second];
+	const int w = ind->location.w, h = ind->location.h;
+	double best = -1;
+	for (int y0 = 0; y0 + obj->tiles_y <= h; y0++) {
+		for (int x0 = 0; x0 + obj->tiles_x <= w; x0++) {
+			bool own = true;
+			for (int y = 0; y < obj->tiles_y && own; y++) {
+				for (int x = 0; x < obj->tiles_x && own; x++) {
+					const TileIndex t = TileAddXY(ind->location.tile, x0 + x, y0 + y);
+					own = IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index;
+				}
+			}
+			if (!own) continue;
+			const double off = std::hypot(x0 + obj->tiles_x / 2.0 - w / 2.0, y0 + obj->tiles_y / 2.0 - h / 2.0);
+			if (best >= 0 && off >= best) continue;
+			best = off;
+			square = TileAddXY(ind->location.tile, x0, y0);
+		}
+	}
+	return best >= 0 ? obj : nullptr;
+}
+
+/**
+ * The 3D object an industry is drawn as: its type's, if the industry is as big as the object -- a pub of one tile
+ * built before the pub was two by two (the colleague, 16. 10.: "the pub twice as big, on 2 x 2 tiles"), or a
+ * coffeeshop of one tile from before the hut, stays as it was drawn then rather than lie over its neighbours.
+ */
+const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind)
+{
+	if (ind == nullptr) return nullptr;
+	const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
+	if (obj == nullptr) {
+		TileIndex square;
+		return SharedIndustryObject(ind, square);
+	}
+	if (obj->tiles_x != ind->location.w || obj->tiles_y != ind->location.h) return nullptr;
+	return obj;
+}
+
+/** The north tile of the 3D object an industry is drawn as (GetThreeDIndustryObjectOf()): its own, or the square of a shared one. */
+TileIndex GetThreeDIndustryObjectOrigin(const Industry *ind)
+{
+	TileIndex square;
+	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) == nullptr && SharedIndustryObject(ind, square) != nullptr) return square;
+	return ind->location.tile;
+}
+
+/**
+ * A tile of an industry drawn as a shared object outside the object's square: its own tanks and columns of the original
+ * game (GetThreeDOriginalIndustryTile()) on trodden earth as the distillery's yard -- the colleague asked for asphalt,
+ * the player: "away with the asphalt about the distillery, it looks silly; the refinery is the same plant, the
+ * distilling of oil, tanks". nullptr for any other tile.
+ */
+const ThreeDIndustryTileParts *GetThreeDIndustryYard(const Industry *ind, TileIndex tile)
+{
+	TileIndex square;
+	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) != nullptr) return nullptr;
+	const ThreeDObject *obj = SharedIndustryObject(ind, square);
+	if (obj == nullptr) return nullptr;
+	const uint dx = TileX(tile) - TileX(square), dy = TileY(tile) - TileY(square);
+	if (dx < static_cast<uint>(obj->tiles_x) && dy < static_cast<uint>(obj->tiles_y)) return nullptr;
+	static std::map<IndustryGfx, ThreeDIndustryTileParts> yards;
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	auto [it, added] = yards.try_emplace(gfx);
+	if (added) {
+		if (const ThreeDIndustryTileParts *own = GetThreeDOriginalIndustryTile(gfx); own != nullptr) it->second = *own;
+		it->second.ground = GetThreeDObjectByName("pv_dvur_hlina");
+		it->second.member = false;
+	}
+	return &it->second;
+}
+
+/**
+ * The girls of an industry's object that are there now (the colleague's hra/3d/PROSBA-PRUMYSL-HOLKY-NOC.md): those
+ * that come with the deliveries ("postavy_s_holkami", while HasGirls()), or those of the hut standing about the yard
+ * or sitting on the benches (HutGirlsAt()). Its own "postavy" (the pub's) are always there besides.
+ */
+std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj)
+{
+	if (ind == nullptr || obj == nullptr) return {};
+	if (!obj->girls.empty() && HasGirls(ind)) return obj->girls;
+	if (!obj->hut_girls[0].empty() || !obj->hut_girls[1].empty()) {
+		switch (HutGirlsAt(ind)) {
+			case HutGirls::Standing: return obj->hut_girls[0];
+			case HutGirls::Sitting: return obj->hut_girls[1];
+			default: break;
+		}
+	}
+	return {};
+}
+
+/** The rig: every building's event on today (test3d akce 1). */
+bool _three_d_event_forced = false;
+
+/** A building's event ("akce") lasts this many days ... */
+static constexpr int64_t HOUSE_EVENT_DAYS = 14;
+/** ... once in so many days (the player, 29. 10.: "it will stand there two weeks once in two months"). */
+static constexpr int64_t HOUSE_EVENT_PERIOD = 61;
+
+/**
+ * The figures of a building's event standing about it today ("akce", the new stadium's): two weeks once in two months,
+ * each building on days of its own -- the days counted in blocks of HOUSE_EVENT_PERIOD, the event HOUSE_EVENT_DAYS of
+ * them from a day of the block picked by the building's place and the block. Nothing on the other days. (It was one day
+ * in every 11, two seconds of the game each third of a minute: the player, 29. 10.: "it is there for 5 seconds three
+ * times a minute".)
+ */
+std::span<const ThreeDObjectFigure> GetThreeDHouseEvent(const ThreeDObject *obj, TileIndex origin)
+{
+	if (obj == nullptr || obj->event_figures.empty()) return {};
+	if (_three_d_event_forced) return obj->event_figures;
+	const uint32_t seed = origin.base() * 2654435761u;
+	const int64_t day = static_cast<int64_t>(TimerGameCalendar::date.base()) + seed % HOUSE_EVENT_PERIOD;
+	const uint64_t block = static_cast<uint64_t>(day / HOUSE_EVENT_PERIOD);
+	const uint32_t pick = static_cast<uint32_t>(((block * 40503u) ^ seed) * 2246822519u) >> 16;
+	const int64_t start = pick % (HOUSE_EVENT_PERIOD - HOUSE_EVENT_DAYS + 1);
+	const int64_t in_block = day % HOUSE_EVENT_PERIOD;
+	if (in_block < start || in_block >= start + HOUSE_EVENT_DAYS) return {};
+	return obj->event_figures;
+}
+
+/** A building's object by its name in the index ("jmeno"), for the rig; nullptr when there is none. */
+const ThreeDObject *GetThreeDObjectByName(std::string_view name)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (o.name == name) return &o;
+	}
+	return nullptr;
+}
+
+/** An object by its place in the list (the heaps of hay of the dragon farm, ThreeDObject::hay). */
+const ThreeDObject *GetThreeDObjectNumbered(size_t index)
+{
+	return &_three_d_objects[index];
+}
+
+/** The interior of a house (ReadInterior()), nullptr for a house without one. */
+const ThreeDObject *GetThreeDInterior(const ThreeDObject *house)
+{
+	return house != nullptr && house->interior < _three_d_objects.size() ? &_three_d_objects[house->interior] : nullptr;
+}
+
+/** An industry with an interior without what lies in the interior's box (ThreeDObject::outside), drawn near with it; else it as it is. */
+const ThreeDObject *GetThreeDOutsideOfInterior(const ThreeDObject *obj)
+{
+	return obj != nullptr && obj->outside < _three_d_objects.size() ? &_three_d_objects[obj->outside] : obj;
+}
+
+/**
+ * The 3D object standing on a tile, to be walked on (its floors, "podlaha": the dragon castle's stairs and wall walks,
+ * a high seat's steps), and its north tile: a house's, a part of the forest's, an industry's. nullptr none.
+ */
+const ThreeDObject *GetThreeDObjectToStandOnAt(TileIndex tile, TileIndex &origin)
+{
+	/* A lighthouse: up its stairs (TakeFlatFloors()). */
+	if (const ThreeDObject *lighthouse = GetThreeDLighthouse(tile); lighthouse != nullptr) {
+		origin = tile;
+		return lighthouse;
+	}
+	if (IsTileType(tile, TileType::House)) {
+		if (!IsHouseCompleted(tile)) return nullptr;
+		HouseID north = GetHouseType(tile);
+		origin = tile + GetHouseNorthPart(north);
+		return GetThreeDHouseObjectAt(north, origin);
+	}
+	if (!IsTileType(tile, TileType::Industry)) return nullptr;
+	if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile); forest != nullptr) {
+		origin = tile;
+		return forest->ground;
+	}
+	if (!IsIndustryCompleted(tile)) return nullptr;
+	const Industry *ind = Industry::GetByTile(tile);
+	origin = GetThreeDIndustryObjectOrigin(ind);
+	return GetThreeDIndustryObjectOf(ind);
+}
+
+/**
+ * The 3D object with rooms on a tile and its north tile: a house's, or an industry's with an interior or doors (the
+ * colleague's dragon castle). nullptr none.
+ */
+const ThreeDObject *GetThreeDObjectWithRoomsAt(TileIndex tile, TileIndex &origin)
+{
+	if (IsTileType(tile, TileType::House) && IsHouseCompleted(tile)) {
+		HouseID north = GetHouseType(tile);
+		origin = tile + GetHouseNorthPart(north);
+		return GetThreeDHouseObjectAt(north, origin);
+	}
+	if (const ThreeDForestPart *forest = IsTileType(tile, TileType::Industry) ? ThreeDGameForestPartAt(tile) : nullptr; forest != nullptr) {
+		/* A part of the forest with a clearing with a cabin to go into. */
+		if (forest->ground == nullptr || (forest->ground->interior == SIZE_MAX && forest->ground->door_wings.empty())) return nullptr;
+		origin = tile;
+		return forest->ground;
+	}
+	if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
+		const Industry *ind = Industry::GetByTile(tile);
+		const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
+		if (obj == nullptr || (obj->interior == SIZE_MAX && obj->door_wings.empty())) return nullptr;
+		origin = GetThreeDIndustryObjectOrigin(ind);
+		return obj;
+	}
+	return nullptr;
+}
+
+/**
+ * Whether a point is inside a house's interior (world units from the house's north corner): within what its walls
+ * enclose, the interior read (in the background the first time, outside till then).
+ */
+bool ThreeDInsideInterior(const ThreeDObject *house, double x, double y)
+{
+	const ThreeDObject *in = GetThreeDInterior(house);
+	if (in == nullptr || !in->TryRead()) return false;
+	return x > in->extent[0] && x < in->extent[1] && y > in->extent[2] && y < in->extent[3];
+}
+
+/** The doors open (E, ToggleThreeDDoor()), by the house's north tile and the door: 1 open one way, 2 the other; never saved. */
+static std::map<std::pair<TileIndex, size_t>, uint8_t> _three_d_doors_open;
+
+/** Whether a door of a house is the shutter of a window ("okno_NN", IsWingNode()). */
+bool ThreeDDoorIsWindow(const ThreeDObject *house, size_t door)
+{
+	return house != nullptr && door < house->door_wings.size() && _three_d_objects[house->door_wings[door][0]].door_node.starts_with("okno_");
+}
+
+/** Whether a door of the house on a tile is open. */
+bool ThreeDDoorOpen(TileIndex origin, size_t door)
+{
+	return _three_d_doors_open.contains({origin, door});
+}
+
+/** The wing of a door of a house as it stands now: shut, or open the way it was opened. */
+const ThreeDObject *GetThreeDDoorWing(const ThreeDObject *house, TileIndex origin, size_t door)
+{
+	if (house == nullptr || door >= house->door_wings.size()) return nullptr;
+	auto it = _three_d_doors_open.find({origin, door});
+	const size_t state = it == _three_d_doors_open.end() ? 0 : std::min<size_t>(it->second, 2);
+	return &_three_d_objects[house->door_wings[door][state]];
+}
+
+/** The middle of a door's wing as it is made shut, world units from the house's north corner. */
+static std::optional<std::pair<double, double>> DoorMiddle(const ThreeDObject &wing)
+{
+	if (!wing.Read() || wing.pos.empty()) return std::nullopt;
+	return std::make_pair((wing.extent[0] + wing.extent[1]) / 2.0, (wing.extent[2] + wing.extent[3]) / 2.0);
+}
+
+/**
+ * The rig ('test3d majakprofil'): along a line over a lighthouse's tile (metres from its north corner, every 0.1 m) its
+ * highest floor, the highest no more than a step over feet at 0, 0.2, 0.4 and 0.6 m over a height, and whether it is
+ * in the way of feet there ('#').
+ */
+std::string RigThreeDLighthouseProfile(TileIndex tile, double x0, double y0, double x1, double y1, double from)
+{
+	const ThreeDObject *o = GetThreeDLighthouse(tile);
+	if (o == nullptr || !o->Read() || o->pos.empty()) return "zadny majak";
+	std::string out = o->name;
+	const int steps = std::max(1, static_cast<int>(std::lround(std::hypot(x1 - x0, y1 - y0) / 0.1)));
+	for (int s = 0; s <= steps; s++) {
+		const double xm = x0 + (x1 - x0) * s / steps, ym = y0 + (y1 - y0) * s / steps;
+		const double x = xm * OBJECT_UNITS_PER_METRE, y = ym * OBJECT_UNITS_PER_METRE;
+		const auto top = o->FloorAt(x, y, 1e9);
+		out += fmt::format("\n {:.1f},{:.1f}: podlaha {}", xm, ym, top.has_value() ? fmt::format("{:.2f}", *top / OBJECT_HEIGHT_PER_METRE) : std::string("-"));
+		for (double feet : {from, from + 0.2, from + 0.4, from + 0.6}) {
+			const auto f = o->FloorAt(x, y, (feet + 0.45) * OBJECT_HEIGHT_PER_METRE);
+			const double stand = f.has_value() ? std::max(0.0, *f / OBJECT_HEIGHT_PER_METRE) : 0.0;
+			out += fmt::format(" | {:.1f}->{:.2f}{}", feet, stand, o->Blocks(x, y, stand * OBJECT_HEIGHT_PER_METRE) ? "#" : ".");
+		}
+	}
+	return out;
+}
+
+/**
+ * The rig ('test3d majakoblouk'): walked along an arc about the middle of a lighthouse's tile (its round one's stairs),
+ * from feet so high: at each 5 degrees the floor reached (a step at most over the last) and whether it is in the way.
+ */
+std::string RigThreeDLighthouseArc(TileIndex tile, double r, double a0, double a1, double from)
+{
+	const ThreeDObject *o = GetThreeDLighthouse(tile);
+	if (o == nullptr || !o->Read() || o->pos.empty()) return "zadny majak";
+	const double middle = TILE_SIZE / 2.0;
+	double feet = from * OBJECT_HEIGHT_PER_METRE;
+	std::string out = fmt::format("{} r {:.2f} m:", o->name, r);
+	for (double a = a0; a <= a1 + 1e-6; a += 5) {
+		const double x = middle + r * OBJECT_UNITS_PER_METRE * std::cos(a * M_PI / 180), y = middle + r * OBJECT_UNITS_PER_METRE * std::sin(a * M_PI / 180);
+		const std::optional<double> f = o->FloorAt(x, y, feet + 0.45 * OBJECT_HEIGHT_PER_METRE);
+		if (f.has_value()) feet = *f;
+		out += fmt::format(" {:.0f}:{:.2f}{}", a, feet / OBJECT_HEIGHT_PER_METRE, o->Blocks(x, y, feet) ? "#" : "");
+	}
+	return out;
+}
+
+/** The rig ('test3d vrata'): a depot's doors as they stand, each with its middle shut (metres from its north corner). */
+std::string RigThreeDDepotDoors(TileIndex tile)
+{
+	TileIndex origin;
+	const ThreeDObject *o = GetThreeDDepot(tile, origin);
+	if (o == nullptr) return "zadne depo";
+	std::string out = fmt::format("{} ({} kridel):", o->name, o->door_wings.size());
+	for (size_t k = 0; k < o->door_wings.size(); k++) {
+		const auto mid = DoorMiddle(_three_d_objects[o->door_wings[k][0]]);
+		out += fmt::format(" {}", GetThreeDDepotDoorWing(o, origin, k)->name);
+		if (mid.has_value()) out += fmt::format(" (stred {:.2f},{:.2f} m)", mid->first / OBJECT_UNITS_PER_METRE, mid->second / OBJECT_UNITS_PER_METRE);
+	}
+	return out;
+}
+
+/**
+ * The doors people walk in and out of at a depot or a lighthouse whose north tile a tile is (Mat's visits,
+ * three_d_walkers.h; the player, 10. 11.: "Mat appears about, walks to the door, goes in"): a depot's doors for people
+ * (ThreeDObject::gate_ways 0, the way out away from the depot's middle), a lighthouse's ("dvere" of its index).
+ */
+std::vector<ThreeDPeopleDoor> ThreeDPeopleDoorsAt(TileIndex tile)
+{
+	std::vector<ThreeDPeopleDoor> doors;
+	const double cx = TileX(tile) * TILE_SIZE, cy = TileY(tile) * TILE_SIZE;
+	if (const ThreeDObject *l = GetThreeDLighthouse(tile); l != nullptr) {
+		for (const ThreeDObjectDoor &d : l->doors) {
+			const double len = std::hypot(d.out[0], d.out[1]);
+			if (len <= 0) continue;
+			doors.push_back({cx + d.at[0] * OBJECT_UNITS_PER_METRE, cy + d.at[1] * OBJECT_UNITS_PER_METRE, d.out[0] / len, d.out[1] / len});
+		}
+		return doors;
+	}
+	TileIndex origin;
+	const ThreeDObject *o = GetThreeDDepot(tile, origin);
+	if (o == nullptr || origin != tile || !o->Read() || o->pos.empty()) return doors;
+	const double mx = (o->extent[0] + o->extent[1]) / 2.0, my = (o->extent[2] + o->extent[3]) / 2.0;
+	for (size_t k = 0; k < o->door_wings.size() && k < o->gate_ways.size(); k++) {
+		if (o->gate_ways[k] != 0) continue;
+		const auto mid = DoorMiddle(_three_d_objects[o->door_wings[k][0]]);
+		if (!mid.has_value()) continue;
+		/* Out away from the depot's middle, along the nearer axis: its door is in a wall. */
+		const double dx = mid->first - mx, dy = mid->second - my;
+		const bool along_x = std::abs(dx) >= std::abs(dy);
+		doors.push_back({cx + mid->first, cy + mid->second, along_x ? (dx >= 0 ? 1.0 : -1.0) : 0.0, along_x ? 0.0 : (dy >= 0 ? 1.0 : -1.0)});
+	}
+	return doors;
+}
+
+/** The door of a house nearest a point (world units from its north corner) within reach of it (world units), if any. */
+std::optional<size_t> ThreeDDoorNear(const ThreeDObject *house, TileIndex, double x, double y, double reach)
+{
+	if (house == nullptr) return std::nullopt;
+	std::optional<size_t> best;
+	for (size_t k = 0; k < house->door_wings.size(); k++) {
+		const auto mid = DoorMiddle(_three_d_objects[house->door_wings[k][0]]);
+		if (!mid.has_value()) continue;
+		const double d = std::hypot(mid->first - x, mid->second - y);
+		if (d < reach) {
+			reach = d;
+			best = k;
+		}
+	}
+	return best;
+}
+
+/**
+ * E at a door (the colleague's hra/3d/PROSBA-INTERIERY.md: "E opens it, turned by 90 degrees away from the walker"):
+ * a shut one opened the way away from the walker standing at a point (world units from the house's north corner), an
+ * open one shut.
+ */
+void ToggleThreeDDoor(const ThreeDObject *house, TileIndex origin, size_t door, double x, double y)
+{
+	if (house == nullptr || door >= house->door_wings.size()) return;
+	if (_three_d_doors_open.erase({origin, door}) != 0) return;
+	/* A window's shutter opens out (the colleague: "otevira_se": "ven"), from inside as from outside: away from the
+	 * middle of the interior. */
+	if (const ThreeDObject *in = GetThreeDInterior(house); ThreeDDoorIsWindow(house, door) && in != nullptr && in->IsRead() && !in->pos.empty()) {
+		x = (in->extent[0] + in->extent[1]) / 2.0;
+		y = (in->extent[2] + in->extent[3]) / 2.0;
+	}
+	const auto a = DoorMiddle(_three_d_objects[house->door_wings[door][1]]), b = DoorMiddle(_three_d_objects[house->door_wings[door][2]]);
+	uint8_t way = 1;
+	if (a.has_value() && b.has_value() && std::hypot(b->first - x, b->second - y) > std::hypot(a->first - x, a->second - y)) way = 2;
+	_three_d_doors_open[{origin, door}] = way;
+}
+
+/**
+ * The floor of an interior under a point (world units from the house's north corner): the highest of its floors
+ * ("podlaha") there no higher than a height (units of height over the house's ground) -- a step up the stairs, not
+ * onto the gallery overhead.
+ */
+std::optional<double> ThreeDObject::FloorAt(double x, double y, double up_to) const
+{
+	std::optional<double> best;
+	for (size_t i = 0; i + 8 < this->floor.size(); i += 9) {
+		const float *a = &this->floor[i], *b = &this->floor[i + 3], *c = &this->floor[i + 6];
+		const double d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+		if (std::abs(d) < 1e-9) continue;
+		const double l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+		const double l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+		const double l3 = 1 - l1 - l2;
+		if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
+		const double z = l1 * a[2] + l2 * b[2] + l3 * c[2];
+		if (z > up_to) continue;
+		if (!best.has_value() || z > *best) best = z;
+	}
+	return best;
+}
+
+/**
+ * The street lamp standing where the game has a street light on a tile (MakeStreetLamps()): in a clay town the lamp
+ * on its wooden post, elsewhere David H.'s lamp (the game's street lights are in the towns' centres); the other where
+ * one of them is not in the sets. Asked as the map is collected, under the game's lock (the town of the tile).
+ * @param tile the road tile
+ * @param dx its place on the tile, world units
+ * @param dy its place on the tile, world units
+ * @return the lamp, nullptr none
+ */
+const ThreeDObject *GetThreeDStreetLamp(TileIndex tile, int dx, int dy)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	const int place = dx * 16 + dy;
+	const int first = GetTownThemeAt(tile) == TownTheme::Clay ? 0 : 1;
+	for (int kind : {first, 1 - first}) {
+		auto it = _three_d_street_lamps.find(kind * 256 + place);
+		if (it != _three_d_street_lamps.end()) return &_three_d_objects[it->second];
+	}
+	return nullptr;
+}
+
+/**
+ * The lamp of a town's outer street, where the game has no street light (the player, 4. 11.: socík "on the edges of
+ * the temperate and arctic towns"; "yes, socík for the temperate and the sub-arctic" to the game's proposal: on the
+ * paved streets of the towns' outer parts, every other tile, on one side of the street): a road tile with a paved
+ * roadside (Roadside::Paved: a town's outskirts, TileLoop_Road()) in the temperate or the sub-arctic climate, on no
+ * themed town's land, without a bridge over it, every other tile; at the middle of the first of its edges the road
+ * does not leave by -- south-east, south-west, north-west, north-east --, so a straight street's lamps stand on one
+ * side. Asked as the map is collected, under the game's lock.
+ * @param tile the tile
+ * @param[out] dx where on the tile, world units
+ * @param[out] dy where on the tile, world units
+ * @return socík, nullptr none
+ */
+const ThreeDObject *GetThreeDEdgeLamp(TileIndex tile, int &dx, int &dy)
+{
+	const LandscapeType climate = _settings_game.game_creation.landscape;
+	if (climate != LandscapeType::Temperate && climate != LandscapeType::Arctic) return nullptr;
+	if (((TileX(tile) + TileY(tile)) & 1) != 0) return nullptr;
+	if (!IsTileType(tile, TileType::Road) || !IsNormalRoad(tile) || GetRoadside(tile) != Roadside::Paved || IsBridgeAbove(tile)) return nullptr;
+	if (GetThemedLand(tile) != ThemedLand::None) return nullptr;
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static constexpr struct {
+		RoadBit edge;
+		int dx, dy;
+	} SIDES[] = {{RoadBit::SE, 8, 14}, {RoadBit::SW, 14, 8}, {RoadBit::NW, 8, 1}, {RoadBit::NE, 1, 8}};
+	const RoadBits bits = GetAllRoadBits(tile);
+	for (const auto &side : SIDES) {
+		if (bits.Test(side.edge)) continue;
+		auto it = _three_d_street_lamps.find(EDGE_LAMP_KIND * 256 + side.dx * 16 + side.dy);
+		if (it == _three_d_street_lamps.end()) return nullptr;
+		dx = side.dx;
+		dy = side.dy;
+		return &_three_d_objects[it->second];
+	}
+	return nullptr;
+}
+
+/**
+ * The bench and the BUS sign standing for a shelter of a drive-through bus stop (MakeBusStops()): the game's own stop
+ * of buses, not a NewGRF's (that draws its own). Asked as the map is collected, under the game's lock.
+ * @param tile the tile
+ * @param image a sprite the tile drew
+ * @return the pavement's object, nullptr where the sprite is no shelter of such a stop
+ */
+const ThreeDObject *GetThreeDBusStop(TileIndex tile, SpriteID image)
+{
+	if (!IsTileType(tile, TileType::Station) || !IsDriveThroughStopTile(tile) || GetStationType(tile) != StationType::Bus || GetRoadStopSpec(tile) != nullptr) return nullptr;
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_bus_stops.find(image & SPRITE_MASK);
+	return it == _three_d_bus_stops.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/** A part of the fields by its name ("dil": "zem", "cesta", "mari_vzrostle", ...), or nullptr. */
+const ThreeDObject *GetThreeDFieldPart(std::string_view part)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_field_parts.find(part);
+	return it == _three_d_field_parts.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * A tile of an industry of the original game drawn from the shared parts (set prumysl_vanilla): its ground, its parts,
+ * its plants; nullptr when the sets have none for the gfx (Toyland).
+ */
+const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static std::map<IndustryGfx, ThreeDIndustryTileParts> resolved;
+	static bool made = false;
+	if (!made) {
+		/* The objects by their places, now that all the indices are read and the list stays as it is. */
+		made = true;
+		for (const auto &[g, t] : _original_industry_tiles) {
+			ThreeDIndustryTileParts &r = resolved[g];
+			r.ground = t.ground.empty() ? nullptr : GetThreeDObjectByName(t.ground);
+			if (!t.ground.empty() && r.ground == nullptr) Debug(misc, 0, "3D objects: gfx {} has no ground {}", g, t.ground);
+			for (size_t i : t.parts) r.parts.push_back(&_three_d_objects[i]);
+			for (const std::string &w : t.whole) {
+				const ThreeDObject *o = GetThreeDObjectByName(w);
+				if (o != nullptr) r.parts.push_back(o); else Debug(misc, 0, "3D objects: gfx {} has no part {}", g, w);
+			}
+			if (t.plants != SIZE_MAX) r.plants = &_three_d_objects[t.plants];
+			r.member = t.member;
+			r.anchor_dx = t.anchor_dx;
+			r.anchor_dy = t.anchor_dy;
+			r.at_once = !t.buildings;
+			r.vehicles = t.vehicles;
+			r.vehicles_again = t.vehicles_again;
+		}
+	}
+	auto it = resolved.find(gfx);
+	if (it == resolved.end() && gfx < NEW_INDUSTRYTILEOFFSET) {
+		/* A frame of a tile's animation with no record of its own (the forest's growing trees, 17, of its tile 16 while
+		 * it produces): drawn as the tile it goes back to, not as its sprites among the 3D. */
+		const IndustryGfx next = GetIndustryTileSpec(gfx)->anim_next;
+		if (next != INDUSTRYTILE_NOANIM && next != gfx) it = resolved.find(next);
+	}
+	return it == resolved.end() ? nullptr : &it->second;
+}
+
+/**
+ * Whether what stands on a tile of an original industry from the shared parts is there: its buildings when the
+ * industry is built; the trees of the forest from the first (the player, 24. 10.: "the trees may grow at once, not as
+ * on the field where the potatoes grow when the girls come").
+ */
+bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts)
+{
+	return parts.at_once || IsIndustryCompleted(tile);
+}
+
+/**
+ * The vehicles of the sets and pieces of the loads standing on a tile of an original industry, drawn from its anchor
+ * (ThreeDIndustryTileParts::vehicles): those shown once an industry ("jednou_na_prumysl", the colleague's
+ * hra/3d/RAFINERIE-PRO-HRU.md: the Tatra Benzina and the forklift on the refinery's yard) only on its first tile of
+ * these parts, as the tiles go -- the refinery's second layout has its yard twice, the player wants one Tatra.
+ */
+std::span<const ThreeDObjectFigure> GetThreeDIndustryTileVehicles(const ThreeDIndustryTileParts &parts, TileIndex anchor)
+{
+	if (parts.vehicles.size() == parts.vehicles_again.size() || !IsTileType(anchor, TileType::Industry)) return parts.vehicles;
+	const Industry *ind = Industry::GetByTile(anchor);
+	for (TileIndex t : ind->location) {
+		if (!IsTileType(t, TileType::Industry) || GetIndustryIndex(t) != ind->index || GetThreeDOriginalIndustryTileAt(t) != &parts) continue;
+		return t == anchor ? std::span<const ThreeDObjectFigure>(parts.vehicles) : std::span<const ThreeDObjectFigure>(parts.vehicles_again);
+	}
+	return parts.vehicles;
+}
+
+/**
+ * The parts of a tile of an industry of the original game drawn from the parts the industries share (the colleague's
+ * hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md, GetThreeDOriginalIndustryTile()); nullptr for a tile of a set (NewGRF) or one
+ * the sets have none for (Toyland), drawn by its sprites as ever.
+ */
+const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile)
+{
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+	return GetThreeDOriginalIndustryTile(gfx);
+}
+
+/**
+ * The anchor of the block a tile of an original industry is of (a factory of 2 x 2 tiles: its north tile draws it
+ * whole) and its parts; the tile itself when it is no member of a block. INVALID_TILE when the anchor is not there.
+ */
+TileIndex GetThreeDOriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts)
+{
+	if (!parts->member) return tile;
+	const TileIndex anchor = TileAddWrap(tile, -parts->anchor_dx, -parts->anchor_dy);
+	if (anchor == INVALID_TILE || !IsTileType(anchor, TileType::Industry) || GetIndustryIndex(anchor) != GetIndustryIndex(tile)) return INVALID_TILE;
+	parts = GetThreeDOriginalIndustryTileAt(anchor);
+	return parts != nullptr && !parts->member ? anchor : INVALID_TILE;
+}
+
+/**
+ * Where the smoke of an industry's chimney is drawn in the 3D views (the player's #325, a copper mine: "the smoke comes
+ * out too low; in the middle of the chimney a ring of smoke forms and rises over the chimney's picture"): the game lets
+ * its smoke out where the sprite of the tile has its chimney (a copper mine 43 units over the ground at 6, 6 of the
+ * tile -- half way up our chimney of 28 m, beside it --, a power station 59 at 15, 14), and it rises from there.
+ * Drawn the same way up from the middle of the top of the chimney of the tile's parts (a part "...komin..." of
+ * GetThreeDOriginalIndustryTileAt()); the game's smoke itself, where it is and how it moves, as ever.
+ * @param v the vehicle drawn: anything but the smoke of an industry's chimney drawn from our parts left as it is
+ * @param[in,out] x,y,z where to draw it, world units
+ * @return whether it is drawn elsewhere
+ */
+bool ThreeDIndustrySmokeAt(const Vehicle *v, int &x, int &y, int &z)
+{
+	if (v->type != VehicleType::Effect) return false;
+	/* Where the game lets it out over the ground of its tile (TileLoop_Industry(), CreateChimneySmoke()). */
+	int ox, oy, oz;
+	bool by_slope;
+	switch (static_cast<EffectVehicleType>(v->subtype)) {
+		case EV_COPPER_MINE_SMOKE: ox = 6; oy = 6; oz = 43; by_slope = true; break;
+		case EV_CHIMNEY_SMOKE: ox = 15; oy = 14; oz = 59; by_slope = false; break;
+		default: return false;
+	}
+	const TileIndex tile = TileVirtXY(v->x_pos, v->y_pos);
+	if (!IsTileType(tile, TileType::Industry)) return false;
+	const ThreeDIndustryTileParts *parts = GetThreeDOriginalIndustryTileAt(tile);
+	if (parts == nullptr || !ThreeDOriginalIndustryTileStands(tile, *parts)) return false;
+	const TileIndex anchor = GetThreeDOriginalIndustryAnchor(tile, parts);
+	if (anchor == INVALID_TILE) return false;
+	/* The top of its chimney, once for each part: the middle of its highest corners. */
+	struct Top {
+		float x = 0, y = 0, z = 0;
+		bool chimney = false;
+	};
+	static std::unordered_map<const ThreeDObject *, Top> tops;
+	const Top *best = nullptr;
+	for (const ThreeDObject *part : parts->parts) {
+		auto [it, made] = tops.try_emplace(part);
+		Top &t = it->second;
+		if (made) {
+			const size_t slash = part->name.rfind('/');
+			t.chimney = slash != std::string::npos && part->name.find("komin", slash) != std::string::npos && part->top > 0;
+			if (t.chimney) {
+				double sx = 0, sy = 0;
+				int n = 0;
+				for (size_t i = 0; i + 2 < part->pos.size(); i += 3) {
+					if (part->pos[i + 2] < part->top * 0.97f) continue;
+					sx += part->pos[i];
+					sy += part->pos[i + 1];
+					n++;
+				}
+				t.chimney = n > 0;
+				if (n > 0) t = {static_cast<float>(sx / n), static_cast<float>(sy / n), part->top, true};
+			}
+		}
+		if (t.chimney && (best == nullptr || t.z > best->z)) best = &t;
+	}
+	if (best == nullptr) return false;
+	const int from = by_slope ? GetSlopePixelZ(TileX(tile) * TILE_SIZE + ox, TileY(tile) * TILE_SIZE + oy) : GetTileMaxPixelZ(tile);
+	const int risen = v->z_pos - (from + oz);
+	x = static_cast<int>(TileX(anchor) * TILE_SIZE + std::lround(best->x));
+	y = static_cast<int>(TileY(anchor) * TILE_SIZE + std::lround(best->y));
+	z = GetTileMaxPixelZ(anchor) + static_cast<int>(std::lround(best->z)) + std::max(0, risen);
+	return true;
+}
+
+/**
+ * Whether a tile is of a forest: of an original industry, with trees alone on it (ThreeDIndustryTileParts::at_once).
+ * Its mushrooms grow there, its game lives there, one walks among its trunks as among trees.
+ */
+bool ThreeDForestTile(TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::Industry)) return false;
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return false;
+	const ThreeDIndustryTileParts *parts = GetThreeDOriginalIndustryTile(gfx);
+	return parts != nullptr && parts->at_once;
+}
+
+/**
+ * The plants of a field (wheat on the farm's fields) on its tile: as squares of the tile (LayFieldPlantsOnTileGrid()),
+ * on a sloped one each lifted to the ground under it, the heights of the tile's corners shared between them (an object
+ * of its own a slope, made the first time).
+ */
+/**
+ * The plants of a field laid as squares of the tile (the player, test5: "put normal squares over the tile; why do you
+ * make the squares of the field another size than the game's tiles"): the n x n squares of its list (the wheat's 16,
+ * each about 4 m, a little apart from the grid, each of its own height and turned its own way, so that the field showed
+ * squares smaller than the tile and steps between them) on the tile's grid exactly, each as wide as its cell -- edge to
+ * edge, none over another --, all as high as they are on average and turned alike. A list not of n x n stays as it is.
+ */
+static void LayFieldPlantsOnTileGrid(std::vector<ThreeDObjectFigure> &plants)
+{
+	const size_t n = static_cast<size_t>(std::lround(std::sqrt(static_cast<double>(plants.size()))));
+	if (n < 2 || n * n != plants.size()) return;
+	const ThreeDVehicleObject *fig = GetThreeDFigure(plants[0].figure);
+	const ThreeDVehicleShape *shape = fig != nullptr ? fig->GetShape() : nullptr;
+	if (shape == nullptr || shape->x1 - shape->x0 <= 0.01f || shape->y1 - shape->y0 <= 0.01f) return;
+	if (std::ranges::any_of(plants, [&](const ThreeDObjectFigure &f) { return f.figure != plants[0].figure; })) return;
+	const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	const double cell = side / n;
+	/* Its own width, square, as it turns by quarters. */
+	const double width = std::max(shape->x1 - shape->x0, shape->y1 - shape->y0);
+	double height = 0;
+	for (const ThreeDObjectFigure &f : plants) height += f.scale * f.stretch;
+	height /= plants.size();
+	const float scale = static_cast<float>(cell / width);
+	/* Each to the cell it is in: by its place, the rows along y, in each row along x. */
+	std::vector<size_t> order(plants.size());
+	std::iota(order.begin(), order.end(), 0);
+	std::ranges::sort(order, [&](size_t a, size_t b) { return plants[a].at[1] < plants[b].at[1]; });
+	for (size_t row = 0; row < n; row++) {
+		std::sort(order.begin() + row * n, order.begin() + (row + 1) * n, [&](size_t a, size_t b) { return plants[a].at[0] < plants[b].at[0]; });
+		for (size_t col = 0; col < n; col++) {
+			ThreeDObjectFigure &f = plants[order[row * n + col]];
+			/* All turned alike: turned by quarters each its own way, each square's stalks lay and caught the light
+			 * otherwise, a chessboard of them on the tile still. Its middle on the cell's. */
+			f.facing = 0;
+			f.at[0] = static_cast<float>((col + 0.5) * cell - (shape->x0 + shape->x1) / 2 * scale);
+			f.at[1] = static_cast<float>((row + 0.5) * cell - (shape->y0 + shape->y1) / 2 * scale);
+			f.scale = scale;
+			f.stretch = static_cast<float>(height / scale);
+		}
+	}
+}
+
+const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope)
+{
+	if (plants == nullptr) return plants;
+	static std::map<std::pair<const ThreeDObject *, Slope>, std::unique_ptr<ThreeDObject>> sloped;
+	auto &made = sloped[{plants, slope}];
+	if (made == nullptr) {
+		made = std::make_unique<ThreeDObject>();
+		made->name = plants->name + fmt::format("/svah{}", to_underlying(slope));
+		made->variants = 0;
+		made->plants = plants->plants;
+		LayFieldPlantsOnTileGrid(made->plants);
+		if (slope == SLOPE_FLAT) return made.get();
+		/* The corners' heights in metres: north (x 0, y 0), east (x 0, y 1), south (1, 1), west (1, 0). */
+		const double level = TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
+		const bool steep = IsSteepSlope(slope);
+		auto corner = [&](Corner c) -> double {
+			double h = (to_underlying(slope) & to_underlying(SlopeWithOneCornerRaised(c))) != 0 ? level : 0;
+			if (steep && GetHighestSlopeCorner(slope) == c) h = 2 * level;
+			return h;
+		};
+		const double n = corner(CORNER_N), e = corner(CORNER_E), s = corner(CORNER_S), w = corner(CORNER_W);
+		const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+		for (ThreeDObjectFigure &f : made->plants) {
+			const double u = std::clamp(f.at[0] / side, 0.0, 1.0), v = std::clamp(f.at[1] / side, 0.0, 1.0);
+			f.at[2] += static_cast<float>(n * (1 - u) * (1 - v) + e * (1 - u) * v + s * u * v + w * u * (1 - v));
+			/* Leaning with the slope there, not level (the player, test4: "the stairs are on the slope of the field too, the
+			 * field is of strips" -- the young wheat's squares of 3.6 m each level at its own height, terraces). */
+			f.rise[0] = static_cast<float>((-n * (1 - v) - e * v + s * v + w * (1 - v)) / side);
+			f.rise[1] = static_cast<float>((-n * (1 - u) + e * (1 - u) + s * u - w * u) / side);
+		}
+	}
+	return made.get();
+}
+
+/**
+ * The bales on a farm's field after the harvest, its type 8, whose sprite has the haystacks painted in (the player,
+ * 7. 11.: "one field has no 3D graphics, it is the field with the bales of straw"): the colleague's shared pieces of
+ * the loads (hra/3d/PAR18-7-11-PRO-HRU.md, part 6) standing as the pallets on a yard do, "naklad:<piece>|<part>=<RRGGBB>"
+ * (GetThreeDStandingVehicle()) -- round ones one by one about the field, small square ones by a few or in a little
+ * stack -- in the straw's colour, each on the ground under it. One of a few layouts a tile, by the tile.
+ * @return none when the sets have not the bales: the field's sprite with them painted in stays
+ */
+/**
+ * How big the bales of a harvested field are drawn against their true size (the player, test6: "the bales are not seen
+ * from above, they are too small, they are there but tiny"): twice.
+ */
+static constexpr float FIELD_BALE_SCALE = 2.0f;
+
+std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope slope)
+{
+	struct Bale {
+		bool square;
+		float x, y, z, turn; ///< its foot, metres from the tile's north corner; degrees
+	};
+	/* A little stack of square ones: two side by side, one across them on top (as big as they are drawn). */
+	auto stack = [](float x, float y) {
+		const float k = FIELD_BALE_SCALE;
+		return std::array<Bale, 3>{{{true, x, y - 0.24f * k, 0, 0}, {true, x, y + 0.24f * k, 0, 0}, {true, x, y, 0.36f * k, 90}}};
+	};
+	static const std::array<std::vector<Bale>, 6> layouts = [&] {
+		std::array<std::vector<Bale>, 6> l;
+		l[0] = {{false, 4.0f, 4.5f, 0, 30}, {false, 10.5f, 9.5f, 0, 105}};
+		l[1] = {{false, 7.4f, 7.0f, 0, 75}};
+		l[2] = {{false, 3.5f, 10.5f, 0, 10}, {false, 8.0f, 3.8f, 0, 60}, {false, 11.6f, 11.2f, 0, 140}};
+		for (const Bale &b : stack(7.4f, 7.4f)) l[3].push_back(b);
+		l[4] = {{true, 3.2f, 4.0f, 0, 20}, {true, 6.1f, 8.3f, 0, 200}, {true, 9.4f, 5.1f, 0, 95}, {true, 11.2f, 11.0f, 0, 40}};
+		l[5] = {{false, 4.8f, 9.6f, 0, 0}};
+		for (const Bale &b : stack(10.4f, 4.2f)) l[5].push_back(b);
+		return l;
+	}();
+	const ThreeDLoadPiece *round = GetThreeDLoadPiece(FIELD_BALE_ROUND);
+	const ThreeDLoadPiece *square = GetThreeDLoadPiece(FIELD_BALE_SQUARE);
+	if (round == nullptr || square == nullptr) return {};
+	const size_t layout = (TileX(tile) * 7919u + TileY(tile) * 104729u) % layouts.size();
+	static std::map<std::pair<size_t, Slope>, std::vector<ThreeDObjectFigure>> made;
+	auto [it, fresh] = made.try_emplace({layout, slope});
+	if (!fresh) return it->second;
+	/* The corners' heights in metres, as the wheat's (GetThreeDSlopedPlants()). */
+	const double level = TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
+	const bool steep = IsSteepSlope(slope);
+	auto corner = [&](Corner c) -> double {
+		double h = (to_underlying(slope) & to_underlying(SlopeWithOneCornerRaised(c))) != 0 ? level : 0;
+		if (steep && GetHighestSlopeCorner(slope) == c) h = 2 * level;
+		return h;
+	};
+	const double n = corner(CORNER_N), e = corner(CORNER_E), s = corner(CORNER_S), w = corner(CORNER_W);
+	const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	for (const Bale &b : layouts[layout]) {
+		const ThreeDLoadPiece *piece = b.square ? square : round;
+		ThreeDObjectFigure f;
+		f.figure = fmt::format("naklad:{}|{}={}", piece->name, piece->paint_part, FIELD_BALE_STRAW);
+		const double u = std::clamp(b.x / side, 0.0, 1.0), v = std::clamp(b.y / side, 0.0, 1.0);
+		f.at[0] = b.x;
+		f.at[1] = b.y;
+		f.at[2] = b.z + static_cast<float>(n * (1 - u) * (1 - v) + e * (1 - u) * v + s * u * v + w * u * (1 - v));
+		f.facing = b.turn;
+		f.scale = FIELD_BALE_SCALE;
+		it->second.push_back(std::move(f));
+	}
+	return it->second;
+}
+
+const ThreeDObject *GetThreeDStation(TileIndex tile)
+{
+	if (!_three_d_objects_read || _three_d_station_objects.empty() || !IsValidTile(tile) || !IsTileType(tile, TileType::Station)) return nullptr;
+	ThreeDStationKind kind;
+	int way;
+	if (HasStationRail(tile)) {
+		/* The game's own: one of a set (NewGRF) has its own look. */
+		if (IsCustomStationSpecIndex(tile)) return nullptr;
+		kind = IsRailWaypoint(tile) ? ThreeDStationKind::Waypoint : ThreeDStationKind::Platform;
+		way = to_underlying(GetRailStationAxis(tile));
+	} else if (IsTruckStop(tile) && GetRoadStopSpec(tile) == nullptr) {
+		kind = IsDriveThroughStopTile(tile) ? ThreeDStationKind::TruckStop : ThreeDStationKind::TruckBay;
+		way = kind == ThreeDStationKind::TruckStop ? to_underlying(GetDriveThroughStopAxis(tile)) : to_underlying(GetBayRoadStopDir(tile));
+	} else {
+		return nullptr;
+	}
+	const auto it = _three_d_station_objects.find({kind, way});
+	return it == _three_d_station_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/** Units of a cargo waiting a piece of it stands for on a loading bay (GetThreeDStationCargo(), the colleague's proposal). */
+static constexpr uint STATION_CARGO_PIECE_UNITS = 10;
+/** And a heap of a bulk cargo at its biggest; less, smaller, down to STATION_CARGO_HEAP_LEAST of its size. */
+static constexpr uint STATION_CARGO_HEAP_UNITS = 100;
+static constexpr float STATION_CARGO_HEAP_LEAST = 0.4f;
+
+const ThreeDObject *GetThreeDLighthouse(TileIndex tile)
+{
+	if (!_three_d_objects_read || _three_d_lighthouses.empty() || !IsValidTile(tile) || !IsTileType(tile, TileType::Object) || GetObjectType(tile) != OBJECT_LIGHTHOUSE) return nullptr;
+	return &_three_d_objects[_three_d_lighthouses[(TileX(tile) * 7 + TileY(tile) * 13) % _three_d_lighthouses.size()]];
+}
+
+/** How many steps a turn of a lighthouse's beams on the map goes in: as its reflector's picture (SPIN_STEPS of three_d_vehicle_object.cpp). */
+static constexpr int LIGHTHOUSE_BEAM_STEPS = 24;
+
+/** Where a lighthouse's reflector is in its turn on the map (LIGHTHOUSE_BEAM_STEPS), by the game's tick. */
+static int LighthouseBeamStep(const ThreeDObject &lh)
+{
+	return static_cast<int>((TimerGameTick::counter % lh.beam_spin_ticks) * LIGHTHOUSE_BEAM_STEPS / lh.beam_spin_ticks);
+}
+
+/**
+ * The two beams of a lighthouse turned so far (AddThreeDLighthouseLights()).
+ * @param turn radians the reflector has turned from its file's way
+ */
+static void LighthouseBeams(TileIndex tile, const ThreeDObject &lh, double turn, std::vector<ThreeDWitchLight> &out)
+{
+	const double c = std::cos(turn), sn = std::sin(turn);
+	const double cx = TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, cy = TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	const double foot = GetTileMaxPixelZ(tile);
+	/* A point of the file (metres from the middle of its foot) turned with the reflector about its axis. */
+	auto turned = [&](const float *p, double &x, double &y, double &z) {
+		const double px = p[0] - lh.beam_centre[0], py = p[1] - lh.beam_centre[1];
+		x = lh.beam_centre[0] + px * c - py * sn;
+		y = lh.beam_centre[1] + px * sn + py * c;
+		z = p[2];
+	};
+	for (size_t i = 0; i + 2 < lh.beam_from.size() && i + 2 < lh.beam_aim.size(); i += 3) {
+		double fx, fy, fz, ax, ay, az;
+		turned(&lh.beam_from[i], fx, fy, fz);
+		turned(&lh.beam_aim[i], ax, ay, az);
+		/* Its way in metres' terms, as a witch's torch's (LightsOf()). */
+		double dx = ax - fx, dy = ay - fy, dz = az - fz;
+		const double len = std::sqrt(dx * dx + dy * dy + dz * dz);
+		if (len < 1e-6) continue;
+		ThreeDWitchLight &l = out.emplace_back();
+		l.torch = true;
+		l.dx = dx / len;
+		l.dy = dy / len;
+		l.dz = dz / len;
+		l.x = cx + fx * OBJECT_UNITS_PER_METRE;
+		l.y = cy + fy * OBJECT_UNITS_PER_METRE;
+		l.z = foot + fz * OBJECT_HEIGHT_PER_METRE;
+		l.reach = lh.beam_reach_m * OBJECT_UNITS_PER_METRE;
+		l.half_angle = lh.beam_angle * M_PI / 360.0;
+		l.colour = Colour(lh.beam_colour);
+		/* Where it falls on the land, within its reach (as a witch's torch, LightsOf()). */
+		if (l.dz < -0.01) {
+			const double over = (l.z - FirstPersonGroundZ(l.x, l.y)) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+			const double ground = over / -l.dz;
+			if (over > 0 && ground < l.reach) l.ground = ground;
+		}
+	}
+}
+
+/**
+ * The beams of the lighthouses at night (the player's test9: "the lighthouses have a silly light, put a cone there as the
+ * witches shine on the ground, the light could fade in the distance", "it shines on the concrete railing, put the light a
+ * bit higher", "it is a cylinder like a laser, a normal light widens and fades"): two cones from each lamp, opposite,
+ * turning with its reflector, a little down from the level so that each falls on the land a hundred metres off; as the
+ * witches' torches (ThreeDWitchLight), drawn on the map and from the eyes as theirs are. Each starts out past the
+ * lantern's gallery, a little over the lamp, so that it does not light its railing. On the map in steps as its
+ * reflector's picture turns (LIGHTHOUSE_BEAM_STEPS; the map drawn again where they were and are at each step,
+ * _lighthouse_beams_timer), from the eyes smoothly as its reflector there.
+ * @param eye of the view from an eye, else of the map
+ * @param out the lights, the witches' and the saucers' (GetThreeDWitchLights())
+ */
+void AddThreeDLighthouseLights(bool eye, std::vector<ThreeDWitchLight> &out)
+{
+	if (!IsNightNow() || !_three_d_objects_read || _three_d_lighthouses.empty()) return;
+	for (const Object *o : Object::Iterate()) {
+		if (o->type != OBJECT_LIGHTHOUSE) continue;
+		const TileIndex tile = o->location.tile;
+		const ThreeDObject *lh = GetThreeDLighthouse(tile);
+		if (lh == nullptr || lh->beam_from.empty() || lh->beam_spin_ticks <= 0) continue;
+		/* Its reflector's turn now (the figure's, viewport.cpp and three_d_vehicle_object.cpp: the same tick), the
+		 * model's beams along its x. */
+		const double turn = eye ? (TimerGameTick::counter % lh->beam_spin_ticks) * 2 * M_PI / lh->beam_spin_ticks : LighthouseBeamStep(*lh) * 2 * M_PI / LIGHTHOUSE_BEAM_STEPS;
+		LighthouseBeams(tile, *lh, turn, out);
+	}
+}
+
+/** The map drawn again where a lighthouse's beams are at a step of their turn (as a witch's, MarkDirty() of three_d_witches.cpp). */
+static void MarkLighthouseBeamsDirty(TileIndex tile, const ThreeDObject &lh, int step)
+{
+	std::vector<ThreeDWitchLight> beams;
+	LighthouseBeams(tile, lh, step * 2 * M_PI / LIGHTHOUSE_BEAM_STEPS, beams);
+	const double up = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
+	for (const ThreeDWitchLight &l : beams) {
+		const double len = l.ground > 0 ? l.ground : l.reach, r = len * std::tan(l.half_angle) * 1.3 + 2;
+		const double ex = l.x + l.dx * len, ey = l.y + l.dy * len, ez = l.z + l.dz * len * up;
+		DirtyPlace place;
+		place.kind = DirtyPlace::Kind::Box;
+		place.mover = true;
+		place.x0 = std::min(l.x - 2, ex - r);
+		place.x1 = std::max(l.x + 2, ex + r);
+		place.y0 = std::min(l.y - 2, ey - r);
+		place.y1 = std::max(l.y + 2, ey + r);
+		place.z0 = std::max(0.0, std::min(l.z, ez) - r * up);
+		place.z1 = std::max(l.z, ez) + 2 * up;
+		DirtyPlaceScope scope(place);
+		int left = INT_MAX, top = INT_MAX, right = INT_MIN, bottom = INT_MIN;
+		for (double x : {place.x0, place.x1}) {
+			for (double y : {place.y0, place.y1}) {
+				for (double z : {place.z0, place.z1}) {
+					const Point pt = RemapCoords(static_cast<int>(x), static_cast<int>(y), static_cast<int>(z));
+					left = std::min(left, pt.x);
+					right = std::max(right, pt.x);
+					top = std::min(top, pt.y);
+					bottom = std::max(bottom, pt.y);
+				}
+			}
+		}
+		MarkAllViewportsDirty(left - 2 * ZOOM_BASE, top - 2 * ZOOM_BASE, right + 2 * ZOOM_BASE, bottom + 2 * ZOOM_BASE);
+	}
+}
+
+/** Each lighthouse's step of its beams on the map last drawn (_lighthouse_beams_timer); none by day. */
+static std::map<TileIndex, int> _lighthouse_beam_steps;
+
+/** Every tick: where a lighthouse's beams went on a step, the map drawn again where they were and where they are. */
+static const IntervalTimer<TimerGameTick> _lighthouse_beams_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	const bool on = _game_mode == GameMode::Normal && IsNightNow() && _three_d_objects_read && !_three_d_lighthouses.empty();
+	if (!on) {
+		_lighthouse_beam_steps.clear();
+		return;
+	}
+	for (const Object *o : Object::Iterate()) {
+		if (o->type != OBJECT_LIGHTHOUSE) continue;
+		const TileIndex tile = o->location.tile;
+		const ThreeDObject *lh = GetThreeDLighthouse(tile);
+		if (lh == nullptr || lh->beam_from.empty() || lh->beam_spin_ticks <= 0) continue;
+		const int step = LighthouseBeamStep(*lh);
+		auto [it, added] = _lighthouse_beam_steps.try_emplace(tile, step);
+		if (!added && it->second == step) continue;
+		if (!added) MarkLighthouseBeamsDirty(tile, *lh, it->second);
+		MarkLighthouseBeamsDirty(tile, *lh, step);
+		it->second = step;
+	}
+});
+
+const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin)
+{
+	if (!_three_d_objects_read || _three_d_depots.empty() || !IsValidTile(tile)) return nullptr;
+	origin = tile;
+	int transport, way;
+	if (IsRailDepotTile(tile)) {
+		/* A rail type's own depot (a set of rails) its own look. */
+		if (GetCustomRailSprite(GetRailTypeInfo(GetRailType(tile)), tile, RailSpriteType::Depot) != 0) return nullptr;
+		transport = 0;
+		way = to_underlying(GetRailDepotDirection(tile));
+	} else if (IsRoadDepotTile(tile)) {
+		/* A road type's own (CZTR's) and a tram's its own look. */
+		const RoadType road = GetRoadTypeRoad(tile);
+		if (road == INVALID_ROADTYPE || GetCustomRoadSprite(GetRoadTypeInfo(road), tile, RoadSpriteType::Depot) != 0) return nullptr;
+		transport = 1;
+		way = to_underlying(GetRoadDepotDirection(tile));
+	} else if (IsShipDepotTile(tile)) {
+		transport = 2;
+		way = to_underlying(GetShipDepotAxis(tile));
+		origin = GetShipDepotNorthTile(tile);
+	} else {
+		return nullptr;
+	}
+	const auto it = _three_d_depots.find({transport, way});
+	return it == _three_d_depots.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/** The depots whose gates have been drawn, open or not (GetThreeDDepotDoorWing()): drawn again as that changes (ThreeDDepotGatesTick()). */
+static std::map<TileIndex, bool> _three_d_depot_gates;
+
+/** Whether a depot's gates stand open: a train or a road vehicle on its tile and not hidden in it, coming in or going out. */
+static bool ThreeDDepotGatesOpen(TileIndex origin)
+{
+	return HasVehicleOnTile(origin, [](const Vehicle *v) {
+		return (v->type == VehicleType::Train || v->type == VehicleType::Road) && !v->vehstatus.Test(VehState::Hidden);
+	});
+}
+
+const ThreeDObject *GetThreeDDepotDoorWing(const ThreeDObject *depot, TileIndex origin, size_t door)
+{
+	if (depot == nullptr || door >= depot->door_wings.size()) return nullptr;
+	const uint8_t gate = door < depot->gate_ways.size() ? depot->gate_ways[door] : 0;
+	if (gate != 0) {
+		const bool open = ThreeDDepotGatesOpen(origin);
+		_three_d_depot_gates[origin] = open;
+		if (open) return &_three_d_objects[depot->door_wings[door][gate]];
+	}
+	return &_three_d_objects[depot->door_wings[door][0]];
+}
+
+void ThreeDDepotGatesTick()
+{
+	for (auto it = _three_d_depot_gates.begin(); it != _three_d_depot_gates.end();) {
+		TileIndex origin;
+		if (it->first >= Map::Size() || GetThreeDDepot(it->first, origin) == nullptr || origin != it->first) {
+			it = _three_d_depot_gates.erase(it);
+			continue;
+		}
+		if (const bool open = ThreeDDepotGatesOpen(it->first); open != it->second) {
+			it->second = open;
+			MarkTileDirtyByTile(it->first);
+		}
+		++it;
+	}
+}
+
+std::vector<ThreeDObjectFigure> GetThreeDStationCargo(TileIndex tile)
+{
+	std::vector<ThreeDObjectFigure> out;
+	if (GetThreeDStation(tile) == nullptr || !IsTruckStop(tile)) return out;
+	const ThreeDStationKind kind = IsDriveThroughStopTile(tile) ? ThreeDStationKind::TruckStop : ThreeDStationKind::TruckBay;
+	const int way = kind == ThreeDStationKind::TruckStop ? to_underlying(GetDriveThroughStopAxis(tile)) : to_underlying(GetBayRoadStopDir(tile));
+	const std::optional<ThreeDStationPiece> &piece = _three_d_station_pieces[to_underlying(kind)];
+	if (!piece.has_value() || piece->cells.empty()) return out;
+	const Station *st = Station::GetByTile(tile);
+	/* The station's cargo shared by its bays drawn so. */
+	uint bays = 0;
+	for (const RoadStop *rs = st->truck_stops; rs != nullptr; rs = rs->next) {
+		if (GetThreeDStation(rs->xy) != nullptr) bays++;
+	}
+	bays = std::max(1u, bays);
+	/* What waits: a piece of the shared loads by its table ("naklady"), a bulk cargo without one a heap. */
+	struct Want {
+		uint32_t label;
+		const ThreeDLoadPiece *piece;
+		bool heap;
+		uint amount;
+		uint placed = 0;
+	};
+	const ThreeDLoadPiece *heap = piece->heap_piece.empty() ? nullptr : GetThreeDLoadPiece(piece->heap_piece);
+	std::vector<Want> wants;
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		const GoodsEntry &ge = st->goods[cs->Index()];
+		if (!ge.HasData()) continue;
+		const uint amount = (ge.GetData().cargo.TotalCount() + bays - 1) / bays;
+		if (amount == 0) continue;
+		const uint32_t label = cs->label.base();
+		const ThreeDLoadPiece *p = nullptr;
+		for (const ThreeDLoadPiece &lp : _load_pieces) {
+			if (std::ranges::find(lp.cargoes, label) != lp.cargoes.end() && !lp.figure.empty()) {
+				p = &lp;
+				break;
+			}
+		}
+		if (p != nullptr) {
+			wants.push_back({label, p, false, amount});
+		} else if (heap != nullptr && cs->classes.Test(CargoClass::Bulk)) {
+			wants.push_back({label, heap, true, amount});
+		}
+	}
+	if (wants.empty()) return out;
+	std::ranges::stable_sort(wants, std::greater{}, &Want::amount);
+	/* Its places turned as the bay stands (MakeStationObjects()). */
+	const double turn = StationWayTurn(kind, way), a = turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	auto stand = [&](const Want &w, double x, double y, double z, float facing, float scale) {
+		ThreeDObjectFigure &f = out.emplace_back();
+		f.figure = fmt::format("naklad:{}|#{:08X}", w.piece->name, w.label);
+		const double dx = x - piece->centre[0], dy = y - piece->centre[1];
+		f.at[0] = static_cast<float>(piece->centre[0] + dx * c - dy * s);
+		f.at[1] = static_cast<float>(piece->centre[1] + dx * s + dy * c);
+		f.at[2] = static_cast<float>(z);
+		f.facing = facing + static_cast<float>(turn);
+		f.scale = scale;
+	};
+	std::vector<bool> used(piece->cells.size(), false);
+	auto cell_at = [&](uint8_t side, int row, int column) -> int {
+		for (size_t k = 0; k < piece->cells.size(); k++) {
+			const ThreeDStationPiece::Cell &cell = piece->cells[k];
+			if (cell.side == side && cell.row == row && cell.column == column) return static_cast<int>(k);
+		}
+		return -1;
+	};
+	/* The heaps first, their places (both rows of their columns) given to the bulk cargoes the most waits of. */
+	for (const ThreeDStationPiece::Heap &h : piece->heaps) {
+		Want *w = nullptr;
+		for (Want &cand : wants) {
+			if (cand.heap && cand.placed < cand.amount && (w == nullptr || cand.amount - cand.placed > w->amount - w->placed)) w = &cand;
+		}
+		if (w == nullptr) break;
+		const uint units = std::min(STATION_CARGO_HEAP_UNITS, w->amount - w->placed);
+		w->placed += units;
+		stand(*w, h.at[0], h.at[1], h.at[2], h.turn, STATION_CARGO_HEAP_LEAST + (1.0f - STATION_CARGO_HEAP_LEAST) * units / STATION_CARGO_HEAP_UNITS);
+		for (const int column : h.columns) {
+			for (int row = 0; row < 2; row++) {
+				if (const int k = cell_at(h.side, row, column); k >= 0) used[k] = true;
+			}
+		}
+	}
+	/* The pieces: a piece a block of cells as long and wide as it is (a log over three, the steel over two), the cells
+	 * shared by the cargoes as much as each waits; then on each other as high as the floors and the piece allow. */
+	struct Block {
+		size_t want;
+		double x, y, z;
+		float turn;
+	};
+	std::vector<Block> blocks;
+	uint pieces_wanted = 0;
+	for (const Want &w : wants) {
+		if (!w.heap) pieces_wanted += (w.amount + STATION_CARGO_PIECE_UNITS - 1) / STATION_CARGO_PIECE_UNITS;
+	}
+	const size_t free_cells = static_cast<size_t>(std::ranges::count(used, false));
+	for (int pass = 0; pass < 2; pass++) {
+		for (size_t i = 0; i < wants.size(); i++) {
+			Want &w = wants[i];
+			if (w.heap) continue;
+			const ThreeDLoadPiece &p = *w.piece;
+			const int columns = std::max(1, static_cast<int>(std::ceil(p.size[0] / piece->cell_m[0] - 0.05f)));
+			const int rows = std::max(1, static_cast<int>(std::ceil(p.size[1] / piece->cell_m[1] - 0.05f)));
+			const uint wanted = (w.amount + STATION_CARGO_PIECE_UNITS - 1) / STATION_CARGO_PIECE_UNITS;
+			/* Its share of the floor the first time round, the rest of it the second. */
+			const size_t share = pass == 0 ? std::max<size_t>(1, free_cells * wanted / std::max(1u, pieces_wanted) / (columns * rows)) : SIZE_MAX;
+			size_t laid = 0;
+			for (size_t k = 0; k < piece->cells.size() && w.placed < wanted && laid < share; k++) {
+				const ThreeDStationPiece::Cell &first = piece->cells[k];
+				if (used[k]) continue;
+				std::vector<int> block;
+				for (int r = 0; r < rows; r++) {
+					for (int col = 0; col < columns; col++) {
+						const int at = cell_at(first.side, first.row + r, first.column + col);
+						if (at < 0 || used[at]) {
+							block.clear();
+							r = rows;
+							break;
+						}
+						block.push_back(at);
+					}
+				}
+				if (block.empty()) continue;
+				double x = 0, y = 0;
+				for (const int at : block) {
+					used[at] = true;
+					x += piece->cells[at].at[0];
+					y += piece->cells[at].at[1];
+				}
+				blocks.push_back({i, x / block.size(), y / block.size(), first.at[2], first.turn});
+				w.placed++;
+				laid++;
+			}
+		}
+	}
+	/* On each other, a floor at a time, as many as the piece lies in layers and the bay has floors. */
+	const std::vector<Block> ground = blocks;
+	for (int floor = 1; floor < piece->floors; floor++) {
+		for (const Block &b : ground) {
+			Want &w = wants[b.want];
+			const uint wanted = (w.amount + STATION_CARGO_PIECE_UNITS - 1) / STATION_CARGO_PIECE_UNITS;
+			if (w.placed >= wanted || floor >= w.piece->layers) continue;
+			blocks.push_back({b.want, b.x, b.y, b.z + floor * w.piece->size[2], b.turn});
+			w.placed++;
+		}
+	}
+	for (const Block &b : blocks) stand(wants[b.want], b.x, b.y, b.z, b.turn, 1.0f);
+	return out;
+}
+
+const ThreeDObject *GetThreeDRocks(TileIndex tile)
+{
+	if (!_three_d_objects_read || _three_d_rock_layouts.empty() || !IsValidTile(tile)) return nullptr;
+	if (!IsTileType(tile, TileType::Clear) || !IsClearGround(tile, ClearGround::Rocks)) return nullptr;
+	/* A walker's tent pitched there: on the rocks as the game paints them, no stone through its cloth. */
+	if (WalkerTentAt(tile) != nullptr) return nullptr;
+	/* The layout by the tile as the game picks its second set of rocky sprites (DrawTile_Clear()): a tile has one always. */
+	const size_t layout = TileHash(TileX(tile) * TILE_SIZE, TileY(tile) * TILE_SIZE) % _three_d_rock_layouts.size();
+	const auto it = _three_d_rock_tiles.find({layout, GetTileSlope(tile)});
+	return it == _three_d_rock_tiles.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/** The top of an object's triangles over a point, world units from its north corner: units of height over its foot; none there, or not read yet. */
+static std::optional<double> ShapeTopAt(const ThreeDObject *o, double x, double y)
+{
+	if (o == nullptr || !o->TryRead() || o->pos.empty()) return std::nullopt;
+	if (x < o->extent[0] || x > o->extent[1] || y < o->extent[2] || y > o->extent[3]) return std::nullopt;
+	std::optional<double> top;
+	for (size_t t = 0; t + 2 < o->tri.size(); t += 3) {
+		const float *a = &o->pos[o->tri[t] * 3], *b = &o->pos[o->tri[t + 1] * 3], *c = &o->pos[o->tri[t + 2] * 3];
+		if (std::max({a[0], b[0], c[0]}) < x || std::min({a[0], b[0], c[0]}) > x || std::max({a[1], b[1], c[1]}) < y || std::min({a[1], b[1], c[1]}) > y) continue;
+		const double d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+		if (std::abs(d) < 1e-9) continue;
+		const double l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+		const double l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+		const double l3 = 1 - l1 - l2;
+		if (l1 < 0 || l2 < 0 || l3 < 0) continue;
+		const double z = l1 * a[2] + l2 * b[2] + l3 * c[2];
+		if (!top.has_value() || z > *top) top = z;
+	}
+	return top;
+}
+
+std::optional<double> ThreeDLandThingTopAt(TileIndex tile, double x, double y)
+{
+	/* The stones from the tile's lowest corner, a station from the top of its foundation. */
+	if (const ThreeDObject *rocks = GetThreeDRocks(tile); rocks != nullptr) {
+		const std::optional<double> top = ShapeTopAt(rocks, x, y);
+		if (top.has_value()) return GetTilePixelZ(tile) + *top;
+		return std::nullopt;
+	}
+	if (const ThreeDObject *station = GetThreeDStation(tile); station != nullptr) {
+		const std::optional<double> top = ShapeTopAt(station, x, y);
+		if (top.has_value()) return GetTileMaxPixelZ(tile) + *top;
+	}
+	/* The planks of a ship depot's walkways (the colleague's "lavky"), from its north tile. */
+	if (IsValidTile(tile) && IsShipDepotTile(tile)) {
+		TileIndex origin;
+		if (const ThreeDObject *depot = GetThreeDDepot(tile, origin); depot != nullptr) {
+			const double lx = x + (static_cast<double>(TileX(tile)) - TileX(origin)) * TILE_SIZE, ly = y + (static_cast<double>(TileY(tile)) - TileY(origin)) * TILE_SIZE;
+			for (const auto &w : depot->walkways) {
+				if (lx >= w[0] && lx <= w[2] && ly >= w[1] && ly <= w[3]) return GetTileMaxPixelZ(origin) + w[4];
+			}
+		}
+	}
+	return std::nullopt;
+}
+
+/**
+ * The rig ('test3d depomapa'): a depot's object seen from above over its north tile, a character every quarter of a
+ * metre: '#' in the way of feet so high (ThreeDObject::Blocks()), '=' a floor between 0.4 and 0.8 m under no more than
+ * 1 m, '.' neither.
+ */
+std::string RigThreeDDepotMap(TileIndex tile, double feet_m)
+{
+	TileIndex origin;
+	const ThreeDObject *o = GetThreeDDepot(tile, origin);
+	if (o == nullptr || !o->Read() || o->pos.empty()) return "zadne depo";
+	std::string out = fmt::format("{} nohy {:.2f} m (x doprava, y dolu, po 0.25 m)", o->name, feet_m);
+	for (double ym = 0.125; ym < 14.8; ym += 0.25) {
+		out += fmt::format("\n{:5.2f} ", ym);
+		for (double xm = 0.125; xm < 14.8; xm += 0.25) {
+			const double x = xm * OBJECT_UNITS_PER_METRE, y = ym * OBJECT_UNITS_PER_METRE;
+			const auto floor = ShapeTopAt(o, x, y);
+			char c = '.';
+			std::optional<double> low;
+			for (size_t t = 0; t + 2 < o->tri.size(); t += 3) {
+				const float *a = &o->pos[o->tri[t] * 3], *b = &o->pos[o->tri[t + 1] * 3], *d = &o->pos[o->tri[t + 2] * 3];
+				if (std::max({a[0], b[0], d[0]}) < x || std::min({a[0], b[0], d[0]}) > x || std::max({a[1], b[1], d[1]}) < y || std::min({a[1], b[1], d[1]}) > y) continue;
+				const double z = std::max({a[2], b[2], d[2]}) / OBJECT_HEIGHT_PER_METRE;
+				if (std::min({a[2], b[2], d[2]}) / OBJECT_HEIGHT_PER_METRE > 0.4 && z < 0.8) low = z;
+			}
+			if (low.has_value()) c = '=';
+			if (o->Blocks(x, y, feet_m * OBJECT_HEIGHT_PER_METRE)) c = '#';
+			(void)floor;
+			out += c;
+		}
+	}
+	return out;
+}
+
+/**
+ * A tile of the marijuana plantation (and the potato field) laid from the parts of the fields: what
+ * GetThreeDPlantationTile() says is on it and on the road tile behind it.
+ * @return whether the fields have their parts at all (the soil)
+ */
+bool GetThreeDFieldTile(const ThreeDPlantationTile &tile, ThreeDFieldTile &out)
+{
+	out = {};
+	out.soil = GetThreeDFieldPart("zem");
+	if (out.soil == nullptr) return false;
+	const int crop = tile.crop & 1;
+	static const char *const small[2] = {"mari_male", "brambory_male"};
+	static const char *const grown[2] = {"mari_vzrostle", "brambory_vzrostle"};
+	if (tile.stage == 1) out.plants = GetThreeDFieldPart(small[crop]);
+	if (tile.stage == 2) out.plants = GetThreeDFieldPart(grown[crop]);
+	if (tile.worker >= 0 && tile.stage != 0) {
+		const std::string name = std::string("pole_") + ThreeDPlantationWorkerName(tile.worker);
+		const std::vector<ThreeDObjectFigure> &work = out.soil->work[crop];
+		for (size_t i = 0; i < work.size(); i++) {
+			if (work[i].figure == name) out.worker = std::span(work).subspan(i, 1);
+		}
+	}
+	if (tile.road_behind) {
+		out.road = GetThreeDFieldPart("cesta");
+		if (tile.shed) {
+			out.shed = GetThreeDFieldPart("bouda");
+			out.hay = GetThreeDFieldPart("seno");
+		}
+		if (out.road != nullptr) {
+			if (tile.girls_nw) out.girls[0] = out.road->by_road[0];
+			if (tile.girls_se) out.girls[1] = out.road->by_road[1];
+		}
+	}
+	return true;
+}
+
+/** How many ThreeDEyeScope stand: what is asked for is for the view from the eyes. */
+static int _three_d_eye_scopes = 0;
+
+ThreeDEyeScope::ThreeDEyeScope()
+{
+	_three_d_eye_scopes++;
+}
+
+ThreeDEyeScope::~ThreeDEyeScope()
+{
+	_three_d_eye_scopes--;
+}
+
+/**
+ * Whether a group of the 3D is shown in 3D where it is asked for: from the eyes -- drawing them (ViewportDrawingEye())
+ * or the walker's steps there (ThreeDEyeScope) -- by its setting for the eyes, else by its setting from above (the map,
+ * the small views, the walkers and the creatures of the towns).
+ */
+bool ThreeDGroupShown(ThreeDGroup group)
+{
+	const bool eye = ViewportDrawingEye() || _three_d_eye_scopes > 0;
+	const GUISettings &g = _settings_client.gui;
+	switch (group) {
+		case ThreeDGroup::Houses: return eye ? g.three_d_houses_eye : g.three_d_houses_map;
+		case ThreeDGroup::Bridges: return eye ? g.three_d_bridges_eye : g.three_d_bridges_map;
+		/* From above always the game's (the player, test4: "the 3D rails from above off by default and not to be used,
+		 * that is what the track sets are for"). */
+		case ThreeDGroup::Rails: return eye && g.three_d_rails_eye;
+		case ThreeDGroup::Catenary: return eye ? g.three_d_catenary_eye : g.three_d_catenary_map;
+	}
+	return true;
+}
+
+/**
+ * The 3D object of an original house.
+ * @param north_house the house of its north tile
+ * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
+ * @param theme the theme of its town (TownTheme): its own object where the theme has one, else the house's as in every town
+ */
+const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, uint8_t theme)
+{
+	/* Kept as the first 3D of this game drew it, the boxes of its hand table, in memory of it (the player, 14. 10.:
+	 * "I am nostalgic, the white house of many storeys, tall, I would keep"): the tall office block. */
+	static constexpr HouseID KEPT_AS_HAND_TABLE[] = {0x1c};
+	if (std::ranges::find(KEPT_AS_HAND_TABLE, north_house) != std::end(KEPT_AS_HAND_TABLE)) return nullptr;
+	/* The original houses of OpenTTD wanted instead, there (ThreeDGroupShown()): no house is a 3D object. */
+	if (!ThreeDGroupShown(ThreeDGroup::Houses)) return nullptr;
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	if (theme != 0) {
+		auto themed = _three_d_house_objects.find(std::make_tuple(theme, north_house, colour_slot & 3));
+		if (themed != _three_d_house_objects.end()) return &_three_d_objects[themed->second];
+	}
+	auto it = _three_d_house_objects.find(std::make_tuple(static_cast<uint8_t>(0), north_house, colour_slot & 3));
+	return it == _three_d_house_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * The 3D object of any house, an original's or a set's (NewGRF): a set's house by the set's id and its number in
+ * the set (the Mars houses, the game's own Mars towns).
+ * @param north_house the house of its north tile
+ * @param colour_slot the colour variant of its north tile (TileHash2Bit() of the tile)
+ */
+const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot, uint8_t theme)
+{
+	if (north_house < NEW_HOUSE_OFFSET) return GetThreeDHouseObject(north_house, colour_slot, theme);
+	if (!ThreeDGroupShown(ThreeDGroup::Houses)) return nullptr;
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	const HouseSpec *hs = HouseSpec::Get(north_house);
+	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return nullptr;
+	auto it = _three_d_grf_house_objects.find(std::make_tuple(hs->grf_prop.grfid, hs->grf_prop.local_id, colour_slot & 3));
+	return it == _three_d_grf_house_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/**
+ * The 3D object of the house standing on a tile, as its town looks (Town::theme): the clay town's clay house.
+ * @param north_house the house of its north tile
+ * @param origin its north tile
+ */
+const ThreeDObject *GetThreeDHouseObjectAt(HouseID north_house, TileIndex origin)
+{
+	uint8_t theme = 0;
+	if (IsTileType(origin, TileType::House)) {
+		const Town *t = Town::GetIfValid(GetTownIndex(origin));
+		if (t != nullptr) theme = to_underlying(t->theme);
+	}
+	return GetThreeDHouseObjectAny(north_house, TileHash2Bit(TileX(origin) * TILE_SIZE, TileY(origin) * TILE_SIZE), theme);
+}
+
+/** The trees of a town theme (TownTheme, "druh": "strom" with its "tema"): the names of their figures, none for the plain towns. */
+/**
+ * The add-ons among the trees of a town theme's land (the clay town's tropical plants, "stromy_mapy_dalsi" with "tema").
+ * @param theme the town theme
+ * @param plants the plants (an undergrowth somewhere too: banana plants, monsteras), else the trees (palms)
+ */
+std::span<const std::string> GetThreeDThemeGuestTrees(uint8_t theme, bool plants)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _three_d_theme_guests_split.find(theme);
+	if (it == _three_d_theme_guests_split.end()) return {};
+	return it->second[plants ? 1 : 0];
+}
+
+std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	const auto &trees = night ? _three_d_theme_trees_night : _three_d_theme_trees;
+	auto it = trees.find(theme);
+	if (it == trees.end()) return {};
+	return it->second;
+}
+
+/**
+ * The trees standing for a kind of tree of the map ("stromy_mapy"), or the plants under them ("podrost").
+ * @param kind the kind of tree on the tile (TreeType)
+ * @param undergrowth the plants under them, not the trees
+ * @return their figures and sizes, none for a kind without them
+ */
+std::span<const ThreeDMapTree> GetThreeDMapTrees(uint8_t kind, bool undergrowth)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (kind >= MAP_TREE_KINDS) return {};
+	return undergrowth ? _three_d_map_undergrowth[kind] : _three_d_map_trees[kind];
+}
+
+/**
+ * The plants by some houses of the clay towns and the towns of the tropics (the colleague's
+ * hra/3d/TROPY-PLANTAZ-PRO-HRU.md, point 3: "the plants by the houses you place"; the player, 2. 11.: "only
+ * somewhere"): the palms of the tropics' grass (0x1C-0x1E) and the undergrowth of the rainforest (banana plants,
+ * monsteras, ferns), each as it is; in the desert the palms alone.
+ * @param desert the palms alone
+ * @return their figures, none without the colleague's tropical plants
+ */
+std::span<const ThreeDMapTree> GetThreeDHousePlants(bool desert)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (!_three_d_house_plants_made) {
+		_three_d_house_plants_made = true;
+		auto add = [](std::vector<ThreeDMapTree> &into, const ThreeDMapTree &plant) {
+			if (std::ranges::find_if(into, [&plant](const ThreeDMapTree &p) { return p.name == plant.name; }) == into.end()) {
+				into.push_back({plant.name, 1.0f});
+			}
+		};
+		for (uint kind = TREE_SUB_TROPICAL; kind < TREE_SUB_TROPICAL + 3; kind++) {
+			for (const ThreeDMapTree &palm : _three_d_map_trees[kind]) {
+				add(_three_d_house_plants, palm);
+				add(_three_d_house_palms, palm);
+			}
+		}
+		for (const ThreeDMapTree &plant : _three_d_map_undergrowth[TREE_RAINFOREST]) add(_three_d_house_plants, plant);
+	}
+	return desert ? _three_d_house_palms : _three_d_house_plants;
+}
+
+/** The plants under the trees of a town theme's land ("stromy_mapy_dalsi" with "tema" and "podrost"): their figures. */
+std::span<const std::string> GetThreeDThemeUndergrowth(uint8_t theme)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _three_d_theme_undergrowth.find(theme);
+	if (it == _three_d_theme_undergrowth.end()) return {};
+	return it->second;
+}
+
+/** The creatures of the indices ("druh": "tvor", the colleague's dragons), read the first time they are asked for. */
+const std::vector<ThreeDCreature> &GetThreeDCreatures()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _creatures;
+}
+
+/** The witches of the indices ("druh": "carodejnice"), read the first time they are asked for. */
+const std::vector<ThreeDWitch> &GetThreeDWitches()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _witches;
+}
+
+/** The flying saucers of the indices ("druh": "ufo"), read the first time they are asked for. */
+const std::vector<ThreeDUfo> &GetThreeDUfos()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _ufos;
+}
+
+/** The dogs, the animals, the ghosts and the sellers of dogs of the indices, read the first time they are asked for. */
+const std::vector<ThreeDAnimal> &GetThreeDAnimals()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _animals;
+}
+
+/** One of them by its name, or nullptr. */
+const ThreeDAnimal *GetThreeDAnimal(std::string_view name)
+{
+	for (const ThreeDAnimal &a : GetThreeDAnimals()) {
+		if (a.name == name) return &a;
+	}
+	return nullptr;
+}
+
+/** Its name in Czech or else in English. */
+const std::string &ThreeDAnimal::Title() const
+{
+	return std::string_view(_current_language->isocode).starts_with("cs") ? this->title_cs : this->title_en;
+}
+
+/** The mushrooms to pick of the indices, read the first time they are asked for. */
+const std::vector<ThreeDMushroom> &GetThreeDMushrooms()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _mushrooms;
+}
+
+/** An animal of the water of the indices by its name ("vodni_zvire": the fish on the rod), or nullptr. */
+const ThreeDWaterAnimal *GetThreeDWaterAnimal(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDWaterAnimal &a : _water_animals) {
+		if (a.name == name) return &a;
+	}
+	return nullptr;
+}
+
+/** All the animals of the water of the indices. */
+const std::vector<ThreeDWaterAnimal> &GetThreeDWaterAnimals()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _water_animals;
+}
+
+/** All the plants of the water of the indices ("vodni_rostlina"). */
+const std::vector<ThreeDWaterPlant> &GetThreeDWaterPlants()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _water_plants;
+}
+
+/**
+ * The name the land area information shows for a house that is drawn as a 3D object with a name of its own ("nazev"),
+ * in Czech or else in English; none with the 3D off, while it is built, or for a house without.
+ * @param tile a tile of the house
+ */
+std::optional<std::string> GetThreeDHouseTitle(TileIndex tile)
+{
+	if (!ThreeDEnabled() || !IsHouseCompleted(tile)) return std::nullopt;
+	HouseID north = GetHouseType(tile);
+	TileIndex origin = tile + GetHouseNorthPart(north);
+	const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
+	if (obj == nullptr || obj->title_en.empty()) return std::nullopt;
+	return std::string_view(_current_language->isocode).starts_with("cs") ? obj->title_cs : obj->title_en;
+}
+
+/**
+ * A texture's levels of detail: level 0 as in the PNG, every next one halved (the colour of the pixels that have one,
+ * a pixel transparent when most of its four are). A texture that cannot be read is a plain grey, so the shape still
+ * shows.
+ */
+/**
+ * Which texels of a texture its model's triangles draw from: those whose middles are in a triangle of the cover
+ * (TextureCover()), and the one under each triangle's middle (a triangle smaller than a texel).
+ */
+static std::vector<uint8_t> TextureTexelsDrawn(int w, int h, const std::vector<float> &cover)
+{
+	std::vector<uint8_t> drawn(static_cast<size_t>(w) * h, 0);
+	/* A triangle over more than the texture repeated draws from all of it: no texel to fill (a 512 x 1024 of the
+	 * colleague's took 300 ms, each such triangle tried at every texel). */
+	for (size_t t = 0; t + 5 < cover.size(); t += 6) {
+		const float u0 = std::min({cover[t], cover[t + 2], cover[t + 4]}), u1 = std::max({cover[t], cover[t + 2], cover[t + 4]});
+		const float v0 = std::min({cover[t + 1], cover[t + 3], cover[t + 5]}), v1 = std::max({cover[t + 1], cover[t + 3], cover[t + 5]});
+		if (u1 - u0 >= 1.0f && v1 - v0 >= 1.0f) {
+			std::fill(drawn.begin(), drawn.end(), 1);
+			return drawn;
+		}
+	}
+	auto mark = [&](double x, double y) {
+		const int px = static_cast<int>(std::floor(x)), py = static_cast<int>(std::floor(y));
+		if (px >= 0 && py >= 0 && px < w && py < h) drawn[static_cast<size_t>(py) * w + px] = 1;
+	};
+	for (size_t t = 0; t + 5 < cover.size(); t += 6) {
+		double x[3], y[3];
+		for (int k = 0; k < 3; k++) {
+			x[k] = cover[t + k * 2] * w;
+			y[k] = cover[t + k * 2 + 1] * h;
+		}
+		/* A texture repeated: the triangle where its first corner is. */
+		const double ox = std::floor(x[0] / w) * w, oy = std::floor(y[0] / h) * h;
+		for (int k = 0; k < 3; k++) {
+			x[k] -= ox;
+			y[k] -= oy;
+		}
+		mark((x[0] + x[1] + x[2]) / 3, (y[0] + y[1] + y[2]) / 3);
+		const double area = (x[1] - x[0]) * (y[2] - y[0]) - (y[1] - y[0]) * (x[2] - x[0]);
+		if (std::abs(area) < 1e-9) continue;
+		/* Row by row: where the row's middle crosses the triangle's edges, the texels whose middles are between them
+		 * at once (each texel tried was the most of the time of an atlas of the colleague's). */
+		const int y0 = std::max(0, static_cast<int>(std::floor(std::min({y[0], y[1], y[2]})))), y1 = std::min(h - 1, static_cast<int>(std::ceil(std::max({y[0], y[1], y[2]}))));
+		for (int py = y0; py <= y1; py++) {
+			const double cy = py + 0.5;
+			double lo = std::numeric_limits<double>::infinity(), hi = -std::numeric_limits<double>::infinity();
+			for (int k = 0; k < 3; k++) {
+				const double ax = x[k], ay = y[k], bx = x[(k + 1) % 3], by = y[(k + 1) % 3];
+				if (cy < std::min(ay, by) - 1e-9 || cy > std::max(ay, by) + 1e-9) continue;
+				if (std::abs(by - ay) < 1e-12) {
+					lo = std::min({lo, ax, bx});
+					hi = std::max({hi, ax, bx});
+					continue;
+				}
+				const double cx = ax + (bx - ax) * (cy - ay) / (by - ay);
+				lo = std::min(lo, cx);
+				hi = std::max(hi, cx);
+			}
+			if (!(lo <= hi)) continue;
+			const int px0 = std::max(0, static_cast<int>(std::ceil(lo - 0.5 - 1e-6))), px1 = std::min(w - 1, static_cast<int>(std::floor(hi - 0.5 + 1e-6)));
+			if (px0 <= px1) std::fill_n(drawn.begin() + static_cast<size_t>(py) * w + px0, px1 - px0 + 1, 1);
+		}
+	}
+	return drawn;
+}
+
+/** How far from the texels drawn from those not are filled (FillTexelsNotDrawn()): a triangle reads a texel or two past its edge, no more. */
+static constexpr int FILL_BAND = 8;
+
+/**
+ * The texels no triangle draws from filled from the nearest that one does, its colour (or its index, a mask's) --
+ * the colleague's atlases put every triangle on a piece of its own on black, and a triangle drew black at its edges
+ * (a texel's middle just past it) and in the smaller textures of the distance (the black mixed in): the cars black
+ * lines, then black from a few metres on (the player, 17. 10.). Only a band of FILL_BAND texels about them: the whole
+ * of the empty atlas filled was most of the time a texture took (a 4096 x 3824 one 345 ms; the player, 17. 10.:
+ * "the atlas cover, 50 to 80 ms an atlas").
+ * @param drawn which texels are drawn from (TextureTexelsDrawn())
+ */
+static void FillTexelsNotDrawn(ThreeDObjectTexture &t, const std::vector<uint8_t> &drawn)
+{
+	const int w = t.w, h = t.h;
+	/* Done: drawn from (a hole of the texture where it is drawn stays one, and gives nothing), or filled. */
+	std::vector<uint8_t> done(drawn);
+	std::vector<uint32_t> queue, next;
+	/* The first: those drawn from with a colour beside one that is not. */
+	for (int y = 0; y < h; y++) {
+		const size_t row = static_cast<size_t>(y) * w;
+		for (int x = 0; x < w; x++) {
+			const size_t i = row + x;
+			if (!drawn[i] || t.px[i] == 0) continue;
+			if ((x > 0 && !drawn[i - 1]) || (x + 1 < w && !drawn[i + 1]) || (y > 0 && !drawn[i - w]) || (y + 1 < h && !drawn[i + w])) queue.push_back(static_cast<uint32_t>(i));
+		}
+	}
+	for (int band = 0; band < FILL_BAND && !queue.empty(); band++) {
+		next.clear();
+		for (const uint32_t i : queue) {
+			const int x = static_cast<int>(i % w), y = static_cast<int>(i / w);
+			const int nx[4] = {x - 1, x + 1, x, x}, ny[4] = {y, y, y - 1, y + 1};
+			for (int k = 0; k < 4; k++) {
+				if (nx[k] < 0 || ny[k] < 0 || nx[k] >= w || ny[k] >= h) continue;
+				const size_t j = static_cast<size_t>(ny[k]) * w + nx[k];
+				if (done[j]) continue;
+				done[j] = 1;
+				t.px[j] = t.px[i];
+				next.push_back(static_cast<uint32_t>(j));
+			}
+		}
+		queue.swap(next);
+	}
+}
+
+/** The texels drawn from of the last textures of a size and a cover (TextureTexelsDrawn()): a texture and its masks share the layout. */
+struct TexelsDrawnKept {
+	const std::vector<float> *cover;
+	size_t size;     ///< and its size and a print of its numbers: another cover may come to its place
+	uint64_t print;
+	int w, h;
+	std::shared_ptr<const std::vector<uint8_t>> drawn;
+};
+static std::deque<TexelsDrawnKept> _texels_drawn_kept;
+static std::mutex _texels_drawn_mutex;
+
+/** The texels drawn from (TextureTexelsDrawn()), once for a texture and the masks of its layout. */
+static std::shared_ptr<const std::vector<uint8_t>> TexelsDrawnOf(int w, int h, const std::vector<float> &cover)
+{
+	uint64_t print = 1469598103934665603ULL;
+	for (size_t i = 0; i < cover.size(); i += 97) print = (print ^ std::bit_cast<uint32_t>(cover[i])) * 1099511628211ULL;
+	{
+		std::lock_guard lock(_texels_drawn_mutex);
+		for (const TexelsDrawnKept &k : _texels_drawn_kept) {
+			if (k.cover == &cover && k.size == cover.size() && k.print == print && k.w == w && k.h == h) return k.drawn;
+		}
+	}
+	auto made = std::make_shared<const std::vector<uint8_t>>(TextureTexelsDrawn(w, h, cover));
+	std::lock_guard lock(_texels_drawn_mutex);
+	_texels_drawn_kept.push_back({&cover, cover.size(), print, w, h, made});
+	/* A few: they are of the textures of one object being made. */
+	while (_texels_drawn_kept.size() > 3) _texels_drawn_kept.pop_front();
+	return made;
+}
+
+/** A picture of no more colours drawn from than this is of cells (ThreeDObjectTexture::coarsest): a palette, a mask of strips. */
+static constexpr size_t CELL_COLOURS = 64;
+/** Texels of colours more apart than this in a channel are of two cells. */
+static constexpr int CELL_MIXED = 6;
+/** A level keeps its cells while no more than one of so many texels drawn from mixes two (0.5 %). */
+static constexpr size_t CELL_MIXED_SHARE = 200;
+
+/**
+ * A texture's levels of detail from its picture: each texel opaque where its alpha is at least half, else none (0);
+ * soft, its alpha as it is (a material "BLEND": see-through by it, ThreeDVehicleShape::BlendsByTexel()), none where 0.
+ * Of few colours in cells, the coarsest level that keeps them noted (ThreeDObjectTexture::coarsest).
+ */
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved, const std::vector<float> *cover, bool soft)
+{
+	auto texel = [soft](uint8_t r, uint8_t g, uint8_t b, uint8_t a) -> uint32_t {
+		if (soft) return a == 0 ? 0 : Colour(r, g, b, a).data;
+		return a >= 128 ? Colour(r, g, b).data : 0;
+	};
+	ThreeDObjectTexture t;
+	if (png.size() >= RAW_TEXTURE_MARK.size() + 8 && std::equal(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end(), png.begin())) {
+		/* Pixels as they are (a texture of MSTS, simtrains.h): the mark, the width and the height, then RGBA. */
+		auto u32 = [&png](size_t p) { return png[p] | png[p + 1] << 8 | png[p + 2] << 16 | static_cast<uint32_t>(png[p + 3]) << 24; };
+		const size_t at = RAW_TEXTURE_MARK.size();
+		const uint32_t w = u32(at), h = u32(at + 4);
+		if (w > 0 && h > 0 && w <= 8192 && h <= 8192 && png.size() >= at + 8 + static_cast<size_t>(w) * h * 4) {
+			t.w = static_cast<int>(w);
+			t.h = static_cast<int>(h);
+			t.px.resize(static_cast<size_t>(w) * h);
+			const uint8_t *src = png.data() + at + 8;
+			for (size_t i = 0; i < t.px.size(); i++, src += 4) t.px[i] = texel(src[0], src[1], src[2], src[3]);
+		}
+	}
+#ifdef WITH_PNG
+	if (!png.empty() && t.px.empty()) {
+		png_image image{};
+		image.version = PNG_IMAGE_VERSION;
+		if (png_image_begin_read_from_memory(&image, png.data(), png.size())) {
+			image.format = PNG_FORMAT_RGBA;
+			std::vector<uint8_t> rgba(PNG_IMAGE_SIZE(image));
+			if (png_image_finish_read(&image, nullptr, rgba.data(), 0, nullptr)) {
+				t.w = image.width;
+				t.h = image.height;
+				t.px.resize(static_cast<size_t>(t.w) * t.h);
+				for (size_t i = 0; i < t.px.size(); i++) {
+					const uint8_t *p = &rgba[i * 4];
+					t.px[i] = texel(p[0], p[1], p[2], p[3]);
+				}
+			} else {
+				png_image_free(&image);
+			}
+		}
+	}
+#endif /* WITH_PNG */
+	if (t.px.empty()) {
+		/* No picture: the material's colour, or a plain grey, so the shape still shows. */
+		t.w = t.h = 1;
+		t.px.assign(1, flat != 0 ? flat : Colour(150, 150, 150).data);
+	}
+	/* Where the model draws from it, when that is known (a texture of a .glb, a mask of its layout): the rest filled. */
+	std::vector<uint8_t> drawn;
+	const auto cover_start = std::chrono::steady_clock::now();
+	double ms_drawn = 0, ms_fill = 0;
+	if (cover != nullptr && !cover->empty() && t.w > 1) {
+		drawn = *TexelsDrawnOf(t.w, t.h, *cover);
+		ms_drawn = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count();
+		FillTexelsNotDrawn(t, drawn);
+		ms_fill = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count() - ms_drawn;
+	}
+	const int w0 = t.w, h0 = t.h;
+	/* Few colours (a palette of them in cells, a mask of strips): a level coarser than its cells mixes them. */
+	bool few_colours = halved;
+	if (few_colours) {
+		std::vector<uint32_t> colours;
+		uint32_t last = 0;
+		for (size_t i = 0; i < t.px.size() && few_colours; i++) {
+			if (t.px[i] == 0 || t.px[i] == last || (!drawn.empty() && !drawn[i])) continue;
+			last = t.px[i];
+			if (std::ranges::find(colours, last) != colours.end()) continue;
+			colours.push_back(last);
+			few_colours = colours.size() <= CELL_COLOURS;
+		}
+	}
+	int unmixed = 0;
+	bool mixing = !few_colours;
+	levels.push_back(std::move(t));
+	while (halved && (levels.back().w > 1 || levels.back().h > 1)) {
+		const ThreeDObjectTexture &a = levels.back();
+		ThreeDObjectTexture b;
+		b.w = std::max(1, a.w / 2);
+		b.h = std::max(1, a.h / 2);
+		b.px.resize(static_cast<size_t>(b.w) * b.h);
+		/* A texel of the smaller texture is the mean of the four it covers -- of those drawn from, when that is known:
+		 * the filled ones are not mixed in, and it is drawn from when any of them is (then filled again). */
+		std::vector<uint8_t> drawn_b;
+		if (!drawn.empty()) drawn_b.assign(b.px.size(), 0);
+		size_t texels = 0, mixed = 0;
+		for (int y = 0; y < b.h; y++) {
+			for (int x = 0; x < b.w; x++) {
+				uint r = 0, g = 0, bl = 0, n = 0, holes = 0, alpha = 0;
+				bool any_drawn = false;
+				uint8_t lo[3] = {255, 255, 255}, hi[3] = {0, 0, 0};
+				for (int k = 0; k < 4; k++) {
+					int sx = std::min(a.w - 1, x * 2 + (k & 1)), sy = std::min(a.h - 1, y * 2 + (k >> 1));
+					const size_t at = static_cast<size_t>(sy) * a.w + sx;
+					if (!drawn.empty() && !drawn[at]) continue;
+					any_drawn = true;
+					uint32_t p = a.px[at];
+					if (p == 0) {
+						holes++;
+						continue;
+					}
+					Colour c(p);
+					r += c.r;
+					g += c.g;
+					bl += c.b;
+					alpha += c.a;
+					n++;
+					const uint8_t ch[3] = {c.r, c.g, c.b};
+					for (int q = 0; q < 3; q++) {
+						lo[q] = std::min(lo[q], ch[q]);
+						hi[q] = std::max(hi[q], ch[q]);
+					}
+				}
+				if (!mixing && n > 0) {
+					texels++;
+					if (n > 1 && std::max({hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]}) > CELL_MIXED) mixed++;
+				}
+				const size_t to = static_cast<size_t>(y) * b.w + x;
+				if (soft) {
+					/* Its alpha the mean of the four, none counted as nothing. */
+					const uint mean = alpha / 4;
+					b.px[to] = n > 0 && mean > 0 ? Colour(r / n, g / n, bl / n, mean).data : 0;
+				} else if (drawn.empty()) {
+					b.px[to] = n >= 2 ? Colour(r / n, g / n, bl / n).data : 0;
+				} else {
+					drawn_b[to] = any_drawn ? 1 : 0;
+					b.px[to] = n > 0 && n >= holes ? Colour(r / n, g / n, bl / n).data : 0;
+				}
+			}
+		}
+		if (!drawn.empty()) FillTexelsNotDrawn(b, drawn_b);
+		drawn = std::move(drawn_b);
+		levels.push_back(std::move(b));
+		/* Its cells whole yet: hardly a texel drawn from mixes two colours (their edges where a triangle draws over one). */
+		if (!mixing && texels > 0 && mixed * CELL_MIXED_SHARE <= texels) {
+			unmixed++;
+		} else {
+			mixing = true;
+		}
+	}
+	if (few_colours && !levels.empty()) levels.front().coarsest = static_cast<uint8_t>(unmixed);
+	if (cover != nullptr && !cover->empty() && w0 > 1) Debug(misc, 2, "3D texture {}x{}: cover of {} triangles {:.1f} ms, filled {:.1f} ms, all with the levels {:.1f} ms", w0, h0, cover->size() / 6, ms_drawn, ms_fill, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count());
+}
+
+/** The painted textures kept, bytes; past PAINTED_BUDGET all are dropped and made again as they are drawn. */
+static std::atomic<size_t> _painted_bytes = 0;
+static constexpr size_t PAINTED_BUDGET = static_cast<size_t>(192) << 20;
+
+/**
+ * The bits of a part's colour in a paint (PaintAt()): four, sixteen colours a palette, for up to seven parts; three,
+ * eight colours, for more (the colleague's distillery has nine parts, 23. 10.), all of them below the top bit.
+ */
+static uint8_t PaintBits(size_t parts)
+{
+	return parts <= 7 ? 4 : 3;
+}
+
+/**
+ * The town of a tile for the colours that are one a town ("nahoda": "mesto"; the player, 4. 11.: "the lamps in each
+ * town their own colour of the foot"): the town a road or a house tile keeps (GetTownIndex()), as the map has it now --
+ * the frames paint on threads of their own (as TreeUseAt() reads the height), so read without GetTownIndex()'s check
+ * of the tile; UINT32_MAX on another tile.
+ */
+static uint32_t PaintTownAt(TileIndex t)
+{
+	if (t >= Map::Size()) return UINT32_MAX;
+	const TileType type = GetTileType(t);
+	return type == TileType::House || type == TileType::Road ? static_cast<uint32_t>(Tile(t).m2()) : UINT32_MAX;
+}
+
+/**
+ * The number of a part's colour in its palette: by a hash of the place -- each part another bit of it --, or for a
+ * part that is one colour a town (ThreeDObjectColourPart::per_town) by its town, the same at every place of the town.
+ * @param h the hash of the place
+ * @param town the town of the place (PaintTownAt()), UINT32_MAX none
+ * @param k the part's number
+ */
+static uint32_t PartColourNumber(uint32_t h, uint32_t town, size_t k, const ThreeDObjectColourPart &part, uint8_t bits)
+{
+	if (part.per_town && town != UINT32_MAX) h = town * 0x9E3779B1u ^ 0x5BD1E995u;
+	uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
+	x ^= x >> 15;
+	x *= 0x2C1B3C6Du;
+	x ^= x >> 12;
+	x *= 0x297A2D39u;
+	x ^= x >> 15;
+	return x % std::min<size_t>(part.palette.size(), size_t{1} << bits);
+}
+
+/**
+ * The colours of the house whose north tile is a tile ("barvy", the colleague: "each house another"): for each part
+ * a colour of its palette by a hash of the tile, another bit of it for each part, or by its town (PartColourNumber());
+ * 0 for a house without parts.
+ * @return the colours' numbers, four bits a part, with the top bit set
+ */
+/**
+ * The colour of the company a tile is of (ThreeDObjectColourPart::per_company): its owner's number of the game's
+ * colours, grey a tile of none (a house's, an industry's); read as the town (PaintTownAt()).
+ */
+static uint32_t PaintCompanyAt(TileIndex t)
+{
+	if (t >= Map::Size() || IsTileType(t, TileType::Void) || IsTileType(t, TileType::House) || IsTileType(t, TileType::Industry)) return to_underlying(Colours::Grey);
+	const Owner owner = GetTileOwner(t);
+	return to_underlying(Company::IsValidID(owner) ? _company_colours[owner] : Colours::Grey);
+}
+
+/**
+ * A company's colour as a part painted in it shows it (ThreeDObject::Painted()): the shade of its colour the game's
+ * sprites in the company's colour show most, read from the palette when the texture is painted (the colours are known
+ * once the base graphics are, after the indices are read).
+ */
+static uint32_t CompanyPaintColour(uint32_t colour)
+{
+	const PixelColour index = GetColourGradient(static_cast<Colours>(colour % to_underlying(Colours::End)), Shade::Lighter);
+	const Colour &c = _cur_palette.palette[index.p];
+	return Colour(c.r, c.g, c.b).data;
+}
+
+uint32_t ThreeDObject::PaintAt(TileIndex origin) const
+{
+	/* A tree is painted by its use where it stands among a building's add-ons (AddonPaintAt()), never on its own. */
+	if (this->colours.empty() || this->tree_uses) return 0;
+	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u;
+	uint32_t paint = 1u << 31;
+	const uint8_t bits = PaintBits(this->colours.size());
+	const uint32_t town = PaintTownAt(origin);
+	for (size_t k = 0; k < this->colours.size(); k++) {
+		const uint32_t n = this->colours[k].per_company ? PaintCompanyAt(origin) : PartColourNumber(h, town, k, this->colours[k], bits);
+		paint |= n << (bits * k);
+	}
+	/* The statue of stone or of bronze (variant_paint): its first part the colour of its variant, by a bit of the
+	 * tile's hash -- of the tile only, as the rest: the frame from the eyes paints on threads of its own. */
+	if (this->variant_paint[0] >= 0 || this->variant_paint[1] >= 0) {
+		const int8_t c = this->variant_paint[(h >> 7) & 1];
+		if (c >= 0 && c < (1 << bits) && static_cast<size_t>(c) < this->colours[0].palette.size()) paint = (paint & ~((1u << bits) - 1)) | static_cast<uint32_t>(c);
+	}
+	return paint;
+}
+
+/**
+ * The colours of an add-on's texture of the house whose north tile is a tile (GetTextureOf()): of an add-on painted a
+ * colour by number ("barvy" of its record) a colour of its palette for each part by a hash of the tile and of its place
+ * in the house -- the parasols of a café each another, those of the next house others -- or, a part one colour a town,
+ * by its town (PartColourNumber(): a street lamp's foot); 0 for one not painted so.
+ * @param texture the add-on's texture, 1, 2, ... (ThreeDObjectShapeView::TriangleTexture())
+ */
+uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
+{
+	if (texture == 0 || texture > this->addon_objects.size()) return 0;
+	const ThreeDObject &a = _three_d_objects[this->addon_objects[texture - 1]];
+	if (a.colours.empty()) return 0;
+	const uint32_t place = texture <= this->addon_places_of.size() ? this->addon_places_of[texture - 1] : 0;
+	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u ^ (place + 1) * 0x165667B1u;
+	uint32_t paint = 1u << 31;
+	const uint8_t bits = PaintBits(a.colours.size());
+	if (a.tree_uses) {
+		/* A tree, painted by its use here (TreeUseAt()): each part palette[n % its length], the same n for all (the
+		 * colleague: "the snow goes with its crown"); a part the use does not name as its texture is. */
+		const TreeUse use = this->TreeUseAt(origin);
+		if (use == TreeUse::None) return 0;
+		h ^= h >> 15;
+		h *= 0x2C1B3C6Du;
+		h ^= h >> 12;
+		paint |= static_cast<uint32_t>(to_underlying(use)) << TREE_PAINT_USE_BIT;
+		bool any = false;
+		for (size_t k = 0; k < a.colours.size(); k++) {
+			const std::vector<uint32_t> &palette = a.colours[k].use_palettes[to_underlying(use)];
+			any |= !palette.empty();
+			paint |= (palette.empty() ? TREE_PAINT_OWN : h % palette.size()) << (bits * k);
+		}
+		return any ? paint : 0;
+	}
+	/* A street lamp's foot one colour a town (ThreeDObjectColourPart::per_town), whichever lamp it is. */
+	const uint32_t town = PaintTownAt(origin);
+	for (size_t k = 0; k < a.colours.size(); k++) {
+		const uint32_t n = a.colours[k].per_company ? PaintCompanyAt(origin) : PartColourNumber(h, town, k, a.colours[k], bits);
+		paint |= n << (bits * k);
+	}
+	return paint;
+}
+
+/** The size of a cell of a level of the shapes (ThreeDObject::GetShape()): metres. */
+static double ShapeCellMetres(int level)
+{
+	return 0.05 * (1 << (level - 1));
+}
+
+/**
+ * The level of the shape of a building seen so near (the technologies of OpenMW, the player, 16. 10.: what is far
+ * away it draws simpler): the corners merged while they move by at most so many pixels. A town of houses was half a
+ * million triangles, most of them smaller than a pixel.
+ * @param pixels_per_metre how many pixels of the picture a metre of the building's nearest part takes
+ * @param shift how far a corner may move, pixels: the map's houses are seen sharp, those far from the eyes in haze
+ */
+int ThreeDShapeLevel(double pixels_per_metre, double shift)
+{
+	int level = 0;
+	while (level + 1 < THREE_D_SHAPE_LEVELS && ShapeCellMetres(level + 1) * pixels_per_metre <= shift) level++;
+	return level;
+}
+
+/** A building's shape simplified for a level (ThreeDObject::GetShape()): its corners merged in the cells of the level. */
+static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObject &o, int level)
+{
+	const size_t corners = o.pos.size() / 3;
+	const bool lit = o.light.size() == corners;
+	const double cell_xy = ShapeCellMetres(level) * OBJECT_UNITS_PER_METRE;
+	const double cell_z = ShapeCellMetres(level) * OBJECT_HEIGHT_PER_METRE;
+	/* A texture about a tile across: a corner's place in it moves as far as the corner; but never more than a
+	 * 48th of it, so the parts of the texture (a wall, a roof) do not run into each other. */
+	const double cell_uv = std::min(cell_xy / TILE_SIZE, 1.0 / 48);
+	auto cell = [](double v, double size, int bits) {
+		const int64_t half = int64_t{1} << (bits - 1);
+		return static_cast<uint64_t>(std::clamp<int64_t>(static_cast<int64_t>(std::floor(v / size)) + half, 0, 2 * half - 1));
+	};
+	struct Sum {
+		double x = 0, y = 0, z = 0, u = 0, v = 0, l = 0;
+		uint32_t n = 0;
+		uint8_t tex = 0;
+	};
+	/* The cells of each texture apart: a corner of an add-on is never one with the building's (ThreeDObject::tri_tex). */
+	std::vector<std::unordered_map<uint64_t, uint32_t>> cells(o.Textures());
+	std::vector<Sum> sums;
+	std::vector<uint32_t> to(corners);
+	for (size_t i = 0; i < corners; i++) {
+		const double x = o.pos[i * 3], y = o.pos[i * 3 + 1], z = o.pos[i * 3 + 2];
+		const double u = o.uv[i * 2], v = o.uv[i * 2 + 1];
+		const uint8_t tex = i < o.corner_tex.size() && o.corner_tex[i] < cells.size() ? o.corner_tex[i] : 0;
+		const uint64_t key = cell(x, cell_xy, 13) | cell(y, cell_xy, 13) << 13 | cell(z, cell_z, 13) << 26 | cell(u, cell_uv, 12) << 39 | cell(v, cell_uv, 12) << 51;
+		auto [it, added] = cells[tex].try_emplace(key, static_cast<uint32_t>(sums.size()));
+		if (added) sums.emplace_back().tex = tex;
+		Sum &sum = sums[it->second];
+		sum.x += x;
+		sum.y += y;
+		sum.z += z;
+		sum.u += u;
+		sum.v += v;
+		sum.l += lit ? o.light[i] : 256;
+		sum.n++;
+		to[i] = it->second;
+	}
+	auto shape = std::make_shared<ThreeDObjectShape>();
+	const bool textures = !o.tri_tex.empty();
+	for (const Sum &sum : sums) {
+		shape->pos.insert(shape->pos.end(), {static_cast<float>(sum.x / sum.n), static_cast<float>(sum.y / sum.n), static_cast<float>(sum.z / sum.n)});
+		shape->uv.insert(shape->uv.end(), {static_cast<float>(sum.u / sum.n), static_cast<float>(sum.v / sum.n)});
+		if (lit) shape->light.push_back(static_cast<uint16_t>(sum.l / sum.n + 0.5));
+		if (textures) shape->corner_tex.push_back(sum.tex);
+	}
+	std::unordered_set<uint64_t> had;
+	for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
+		std::array<uint32_t, 3> c = {to[o.tri[t]], to[o.tri[t + 1]], to[o.tri[t + 2]]};
+		if (c[0] == c[1] || c[1] == c[2] || c[0] == c[2]) continue;
+		/* The same triangle however its corners are counted round (fewer than 2^21 corners). */
+		std::ranges::rotate(c, std::ranges::min_element(c));
+		if (!had.insert(static_cast<uint64_t>(c[0]) | static_cast<uint64_t>(c[1]) << 21 | static_cast<uint64_t>(c[2]) << 42).second) continue;
+		shape->tri.insert(shape->tri.end(), c.begin(), c.end());
+		shape->facing.push_back(t / 3 < o.facing.size() ? o.facing[t / 3] : 0);
+		if (textures) shape->tri_tex.push_back(t / 3 < o.tri_tex.size() ? o.tri_tex[t / 3] : 0);
+	}
+	return shape;
+}
+
+/**
+ * The shape of a building at a level of detail. Its corners in a cell of the level's size, at about the same place in
+ * the texture, are one corner: in the middle of them, their texture's place and light their average. A seam of the
+ * texture stays, its corners at different places of it; a triangle with two of its corners in one cell has no area
+ * and goes, and so does one already there.
+ * @param level 0 its own shape, else simplified: made the first time (not on several cores at once but by
+ *              PrepareThreeDObjectShapes())
+ */
+/**
+ * Lay a building's add-ons into its shape as it is read (hra/3d/DOPLNKY-DOMU-A-POSTAVY.md, the player: "these things
+ * shared by all the objects we will call add-ons"): each add-on of the index read once (its own Read()), at each of
+ * its places turned about its foot, sized and stood there, its corners' light from its normals as turned (the light is
+ * the world's), its triangles with its own texture (tri_tex) -- drawn among the building's own through the same depth,
+ * whatever draws the building.
+ * @param house the building, its places of add-ons
+ * @param read what is read of it, the add-ons laid in
+ */
+static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
+{
+	if (house.addon_places.empty()) return;
+	/* Its own triangles keep their textures (its other materials', TakeGlbMesh()), moved past the add-ons' below. */
+	const size_t own_tris = read.tri.size() / 3, own_corners = read.pos.size() / 3, own_night_tris = read.night_tex.size();
+	read.tri_tex.resize(own_tris, 0);
+	read.corner_tex.resize(own_corners, 0);
+	/* An add-on's triangles and corners of its other materials (TakeGlbMesh()): each with its material's texture, put
+	 * among the building's other materials -- the colleague's BUS sign has its yellow roof, its red posts, its grey
+	 * frame and its plate each a material of its own; all of them drew in its first one's grey (the player, 4. 11.:
+	 * "why has the sign no colours?"). Their numbers in the building's other materials (1, 2, ...), past the add-ons'
+	 * once all are laid. */
+	std::vector<std::pair<size_t, size_t>> material_tris, material_corners;
+	auto material_of = [&](const ThreeDObject &a, uint8_t own) -> size_t {
+		if (own == 0 || own > a.material_pngs.size()) return 0;
+		const ThreeDTextureBytes &png = a.material_pngs[own - 1];
+		const uint32_t flat = own <= a.material_flats.size() ? a.material_flats[own - 1] : 0;
+		for (size_t k = 0; k < read.material_pngs.size(); k++) {
+			if (read.material_pngs[k] == png && (k >= read.material_flats.size() || read.material_flats[k] == flat)) return k + 1;
+		}
+		if (read.material_pngs.size() >= UINT8_MAX / 2) return 0;
+		read.material_pngs.push_back(png);
+		read.material_flats.resize(read.material_pngs.size() - 1, 0);
+		read.material_flats.push_back(flat);
+		return read.material_pngs.size();
+	};
+	size_t laid = 0;
+	for (const ThreeDObjectFigure &place : house.addon_places) {
+		auto found = _three_d_addons.find(place.figure);
+		if (found == _three_d_addons.end()) {
+			Debug(misc, 1, "3D object {}: no add-on '{}' in the indices", house.name, place.figure);
+			continue;
+		}
+		const ThreeDObject &a = _three_d_objects[found->second];
+		if (!a.Read() || a.tri.empty()) continue;
+		/* Its texture: one for all its places; one of its own at each place when it is painted a colour by number,
+		 * each place its colour (AddonPaintAt()). */
+		const uint16_t place_number = a.colours.empty() ? UINT16_MAX : static_cast<uint16_t>(std::min<size_t>(&place - house.addon_places.data(), UINT16_MAX - 1));
+		auto slot = read.addon_objects.end();
+		if (place_number == UINT16_MAX) {
+			for (size_t k = 0; k < read.addon_objects.size(); k++) {
+				if (read.addon_objects[k] == found->second && read.addon_places_of[k] == UINT16_MAX) slot = read.addon_objects.begin() + k;
+			}
+		}
+		if (slot == read.addon_objects.end()) {
+			if (read.addon_objects.size() >= UINT8_MAX - 1) continue;
+			read.addon_objects.push_back(found->second);
+			read.addon_places_of.push_back(place_number);
+			slot = read.addon_objects.end() - 1;
+		}
+		const uint8_t tex = static_cast<uint8_t>(1 + (slot - read.addon_objects.begin()));
+		const double turn = place.facing * M_PI / 180.0, c = std::cos(turn), s = std::sin(turn);
+		const uint32_t base = static_cast<uint32_t>(read.pos.size() / 3);
+		const size_t corners = a.pos.size() / 3;
+		/* Lit by its normals turned; a building without them lit wholly (its light is in its texture), and the other way. */
+		const bool lit = a.nrm.size() == a.pos.size();
+		if ((lit || !read.light.empty()) && read.light.size() != base) read.light.resize(base, 256);
+		std::vector<float> turned_nrm;
+		for (size_t i = 0; i < corners; i++) {
+			const double x = a.pos[i * 3], y = a.pos[i * 3 + 1], z = a.pos[i * 3 + 2];
+			read.pos.push_back(static_cast<float>((x * c - y * s) * place.scale + place.at[0] * OBJECT_UNITS_PER_METRE));
+			read.pos.push_back(static_cast<float>((x * s + y * c) * place.scale + place.at[1] * OBJECT_UNITS_PER_METRE));
+			read.pos.push_back(static_cast<float>(z * place.scale + place.at[2] * OBJECT_HEIGHT_PER_METRE));
+			read.top = std::max(read.top, read.pos.back());
+			read.uv.push_back(i * 2 + 1 < a.uv.size() ? a.uv[i * 2] : 0.0f);
+			read.uv.push_back(i * 2 + 1 < a.uv.size() ? a.uv[i * 2 + 1] : 0.0f);
+			read.corner_tex.push_back(tex);
+			if (lit) {
+				const float nx = a.nrm[i * 3], ny = a.nrm[i * 3 + 1];
+				turned_nrm.insert(turned_nrm.end(), {static_cast<float>(nx * c - ny * s), static_cast<float>(nx * s + ny * c), a.nrm[i * 3 + 2]});
+			}
+		}
+		if (lit) {
+			const std::vector<uint16_t> light = CornerLight(turned_nrm);
+			read.light.insert(read.light.end(), light.begin(), light.end());
+		} else if (!read.light.empty()) {
+			read.light.resize(read.pos.size() / 3, 256);
+		}
+		/* (Turned and sized the same along each axis, a triangle keeps its outer side.) Only its ends when the place
+		 * says so: the grill's trestles without its bricks, over the forest's own fire (ReadForestPart()). */
+		const uint32_t first_tri = static_cast<uint32_t>(read.tri.size() / 3);
+		const float beyond = place.beyond * OBJECT_UNITS_PER_METRE;
+		auto kept = [&](size_t t) {
+			for (size_t k = 0; k < 3; k++) {
+				if (std::abs(a.pos[a.tri[t + k] * 3]) < beyond) return false;
+			}
+			return true;
+		};
+		for (size_t t = 0; t + 2 < a.tri.size(); t += 3) {
+			if (beyond > 0 && !kept(t)) continue;
+			read.tri.insert(read.tri.end(), {base + a.tri[t], base + a.tri[t + 1], base + a.tri[t + 2]});
+			read.facing.push_back(t / 3 < a.facing.size() ? a.facing[t / 3] : 0);
+			/* Its own texture, or one of its other materials' (material_tris). */
+			const size_t material = t / 3 < a.tri_tex.size() ? material_of(a, a.tri_tex[t / 3]) : 0;
+			read.tri_tex.push_back(material == 0 ? tex : 0);
+			if (material == 0) continue;
+			material_tris.emplace_back(read.tri_tex.size() - 1, material);
+			for (size_t k = 0; k < 3; k++) material_corners.emplace_back(base + a.tri[t + k], material);
+		}
+		/* A tree ("kmen_r", the colleague's STROMY-SPOLECNE-PRO-HRU.md): its crown in no one's way, only its trunk. */
+		if (a.trunk_r > 0) {
+			read.passable_tris.push_back(first_tri);
+			read.passable_tris.push_back(static_cast<uint32_t>(read.tri.size() / 3));
+			read.trunks.insert(read.trunks.end(), {static_cast<float>(place.at[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(place.at[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(a.trunk_r * place.scale * OBJECT_UNITS_PER_METRE)});
+		}
+		/* Its night (the colleague's lamps: their paper, glass and flame in "noc", their glows "svetlo_NN"): laid as it
+		 * is, the glass in its own texture -- the paper in its colour at the place, as by day. */
+		auto lay = [&](const float *p, std::vector<float> &out) {
+			const double x = p[0], y = p[1];
+			out.push_back(static_cast<float>((x * c - y * s) * place.scale + place.at[0] * OBJECT_UNITS_PER_METRE));
+			out.push_back(static_cast<float>((x * s + y * c) * place.scale + place.at[1] * OBJECT_UNITS_PER_METRE));
+			out.push_back(static_cast<float>(p[2] * place.scale + place.at[2] * OBJECT_HEIGHT_PER_METRE));
+		};
+		if (!a.night_tri.empty()) {
+			read.night_tex.resize(read.night_tri.size() / 3, 0);
+			const uint32_t night_base = static_cast<uint32_t>(read.night_pos.size() / 3);
+			for (size_t i = 0; i + 2 < a.night_pos.size(); i += 3) {
+				lay(&a.night_pos[i], read.night_pos);
+				read.night_uv.push_back(i / 3 * 2 + 1 < a.night_uv.size() ? a.night_uv[i / 3 * 2] : 0.0f);
+				read.night_uv.push_back(i / 3 * 2 + 1 < a.night_uv.size() ? a.night_uv[i / 3 * 2 + 1] : 0.0f);
+			}
+			for (size_t t = 0; t + 2 < a.night_tri.size(); t += 3) {
+				read.night_tri.insert(read.night_tri.end(), {night_base + a.night_tri[t], night_base + a.night_tri[t + 1], night_base + a.night_tri[t + 2]});
+				read.night_tex.push_back(tex);
+			}
+		}
+		for (size_t i = 0; i + 2 < a.lights.size(); i += 3) lay(&a.lights[i], read.lights);
+		laid++;
+	}
+	/* Its other materials' textures after the add-ons' (Textures()); past a byte, its own. */
+	if (!read.material_pngs.empty() && !read.addon_objects.empty()) {
+		const size_t shift = read.addon_objects.size();
+		auto past = [&](uint8_t &tex) {
+			if (tex != 0) tex = tex + shift <= UINT8_MAX ? static_cast<uint8_t>(tex + shift) : 0;
+		};
+		for (size_t t = 0; t < own_tris; t++) past(read.tri_tex[t]);
+		for (size_t i = 0; i < own_corners; i++) past(read.corner_tex[i]);
+		for (size_t t = 0; t < own_night_tris; t++) past(read.night_tex[t]);
+	}
+	/* The add-ons' other materials past the add-ons too. */
+	const size_t shift = read.addon_objects.size();
+	auto numbered = [shift](size_t material) { return shift + material <= UINT8_MAX ? static_cast<uint8_t>(shift + material) : static_cast<uint8_t>(0); };
+	for (const auto &[t, material] : material_tris) read.tri_tex[t] = numbered(material);
+	for (const auto &[i, material] : material_corners) {
+		if (i < read.corner_tex.size()) read.corner_tex[i] = numbered(material);
+	}
+	Debug(misc, 2, "3D object {}: {} of its {} add-ons laid, {} textures of add-ons", house.name, laid, house.addon_places.size(), read.addon_objects.size());
+}
+
+/**
+ * Read the house's shape and texture from its .glb (glb_path) the first time they are wanted, on whichever thread asks
+ * first (MakeOnce()); after that they are never written again, and may be looked at on any thread.
+ * @return whether it has them
+ */
+bool ThreeDObject::Read() const
+{
+	if (this->IsRead()) return true;
+	MakeOnce(this, LAZY_HOUSE_GLB, [this] { return this->glb_state.value.load() != 0; }, [this] {
+		GlbFilesScope files;
+		const auto start = std::chrono::steady_clock::now();
+		ThreeDObject read;
+		read.name = this->name;
+		read.tiles_x = this->tiles_x;
+		read.tiles_y = this->tiles_y;
+		read.addon = this->addon;
+		read.all_roots = this->all_roots;
+		read.left_out = this->left_out;
+		read.outside_of = this->outside_of;
+		read.material_from = this->material_from;
+		read.scene_more = this->scene_more;
+		read.depot = this->depot;
+		read.no_see_through = this->no_see_through;
+		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()); a door's wing, an interior
+		 * (ReadInterior()) read as they are. */
+		bool ok;
+		if (!this->door_node.empty()) {
+			ok = ReadGlbDoor(this->glb_path, this->door_node, this->door_turn, read, std::max<int>(0, this->scene_turns));
+		} else if (this->is_interior) {
+			ok = ReadGlbInterior(this->glb_path, read, std::max<int>(0, this->scene_turns));
+		} else if (this->scene_turns >= 0) {
+			ok = ReadGlbScene(this->glb_path, read, this->scene_turns);
+		} else {
+			ok = this->glb_path.empty() ? !this->addon_places.empty() : ReadGlb(this->glb_path, read);
+		}
+		if (ok && !this->snow_path.empty()) {
+			std::vector<uint8_t> snow = ReadWholeFile(this->snow_path);
+			if (!snow.empty()) read.png = std::move(snow);
+		}
+		if (ok) LayAddons(*this, read);
+		if (ok && this->flat_floors) TakeFlatFloors(read);
+		Debug(misc, 2, "3D object {}: {} triangles read in {} ms", this->name, read.tri.size() / 3, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+		if (!ok) ReadDiary(fmt::format("budova {} ({}) se nenačetla, kreslí se krabice", this->name, this->glb_path.empty() ? std::string("jen doplňky") : this->glb_path), true);
+		return std::make_pair(ok, std::move(read));
+	}, [this](std::pair<bool, ThreeDObject> made) {
+		/* (The objects are in _three_d_objects, never const themselves: what is read is put into them once.) */
+		ThreeDObject &self = const_cast<ThreeDObject &>(*this);
+		if (made.first) {
+			ThreeDObject &r = made.second;
+			self.pos = std::move(r.pos);
+			self.night_pos = std::move(r.night_pos);
+			self.night_uv = std::move(r.night_uv);
+			self.night_tri = std::move(r.night_tri);
+			self.night_tex = std::move(r.night_tex);
+			self.lights = std::move(r.lights);
+			self.uv = std::move(r.uv);
+			self.tri = std::move(r.tri);
+			self.facing = std::move(r.facing);
+			self.top = r.top;
+			/* (Of its corners as they are now its own: those read were moved into it.) */
+			if (!self.pos.empty()) {
+				self.extent[0] = self.extent[2] = std::numeric_limits<float>::infinity();
+				self.extent[1] = self.extent[3] = -std::numeric_limits<float>::infinity();
+				for (size_t i = 0; i + 2 < self.pos.size(); i += 3) {
+					self.extent[0] = std::min(self.extent[0], self.pos[i]);
+					self.extent[1] = std::max(self.extent[1], self.pos[i]);
+					self.extent[2] = std::min(self.extent[2], self.pos[i + 1]);
+					self.extent[3] = std::max(self.extent[3], self.pos[i + 1]);
+				}
+			}
+			self.png = std::move(r.png);
+			self.light = std::move(r.light);
+			self.tri_tex = std::move(r.tri_tex);
+			self.corner_tex = std::move(r.corner_tex);
+			self.material_pngs = std::move(r.material_pngs);
+			self.material_flats = std::move(r.material_flats);
+			self.material_levels.assign(self.material_pngs.size(), nullptr);
+			self.addon_objects = std::move(r.addon_objects);
+			self.addon_places_of = std::move(r.addon_places_of);
+			self.passable_tris = std::move(r.passable_tris);
+			self.trunks = std::move(r.trunks);
+			self.floor = std::move(r.floor);
+			self.nrm = std::move(r.nrm);
+		}
+		self.glb_state.value.store(made.first ? 1 : 2, std::memory_order_release);
+	});
+	return this->IsRead();
+}
+
+/** Whether the house's shape and texture are read (Read()); if not, they are read in the background, there a frame or two on. */
+bool ThreeDObject::TryRead() const
+{
+	if (this->IsRead()) return true;
+	MadeOrAsked(this, LAZY_HOUSE_GLB, [this] { return this->glb_state.value.load() != 0; }, [this] { this->Read(); });
+	return this->IsRead();
+}
+
+ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
+{
+	MarkThreeDUsed(this->used);
+	if (!this->Read()) return {};
+	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
+	/* Its own: wanted so, or too many corners to count the triangles below. */
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
+	MakeOnce(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { return MakeHouseShape(*this, level); }, [this, level](std::shared_ptr<const ThreeDObjectShape> made) { this->shapes[level] = std::move(made); });
+	const ThreeDObjectShape &s = *this->shapes[level];
+	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex, s.uid.value};
+}
+
+/** The building's shape simplified for a level if it is made already; else its own shape stands in, and the simpler one is made in the background. */
+ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
+{
+	MarkThreeDUsed(this->used);
+	if (!this->TryRead()) return {};
+	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
+	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
+	const ThreeDObjectShape &s = *this->shapes[level];
+	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex, s.uid.value};
+}
+
+/** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about a quarter of a metre, finer than the walker's half-width. */
+static constexpr int FOOTPRINT_CELLS = 64;
+/**
+ * And up on a building, about an eighth of a metre: the railings and posts up there stand close to where one walks, the
+ * cells round them to a quarter of a metre shut the way -- the ruin's lookout, between a post of its railing and the
+ * handrail of its stairs 0.58 m, a quarter of a metre left of it, the walker (0.4 m) stopped in the last stair (the
+ * player, 26. 10.).
+ */
+static constexpr int FOOTPRINT_UP_CELLS = 128;
+/** The steps of height of the footprints of what stands over a walker up on a building (ThreeDObject::Blocks()), metres. */
+static constexpr double FOOTPRINT_STOREY_M = 0.25;
+
+/**
+ * Whether a building stands at a place as high as a walker's body, from its knees to over its head (the
+ * technologies of OpenMW, the player, 16. 10.: what one bumps into is the shape itself, not its tile): a park, the
+ * square round a fountain, the space under a roof on pillars can be walked into, a wall cannot. Its triangles cut to
+ * that height, their outlines and their insides on a grid of cells, made the first time.
+ * @param x,y the place, world units from the building's north corner
+ * @param feet the height the walker stands at, units of height over the building's ground (its wall walks)
+ */
+bool ThreeDObject::Blocks(double x, double y, double feet) const
+{
+	this->Read();
+	/* What of it is as high as a body standing at a height: its triangles cut to that height, their outlines and their
+	 * insides on the cells, so many to a tile; its trees' trunks with trunks. */
+	auto band = [&](double lo, double hi, std::vector<uint8_t> &fp, bool trunks, int cells) {
+		const int w = this->tiles_x * cells, h = this->tiles_y * cells;
+		const double cell = static_cast<double>(TILE_SIZE) / cells;
+		auto mark = [&](double px, double py) {
+			const int cx = static_cast<int>(std::floor(px / cell)), cy = static_cast<int>(std::floor(py / cell));
+			if (cx >= 0 && cy >= 0 && cx < w && cy < h) fp[static_cast<size_t>(cy) * w + cx] = 1;
+		};
+		size_t run = 0; // the run of passable triangles (a tree's crown) at or after this one
+		for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
+			while (run + 1 < this->passable_tris.size() && t / 3 >= this->passable_tris[run + 1]) run += 2;
+			if (run + 1 < this->passable_tris.size() && t / 3 >= this->passable_tris[run]) continue;
+			/* The triangle cut to the height of a body (a polygon, cut by z >= lo and z <= hi). */
+			std::vector<std::array<double, 3>> poly;
+			for (int k = 0; k < 3; k++) {
+				const uint32_t i = this->tri[t + k];
+				poly.push_back({this->pos[i * 3], this->pos[i * 3 + 1], this->pos[i * 3 + 2]});
+			}
+			for (int side = 0; side < 2 && !poly.empty(); side++) {
+				const double limit = side == 0 ? lo : hi;
+				/* Over the knees by more than a centimetre: what only touches them from below is not in the way (the riser of
+				 * a step whose tread is as high as the knees, a lighthouse's stairs 0.2 m a step, the storeys a quarter of a
+				 * metre; its corners in floats a hair over them). */
+				const double at = side == 0 ? limit + 0.01 * OBJECT_HEIGHT_PER_METRE : limit;
+				auto inside = [&](const std::array<double, 3> &p) { return side == 0 ? p[2] > at : p[2] <= at; };
+				std::vector<std::array<double, 3>> cut;
+				for (size_t k = 0; k < poly.size(); k++) {
+					const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
+					if (inside(a)) cut.push_back(a);
+					if (inside(a) != inside(b)) {
+						const double f = (at - a[2]) / (b[2] - a[2]);
+						cut.push_back({a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, at});
+					}
+				}
+				poly = std::move(cut);
+			}
+			if (poly.size() < 2) continue;
+			/* Its outline, half a cell a step: a wall seen from above is a line. */
+			double x0 = 1e18, y0 = 1e18, x1 = -1e18, y1 = -1e18;
+			for (size_t k = 0; k < poly.size(); k++) {
+				const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
+				x0 = std::min(x0, a[0]);
+				x1 = std::max(x1, a[0]);
+				y0 = std::min(y0, a[1]);
+				y1 = std::max(y1, a[1]);
+				const int steps = std::max(1, static_cast<int>(std::ceil(std::hypot(b[0] - a[0], b[1] - a[1]) / (cell / 2))));
+				for (int s = 0; s <= steps; s++) mark(a[0] + (b[0] - a[0]) * s / steps, a[1] + (b[1] - a[1]) * s / steps);
+			}
+			/* And its inside, the middle of each cell under it (a table top, a low roof). */
+			for (int cy = std::max(0, static_cast<int>(y0 / cell)); cy <= std::min(h - 1, static_cast<int>(y1 / cell)); cy++) {
+				for (int cx = std::max(0, static_cast<int>(x0 / cell)); cx <= std::min(w - 1, static_cast<int>(x1 / cell)); cx++) {
+					const double px = (cx + 0.5) * cell, py = (cy + 0.5) * cell;
+					bool in = false;
+					for (size_t k = 0, l = poly.size() - 1; k < poly.size(); l = k++) {
+						const auto &a = poly[k], &b = poly[l];
+						if ((a[1] > py) != (b[1] > py) && px < (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0]) in = !in;
+					}
+					if (in) fp[static_cast<size_t>(cy) * w + cx] = 1;
+				}
+			}
+		}
+		if (!trunks) return;
+		/* The trunks of its trees: the cells within each, and the one its middle is in. */
+		for (size_t i = 0; i + 2 < this->trunks.size(); i += 3) {
+			const double tx = this->trunks[i], ty = this->trunks[i + 1], tr = this->trunks[i + 2];
+			mark(tx, ty);
+			for (int cy = std::max(0, static_cast<int>((ty - tr) / cell)); cy <= std::min(h - 1, static_cast<int>((ty + tr) / cell)); cy++) {
+				for (int cx = std::max(0, static_cast<int>((tx - tr) / cell)); cx <= std::min(w - 1, static_cast<int>((tx + tr) / cell)); cx++) {
+					if (std::hypot((cx + 0.5) * cell - tx, (cy + 0.5) * cell - ty) <= tr) fp[static_cast<size_t>(cy) * w + cx] = 1;
+				}
+			}
+		}
+	};
+	/* Up on it (the dragon castle's wall walks and the roof of its hall): what stands over the feet there, from the
+	 * knees to over the head, made the first time at each step of FOOTPRINT_STOREY_M -- the walls under the feet are no
+	 * one's way, the battlements are. Only the walker stands up there (on the game's thread). */
+	const int storey = static_cast<int>(std::lround(feet / (FOOTPRINT_STOREY_M * OBJECT_HEIGHT_PER_METRE)));
+	if (storey > 0) {
+		const int w = this->tiles_x * FOOTPRINT_UP_CELLS, h = this->tiles_y * FOOTPRINT_UP_CELLS;
+		const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_UP_CELLS;
+		std::vector<uint8_t> &fp = this->footprints_up[storey];
+		if (fp.empty()) {
+			fp.assign(static_cast<size_t>(w) * h, 0);
+			const double at = storey * FOOTPRINT_STOREY_M * OBJECT_HEIGHT_PER_METRE;
+			band(at + 0.3 * OBJECT_HEIGHT_PER_METRE, at + 2.0 * OBJECT_HEIGHT_PER_METRE, fp, false, FOOTPRINT_UP_CELLS);
+		}
+		const int cx = static_cast<int>(std::floor(x / cell)), cy = static_cast<int>(std::floor(y / cell));
+		if (cx < 0 || cy < 0 || cx >= w || cy >= h) return false;
+		return fp[static_cast<size_t>(cy) * w + cx] != 0;
+	}
+	const int w = this->tiles_x * FOOTPRINT_CELLS, h = this->tiles_y * FOOTPRINT_CELLS;
+	const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_CELLS;
+	if (this->footprint_w == 0) {
+		this->footprint.assign(static_cast<size_t>(w) * h, 0);
+		this->footprint_w = w;
+		band(0.3 * OBJECT_HEIGHT_PER_METRE, 2.0 * OBJECT_HEIGHT_PER_METRE, this->footprint, true, FOOTPRINT_CELLS);
+		/*
+		 * Inside: the building is hollow, its walls only. What a walker cannot get to from outside -- its middle kept
+		 * a body's half-width (WALKER_CELLS) from every wall, a gap narrower than a body shut -- is solid too. A body,
+		 * not the walker's circle on the ground: the corridor of the ruin's stairs is a metre wide (26. 10.); the circle
+		 * keeps the walker out of the narrow gaps by itself (FirstPersonFree()).
+		 */
+		static constexpr double WALKER_CELLS_EXACT = THREE_D_WALKER_BODY_M * OBJECT_UNITS_PER_METRE * FOOTPRINT_CELLS / TILE_SIZE;
+		static constexpr int WALKER_CELLS = static_cast<int>(WALKER_CELLS_EXACT) + (WALKER_CELLS_EXACT > static_cast<int>(WALKER_CELLS_EXACT) ? 1 : 0);
+		/* On a grid with a margin round the tiles, free: the walker comes from there. */
+		static constexpr int MARGIN = WALKER_CELLS + 1;
+		const int ew = w + 2 * MARGIN, eh = h + 2 * MARGIN;
+		const size_t cells = static_cast<size_t>(ew) * eh;
+		auto own = [&](size_t i) -> int {
+			const int x0 = static_cast<int>(i % ew) - MARGIN, y0 = static_cast<int>(i / ew) - MARGIN;
+			return x0 >= 0 && y0 >= 0 && x0 < w && y0 < h ? y0 * w + x0 : -1;
+		};
+		std::vector<int> wall_dist(cells, INT_MAX);
+		std::vector<size_t> queue;
+		for (size_t i = 0; i < cells; i++) {
+			const int o = own(i);
+			if (o >= 0 && this->footprint[o] != 0) {
+				wall_dist[i] = 0;
+				queue.push_back(i);
+			}
+		}
+		auto spread = [&](std::vector<size_t> &q, auto &&step) {
+			for (size_t at = 0; at < q.size(); at++) {
+				const int x0 = static_cast<int>(q[at] % ew), y0 = static_cast<int>(q[at] / ew);
+				for (int dy = -1; dy <= 1; dy++) {
+					for (int dx = -1; dx <= 1; dx++) {
+						const int nx = x0 + dx, ny = y0 + dy;
+						if ((dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= ew || ny >= eh) continue;
+						const size_t n = static_cast<size_t>(ny) * ew + nx;
+						if (step(q[at], n)) q.push_back(n);
+					}
+				}
+			}
+		};
+		spread(queue, [&](size_t from, size_t n) {
+			if (wall_dist[n] <= wall_dist[from] + 1) return false;
+			wall_dist[n] = wall_dist[from] + 1;
+			return true;
+		});
+		/* Where the walker's middle can be, reached from the margin. */
+		std::vector<int> reach(cells, INT_MAX);
+		queue.clear();
+		for (size_t i = 0; i < cells; i++) {
+			const int x0 = static_cast<int>(i % ew), y0 = static_cast<int>(i / ew);
+			if ((x0 == 0 || y0 == 0 || x0 == ew - 1 || y0 == eh - 1) && wall_dist[i] > WALKER_CELLS) {
+				reach[i] = 0;
+				queue.push_back(i);
+			}
+		}
+		spread(queue, [&](size_t, size_t n) {
+			if (reach[n] == 0 || wall_dist[n] <= WALKER_CELLS) return false;
+			reach[n] = 0;
+			return true;
+		});
+		/* And the walker's body round it: up to its half-width from there. */
+		spread(queue, [&](size_t from, size_t n) {
+			if (wall_dist[n] == 0 || reach[n] <= reach[from] + 1 || reach[from] >= WALKER_CELLS) return false;
+			reach[n] = reach[from] + 1;
+			return true;
+		});
+		/* Under its floors ("podlaha") never: one walks there, the corridor of a high seat's stairs between their
+		 * handrails (0.8 m) is narrower than a body on this grid -- the forest cabin's had its interior to keep it
+		 * open, the one at the edge of the palm plantation stood alone, its stairs walled up (the player, 3. 11.). */
+		std::vector<uint8_t> on_floor(static_cast<size_t>(w) * h, 0);
+		for (size_t i = 0; i + 8 < this->floor.size(); i += 9) {
+			const float *a = &this->floor[i], *b = &this->floor[i + 3], *c = &this->floor[i + 6];
+			const double d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+			if (std::abs(d) < 1e-9) continue;
+			const int x0 = std::max(0, static_cast<int>(std::floor(std::min({a[0], b[0], c[0]}) / cell)));
+			const int x1 = std::min(w - 1, static_cast<int>(std::floor(std::max({a[0], b[0], c[0]}) / cell)));
+			const int y0 = std::max(0, static_cast<int>(std::floor(std::min({a[1], b[1], c[1]}) / cell)));
+			const int y1 = std::min(h - 1, static_cast<int>(std::floor(std::max({a[1], b[1], c[1]}) / cell)));
+			for (int cy = y0; cy <= y1; cy++) {
+				for (int cx = x0; cx <= x1; cx++) {
+					const double px = (cx + 0.5) * cell, py = (cy + 0.5) * cell;
+					const double l1 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / d;
+					const double l2 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / d;
+					if (l1 >= -1e-6 && l2 >= -1e-6 && 1 - l1 - l2 >= -1e-6) on_floor[static_cast<size_t>(cy) * w + cx] = 1;
+				}
+			}
+		}
+		for (size_t i = 0; i < cells; i++) {
+			const int o = own(i);
+			if (o >= 0 && reach[i] == INT_MAX && !on_floor[o] && !this->is_interior && this->interior == SIZE_MAX) this->footprint[o] = 1; // a house with an interior: its walls in the way, its interior's inside
+		}
+	}
+	const int cx = static_cast<int>(std::floor(x / cell)), cy = static_cast<int>(std::floor(y / cell));
+	if (cx < 0 || cy < 0 || cx >= w || cy >= h) return false;
+	return this->footprint[static_cast<size_t>(cy) * w + cx] != 0;
+}
+
+/**
+ * Make the shapes of objects about to be drawn on every core at once, as their textures
+ * (PrepareThreeDObjectTextures()): a town seen for the first time from afar wanted thirty of them.
+ * @param wanted the shapes: object and level
+ */
+void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted)
+{
+	std::vector<std::pair<const ThreeDObject *, int>> jobs;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		for (const auto &[o, level] : wanted) {
+			/* Not read yet: read on a core of its own too (ThreeDObject::Read()). */
+			if (o == nullptr || level < 0 || level >= THREE_D_SHAPE_LEVELS || (o->IsRead() && (level == 0 || o->shapes[level] != nullptr))) continue;
+			if (std::ranges::find(jobs, std::make_pair(o, level)) == jobs.end()) jobs.emplace_back(o, level);
+		}
+	}
+	if (jobs.empty()) return;
+	const size_t threads = std::min<size_t>(jobs.size(), std::clamp<size_t>(GetUsableCores(), 1, 16));
+	std::atomic<size_t> next = 0;
+	auto work = [&] {
+		/* Each its own object and level: a slot of shapes no other thread touches. */
+		for (size_t j; (j = next++) < jobs.size();) jobs[j].first->GetShape(jobs[j].second);
+	};
+	std::vector<std::thread> pool;
+	for (size_t i = 1; i < threads; i++) pool.emplace_back(work);
+	work();
+	for (std::thread &t : pool) t.join();
+}
+
+/**
+ * The object's texture at a level of detail (DecodeTextureLevels()), read from the PNG the first time; painted
+ * (PaintAt()) as the vehicles' colour by number: each pixel of a part's mask the part's colour at the texture's
+ * lightness, its own where the texture is "zacatek" light.
+ */
+/**
+ * The texture of the object at a level of detail, painted by number (PaintAt()), made the first time it is asked for.
+ * @param may_drop whether the painted textures of every object may be dropped here when they take too much memory;
+ *                 not while textures are made on several cores at once (PrepareThreeDObjectTextures())
+ */
+/** Which thing of a building a painted texture is (MakeOnce()): its level and paint. */
+static int LazyHousePaint(int level, uint32_t paint)
+{
+	return LAZY_HOUSE_PAINT + level + 16 * static_cast<int>((paint ^ (paint >> 16)) & 0xFFFF);
+}
+
+/**
+ * Let the painted textures of every building go when they take too much memory (PAINTED_BUDGET): not while a frame of
+ * the view from the eyes is drawn from them (EyeFrameDrawing()).
+ */
+static void DropPaintedTextures()
+{
+	if (_painted_bytes <= PAINTED_BUDGET || EyeFrameDrawing() || !_three_d_objects_read) return;
+	std::lock_guard lock(_lazy_mutex);
+	for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
+	_painted_bytes = 0;
+}
+
+/** The building's texture at all its levels of detail, read from its PNG the first time (on either thread, MakeOnce()). */
+static void MakeHouseLevels(const ThreeDObject &o)
+{
+	MakeOnce(&o, LAZY_HOUSE_LEVELS, [&o] { return !o.levels.empty(); }, [&o] {
+		std::vector<ThreeDObjectTexture> made;
+		DecodeTextureLevels(o.png, made);
+		return made;
+	}, [&o](std::vector<ThreeDObjectTexture> made) { o.levels = std::move(made); });
+}
+
+const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, bool may_drop) const
+{
+	MarkThreeDUsed(this->used);
+	/* A part placed on a tile of an original industry: the part's texture, once for all its places. */
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].GetTexture(level, paint, may_drop);
+	this->Read();
+	MakeHouseLevels(*this);
+	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
+	const ThreeDObjectTexture *plain = &this->levels[level];
+	if (paint == 0 || this->colours.empty()) return plain;
+	if (may_drop) DropPaintedTextures();
+	const std::pair<int, uint32_t> key(level, paint);
+	MakeOnce(this, LazyHousePaint(level, paint), [this, key] { return this->painted.contains(key); }, [this, plain, paint] { return this->Painted(*plain, paint); }, [this, key](ThreeDObjectTexture t) {
+		_painted_bytes += t.px.size() * sizeof(uint32_t);
+		this->painted.emplace(key, std::move(t));
+	});
+	std::lock_guard lock(_lazy_mutex);
+	auto it = this->painted.find(key);
+	return it != this->painted.end() ? &it->second : plain;
+}
+
+/**
+ * A texture of the building's triangles (ThreeDObjectShapeView::TriangleTexture()): 0 its own, painted; n its add-on
+ * n's, as it is (the add-ons are not painted by the building's colours).
+ */
+const ThreeDObjectTexture *ThreeDObject::GetTextureOf(uint8_t texture, int level, uint32_t paint) const
+{
+	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, true);
+	if (texture == 0 || texture > this->addon_objects.size()) return this->GetTexture(level, paint);
+	return _three_d_objects[this->addon_objects[texture - 1]].GetTexture(level, paint);
+}
+
+/**
+ * The level of detail from the eyes of a texture of its triangles (GetTextureOf()): its own one's, or a material's
+ * whose texels to a unit of the world are its own (material_texels_per_unit) by them -- about a texel to a pixel.
+ * @param level its own texture's level there
+ * @param pixels_per_unit the picture's pixels to a unit of the world there
+ */
+int ThreeDObject::EyeTextureLevel(uint8_t texture, int level, double pixels_per_unit) const
+{
+	if (texture <= this->addon_objects.size()) return level;
+	const size_t m = texture - 1 - this->addon_objects.size();
+	if (m >= this->material_texels_per_unit.size() || this->material_texels_per_unit[m] <= 0) return level;
+	return std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, this->material_texels_per_unit[m] / std::max(pixels_per_unit, 1e-6))))));
+}
+
+/** A texture of the building's triangles if it is made already (as TryGetTexture()); else made in the background. */
+const ThreeDObjectTexture *ThreeDObject::TryGetTextureOf(uint8_t texture, int level, uint32_t paint) const
+{
+	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, false);
+	if (texture == 0 || texture > this->addon_objects.size()) return this->TryGetTexture(level, paint);
+	return _three_d_objects[this->addon_objects[texture - 1]].TryGetTexture(level, paint);
+}
+
+/**
+ * The texture of another material of its file (material_pngs) at a level of detail, as it is (the building's colours
+ * paint only its own): made once for all the objects with the same picture (ThreeDTextureLevelsOf()) -- the forest's
+ * four parts share their grass. As the textures of the figures, by need (ThreeDVehicleObject::GetTexture()): those
+ * levels shared with a figure of the same picture lose their pixels when the figure's are trimmed (TrimTextures()),
+ * and a level without them drawn read nothing (the player's crash of 11. 11. from the eyes, a texture's pixels at 0):
+ * a level with its pixels given, a finer one made again when it is wanted.
+ * @param now made here if it is not yet (on whichever thread); else made in the background and meanwhile its finest
+ *            level there is (a coarser one), nullptr none
+ */
+const ThreeDObjectTexture *ThreeDObject::MaterialTexture(size_t material, int level, bool now) const
+{
+	MarkThreeDUsed(this->used);
+	level = std::max(level, 0);
+	const int thing = LAZY_HOUSE_MATERIAL + static_cast<int>(material);
+	auto made = [this, material, level] { return material < this->material_levels.size() && this->material_levels[material] != nullptr && HasLevel(*this->material_levels[material], level); };
+	auto make = [this, material, thing, made, level] {
+		MakeOnce(this, thing, made, [this, material, level] { return ThreeDTextureLevelsOf(this->material_pngs[material], this->material_flats[material], level); },
+				[this, material](ThreeDTextureLevels levels) {
+					if (material < this->material_levels.size()) KeepTexture(this->material_levels[material], std::move(levels));
+				});
+	};
+	if (now) {
+		make();
+	} else {
+		MadeOrAsked(this, thing, made, make);
+	}
+	std::lock_guard lock(_lazy_mutex);
+	return material < this->material_levels.size() ? LevelOfKept(this->material_levels[material], level) : nullptr;
+}
+
+/**
+ * The building's texture at a level of detail if it is read already, painted (PaintAt()) if that is made already;
+ * else nullptr (nothing read yet) or the texture unpainted (its paint not made yet), and what is missing is made in the
+ * background (MadeOrAsked()).
+ */
+const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint) const
+{
+	MarkThreeDUsed(this->used);
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].TryGetTexture(level, paint);
+	if (!this->TryRead()) return nullptr;
+	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this] { return !this->levels.empty(); }, [this, level, paint] { this->GetTexture(level, paint, false); })) return nullptr;
+	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
+	const ThreeDObjectTexture *plain = &this->levels[level];
+	if (paint == 0 || this->colours.empty()) return plain;
+	const std::pair<int, uint32_t> key(level, paint);
+	if (!MadeOrAsked(this, LazyHousePaint(level, paint), [this, key] { return this->painted.contains(key); }, [this, level, paint] { this->GetTexture(level, paint, false); })) return plain;
+	std::lock_guard lock(_lazy_mutex);
+	auto it = this->painted.find(key);
+	return it != this->painted.end() ? &it->second : plain;
+}
+
+/**
+ * What a tree among the add-ons of a building is painted for on the building at a tile (the colleague's
+ * hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md): in the temperate climate pastel, on the forest of an industry ("pouziti_stromu":
+ * "les") deep green; in the sub-arctic climate as the texture is, white on the snow -- a house's snowy variant above the
+ * snow line (snow_path), the forest above the snow line --; in the other climates as the texture is.
+ * @param origin the building's north tile
+ */
+TreeUse ThreeDObject::TreeUseAt(TileIndex origin) const
+{
+	switch (_settings_game.game_creation.landscape) {
+		case LandscapeType::Temperate:
+			return this->forest_trees ? TreeUse::Forest : TreeUse::Temperate;
+		case LandscapeType::Arctic: {
+			const bool snow = !this->snow_path.empty() || (this->forest_trees && origin < Map::Size() && TileHeight(origin) >= GetSnowLine());
+			if (snow) return TreeUse::Snow;
+			return this->forest_trees ? TreeUse::Forest : TreeUse::SubArctic;
+		}
+		default:
+			return TreeUse::None;
+	}
+}
+
+/** The texture painted by number (PaintAt()): each pixel of a part's mask the part's colour at the texture's lightness, its own where the texture is "zacatek" light. */
+ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint32_t paint) const
+{
+	ThreeDObjectTexture t = plain;
+	const uint8_t bits = PaintBits(this->colours.size());
+	for (size_t k = 0; k < this->colours.size(); k++) {
+		const ThreeDObjectColourPart &part = this->colours[k];
+		/* A tree's part in the colours of the use its paint names (AddonPaintAt()); as its texture where it names none. */
+		const uint32_t number = GB(paint, static_cast<uint8_t>(bits * k), bits);
+		const std::vector<uint32_t> *palette = &part.palette;
+		if (this->tree_uses) {
+			const uint32_t use = GB(paint, TREE_PAINT_USE_BIT, 3);
+			if (use == 0 || use >= TREE_USES || number == TREE_PAINT_OWN) continue;
+			palette = &part.use_palettes[use];
+		}
+		if (palette->empty()) continue;
+		/* The mask, read the first time (on either thread). */
+		MakeOnce(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part] {
+			std::vector<ThreeDObjectTexture> made;
+			DecodeTextureLevels(part.mask_png, made);
+			return made;
+		}, [&part](std::vector<ThreeDObjectTexture> made) { part.levels = std::move(made); });
+		/* The mask's level nearest the texture's, read at the same place. */
+		const ThreeDObjectTexture *mask = &part.levels.back();
+		for (const ThreeDObjectTexture &m : part.levels) {
+			if (m.w <= t.w) {
+				mask = &m;
+				break;
+			}
+		}
+		const Colour colour(part.per_company ? CompanyPaintColour(number) : (*palette)[number % palette->size()]);
+		const float start = static_cast<float>(part.start);
+		for (int y = 0; y < t.h; y++) {
+			const int my = std::min(mask->h - 1, y * mask->h / t.h);
+			for (int x = 0; x < t.w; x++) {
+				uint32_t &p = t.px[static_cast<size_t>(y) * t.w + x];
+				if (p == 0) continue;
+				const int mx = std::min(mask->w - 1, x * mask->w / t.w);
+				const uint32_t mp = mask->px[static_cast<size_t>(my) * mask->w + mx];
+				const float m = mp == 0 ? 0.0f : Colour(mp).r / 255.0f;
+				if (m <= 0) continue;
+				Colour c(p);
+				float l = std::max({c.r, c.g, c.b}) / start;
+				auto mix = [&](uint8_t own, uint8_t to) { return static_cast<uint8_t>(std::clamp(own + (std::min(255.0f, to * l) - own) * m, 0.0f, 255.0f)); };
+				p = Colour(mix(c.r, colour.r), mix(c.g, colour.g), mix(c.b, colour.b)).data;
+			}
+		}
+		/* The part's pattern over its colour ("tapeta"): the picture of the colour's number, laid on the surface by
+		 * the building's own triangles -- along the surface level across, up its slope (a roof's rows of tiles along
+		 * the eaves, a wall's courses of bricks level), "opakovani_m" metres a picture --, where the mask has the part. */
+		if (part.patterns.empty() || this->tri.empty()) continue;
+		/* Which of the part's patterns: by the place's whole paint, not by the part's colour alone -- a red roof here
+		 * of plain tiles, there of pantiles (the player, 14. 11.: "each roof at random another colour and other tiles"). */
+		const size_t which = (static_cast<uint64_t>(paint) * 2654435761u >> 13) % part.patterns.size();
+		const std::vector<ThreeDObjectTexture> &pattern = *part.patterns[which];
+		const double rep = part.pattern_m[which];
+		const bool only_sloped = part.pattern_sloped[which] != 0;
+		for (size_t i = 0; i + 2 < this->tri.size(); i += 3) {
+			if (i / 3 < this->tri_tex.size() && this->tri_tex[i / 3] != 0) continue;
+			double wp[3][3], tp[3][2];
+			for (int c = 0; c < 3; c++) {
+				const uint32_t v = this->tri[i + c];
+				wp[c][0] = this->pos[v * 3] / OBJECT_UNITS_PER_METRE;
+				wp[c][1] = this->pos[v * 3 + 1] / OBJECT_UNITS_PER_METRE;
+				wp[c][2] = this->pos[v * 3 + 2] / OBJECT_HEIGHT_PER_METRE;
+				tp[c][0] = this->uv[v * 2] * t.w;
+				tp[c][1] = this->uv[v * 2 + 1] * t.h;
+			}
+			const double det = (tp[1][0] - tp[0][0]) * (tp[2][1] - tp[0][1]) - (tp[2][0] - tp[0][0]) * (tp[1][1] - tp[0][1]);
+			if (std::abs(det) < 1e-9) continue;
+			const double e1[3] = {wp[1][0] - wp[0][0], wp[1][1] - wp[0][1], wp[1][2] - wp[0][2]}, e2[3] = {wp[2][0] - wp[0][0], wp[2][1] - wp[0][1], wp[2][2] - wp[0][2]};
+			double n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};
+			const double nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (nl < 1e-12) continue;
+			for (double &c : n) c /= nl;
+			/* Not on a level surface when the set says so ("jen_sikme": the tiles of a roof not on its flat terrace). */
+			if (only_sloped && std::abs(n[2]) >= 0.985) continue;
+			/* Across level, up the slope; a level surface along x and y. */
+			double sd[3] = {1, 0, 0}, td[3] = {0, 1, 0};
+			if (std::abs(n[2]) < 0.985) {
+				const double l = std::hypot(n[0], n[1]);
+				sd[0] = -n[1] / l;
+				sd[1] = n[0] / l;
+				sd[2] = 0;
+				td[0] = n[1] * sd[2] - n[2] * sd[1];
+				td[1] = n[2] * sd[0] - n[0] * sd[2];
+				td[2] = n[0] * sd[1] - n[1] * sd[0];
+				if (td[2] < 0) for (double &c : td) c = -c;
+			}
+			double st[3][2];
+			for (int c = 0; c < 3; c++) {
+				st[c][0] = wp[c][0] * sd[0] + wp[c][1] * sd[1] + wp[c][2] * sd[2];
+				st[c][1] = wp[c][0] * td[0] + wp[c][1] * td[1] + wp[c][2] * td[2];
+			}
+			/* The pattern's level whose texel is about the texture's here. */
+			const double texel_m = std::sqrt(nl / std::abs(det));
+			const ThreeDObjectTexture *pl = &pattern.front();
+			for (const ThreeDObjectTexture &l : pattern) {
+				if (rep / l.w > texel_m * 1.2) break;
+				pl = &l;
+			}
+			const int x0 = std::max(0, static_cast<int>(std::floor(std::min({tp[0][0], tp[1][0], tp[2][0]})) - 1)), x1 = std::min(t.w - 1, static_cast<int>(std::ceil(std::max({tp[0][0], tp[1][0], tp[2][0]})) + 1));
+			const int y0 = std::max(0, static_cast<int>(std::floor(std::min({tp[0][1], tp[1][1], tp[2][1]})) - 1)), y1 = std::min(t.h - 1, static_cast<int>(std::ceil(std::max({tp[0][1], tp[1][1], tp[2][1]})) + 1));
+			/* A texel a little outside the triangle too: the texture's margin about its islands. */
+			const double out = 1.5 / std::sqrt(std::abs(det));
+			for (int y = y0; y <= y1; y++) {
+				const int my = std::min(mask->h - 1, y * mask->h / t.h);
+				for (int x = x0; x <= x1; x++) {
+					const double px = x + 0.5, py = y + 0.5;
+					const double b1 = ((px - tp[0][0]) * (tp[2][1] - tp[0][1]) - (tp[2][0] - tp[0][0]) * (py - tp[0][1])) / det;
+					const double b2 = ((tp[1][0] - tp[0][0]) * (py - tp[0][1]) - (px - tp[0][0]) * (tp[1][1] - tp[0][1])) / det;
+					if (b1 < -out || b2 < -out || b1 + b2 > 1 + out) continue;
+					uint32_t &p = t.px[static_cast<size_t>(y) * t.w + x];
+					if (p == 0) continue;
+					const uint32_t mp = mask->px[static_cast<size_t>(my) * mask->w + std::min(mask->w - 1, x * mask->w / t.w)];
+					const float m = mp == 0 ? 0.0f : Colour(mp).r / 255.0f;
+					if (m <= 0) continue;
+					const double su = (st[0][0] + b1 * (st[1][0] - st[0][0]) + b2 * (st[2][0] - st[0][0])) / rep;
+					const double sv = -(st[0][1] + b1 * (st[1][1] - st[0][1]) + b2 * (st[2][1] - st[0][1])) / rep;
+					/* The pattern there between its four texels nearest (it repeats): its colour weighed by its alpha. */
+					const double fx = (su - std::floor(su)) * pl->w - 0.5, fy = (sv - std::floor(sv)) * pl->h - 0.5;
+					const int ix = static_cast<int>(std::floor(fx)), iy = static_cast<int>(std::floor(fy));
+					const double wx = fx - ix, wy = fy - iy;
+					double oa = 0, orr = 0, og = 0, ob = 0;
+					for (int k = 0; k < 4; k++) {
+						const int qx = ((ix + (k & 1)) % pl->w + pl->w) % pl->w, qy = ((iy + (k >> 1)) % pl->h + pl->h) % pl->h;
+						const Colour q(pl->px[static_cast<size_t>(qy) * pl->w + qx]);
+						const double wq = ((k & 1) ? wx : 1 - wx) * ((k >> 1) ? wy : 1 - wy) * q.a;
+						oa += wq;
+						orr += wq * q.r;
+						og += wq * q.g;
+						ob += wq * q.b;
+					}
+					if (oa <= 0) continue;
+					const float a = static_cast<float>(oa / 255.0) * m;
+					const Colour c(p);
+					auto lay = [a](uint8_t own, double to) { return static_cast<uint8_t>(std::clamp(own + (static_cast<float>(to) - own) * a, 0.0f, 255.0f)); };
+					p = Colour(lay(c.r, orr / oa), lay(c.g, og / oa), lay(c.b, ob / oa), c.a).data;
+				}
+			}
+		}
+	}
+	return t;
+}
+
+/**
+ * Make the textures of objects about to be drawn on every core of the processor at once, before they are drawn (the
+ * technologies of OpenMW, the player, 16. 10.: it makes its world ready in threads of its own): reading the PNG and
+ * painting it took the first picture of a town two seconds, one texture after the other. Each object's textures on
+ * one thread, the objects shared among the threads.
+ * @param wanted the textures: object, level of detail, paint
+ */
+void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
+{
+	/* What is not made yet, by object. */
+	std::vector<std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>> jobs;
+	const bool stand_in = _three_d_pictures_stand_in && !_three_d_load_at_once;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		for (const ThreeDTextureWanted &w : wanted) {
+			const ThreeDObject *o = w.obj;
+			if (o == nullptr) continue;
+			/* A part placed on an industry's tile: its part's texture, made once for all its places (one thread a texture). */
+			if (o->texture_of < _three_d_objects.size()) o = &_three_d_objects[o->texture_of];
+			if (!o->levels.empty()) {
+				const int level = std::clamp<int>(w.level, 0, static_cast<int>(o->levels.size()) - 1);
+				if (w.paint == 0 || o->colours.empty() || o->painted.contains({level, w.paint})) continue;
+				/* Drawing the map, painted at another level already: that one stands in and this one is painted in the
+				 * background (DrawnTexture()) -- not painted here, the main thread waiting for it (the player's test10,
+				 * snimky.log of the map: "dum textura 99x 1109 ms", a drag of the map held up by each). */
+				if (stand_in && std::ranges::any_of(o->painted, [&w](const auto &p) { return p.first.second == w.paint; })) continue;
+			}
+			auto it = std::ranges::find(jobs, o, &std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>::first);
+			if (it == jobs.end()) it = jobs.insert(jobs.end(), {o, {}});
+			if (std::ranges::find(it->second, std::make_pair(w.level, w.paint)) == it->second.end()) it->second.emplace_back(w.level, w.paint);
+		}
+	}
+	if (jobs.size() < 2) return; // as it comes, when drawn
+	DropPaintedTextures();
+	std::atomic<size_t> next = 0;
+	auto work = [&]() {
+		for (size_t j; (j = next++) < jobs.size();) {
+			for (const auto &[level, paint] : jobs[j].second) jobs[j].first->GetTexture(level, paint, false);
+		}
+	};
+	const size_t cores = std::clamp<size_t>(GetUsableCores(), 1, 16);
+	std::vector<std::thread> threads;
+	for (size_t i = 1; i < std::min(cores, jobs.size()); i++) threads.emplace_back(work);
+	work();
+	for (std::thread &t : threads) t.join();
+}
+
+/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
+static std::atomic<uint64_t> _three_d_objects_readied = 0;
+
+/**
+ * Whether a building's object can be drawn on the map now: its shape read and its texture of the level and paint
+ * painted. If not, they are made in the background (ThreeDLoadInBackground()) and the map draws the building as its
+ * sprites meanwhile, its place drawn again when they are there (ThreeDObjectsReadied()): the first frame of a game read
+ * and painted every building in view at once, on the main thread -- one block of the map 10 s on the player's phone
+ * (26. 10.: "the long loading of one block, 10 s"). Painted at another level only (the view zoomed), it is ready: that
+ * level stands in (ThreeDObject::DrawnTexture()) while this one is painted in the background.
+ * @param o the object, nullptr none (ready)
+ * @param level its level of detail (the zoom's)
+ * @param paint its colours (ThreeDObject::PaintAt())
+ * @param[out] exact if given: whether its texture of the level is there, not one of another level standing in
+ */
+bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact)
+{
+	if (exact != nullptr) *exact = true;
+	if (o == nullptr) return true;
+	const ThreeDObject *t = o->texture_of < _three_d_objects.size() ? &_three_d_objects[o->texture_of] : o;
+	/* Read, or tried (a file that cannot be read is drawn as it was, as nothing). */
+	auto tried = [](const ThreeDObject *x) { return x->IsRead() || x->glb_state.value.load(std::memory_order_acquire) != 0; };
+	bool other_level = false;
+	auto ready = [o, t, level, paint, tried, &other_level] {
+		other_level = false;
+		if (!tried(o) || !tried(t) || t->levels.empty()) return false;
+		if (paint == 0 || t->colours.empty()) return true;
+		if (t->painted.contains({std::clamp<int>(level, 0, static_cast<int>(t->levels.size()) - 1), paint})) return true;
+		/* Painted at another level already (another zoom): that one stands in (ThreeDObject::DrawnTexture()). */
+		for (const auto &[key, tex] : t->painted) {
+			if (key.second == paint) other_level = true;
+		}
+		return other_level;
+	};
+	const bool is_ready = MadeOrAsked(o, LAZY_HOUSE_READY, ready, [o, level, paint] {
+		o->Read();
+		o->GetTexture(level, paint, false);
+		{
+			std::lock_guard lock(_lazy_mutex);
+			_lazy_asked.erase({o, LAZY_HOUSE_READY});
+		}
+		_three_d_objects_readied++;
+	});
+	if (is_ready && other_level) {
+		/* The level of this zoom painted in the background, the place drawn again when it is there. */
+		if (exact != nullptr) *exact = false;
+		const std::pair<int, uint32_t> key(std::clamp<int>(level, 0, static_cast<int>(t->levels.size()) - 1), paint);
+		MadeOrAsked(t, LazyHousePaint(key.first, paint), [t, key] { return t->painted.contains(key); }, [t, key] {
+			t->GetTexture(key.first, key.second, false);
+			_three_d_objects_readied++;
+		});
+	}
+	return is_ready;
+}
+
+/** How many objects were made ready in the background so far (ThreeDObjectReadyToDraw()): the places waiting for them drawn again when it grows. */
+uint64_t ThreeDObjectsReadied()
+{
+	return _three_d_objects_readied.load();
+}
+
+/** How many times a building was drawn with a texture of another level standing in (ThreeDObject::DrawnTexture()). */
+static std::atomic<uint64_t> _three_d_textures_stood_in = 0;
+
+/** How many textures of another level stood in so far: a building drawn with one is drawn again when its own comes (ThreeDObjectsReadied()). */
+uint64_t ThreeDTexturesStoodIn()
+{
+	return _three_d_textures_stood_in.load();
+}
+
+/**
+ * The building's texture to draw it with now, the drawing waiting for no painting (the player, 28. 10.: zooming in and
+ * out showed the boxes of the houses and the industries first and their 3D after; a zoom asks for the texture at
+ * another level, and painting it waited): at the level painted if it is already; else the nearest level painted
+ * already stands in, the level is painted in the background and the building's place drawn again when it is there
+ * (ThreeDObjectsReadied(), ThreeDTexturesStoodIn()). Nothing of it painted yet: painted now, as GetTexture().
+ */
+const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint) const
+{
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].DrawnTexture(level, paint);
+	if (paint == 0 || this->colours.empty() || this->levels.empty()) return this->GetTexture(level, paint);
+	MarkThreeDUsed(this->used);
+	const std::pair<int, uint32_t> key(std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1), paint);
+	const ThreeDObjectTexture *nearest = nullptr;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->painted.find(key);
+		if (it != this->painted.end()) return &it->second;
+		int best = INT_MAX;
+		for (const auto &[k, tex] : this->painted) {
+			if (k.second != paint || std::abs(k.first - key.first) >= best) continue;
+			best = std::abs(k.first - key.first);
+			nearest = &tex;
+		}
+	}
+	if (nearest == nullptr) return this->GetTexture(level, paint);
+	if (!MadeOrAsked(this, LazyHousePaint(key.first, paint), [this, key] { return this->painted.contains(key); }, [this, key] {
+		this->GetTexture(key.first, key.second, false);
+		_three_d_objects_readied++;
+	})) {
+		_three_d_textures_stood_in++;
+		return nearest;
+	}
+	std::lock_guard lock(_lazy_mutex);
+	auto it = this->painted.find(key);
+	return it != this->painted.end() ? &it->second : nearest;
+}
+
+/** A texture of the building's triangles to draw it with now (as GetTextureOf(), by DrawnTexture()). */
+const ThreeDObjectTexture *ThreeDObject::DrawnTextureOf(uint8_t texture, int level, uint32_t paint) const
+{
+	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, true);
+	if (texture == 0 || texture > this->addon_objects.size()) return this->DrawnTexture(level, paint);
+	return _three_d_objects[this->addon_objects[texture - 1]].DrawnTexture(level, paint);
+}
+
+/** The rig: the objects read, a line each. */
+std::string DescribeThreeDObjects()
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	std::string out = fmt::format("{} objects", _three_d_objects.size());
+	for (const ThreeDObject &o : _three_d_objects) {
+		std::string which = o.grfid != 0 ? fmt::format("grf {:08X} house {}", std::byteswap(o.grfid), o.grf_house) : fmt::format("house {:#04x}", o.house);
+		out += fmt::format("\n  {} {} variants {:#x} {}x{} tiles: {} triangles, {} corners, {:.1f} high, texture {} bytes{}", o.name, which, o.variants, o.tiles_x, o.tiles_y, o.tri.size() / 3, o.pos.size() / 3, o.top, o.png.size(), o.light.empty() ? "" : ", lit from its normals");
+		for (const ThreeDObjectColourPart &part : o.colours) out += fmt::format(", colour {} of {}", part.name, part.palette.size());
+		for (const ThreeDObjectFigure &f : o.figures) out += fmt::format(", {} at {:.1f},{:.1f},{:.1f}", f.figure, f.at[0], f.at[1], f.at[2]);
+		if (!o.industry_name.empty()) out += fmt::format(", industry {} ({}) variant {}", o.industry_name, o.industry, o.industry_variant);
+		if (!o.field_part.empty()) out += fmt::format(", field part {}, {} + {} at work, {} + {} by the road", o.field_part, o.work[0].size(), o.work[1].size(), o.by_road[0].size(), o.by_road[1].size());
+		if (!o.plants.empty()) out += fmt::format(", {} plants", o.plants.size());
+	}
+	return out;
+}
+
+/** Forget what was made of the building to draw it -- its textures, painted or not, its simplified shapes -- to be made again when it is drawn. */
+void ThreeDObject::Forget() const
+{
+	std::lock_guard lock(_lazy_mutex);
+	this->levels.clear();
+	this->levels.shrink_to_fit();
+	for (ThreeDTextureLevels &material : this->material_levels) material.reset();
+	size_t painted = 0;
+	for (const auto &[key, t] : this->painted) painted += t.px.size() * sizeof(uint32_t);
+	this->painted.clear();
+	_painted_bytes -= std::min<size_t>(painted, _painted_bytes);
+	for (const ThreeDObjectColourPart &part : this->colours) {
+		part.levels.clear();
+		part.levels.shrink_to_fit();
+	}
+	for (auto &shape : this->shapes) shape.reset();
+}
+
+/** Forget what was made of the vehicle or figure to draw it: its textures and the shapes of its frames (a dragon's poses). */
+void ThreeDVehicleObject::Forget() const
+{
+	std::lock_guard lock(_lazy_mutex);
+	this->levels.clear();
+	this->mask_levels.reset();
+	this->mask_tried = false;
+	this->rust_levels.reset();
+	this->rust_tried = false;
+	this->second_levels.reset();
+	this->second_tried = false;
+	this->addon_mask_levels.clear();
+	this->addon_mask_tried.clear();
+	this->detail_masks.clear();
+	this->detail_tried.clear();
+	this->frame_shapes.clear();
+	this->frame_shapes.shrink_to_fit();
+	this->frame_bones.clear();
+	this->frame_bones.shrink_to_fit();
+	this->shape.reset();
+	this->shape_tried = false;
+	this->shape_parts = {};
+}
+
+/**
+ * Whether it holds anything made to draw it (Forget()). The vehicles were never forgotten before, only the figures:
+ * this asked only for the frames of a figure, and a lorry or a train has one shape and its textures (the player's test5,
+ * 10. 11.: the vehicles' shapes grew to 1.3 GB, the game to 5.5 GB, and Android killed it when the turned view went far
+ * out over the map).
+ */
+bool ThreeDVehicleObject::HoldsMade() const
+{
+	return this->shape != nullptr || !this->frame_shapes.empty() || !this->frame_bones.empty() || !this->levels.empty() ||
+			this->mask_levels != nullptr || this->rust_levels != nullptr || this->second_levels != nullptr ||
+			!this->addon_mask_levels.empty() || !this->detail_masks.empty();
+}
+
+/** Mark it drawn now without asking for its shape: its picture on the map was kept (ObjectPictureOf()), so it is not forgotten while seen. */
+void ThreeDVehicleObject::MarkDrawn() const
+{
+	MarkThreeDUsed(this->used);
+}
+
+/** How long a thing not drawn keeps what was made of it, seconds. */
+static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
+
+/**
+ * Forget what was made to draw the things not drawn for two minutes (the technologies of OpenMW, the player, 16. 10.:
+ * what is far from the player is let go of): the textures and the simplified shapes of the buildings, the textures and
+ * the poses of the figures and the creatures, the passages between their animations, the shapes no one keeps. A big
+ * map walked over kept all of it before. Between the frames, never while they are drawn.
+ */
+/**
+ * A forgetting put off (ForgetUnusedThreeDObjectsNow()): done at the first moment nothing holds what the objects made
+ * (ForgetThreeDObjectsIfOwed()). Put off till the next quarter of a minute, it was never done in the view from the
+ * eyes: its frames are drawn one after the other on their thread, one always in hand, and the phone's memory grew to
+ * 3.2 GB and Android killed the game (the player's log of 2. 11., 2.3 GB to 3.2 GB in five minutes from the eyes).
+ */
+static bool _three_d_forget_owed = false;
+uint64_t _three_d_forgets_done = 0;     ///< the diary: forgettings done since its last line
+uint64_t _three_d_forgets_put_off = 0;  ///< and put off, something holding what the objects made
+
+static void ForgetUnusedThreeDObjectsNow()
+{
+	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp) or a frame
+	 * of the view from the eyes is drawn (EyeFrameDrawing()): they hold what the objects made; owed till they are
+	 * done (ForgetThreeDObjectsIfOwed()). */
+	if (ThreeDPicturesBeingMade() || EyeFrameDrawing()) {
+		if (!_three_d_forget_owed) _three_d_forgets_put_off++;
+		_three_d_forget_owed = true;
+		return;
+	}
+	_three_d_forget_owed = false;
+	_three_d_forgets_done++;
+	TrimThreeDTextures();
+	TrimThreeDEyePainted();
+	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) return;
+	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
+	size_t forgotten = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (o.used >= before || (o.levels.empty() && o.painted.empty() && std::ranges::all_of(o.shapes, [](const auto &p) { return p == nullptr; }))) continue;
+		o.Forget();
+		forgotten++;
+	}
+	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+		for (const ThreeDVehicleObject &v : *list) {
+			if (v.used >= before || !v.HoldsMade()) continue;
+			v.Forget();
+			forgotten++;
+		}
+	}
+	for (auto it = _passages.begin(); it != _passages.end();) {
+		if (it->second->used < before) {
+			it = _passages.erase(it);
+			forgotten++;
+		} else {
+			++it;
+		}
+	}
+	/* The shapes read that nothing keeps any more (the poses of a passage gone, a vehicle's frames). */
+	{
+		std::lock_guard lock(_vehicle_shapes_mutex);
+		for (auto it = _vehicle_shapes.begin(); it != _vehicle_shapes.end();) {
+			if (it->second.use_count() == 1) {
+				it = _vehicle_shapes.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+	if (forgotten > 0) Debug(misc, 1, "3D objects: {} not drawn for {} s forgotten", forgotten, THREE_D_FORGET_AFTER);
+}
+
+/** The clock of the objects on by a quarter of a minute, and what was not drawn for two minutes forgotten (ForgetUnusedThreeDObjectsNow()). */
+static void ForgetUnusedThreeDObjects()
+{
+	_three_d_clock += 15;
+	ForgetUnusedThreeDObjectsNow();
+}
+
+/** A forgetting put off done now, when nothing holds what the objects made (the view from the eyes between its frames, EyeView()). */
+void ForgetThreeDObjectsIfOwed()
+{
+	if (_three_d_forget_owed) ForgetUnusedThreeDObjectsNow();
+}
+
+/** The clock of the objects goes on in real time, every fifteen seconds (ForgetUnusedThreeDObjects()). */
+static IntervalTimer<TimerWindow> _forget_timer(std::chrono::seconds(15), [](auto) { ForgetUnusedThreeDObjects(); });
+/** A forgetting put off tried again soon, not a quarter of a minute later (the thread of the pictures of the vehicles done meanwhile). */
+static IntervalTimer<TimerWindow> _forget_owed_timer(std::chrono::milliseconds(250), [](auto) { ForgetThreeDObjectsIfOwed(); });
+
+/** The memory of a vector's elements. */
+template <typename T>
+static size_t VectorBytes(const std::vector<T> &v)
+{
+	return v.capacity() * sizeof(T);
+}
+
+/** The memory of a vehicle's shape and of its simpler shapes made: its corners, triangles and lights (its textures apart). */
+size_t ThreeDVehicleShape::Bytes() const
+{
+	size_t b = VectorBytes(this->pos) + VectorBytes(this->nrm) + VectorBytes(this->uv) + VectorBytes(this->tri) + VectorBytes(this->tri_tex);
+	b += VectorBytes(this->night_pos) + VectorBytes(this->night_tri) + VectorBytes(this->night_colour) + VectorBytes(this->night_kind) + VectorBytes(this->front_back_lights) + VectorBytes(this->back_front_lights);
+	b += VectorBytes(this->tri_part) + VectorBytes(this->corner_wheel) + VectorBytes(this->tri_glass) + VectorBytes(this->night_part);
+	b += VectorBytes(this->lanterns) + VectorBytes(this->torches) + VectorBytes(this->torch_aims);
+	b += VectorBytes(this->tex_glow) + VectorBytes(this->tex_alpha);
+	b += VectorBytes(this->corner_joints) + VectorBytes(this->corner_weights);
+	for (const auto &simpler : this->simpler.shapes) {
+		if (simpler != nullptr) b += simpler->Bytes();
+	}
+	return b;
+}
+
+/**
+ * The textures the object holds now (DescribeThreeDObjectMemory(): which hold the most): each with what it is to the
+ * object. Under _lazy_mutex.
+ */
+void ThreeDVehicleObject::ForHeldTextures(const std::function<void(const ThreeDTextureLevels &, const char *)> &fn) const
+{
+	for (const ThreeDTextureLevels &lv : this->levels) fn(lv, "textura");
+	for (const ThreeDTextureLevels &lv : this->addon_mask_levels) fn(lv, "maska doplnku");
+	fn(this->mask_levels, "maska laku");
+	fn(this->rust_levels, "maska rzi");
+	fn(this->second_levels, "maska druhe barvy");
+}
+
+/** The bytes of a texture's levels that have their pixels. */
+static size_t LevelsBytes(const ThreeDTextureLevels &lv)
+{
+	size_t b = 0;
+	if (lv != nullptr) {
+		for (const ThreeDObjectTexture &t : *lv) b += VectorBytes(t.px);
+	}
+	return b;
+}
+
+/**
+ * The rig ('test3d pamet'): how much memory what was made of the 3D objects takes -- the vehicles' shapes, their
+ * textures halved for each level of detail, the pictures of the textures as they are in the files, the .glb files kept
+ * a moment, the buildings' textures (painted too) and simplified shapes.
+ */
+std::string DescribeThreeDObjectMemory()
+{
+	auto mb = [](size_t b) { return b / (1024.0 * 1024.0); };
+	size_t shapes = 0, shape_count = 0, posed = 0, posed_count = 0, rest = 0, rest_count = 0;
+	{
+		std::lock_guard lock(_vehicle_shapes_mutex);
+		for (const auto &[key, shape] : _vehicle_shapes) {
+			if (shape == nullptr) continue;
+			shapes += shape->Bytes();
+			shape_count++;
+			/* The frames of the figures on bones, each posed by the processor (MakePosedShape()); their shapes at rest
+			 * the card poses (RestShapeOf()). */
+			if (key.starts_with("kostra|")) {
+				posed += shape->Bytes();
+				posed_count++;
+			} else if (key.starts_with("kostra-klid|")) {
+				rest += shape->Bytes();
+				rest_count++;
+			}
+		}
+	}
+	/* The frames the card poses: their joints' matrices (ThreeDBonesFrame). */
+	size_t bones = 0, bones_count = 0;
+	/* The vehicles and figures holding the most, by name: their shapes and their textures (the player, 4. 11.: "can't
+	 * you see from the log what object it was?" -- the sums above name nothing). A texture several of them share counts
+	 * with each by its share (the colleague's lorries share their add-ons' pictures: each lorry was told 606 MB, the
+	 * three of them together held that); and the biggest textures, of what and how many share them. */
+	std::vector<std::pair<size_t, std::string>> biggest;
+	struct HeldTexture {
+		size_t bytes = 0;
+		int holders = 0;
+		std::string first; ///< the first object holding it, and what it is to it
+		int w = 0, h = 0, level = 0; ///< its finest level with pixels
+	};
+	std::map<const void *, HeldTexture> held_textures;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto count_bones = [&](const ThreeDVehicleObject &v) {
+			for (const auto &b : v.frame_bones) {
+				if (b == nullptr) continue;
+				bones += sizeof(ThreeDBonesFrame) + VectorBytes(b->joints);
+				bones_count++;
+			}
+		};
+		std::vector<const ThreeDVehicleObject *> objects;
+		for (const std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+			for (const ThreeDVehicleObject &v : *list) {
+				count_bones(v);
+				objects.push_back(&v);
+				std::set<const void *> own;
+				v.ForHeldTextures([&](const ThreeDTextureLevels &lv, const char *what) {
+					const size_t b = LevelsBytes(lv);
+					if (b == 0 || !own.insert(lv.get()).second) return;
+					HeldTexture &t = held_textures[lv.get()];
+					if (t.holders++ > 0) return;
+					t.bytes = b;
+					t.first = fmt::format("{} {}", v.name, what);
+					t.level = FinestLevel(*lv);
+					t.w = (*lv)[t.level].w;
+					t.h = (*lv)[t.level].h;
+				});
+			}
+		}
+		for (const auto &[name, passage] : _passages) count_bones(*passage);
+		for (const ThreeDVehicleObject *v : objects) {
+			double b = v->shape != nullptr ? v->shape->Bytes() : 0;
+			for (const auto &s : v->frame_shapes) b += s != nullptr ? s->Bytes() : 0;
+			std::set<const void *> own;
+			v->ForHeldTextures([&](const ThreeDTextureLevels &lv, const char *) {
+				auto it = held_textures.find(lv.get());
+				if (it != held_textures.end() && own.insert(lv.get()).second) b += static_cast<double>(it->second.bytes) / it->second.holders;
+			});
+			if (b >= (1u << 20)) biggest.emplace_back(static_cast<size_t>(b), v->name);
+		}
+	}
+	std::vector<const HeldTexture *> by_size;
+	for (const auto &[at, t] : held_textures) by_size.push_back(&t);
+	std::ranges::sort(by_size, std::greater{}, &HeldTexture::bytes);
+	std::string textures_most;
+	for (size_t i = 0; i < std::min<size_t>(by_size.size(), 3); i++) {
+		const HeldTexture &t = *by_size[i];
+		textures_most += fmt::format("{}{:.1f} MB {}x{} (uroven {}, {} sdili od {})", i == 0 ? "" : ", ", t.bytes / (1024.0 * 1024.0), t.w, t.h, t.level, t.holders, t.first);
+	}
+	size_t textures = 0, texture_count = 0, pngs = 0, png_count = 0, masks = 0;
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		std::set<const void *> seen;
+		auto levels_bytes = [&](const std::shared_ptr<const std::vector<ThreeDObjectTexture>> &lv) {
+			if (lv == nullptr || !seen.insert(lv.get()).second) return;
+			for (const ThreeDObjectTexture &t : *lv) textures += VectorBytes(t.px);
+			texture_count++;
+		};
+		for (const auto &[key, made] : _texture_levels) levels_bytes(made.levels.lock());
+		for (const auto &[key, made] : _file_texture_levels) levels_bytes(made.lock());
+		for (const auto &[key, made] : _detail_masks_made) {
+			if (auto m = made.lock(); m != nullptr) masks += VectorBytes(m->index);
+		}
+		for (const auto &[hash, bytes] : _texture_bytes) {
+			if (auto b = bytes.lock(); b != nullptr) {
+				pngs += b->size();
+				png_count++;
+			}
+		}
+	}
+	const size_t glb_files = _glb_files_kept_bytes;
+	size_t houses = 0, house_count = 0, house_glb = 0, houses_read = 0;
+	if (_three_d_objects_read) {
+		std::lock_guard lock(_lazy_mutex);
+		for (const ThreeDObject &o : _three_d_objects) {
+			/* What is read of its .glb (ThreeDObject::Read()): its shape and its texture's picture. */
+			if (!o.glb_path.empty() && o.IsRead()) {
+				houses_read++;
+				house_glb += VectorBytes(o.pos) + VectorBytes(o.uv) + VectorBytes(o.tri) + VectorBytes(o.facing) + VectorBytes(o.light) + VectorBytes(o.png) + VectorBytes(o.night_pos) + VectorBytes(o.night_uv) + VectorBytes(o.night_tri);
+			}
+			size_t b = 0;
+			for (const ThreeDObjectTexture &t : o.levels) b += VectorBytes(t.px);
+			for (const auto &[key, t] : o.painted) b += VectorBytes(t.px);
+			for (const auto &shape : o.shapes) {
+				if (shape != nullptr) b += VectorBytes(shape->pos) + VectorBytes(shape->uv) + VectorBytes(shape->light) + VectorBytes(shape->tri) + VectorBytes(shape->facing);
+			}
+			if (b == 0) continue;
+			houses += b;
+			house_count++;
+			if (b >= (1u << 20)) biggest.emplace_back(b, o.name);
+		}
+	}
+	std::ranges::sort(biggest, std::greater{});
+	std::string most;
+	for (size_t i = 0; i < std::min<size_t>(biggest.size(), 3); i++) most += fmt::format("{}{} {:.1f} MB", i == 0 ? "" : ", ", biggest[i].second, mb(biggest[i].first));
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}",
+			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most);
+}
+
+/**
+ * The rig ('test3d pamet'): the textures of the buildings' other materials (ThreeDObject::MaterialTexture()) made,
+ * those of them a vehicle or a figure holds too (the same picture: trimmed with its, TrimTextures()), and those with
+ * levels finer than their finest without pixels.
+ */
+std::string DescribeThreeDSharedMaterials()
+{
+	std::lock_guard lock(_lazy_mutex);
+	std::set<const void *> of_figures;
+	for (const std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+		for (const ThreeDVehicleObject &v : *list) v.ForHeldTextures([&](const ThreeDTextureLevels &lv, const char *) { of_figures.insert(lv.get()); });
+	}
+	int made = 0, shared = 0, without = 0;
+	auto count = [&](const ThreeDObject &o) {
+		for (const ThreeDTextureLevels &lv : o.material_levels) {
+			if (lv == nullptr || lv->empty()) continue;
+			made++;
+			if (of_figures.contains(lv.get())) shared++;
+			if (lv->front().px.empty()) without++;
+		}
+	};
+	for (const ThreeDObject &o : _three_d_objects) count(o);
+	for (const auto &[key, arc] : _track_arcs) count(*arc.obj);
+	for (const auto &[key, wire] : _three_d_wires) count(*wire.obj);
+	return fmt::format("materialy domu: udelano {}, sdileno s vozidly a postavami {}, bez pixelu nejjemnejsi urovne {}", made, shared, without);
+}
+
+/** The rig: every house read now (ThreeDObject::Read()), as the start of the game read them all before. */
+std::string RigReadAllThreeDHouses()
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	const auto start = std::chrono::steady_clock::now();
+	size_t read = 0, bytes = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (o.glb_path.empty() || o.IsRead()) continue;
+		if (!o.Read()) continue;
+		read++;
+		bytes += VectorBytes(o.pos) + VectorBytes(o.uv) + VectorBytes(o.tri) + VectorBytes(o.facing) + VectorBytes(o.light) + VectorBytes(o.png);
+	}
+	return fmt::format("domu precteno {} za {} ms, {:.1f} MB", read, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), bytes / (1024.0 * 1024.0));
+}
+
+/** The rig: the clock of the objects on by so many seconds, and what is not drawn since forgotten. */
+std::string RigForgetThreeDObjects(uint seconds)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	for (uint s = 0; s < seconds; s += 15) ForgetUnusedThreeDObjects();
+	size_t textures = 0, shapes = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (!o.levels.empty()) textures++;
+		for (const auto &p : o.shapes) shapes += p != nullptr;
+	}
+	return fmt::format("hodiny {} s, domu s texturou {}, zjednodusenych tvaru {}, prechodu {}, tvaru vozidel {}", _three_d_clock.load(), textures, shapes, _passages.size(), VehicleShapesKept());
+}
+
+/**
+ * How big the glow of a light of an object ("svetlo_NN", its x, y, z at i in lights) is drawn, a share of a lone
+ * light's (THREE_D_GLOW_UNITS): no bigger than the way to the nearest other light of it. Bulbs set close in a row -- the
+ * cinema's marquee, eleven of them 0.44 m apart -- light as a row of bulbs; with each the glow of a window they added
+ * up to one white blot over the door (the player, 23. 10.: "the cinema shines too much at night").
+ */
+float ThreeDGlowShare(const std::vector<float> &lights, size_t i)
+{
+	double nearest = THREE_D_GLOW_UNITS;
+	for (size_t j = 0; j + 2 < lights.size(); j += 3) {
+		if (j == i) continue;
+		const double dx = lights[j] - lights[i], dy = lights[j + 1] - lights[i + 1];
+		const double dz = (lights[j + 2] - lights[i + 2]) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+		nearest = std::min(nearest, std::sqrt(dx * dx + dy * dy + dz * dz));
+	}
+	return static_cast<float>(std::clamp(nearest / THREE_D_GLOW_UNITS, 0.3, 1.0));
+}
+
+/** A tree's trunk blocks the walker so far about its foot, metres; a plant lower than THREE_D_TRUNK_PLANT_M none (the crops, the flowers). */
+static constexpr double THREE_D_TRUNK_M = 0.3;
+static constexpr double THREE_D_TRUNK_PLANT_M = 4.0;
+
+/**
+ * Whether what stands on a tile of an industry of the original game drawn from the parts the industries share keeps
+ * the walker off a world point: its buildings by their shape (ThreeDObject::Blocks(), from the anchor of their block),
+ * its trees by their trunks only -- the crown is over the head. Before, every such tile was a wall, and the forest
+ * could not be walked into (the player, 23. 10.: "the distillery can be walked through and the forest I cannot enter").
+ * @return whether it blocks; nullopt for a tile the parts do not draw (a set's, one being built: as before)
+ */
+std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y)
+{
+	if (!IsTileType(tile, TileType::Industry)) return std::nullopt;
+	auto parts_of = [](TileIndex t) -> const ThreeDIndustryTileParts * {
+		const IndustryGfx gfx = GetIndustryGfx(t);
+		if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+		return GetThreeDOriginalIndustryTile(gfx);
+	};
+	const ThreeDIndustryTileParts *tp = parts_of(tile);
+	if (tp == nullptr || !ThreeDOriginalIndustryTileStands(tile, *tp)) return std::nullopt;
+	TileIndex anchor = tile;
+	if (tp->member) {
+		anchor = TileAddWrap(tile, -tp->anchor_dx, -tp->anchor_dy);
+		if (anchor == INVALID_TILE || !IsTileType(anchor, TileType::Industry) || GetIndustryIndex(anchor) != GetIndustryIndex(tile)) return false;
+		tp = parts_of(anchor);
+		if (tp == nullptr || tp->member) return false;
+	}
+	const double ox = x - TileX(anchor) * TILE_SIZE, oy = y - TileY(anchor) * TILE_SIZE;
+	for (const ThreeDObject *part : tp->parts) {
+		if (part->Blocks(ox, oy)) return true;
+	}
+	if (tp->plants != nullptr) {
+		for (const ThreeDObjectFigure &p : tp->plants->plants) {
+			if (p.scale * p.stretch < THREE_D_TRUNK_PLANT_M) continue;
+			if (std::hypot(ox - p.at[0] * OBJECT_UNITS_PER_METRE, oy - p.at[1] * OBJECT_UNITS_PER_METRE) < THREE_D_TRUNK_M * OBJECT_UNITS_PER_METRE) return true;
+		}
+	}
+	return false;
+}

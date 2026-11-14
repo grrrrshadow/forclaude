@@ -1,0 +1,90 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ * Changed for ottd Decouple by Karel Mácha: the changes Copyright (C) 2026 Karel Mácha.
+ */
+
+/** @file 40bpp_anim.hpp Animated 40 bpp blitter. */
+
+#ifndef BLITTER_40BPP_OPTIMIZED_HPP
+#define BLITTER_40BPP_OPTIMIZED_HPP
+
+
+#include "32bpp_optimized.hpp"
+#include "../video/video_driver.hpp"
+
+/** The optimized 40 bpp blitter (for OpenGL video driver). */
+class Blitter_40bppAnim : public Blitter_32bppOptimized {
+public:
+
+	void SetPixel(void *video, int x, int y, PixelColour colour) override;
+	void DrawRect(void *video, int width, int height, PixelColour colour) override;
+	void DarkenRect(void *video, int width, int height, uint r, uint g, uint b) override;
+	void RealizeAnimation(void *video, int width, int height) override;
+	void ClearAnimation(void *video, int width, int height) override;
+	void DrawLine(void *video, int x, int y, int x2, int y2, int screen_width, int screen_height, PixelColour colour, int width, int dash) override;
+	void CopyFromBuffer(void *video, const void *src, int width, int height) override;
+	void CopyToBuffer(const void *video, void *dst, int width, int height) override;
+	void CopyImageToBuffer(const void *video, void *dst, int width, int height, int dst_pitch) override;
+	void ScrollBuffer(void *video, int &left, int &top, int &width, int &height, int scroll_x, int scroll_y) override;
+	void Draw(Blitter::BlitterParams *bp, BlitterMode mode, ZoomLevel zoom) override;
+	void DrawColourMappingRect(void *dst, int width, int height, PaletteID pal) override;
+	Sprite *Encode(SpriteType sprite_type, const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
+	size_t BufferSize(uint width, uint height) override;
+	Blitter::PaletteAnimation UsePaletteAnimation() override;
+	bool NeedsAnimationBuffer() override;
+
+	std::string_view GetName()  override { return "40bpp-anim"; }
+
+	template <BlitterMode mode> void Draw(const Blitter::BlitterParams *bp, ZoomLevel zoom);
+
+protected:
+	static inline Colour RealizeBlendedColour(uint8_t anim, Colour c)
+	{
+		return anim != 0 ? AdjustBrightness(LookupColourInPalette(anim), GetColourBrightness(c)) : c;
+	}
+
+	/**
+	 * ComposeColourRGBANoCheck() over the screen, whose pixel may be of a hole the video driver lays a picture of the
+	 * graphics card into (alpha below 255, its colour with its alpha in it; the ground of the turned map): what covers
+	 * it adds to its alpha. Over a whole pixel the same as ComposeColourRGBANoCheck().
+	 */
+	static inline Colour ComposeOver(uint r, uint g, uint b, uint a, Colour current)
+	{
+		Colour c = ComposeColourRGBANoCheck(r, g, b, a, current);
+		c.a = static_cast<uint8_t>(current.a + ((255 - current.a) * a) / 256);
+		return c;
+	}
+
+	/** ComposeColourPANoCheck() over the screen, over a hole too (ComposeOver()). */
+	static inline Colour ComposeOver(Colour colour, uint a, Colour current)
+	{
+		return ComposeOver(colour.r, colour.g, colour.b, a, current);
+	}
+
+	/** MakeTransparent() over the screen, over a hole too (ComposeOver()): what shows through it darkened as much. */
+	static inline Colour DarkenOver(Colour colour, uint nom, uint denom = 256)
+	{
+		Colour c = MakeTransparent(colour, nom, denom);
+		c.a = static_cast<uint8_t>(255 - ((255 - colour.a) * nom) / denom);
+		return c;
+	}
+
+};
+
+/** Factory for the 40 bpp animated blitter (for OpenGL). */
+class FBlitter_40bppAnim : public BlitterFactory {
+protected:
+	bool IsUsable() const override
+	{
+		return VideoDriver::GetInstance() == nullptr || VideoDriver::GetInstance()->HasAnimBuffer();
+	}
+
+public:
+	FBlitter_40bppAnim() : BlitterFactory("40bpp-anim", "40bpp Animation Blitter (OpenGL)") {}
+	std::unique_ptr<Blitter> CreateInstance() override { return std::make_unique<Blitter_40bppAnim>(); }
+};
+
+#endif /* BLITTER_40BPP_OPTIMIZED_HPP */
