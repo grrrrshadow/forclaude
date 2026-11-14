@@ -612,6 +612,8 @@ struct ThreeDVehicleShape {
 	const ThreeDVehicleShape *Simpler(double cell_m, bool plant = false) const;
 	const ThreeDVehicleShape *TrySimpler(double cell_m, bool plant = false) const;
 	size_t Bytes() const;
+	size_t SimplerBytes(int &count) const;
+	int JoinSimpler() const;
 private:
 	/** Its simpler shapes, made the first time each is asked for; a copy of the shape has none of its own yet. */
 	struct SimplerShapes {

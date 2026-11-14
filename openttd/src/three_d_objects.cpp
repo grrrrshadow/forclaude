@@ -9529,7 +9529,28 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, bool plant)
 	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m, plant);
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / SIMPLER_CELL_M))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
-	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level, plant] { return MakeSimplerShape(*this, level, plant); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
+	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level, plant] { return MakeSimplerShape(*this, level, plant); }, [this, level, &made](std::shared_ptr<const ThreeDVehicleShape> out) {
+		/* One that saves little against the nearest finer one made is not kept, that one stands for it (the player's log
+		 * of 14. 11., the game killed for memory at 4.8 GB, the vehicles' shapes 1.6 GB of it: a model all seams is not
+		 * made simpler at all, each of its levels a whole copy -- the two-wheel cart 13.0 MB a level beside its own
+		 * 12.6 MB; a Tatra's six levels 58 MB beside its own 20 MB, each a little less than the one before: 303, 244,
+		 * 209, 192, 185 and 182 thousand triangles of 554). The shape itself not owned: the level lives in it. The
+		 * levels are asked for from the coarsest as a vehicle comes nearer, no finer one made yet: joined again between
+		 * the frames (JoinSimpler()). */
+		const ThreeDVehicleShape *finer = this;
+		int finer_level = -1;
+		for (int l = level - 1; l >= 0 && finer_level < 0; l--) {
+			if (this->simpler.shapes[l] != nullptr) {
+				finer = this->simpler.shapes[l].get();
+				finer_level = l;
+			}
+		}
+		if (out != nullptr && out->tri.size() * 4 > finer->tri.size() * 3) {
+			made = finer_level >= 0 ? this->simpler.shapes[finer_level] : std::shared_ptr<const ThreeDVehicleShape>(std::shared_ptr<void>(), this);
+		} else {
+			made = std::move(out);
+		}
+	});
 	return made != nullptr ? made.get() : this;
 }
 
@@ -15189,6 +15210,20 @@ static void ForgetUnusedThreeDObjectsNow()
 	_three_d_forgets_done++;
 	TrimThreeDTextures();
 	TrimThreeDEyePainted();
+	/* Of the shapes kept, the simpler shapes that save little joined (ThreeDVehicleShape::JoinSimpler()). */
+	{
+		std::vector<std::shared_ptr<const ThreeDVehicleShape>> kept;
+		{
+			std::lock_guard lock(_vehicle_shapes_mutex);
+			for (const auto &[key, shape] : _vehicle_shapes) {
+				if (shape != nullptr) kept.push_back(shape);
+			}
+		}
+		std::lock_guard lock(_lazy_mutex);
+		int joined = 0;
+		for (const auto &shape : kept) joined += shape->JoinSimpler();
+		if (joined > 0) Debug(misc, 1, "3D objects: {} simpler shapes joined with finer ones", joined);
+	}
 	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) return;
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
 	size_t forgotten = 0;
@@ -15223,6 +15258,7 @@ static void ForgetUnusedThreeDObjectsNow()
 			}
 		}
 	}
+
 	if (forgotten > 0) Debug(misc, 1, "3D objects: {} not drawn for {} s forgotten", forgotten, THREE_D_FORGET_AFTER);
 }
 
@@ -15252,6 +15288,49 @@ static size_t VectorBytes(const std::vector<T> &v)
 }
 
 /** The memory of a vehicle's shape and of its simpler shapes made: its corners, triangles and lights (its textures apart). */
+/**
+ * Its simpler shapes that save little against the nearest finer one made let go of, that one standing for each
+ * (Simpler(): at least a quarter fewer triangles, or it is not worth a copy). Between the frames, when nothing holds
+ * what the objects made (ForgetUnusedThreeDObjectsNow()); under _lazy_mutex.
+ * @return how many were let go of
+ */
+int ThreeDVehicleShape::JoinSimpler() const
+{
+	int joined = 0;
+	const ThreeDVehicleShape *finer = this;
+	int finer_level = -1;
+	for (int l = 0; l < SIMPLER_LEVELS; l++) {
+		std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[l];
+		if (made == nullptr) continue;
+		if (made.get() == finer) continue;
+		if (made->tri.size() * 4 > finer->tri.size() * 3) {
+			made = finer_level >= 0 ? this->simpler.shapes[finer_level] : std::shared_ptr<const ThreeDVehicleShape>(std::shared_ptr<void>(), this);
+			joined++;
+		} else {
+			finer = made.get();
+			finer_level = l;
+		}
+	}
+	return joined;
+}
+
+/** What its simpler shapes hold, and how many they are (the rig). */
+size_t ThreeDVehicleShape::SimplerBytes(int &count) const
+{
+	size_t b = 0;
+	count = 0;
+	const ThreeDVehicleShape *last = this;
+	for (const auto &simpler : this->simpler.shapes) {
+		/* One standing for the next (Simpler()) once. */
+		if (simpler != nullptr && simpler.get() != last) {
+			b += simpler->Bytes();
+			count++;
+			last = simpler.get();
+		}
+	}
+	return b;
+}
+
 size_t ThreeDVehicleShape::Bytes() const
 {
 	size_t b = VectorBytes(this->pos) + VectorBytes(this->nrm) + VectorBytes(this->uv) + VectorBytes(this->tri) + VectorBytes(this->tri_tex);
@@ -15260,9 +15339,8 @@ size_t ThreeDVehicleShape::Bytes() const
 	b += VectorBytes(this->lanterns) + VectorBytes(this->torches) + VectorBytes(this->torch_aims);
 	b += VectorBytes(this->tex_glow) + VectorBytes(this->tex_alpha);
 	b += VectorBytes(this->corner_joints) + VectorBytes(this->corner_weights);
-	for (const auto &simpler : this->simpler.shapes) {
-		if (simpler != nullptr) b += simpler->Bytes();
-	}
+	int simpler_count;
+	b += this->SimplerBytes(simpler_count);
 	return b;
 }
 
@@ -15287,6 +15365,39 @@ static size_t LevelsBytes(const ThreeDTextureLevels &lv)
 		for (const ThreeDObjectTexture &t : *lv) b += VectorBytes(t.px);
 	}
 	return b;
+}
+
+/** The rig ('test3d pamet tvary'): the vehicles' shapes holding the most, each with its own lists and its simpler shapes apart. */
+std::string RigDescribeBiggestShapes()
+{
+	auto mb = [](size_t b) { return b / (1024.0 * 1024.0); };
+	struct Row { size_t all, geo, night, per_tri, simpler; int simpler_n; size_t corners, tris; std::string key; };
+	std::vector<Row> rows;
+	{
+		std::lock_guard lock(_vehicle_shapes_mutex);
+		for (const auto &[key, shape] : _vehicle_shapes) {
+			if (shape == nullptr) continue;
+			Row r{};
+			r.all = shape->Bytes();
+			r.geo = VectorBytes(shape->pos) + VectorBytes(shape->nrm) + VectorBytes(shape->uv) + VectorBytes(shape->tri);
+			r.night = VectorBytes(shape->night_pos) + VectorBytes(shape->night_tri) + VectorBytes(shape->night_colour) + VectorBytes(shape->night_kind) + VectorBytes(shape->night_part);
+			r.per_tri = VectorBytes(shape->tri_tex) + VectorBytes(shape->tri_part) + VectorBytes(shape->tri_glass) + VectorBytes(shape->corner_wheel) + VectorBytes(shape->corner_joints) + VectorBytes(shape->corner_weights);
+			r.simpler = shape->SimplerBytes(r.simpler_n);
+			r.corners = shape->pos.size() / 3;
+			r.tris = shape->tri.size() / 3;
+			r.key = key;
+			rows.push_back(std::move(r));
+		}
+	}
+	std::ranges::sort(rows, std::greater{}, &Row::all);
+	size_t all = 0, geo = 0, simpler = 0, night = 0, per_tri = 0;
+	for (const Row &r : rows) { all += r.all; geo += r.geo; simpler += r.simpler; night += r.night; per_tri += r.per_tri; }
+	std::string out = fmt::format("tvary {}: celkem {:.1f} MB, vlastni rohy a trojuhelniky {:.1f}, zjednodusene {:.1f}, nocni {:.1f}, po trojuhelnicich {:.1f}", rows.size(), mb(all), mb(geo), mb(simpler), mb(night), mb(per_tri));
+	for (size_t i = 0; i < std::min<size_t>(rows.size(), 8); i++) {
+		const Row &r = rows[i];
+		out += fmt::format("\n  {:.1f} MB (rohy {:.1f}, zjednodusene {}x {:.1f}, nocni {:.1f}, po trojuhelnicich {:.1f}) {} rohu {} trojuhelniku: {}", mb(r.all), mb(r.geo), r.simpler_n, mb(r.simpler), mb(r.night), mb(r.per_tri), r.corners, r.tris, r.key.size() > 150 ? r.key.substr(r.key.size() - 150) : r.key);
+	}
+	return out;
 }
 
 /**

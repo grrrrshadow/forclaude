@@ -10996,6 +10996,34 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_DEFAULT, "test3d:   {}", half);
 			}
 		}
+	} else if (what == "vyjed") {
+		/* 'vyjed': a save's vehicles standing stopped in their depots sent out, the game going (the player's sxs.sav, 14. 11.:
+		 * "it is enough to let the vehicles out of the depot; there are two depots"): how many, and where. */
+		_pause_mode = {};
+		std::map<uint32_t, int> depots;
+		int started = 0;
+		for (Vehicle *v : Vehicle::Iterate()) {
+			if (!v->IsPrimaryVehicle() || !v->vehstatus.Test(VehState::Stopped)) continue;
+			AutoRestoreBackup cur_company(_current_company, v->owner);
+			if (Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, v->index, false).Succeeded()) {
+				started++;
+				depots[v->tile.base()]++;
+			}
+		}
+		std::string where;
+		for (const auto &[tile, n] : depots) where += fmt::format(" {}x na {},{}", n, TileX(TileIndex(tile)), TileY(TileIndex(tile)));
+		IConsolePrint(CC_DEFAULT, "test3d: vyjed: {} vozidel:{}", started, where);
+		return true;
+	} else if (what == "pamet" && argv.size() > 2 && argv[2] == "tvary") {
+		/* 'pamet tvary': the vehicles' shapes holding the most (RigDescribeBiggestShapes()). */
+		extern std::string RigDescribeBiggestShapes();
+		const std::string all = RigDescribeBiggestShapes();
+		for (size_t from = 0; from < all.size();) {
+			const size_t to = std::min(all.find('\n', from), all.size());
+			IConsolePrint(CC_DEFAULT, "test3d: pamet {}", all.substr(from, to - from));
+			from = to + 1;
+		}
+		return true;
 	} else if (what == "pamet") {
 		/* 'pamet': how much memory the 3D objects (glb) and the pictures made of them take. */
 		extern std::string DescribeThreeDObjectMemory();
