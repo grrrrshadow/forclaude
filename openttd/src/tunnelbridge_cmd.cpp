@@ -1326,6 +1326,12 @@ static void DrawBridgeRoadBits(TileIndex head_tile, int x, int y, int z, int off
  * @param water a ship tunnel's: the canal's water under it, the concrete; else a road tunnel's, the stones
  * @return whether it was drawn so: the road portal's sprites left out
  */
+/**
+ * The tunnel's end whose mouth in 3D was drawn last (DrawThreeDTunnelEntrance()): the turned view lays its ground level
+ * at the foot of the slope, as the mouth's walls stand (ViewportDoDrawTurned()).
+ */
+TileIndex _three_d_tunnel_mouth_drawn = INVALID_TILE;
+
 static bool DrawThreeDTunnelEntrance(const TileInfo *ti, bool water)
 {
 	if (ViewportDrawingEye() || (!ViewportDrawingTurned() && !ViewportDrawingNorthObjects())) return false;
@@ -1383,6 +1389,7 @@ static bool DrawThreeDTunnelEntrance(const TileInfo *ti, bool water)
 	const double along = half - WALL_T_M / 2 * m;
 	const double hc = WALL_T_M / 2 * m;
 	put(FACE, cx + ax * along, cy + ay * along, left_deg, std::abs(px) * half + std::abs(ax) * hc, std::abs(py) * half + std::abs(ay) * hc, LEVEL_M);
+	_three_d_tunnel_mouth_drawn = ti->tile;
 	return true;
 }
 

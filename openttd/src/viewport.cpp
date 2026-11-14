@@ -8798,6 +8798,19 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		t.top_slope = t.raw_slope;
 		t.top_z = t.raw_z;
 		if (_cur_ti.tile != INVALID_TILE) std::tie(t.top_slope, t.top_z) = GetFoundationPixelSlope(_cur_ti.tile);
+		/* A tunnel's end with its mouth in 3D (DrawThreeDTunnelEntrance()): its ground -- a straight road, a straight
+		 * track, the canal's water -- level at the foot of the slope into the portal, between the mouth's walls, as the
+		 * vehicles go there; laid on the tile's slope the road rose to the hill's top before the portal (the player's save
+		 * of 14. 11., the sign 'pohled shora odsud': "turned, the road at the entrance is drawn wrong, raised as on a
+		 * slope, while there is the entrance to the tunnel"). In its place among the tiles: the hill before it hides it. */
+		{
+			extern TileIndex _three_d_tunnel_mouth_drawn;
+			if (_cur_ti.tile != INVALID_TILE && _three_d_tunnel_mouth_drawn == _cur_ti.tile) {
+				t.top_slope = SLOPE_FLAT;
+				t.top_z = _cur_ti.z;
+			}
+			_three_d_tunnel_mouth_drawn = INVALID_TILE;
+		}
 		t.first_sprite = first;
 		t.end_sprite = _vd.tile_sprites_to_draw.size();
 		t.foundation[0] = _vd.foundation[FoundationPart::Normal];
