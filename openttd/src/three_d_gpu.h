@@ -141,6 +141,25 @@ struct ThreeDGpuPicture {
  * filled from the nearest within three texels, as the processor fills it --, shaded by the light of the corners about
  * it; the side facing away left out; the nearer kept.
  */
+/**
+ * A part of a building's first texture the card paints as it draws it (the player, 14. 11.: "why does the card not keep
+ * one pattern and colour it?"): where the mask has the part, the texture's colour turned to the part's as bright as the
+ * texel is of `start`, and the part's pattern laid over it by the building's own surface -- level across, up its slope,
+ * a picture every pattern_m metres --, as ThreeDObject::Painted() of three_d_objects.cpp paints a copy of the texture.
+ * The texture, the masks and the patterns are on the card once for every building and paint.
+ */
+struct ThreeDGpuBuildingPaint {
+	const ThreeDObjectTexture *mask = nullptr;    ///< the part where its red is, as much
+	std::array<float, 3> colour{};                ///< its colour, 0 .. 255
+	float start = 255.0f;                         ///< a texel this bright is the colour as it is
+	const ThreeDObjectTexture *pattern = nullptr; ///< its pattern's finest picture, nullptr none
+	float pattern_m = 0;                          ///< metres a picture of the pattern
+	bool only_sloped = false;                     ///< the pattern not on a level surface
+};
+
+/** A building's parts painted by the card at most (ThreeDGpuBuildingPaint): more, the processor paints its texture. */
+static constexpr size_t THREE_D_GPU_BUILDING_PAINTS = 4;
+
 struct ThreeDGpuBuilding {
 	uint64_t uid = 0;                     ///< its shape's number (ThreeDObjectShapeView::uid)
 	std::span<const float> pos;           ///< its corners, world units from its north corner
@@ -150,6 +169,8 @@ struct ThreeDGpuBuilding {
 	std::span<const int8_t> facing;       ///< each triangle's side facing out (1 its corners' order, -1 the other, 0 both); empty: both
 	std::span<const uint8_t> tri_tex;     ///< each triangle's texture; empty: all the first
 	std::vector<const ThreeDObjectTexture *> textures;
+	std::vector<ThreeDGpuBuildingPaint> paints; ///< its first texture painted by the card (the view from the eyes); empty: as it is
+	std::array<float, 3> to_metres{1.0f, 1.0f, 1.0f}; ///< its corners' units to metres along x, y and up (the patterns' size)
 	bool cull = true;                     ///< the sides facing away left out (the rig: test3d zadni 0 draws them)
 };
 

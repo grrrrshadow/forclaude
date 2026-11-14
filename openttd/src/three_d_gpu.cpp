@@ -296,6 +296,9 @@ constexpr GLenum GL_RGBA = 0x1908;
 constexpr GLenum GL_RENDERER = 0x1F01;
 constexpr GLenum GL_VERSION = 0x1F02;
 constexpr GLenum GL_NEAREST = 0x2600;
+constexpr GLenum GL_LINEAR = 0x2601;
+constexpr GLenum GL_LINEAR_MIPMAP_LINEAR = 0x2703;
+constexpr GLenum GL_REPEAT = 0x2901;
 constexpr GLenum GL_TEXTURE_MAG_FILTER = 0x2800;
 constexpr GLenum GL_TEXTURE_MIN_FILTER = 0x2801;
 constexpr GLenum GL_TEXTURE_WRAP_S = 0x2802;
@@ -315,6 +318,7 @@ constexpr GLenum GL_TEXTURE0 = 0x84C0;
 constexpr GLenum GL_TEXTURE1 = 0x84C1;
 constexpr GLenum GL_TEXTURE2 = 0x84C2;
 constexpr GLenum GL_TEXTURE3 = 0x84C3;
+constexpr GLenum GL_TEXTURE5 = 0x84C5;
 constexpr GLenum GL_MAX_RENDERBUFFER_SIZE = 0x84E8;
 constexpr GLenum GL_RGBA32F = 0x8814;
 constexpr GLenum GL_ARRAY_BUFFER = 0x8892;
@@ -393,6 +397,7 @@ constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 	X(void, glGenVertexArrays, (GLsizei n, GLuint *arrays)) \
 	X(void, glDeleteVertexArrays, (GLsizei n, const GLuint *arrays)) \
 	X(void, glBindVertexArray, (GLuint array)) \
+	X(void, glGenerateMipmap, (GLenum target)) \
 	X(void, glGenBuffers, (GLsizei n, GLuint *buffers)) \
 	X(void, glDeleteBuffers, (GLsizei n, const GLuint *buffers)) \
 	X(void, glBindBuffer, (GLenum target, GLuint buffer)) \
@@ -1018,23 +1023,59 @@ layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
 layout(location = 2) in float a_light;
 uniform mat4 u_matrix;
+uniform vec3 u_metres;
 out vec2 v_uv;
+out vec3 v_m;
 flat out float v_light;
 void main()
 {
 	gl_Position = u_matrix * vec4(a_pos, 1.0);
 	v_uv = a_uv;
+	v_m = a_pos * u_metres;
 	v_light = a_light;
 }
 )";
 
+/* The building's first texture painted as it is drawn (ThreeDGpuBuildingPaint; ThreeDObject::Painted() of
+ * three_d_objects.cpp paints a copy the same way): each part where its mask is -- the texel's colour to the part's, as
+ * bright as the texel is of its start --, then the part's pattern over it, laid by the surface's own place in metres:
+ * across it level, up its slope (a level surface along x and y), a picture every so many metres. */
 const char *const EYE_BUILDING_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_tex;
 uniform float u_near;
+uniform int u_parts;
+uniform sampler2D u_mask0, u_mask1, u_mask2, u_mask3;
+uniform sampler2D u_pattern0, u_pattern1, u_pattern2, u_pattern3;
+uniform vec4 u_colour[4]; // red, green, blue (0 .. 255), start
+uniform vec4 u_about[4];  // metres a picture of the pattern (0: none), only on a slope
 in vec2 v_uv;
+in vec3 v_m;
 flat in float v_light;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_glow;
+float part_of(sampler2D mask, ivec2 at, ivec2 size)
+{
+	ivec2 ms = textureSize(mask, 0);
+	vec4 mp = texelFetch(mask, min(ms - 1, at * ms / size), 0);
+	return mp == vec4(0.0) ? 0.0 : mp.r;
+}
+vec3 painted(vec3 c, float m, vec4 colour, vec4 about, sampler2D pattern, vec3 n, float nl)
+{
+	if (m <= 0.0) return c;
+	float l = max(c.r, max(c.g, c.b)) / colour.a;
+	c = clamp(floor(c + (min(vec3(255.0), colour.rgb * l) - c) * m), 0.0, 255.0);
+	if (about.x <= 0.0 || nl < 1e-12) return c;
+	if (about.y > 0.5 && abs(n.z) >= 0.985) return c;
+	vec3 sd = vec3(1.0, 0.0, 0.0), td = vec3(0.0, 1.0, 0.0);
+	if (abs(n.z) < 0.985) {
+		float nxy = length(n.xy);
+		sd = vec3(-n.y / nxy, n.x / nxy, 0.0);
+		td = cross(n, sd);
+		if (td.z < 0.0) td = -td;
+	}
+	vec4 q = texture(pattern, vec2(dot(v_m, sd), -dot(v_m, td)) / about.x);
+	return clamp(floor(c + (q.rgb * 255.0 - c) * (q.a * m)), 0.0, 255.0);
+}
 void main()
 {
 	o_glow = vec4(0.0);
@@ -1044,6 +1085,15 @@ void main()
 	vec4 t = texelFetch(u_tex, at, 0);
 	if (t == vec4(0.0)) discard;
 	vec3 c = floor(t.rgb * 255.0 + 0.5);
+	if (u_parts > 0) {
+		vec3 n = cross(dFdx(v_m), dFdy(v_m));
+		float nl = length(n);
+		if (nl >= 1e-12) n /= nl;
+		c = painted(c, part_of(u_mask0, at, size), u_colour[0], u_about[0], u_pattern0, n, nl);
+		if (u_parts > 1) c = painted(c, part_of(u_mask1, at, size), u_colour[1], u_about[1], u_pattern1, n, nl);
+		if (u_parts > 2) c = painted(c, part_of(u_mask2, at, size), u_colour[2], u_about[2], u_pattern2, n, nl);
+		if (u_parts > 3) c = painted(c, part_of(u_mask3, at, size), u_colour[3], u_about[3], u_pattern3, n, nl);
+	}
 	if (v_light != 256.0) c = min(vec3(255.0), floor(c * v_light / 256.0));
 	o_colour = vec4(c / 255.0, 1.0);
 	gl_FragDepth = u_near * gl_FragCoord.w;
@@ -3237,6 +3287,38 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
 
+/**
+ * A pattern laid over a building's part (ThreeDGpuBuildingPaint::pattern) on the card: repeating, smoothed, with its
+ * smaller pictures made by the card -- one for every building it is laid on.
+ */
+const GpuTexture *PatternOnCard(const ThreeDObjectTexture &t)
+{
+	auto it = _card_textures.find(t.uid.value);
+	if (it != _card_textures.end()) {
+		it->second.used = _card_clock;
+		return &it->second;
+	}
+	if (t.w <= 0 || t.h <= 0 || t.w > _max_texture || t.h > _max_texture || t.px.size() < static_cast<size_t>(t.w) * t.h) return nullptr;
+	Step(fmt::format("tapeta na kartu: {}x{}", t.w, t.h));
+	GpuTexture g;
+	gl.glGenTextures(1, &g.name);
+	gl.glBindTexture(GL_TEXTURE_2D, g.name);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, t.w, t.h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, t.px.data());
+	gl.glGenerateMipmap(GL_TEXTURE_2D);
+	g.bytes = static_cast<size_t>(t.w) * t.h * 4 * 4 / 3;
+	g.used = _card_clock;
+	_card_bytes += g.bytes;
+	_card_bytes_of[2] += g.bytes;
+	_card_sent_of[2] += g.bytes;
+	_card_sent += g.bytes;
+	return &_card_textures.emplace(t.uid.value, g).first->second;
+}
+
 /** A mask of details on the card, its index in the red of each texel (8 bits as it is). */
 const GpuTexture *DetailMaskOnCard(const ThreeDDetailMask &m)
 {
@@ -5342,6 +5424,11 @@ struct EyeObjectDraws {
 		const ThreeDGpuEyeBuilding *eye;
 		const GpuBuilding *on;
 		std::vector<GLuint> textures;
+		/** Its first texture's parts painted as it is drawn (ThreeDGpuBuildingPaint): the mask and the pattern on the card, 0 none. */
+		struct Part {
+			GLuint mask = 0, pattern = 0;
+		};
+		std::vector<Part> parts = {};
 	};
 	struct MeshDraw {
 		const ThreeDGpuMesh *mesh;
@@ -5425,6 +5512,18 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 			if (t == nullptr) return false;
 			d.textures[r.texture] = t->name;
 		}
+		/* What paints its first texture: the masks as they are, the patterns repeating and smoothed. One that cannot be
+		 * put on the card: unpainted this picture. */
+		for (const ThreeDGpuBuildingPaint &bp : e.building.paints) {
+			if (d.parts.size() >= THREE_D_GPU_BUILDING_PAINTS) break;
+			const GpuTexture *mask = bp.mask != nullptr ? TextureOnCard(*bp.mask) : nullptr;
+			const GpuTexture *pattern = bp.pattern != nullptr ? PatternOnCard(*bp.pattern) : nullptr;
+			if (mask == nullptr || (bp.pattern != nullptr && pattern == nullptr)) {
+				d.parts.clear();
+				break;
+			}
+			d.parts.push_back({mask->name, pattern != nullptr ? pattern->name : 0});
+		}
 		out.draws.push_back(std::move(d));
 	}
 	/* The figures' shapes, triangles, textures and the masks the card paints them by as it draws them (ThreeDGpuMesh::paints). */
@@ -5497,16 +5596,57 @@ static std::string MeshDrawKind(bool glass, bool instanced, const GpuShape &shap
 
 void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 {
-	gl.glUseProgram(_eye_building_program.program);
+	const GLuint bp = _eye_building_program.program;
+	gl.glUseProgram(bp);
 	gl.glUniform1i(_eye_building_program.tex, 0);
 	gl.glUniform1f(_eye_building_program.near_plane, near_plane);
+	/* The parts the card paints (EYE_BUILDING_FRAGMENT): their masks on the units 1 to 4, their patterns on 5 to 8. */
+	const GLint u_parts = gl.glGetUniformLocation(bp, "u_parts"), u_metres = gl.glGetUniformLocation(bp, "u_metres");
+	std::array<GLint, THREE_D_GPU_BUILDING_PAINTS> u_colour, u_about;
+	for (int k = 0; k < static_cast<int>(THREE_D_GPU_BUILDING_PAINTS); k++) {
+		gl.glUniform1i(gl.glGetUniformLocation(bp, fmt::format("u_mask{}", k).c_str()), 1 + k);
+		gl.glUniform1i(gl.glGetUniformLocation(bp, fmt::format("u_pattern{}", k).c_str()), 5 + k);
+		u_colour[k] = gl.glGetUniformLocation(bp, fmt::format("u_colour[{}]", k).c_str());
+		u_about[k] = gl.glGetUniformLocation(bp, fmt::format("u_about[{}]", k).c_str());
+	}
+	gl.glUniform1i(u_parts, 0);
+	int parts_set = 0;
 	gl.glActiveTexture(GL_TEXTURE0);
 	gl.glCullFace(GL_BACK);
 	for (const EyeObjectDraws::Draw &d : o.draws) {
 		gl.glUniformMatrix4fv(_eye_building_program.matrix, 1, GL_TRUE, d.eye->matrix.data());
 		gl.glBindVertexArray(d.on->vao);
+		/* Its paint: the parts of its first texture, set once for its runs of that texture. */
+		const int parts = static_cast<int>(std::min(d.parts.size(), d.eye->building.paints.size()));
+		if (parts > 0) {
+			std::array<float, 4 * THREE_D_GPU_BUILDING_PAINTS> colours{}, about{};
+			for (int k = 0; k < parts; k++) {
+				const ThreeDGpuBuildingPaint &p = d.eye->building.paints[k];
+				colours[k * 4] = p.colour[0];
+				colours[k * 4 + 1] = p.colour[1];
+				colours[k * 4 + 2] = p.colour[2];
+				colours[k * 4 + 3] = std::max(1.0f, p.start);
+				about[k * 4] = d.parts[k].pattern != 0 ? p.pattern_m : 0.0f;
+				about[k * 4 + 1] = p.only_sloped ? 1.0f : 0.0f;
+				gl.glActiveTexture(GL_TEXTURE1 + k);
+				gl.glBindTexture(GL_TEXTURE_2D, d.parts[k].mask);
+				gl.glActiveTexture(GL_TEXTURE5 + k);
+				gl.glBindTexture(GL_TEXTURE_2D, d.parts[k].pattern != 0 ? d.parts[k].pattern : d.parts[k].mask);
+			}
+			gl.glActiveTexture(GL_TEXTURE0);
+			for (int k = 0; k < parts; k++) {
+				gl.glUniform4f(u_colour[k], colours[k * 4], colours[k * 4 + 1], colours[k * 4 + 2], colours[k * 4 + 3]);
+				gl.glUniform4f(u_about[k], about[k * 4], about[k * 4 + 1], about[k * 4 + 2], about[k * 4 + 3]);
+			}
+			gl.glUniform3f(u_metres, d.eye->building.to_metres[0], d.eye->building.to_metres[1], d.eye->building.to_metres[2]);
+		}
 		for (const GpuBuilding::Run &r : d.on->runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
+			const int run_parts = r.texture == 0 ? parts : 0;
+			if (run_parts != parts_set) {
+				gl.glUniform1i(u_parts, run_parts);
+				parts_set = run_parts;
+			}
 			const bool cull = r.facing != 0 && d.eye->building.cull;
 			if (!cull) {
 				gl.glDisable(GL_CULL_FACE);

@@ -15112,6 +15112,8 @@ struct CabFigure {
 	uint32_t glow = 0;    ///< its own light over all of it, as a material's (ThreeDVehicleShape::Glow()): a thing of the sea at night; 0 none
 };
 static std::vector<CabFigure> _cab_figures;
+/** The buildings of the view from the eyes painted by the card as it draws them (ThreeDGpuBuildingPaint); the rig: 'test3d domykartou 0|1'. */
+bool _eye_buildings_card_paint = true;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
 double _cab_detail_pixels = 2.0;
 /** The rig: 'test3d detail <px> textura': its textures at their full size, whatever its distance. */
@@ -19324,6 +19326,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		ThreeDObjectShapeView shape;
 		std::vector<const ThreeDObjectTexture *> texs; ///< its textures by the triangles' (ThreeDObject::GetTextureOf()): [0] tex; nullptr not made yet
 		double pixels_per_unit; ///< the picture's pixels to a unit of the world there: its materials' levels (ThreeDObject::EyeTextureLevel())
+		std::vector<ThreeDGpuBuildingPaint> paints = {}; ///< its first texture painted by the card as it draws it (ThreeDObject::TryGetCardPaint()); empty: tex as it is
 	};
 	std::vector<ObjectJob> jobs;
 	for (const CabObject &co : objects) {
@@ -19349,7 +19352,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	}
 	/* Its texture painted and its shape simplified if they are made; else unpainted and whole meanwhile, made in the background. */
 	for (ObjectJob &j : jobs) {
-		j.tex = j.o->TryGetTexture(j.level, j.paint);
+		/* Painted by the card as it draws it (the player, 14. 11.: "why does the card not keep one pattern and colour
+		 * it?"): the texture unpainted, one for all the houses of the kind, and the paint's parts; where the card does
+		 * not draw, or cannot paint it, the copy the processor paints. The rig: 'test3d domykartou 0'. */
+		extern bool _eye_buildings_card_paint;
+		if (!_eye_buildings_card_paint || !ThreeDGpuAvailable() || !j.o->TryGetCardPaint(j.level, j.paint, j.tex, j.paints)) {
+			j.paints.clear();
+			j.tex = j.o->TryGetTexture(j.level, j.paint);
+		}
 		j.shape = j.o->TryGetShape(j.shape_level);
 		/* Its add-ons' textures too; one not made yet, its triangles not this frame. */
 		j.texs.assign(1, j.tex);
@@ -19376,6 +19386,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			b.building.facing = job.shape.facing;
 			b.building.tri_tex = job.shape.tri_tex;
 			b.building.textures = job.texs;
+			b.building.paints = job.paints;
+			b.building.to_metres = {static_cast<float>(1.0 / OBJECT_UNITS_PER_METRE), static_cast<float>(1.0 / OBJECT_UNITS_PER_METRE), static_cast<float>(1.0 / OBJECT_HEIGHT_PER_METRE)};
 			b.matrix = EyeClipMatrix(EyeClip(eye, width, height, job.ox, job.oy, job.oz, near));
 		}
 	};

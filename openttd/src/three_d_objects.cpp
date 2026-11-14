@@ -14851,6 +14851,62 @@ const ThreeDObjectTexture *ThreeDObject::MaterialTexture(size_t material, int le
 }
 
 /**
+ * The building's texture for the card to paint as it draws it (ThreeDGpuBuildingPaint): unpainted at a level, and the
+ * parts of a paint -- each its mask, its colour and its pattern, as Painted() takes them. Nothing is painted here and
+ * no copy of the texture made: every house of a kind draws from the one texture, whatever its colours and tiles.
+ * @param[out] plain the texture unpainted, nullptr not read yet
+ * @param[out] paints the parts; empty with nothing to paint, or a mask not read yet (unpainted meanwhile)
+ * @return false: the processor paints it (a tree in the colours of its use, more parts than the card takes)
+ */
+bool ThreeDObject::TryGetCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<ThreeDGpuBuildingPaint> &paints) const
+{
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].TryGetCardPaint(level, paint, plain, paints);
+	paints.clear();
+	if (this->tree_uses || this->colours.size() > THREE_D_GPU_BUILDING_PAINTS) return false;
+	plain = this->TryGetTexture(level, 0);
+	if (plain == nullptr || paint == 0 || this->colours.empty()) return true;
+	const uint8_t bits = PaintBits(this->colours.size());
+	for (size_t k = 0; k < this->colours.size(); k++) {
+		const ThreeDObjectColourPart &part = this->colours[k];
+		if (part.palette.empty()) continue;
+		/* Its mask, read in the background the first time. */
+		if (!MadeOrAsked(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part, k] {
+			MakeOnce(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part] {
+				std::vector<ThreeDObjectTexture> made;
+				DecodeTextureLevels(part.mask_png, made);
+				return made;
+			}, [&part](std::vector<ThreeDObjectTexture> made) { part.levels = std::move(made); });
+		})) {
+			paints.clear();
+			return true;
+		}
+		const uint32_t number = GB(paint, static_cast<uint8_t>(bits * k), bits);
+		ThreeDGpuBuildingPaint p;
+		/* The mask's level nearest the texture's (Painted()). */
+		p.mask = &part.levels.back();
+		for (const ThreeDObjectTexture &m : part.levels) {
+			if (m.w <= plain->w) {
+				p.mask = &m;
+				break;
+			}
+		}
+		const Colour colour(part.per_company ? CompanyPaintColour(number) : part.palette[number % part.palette.size()]);
+		p.colour = {static_cast<float>(colour.r), static_cast<float>(colour.g), static_cast<float>(colour.b)};
+		p.start = static_cast<float>(part.start);
+		if (!part.patterns.empty() && !this->tri.empty()) {
+			const size_t which = (static_cast<uint64_t>(paint) * 2654435761u >> 13) % part.patterns.size();
+			if (part.patterns[which] != nullptr && !part.patterns[which]->empty()) {
+				p.pattern = &part.patterns[which]->front();
+				p.pattern_m = static_cast<float>(part.pattern_m[which]);
+				p.only_sloped = part.pattern_sloped[which] != 0;
+			}
+		}
+		paints.push_back(p);
+	}
+	return true;
+}
+
+/**
  * The building's texture at a level of detail if it is read already, painted (PaintAt()) if that is made already;
  * else nullptr (nothing read yet) or the texture unpainted (its paint not made yet), and what is missing is made in the
  * background (MadeOrAsked()).

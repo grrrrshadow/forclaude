@@ -11014,6 +11014,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (const auto &[tile, n] : depots) where += fmt::format(" {}x na {},{}", n, TileX(TileIndex(tile)), TileY(TileIndex(tile)));
 		IConsolePrint(CC_DEFAULT, "test3d: vyjed: {} vozidel:{}", started, where);
 		return true;
+	} else if (what == "domykartou" && argv.size() > 2) {
+		/* 'domykartou 0|1': the buildings from the eyes painted by the card as it draws them (1), or of the copies of
+		 * their textures the processor paints (0). */
+		extern bool _eye_buildings_card_paint;
+		_eye_buildings_card_paint = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: domykartou {}", _eye_buildings_card_paint ? 1 : 0);
+		return true;
 	} else if (what == "pamet" && argv.size() > 2 && argv[2] == "tvary") {
 		/* 'pamet tvary': the vehicles' shapes holding the most (RigDescribeBiggestShapes()). */
 		extern std::string RigDescribeBiggestShapes();

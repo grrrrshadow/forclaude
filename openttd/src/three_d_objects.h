@@ -436,6 +436,7 @@ struct ThreeDObject {
 	const ThreeDObjectTexture *MaterialTexture(size_t material, int level, bool now) const;
 	ThreeDObjectShapeView GetShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
+	bool TryGetCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<struct ThreeDGpuBuildingPaint> &paints) const;
 	ThreeDObjectShapeView TryGetShape(int level) const;
 	bool Blocks(double x, double y, double feet = 0) const;
 	void Forget() const;
