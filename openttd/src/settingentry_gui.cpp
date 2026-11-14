@@ -811,8 +811,7 @@ SettingsContainer &GetSettingsTree()
 				static constexpr Group GROUPS[] = {
 					{STR_CONFIG_SETTING_THREE_D_GROUP_HOUSES, "gui.three_d_houses_map", "gui.three_d_houses_eye"},
 					{STR_CONFIG_SETTING_THREE_D_GROUP_BRIDGES, "gui.three_d_bridges_map", "gui.three_d_bridges_eye"},
-					/* The rails from above always the game's (ThreeDGroupShown()). */
-					{STR_CONFIG_SETTING_THREE_D_GROUP_RAILS, {}, "gui.three_d_rails_eye"},
+					{STR_CONFIG_SETTING_THREE_D_GROUP_RAILS, "gui.three_d_rails_map", "gui.three_d_rails_eye"},
 					{STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY, "gui.three_d_catenary_map", "gui.three_d_catenary_eye"},
 				};
 				for (const Group &g : GROUPS) {
