@@ -3575,7 +3575,7 @@ static std::shared_ptr<const ThreeDGpuStandingVehicle> CardDrawnBefore(const Veh
 	return it->second.card;
 }
 
-static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place, bool on_card = false)
+static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place, bool on_card)
 {
 	int piece = 0;
 	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
@@ -3665,6 +3665,40 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	}
 	place.xmin = xmin; place.ymin = ymin; place.zmin = zmin;
 	place.xmax = xmax; place.ymax = ymax; place.zmax = zmax;
+	return obj;
+}
+
+/**
+ * PlaceVehicleObjectNow(), once a frame for a vehicle the card draws: the moving layer, each block the vehicle is near
+ * and by night its lights each placed it again -- its shapes prepared for the card every time (the busy map of the
+ * player, a hundred cars over a town: a quarter of the frame in it). What the card draws of it is kept by its shapes
+ * (a shared pointer); one drawn as its picture is placed every time, as its picture may be let go of meanwhile.
+ * Kept for the frame (the pass of the dirty blocks and the game's tick) and the view as it is drawn.
+ */
+static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place, bool on_card = false)
+{
+	extern uint64_t _dirty_blocks_pass;
+	struct Stamp {
+		uint64_t pass = UINT64_MAX, tick = UINT64_MAX;
+		float yaw = 0;
+		bool turned = false, north = false, eye = false;
+		bool operator==(const Stamp &) const = default;
+	};
+	static Stamp kept_for;
+	static std::map<std::tuple<uint32_t, uint8_t, bool>, std::pair<const ThreeDVehicleObject *, VehicleObjectPlace>> kept;
+	if (!on_card) return PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
+	const Stamp now{_dirty_blocks_pass, TimerGameTick::counter, GetViewYaw(), ViewportDrawingTurned(), ViewportDrawingNorthObjects(), ViewportDrawingEye()};
+	if (!(now == kept_for)) {
+		kept_for = now;
+		kept.clear();
+	}
+	const auto key = std::make_tuple(v->index.base(), to_underlying(zoom), pose != nullptr);
+	if (auto it = kept.find(key); it != kept.end()) {
+		place = it->second.second;
+		return it->second.first;
+	}
+	const ThreeDVehicleObject *obj = PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
+	if (place.on_card && place.pic == nullptr) kept.emplace(key, std::make_pair(obj, place));
 	return obj;
 }
 
