@@ -23,6 +23,7 @@ Written beside this script, each also mirrored (_z: the road on its other side, 
   azd_svetlo_b.glb       its white light lit (the crossing open: it blinks slowly)
   azd_zavora_dole.glb    the barrier down: from its axle over the road, red and white, 5 m
   azd_zavora_nahore.glb  the barrier up, straight up from its axle
+  azd_zavora_pohyb.glb   the barrier on its way: BOOM_FRAMES frames (nodes zavora_00 down .. zavora_15 up; packed by gltfpack when it is there: $GLTFPACK, or on the PATH), eased
 
 The lit red a deep one (the player: "darker, this is too orange"). A face of two colours, the cross's (white and red in
 front, grey behind), is its front's triangles seen from the front only and its back's 5 mm behind (in one plane the two
@@ -194,6 +195,102 @@ def boom(up):
     return parts
 
 
+BOOM_FRAMES = 16                                         # the barrier on its way: so many frames from down to up
+
+
+def boom_at(part):
+    """The barrier a part of its way up (0 down, 1 up): boom(False) turned about its axle; the weight behind with it."""
+    a = math.radians(90.0 * part)
+    ca, sa = math.cos(a), math.sin(a)
+    out = []
+    for mat, t in boom(False):
+        r = t.copy()
+        dy, dz = t[..., 1] - PIVOT[1], t[..., 2] - PIVOT[2]
+        r[..., 1] = PIVOT[1] + dy * ca + dz * sa
+        r[..., 2] = PIVOT[2] - dy * sa + dz * ca
+        out.append((mat, r))
+    return out
+
+
+def boom_frames():
+    """The barrier's way in BOOM_FRAMES frames, the first down, the last up: slow off, fast in the middle, slow to its
+    end (the technologies of Godot, the player's point 3: "smooth motion with a run-up and a run-out: the barriers").
+    The game shows them by the time since the crossing closed or opened (DrawThreeDCrossingPosts()); how it moves is here."""
+    frames = []
+    for k in range(BOOM_FRAMES):
+        x = k / (BOOM_FRAMES - 1)
+        frames.append((f'zavora_{k:02d}', boom_at(x * x * (3.0 - 2.0 * x))))
+    return frames
+
+
+def write_frames(path, name, frames, specs=None):
+    """As write(), each frame a node of its own (its name, its parts); the materials shared by all the frames."""
+    blob = bytearray()
+    views, accessors, materials, meshes, nodes = [], [], [], [], []
+    mat_index = {}
+
+    def view(data, target):
+        while len(blob) % 4:
+            blob.append(0)
+        views.append({'buffer': 0, 'byteOffset': len(blob), 'byteLength': len(data), 'target': target})
+        blob.extend(data)
+        return len(views) - 1
+    for node, parts in frames:
+        by_mat = {}
+        for mat, tris in parts:
+            by_mat.setdefault(mat, []).append(tris)
+        primitives = []
+        for mat, chunks in by_mat.items():
+            t = np.concatenate(chunks)
+            n = np.cross(t[:, 1] - t[:, 0], t[:, 2] - t[:, 0])
+            ln = np.linalg.norm(n, axis=1)
+            keep = ln > 1e-12
+            t, n = t[keep], n[keep] / ln[keep][:, None]
+            pos = t.reshape(-1, 3)
+            nrm = np.repeat(n, 3, axis=0)
+            g_pos = np.stack([pos[:, 0], pos[:, 2], -pos[:, 1]], 1).astype(np.float32)
+            g_nrm = np.stack([nrm[:, 0], nrm[:, 2], -nrm[:, 1]], 1).astype(np.float32)
+            rows = np.concatenate([g_pos, g_nrm], 1)
+            rows, idx = np.unique(np.round(rows, 5), axis=0, return_inverse=True)
+            g_pos, g_nrm = rows[:, :3].astype(np.float32).copy(), rows[:, 3:].astype(np.float32).copy()
+            idx = idx.ravel().astype(np.uint32)
+            a = len(accessors)
+            accessors += [
+                {'bufferView': view(g_pos.tobytes(), 34962), 'componentType': 5126, 'count': len(g_pos), 'type': 'VEC3',
+                 'min': g_pos.min(0).tolist(), 'max': g_pos.max(0).tolist()},
+                {'bufferView': view(g_nrm.tobytes(), 34962), 'componentType': 5126, 'count': len(g_nrm), 'type': 'VEC3'},
+                {'bufferView': view(idx.tobytes(), 34963), 'componentType': 5125, 'count': len(idx), 'type': 'SCALAR'},
+            ]
+            if mat not in mat_index:
+                spec = (specs or {}).get(mat) or MATS.get(mat, {'baseColorFactor': [0.8, 0.8, 0.8, 1.0]})
+                mat_index[mat] = len(materials)
+                materials.append({'name': f'{name}_{mat}', 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 1.0, 'baseColorFactor': spec['baseColorFactor']},
+                                  'doubleSided': True})
+            primitives.append({'attributes': {'POSITION': a, 'NORMAL': a + 1}, 'indices': a + 2, 'material': mat_index[mat]})
+        meshes.append({'name': node, 'primitives': primitives})
+        nodes.append({'mesh': len(meshes) - 1, 'name': node})
+    while len(blob) % 4:
+        blob.append(0)
+    gltf = {'asset': {'version': '2.0', 'generator': 'azd.py (forclaude)'}, 'scene': 0, 'scenes': [{'nodes': list(range(len(nodes)))}],
+            'nodes': nodes, 'meshes': meshes, 'materials': materials, 'accessors': accessors, 'bufferViews': views, 'buffers': [{'byteLength': len(blob)}]}
+    js = json.dumps(gltf, separators=(',', ':')).encode()
+    while len(js) % 4:
+        js += b' '
+    out = struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(js) + 8 + len(blob))
+    out += struct.pack('<II', len(js), 0x4E4F534A) + js + struct.pack('<II', len(blob), 0x004E4942) + bytes(blob)
+    with open(path, 'wb') as f:
+        f.write(out)
+    # Packed (quantised, meshopt: the game reads it), its named nodes kept: sixteen frames in floats are 150 kB.
+    import shutil
+    import subprocess
+    tool = os.environ.get('GLTFPACK') or shutil.which('gltfpack')
+    if tool:
+        packed = path + '.pack.glb'
+        if subprocess.run([tool, '-i', path, '-o', packed, '-kn', '-km', '-cc'], capture_output=True).returncode == 0 and os.path.exists(packed):
+            os.replace(packed, path)
+    print(f'{os.path.basename(path)}: {len(frames)} frames, {os.path.getsize(path)} bytes')
+
+
 def write(path, name, parts, specs=None):
     """parts: (material, triangles (n, 3, 3) in the post's frame, z up); flat normals; glTF Y up (x, z, -y). specs: a
     material's glTF factors by its name (baseColorFactor, emissiveFactor) over MATS (navestidlo.py's own).
@@ -272,6 +369,9 @@ def main():
     for name, parts in pieces.items():
         write(os.path.join(HERE, name + '.glb'), name, parts)
         write(os.path.join(HERE, name + '_z.glb'), name + '_z', mirrored(parts))
+    frames = boom_frames()
+    write_frames(os.path.join(HERE, 'azd_zavora_pohyb.glb'), 'azd_zavora_pohyb', frames)
+    write_frames(os.path.join(HERE, 'azd_zavora_pohyb_z.glb'), 'azd_zavora_pohyb_z', [(n, mirrored(f)) for n, f in frames])
     p = np.concatenate([t.reshape(-1, 3) for _, t in pieces['azd_sloupek']])
     print('sloupek', np.round(p.min(0), 3), np.round(p.max(0), 3))
 

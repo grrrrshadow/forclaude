@@ -3148,6 +3148,8 @@ static constexpr int THREE_D_CROSSING_BLINK_TICKS = 18;
 static constexpr double THREE_D_POST_X0 = -0.3, THREE_D_POST_X1 = 0.10, THREE_D_POST_Y0 = -0.56, THREE_D_POST_Y1 = 0.95, THREE_D_POST_TOP_M = 3.8;
 static constexpr double THREE_D_POST_LENS_X = 0.108, THREE_D_POST_LEFT_Y = -0.16, THREE_D_POST_RIGHT_Y = 0.16, THREE_D_POST_WHITE_Y = 0.0, THREE_D_POST_RED_Z = 2.80, THREE_D_POST_WHITE_Z = 2.50;
 static constexpr double THREE_D_BARRIER_X = 0.18, THREE_D_BARRIER_Y = 0.68, THREE_D_BARRIER_Z = 1.05, THREE_D_BARRIER_LEN = 5.0;
+/** How long the barriers are on their way down or up, the game's ticks: about two seconds. */
+static constexpr uint64_t THREE_D_BARRIER_MOVE_TICKS = 72;
 
 /**
  * The posts of our level crossing (the player, 8. 11.: "the lights one Czech and the crossing", "1 yes"): our AŽD post
@@ -3171,7 +3173,29 @@ static void DrawThreeDCrossingPosts(const TileInfo *ti, Axis rail_axis, bool eye
 	/* The lit light's lens in the post's frame (mirrored driving on the left). */
 	const double light_y = (lit == "_l" ? THREE_D_POST_LEFT_Y : lit == "_p" ? THREE_D_POST_RIGHT_Y : THREE_D_POST_WHITE_Y) * (on_left ? -1.0 : 1.0);
 	const double light_z = lit == "_b" ? THREE_D_POST_WHITE_Z : THREE_D_POST_RED_Z;
-	const std::string barrier = fmt::format("azd_zavora_{}{}", closed ? "dole" : "nahore", mirror);
+	/* The barriers on their way (the technologies of Godot, the player's point 3: "smooth motion with a run-up and a
+	 * run-out: the barriers"): for THREE_D_BARRIER_MOVE_TICKS after the crossing closed or opened, as it was seen drawn,
+	 * the frame of their way by the time since (azd.py boom_frames(): the first down, the last up, eased in the model);
+	 * at rest the barrier down or up. A crossing seen the first time is at rest. */
+	static std::mutex moves_mutex;
+	static std::map<TileIndex, std::pair<bool, uint64_t>> moves;
+	uint64_t since = UINT64_MAX;
+	{
+		std::lock_guard lock(moves_mutex);
+		auto [it, fresh] = moves.try_emplace(ti->tile, closed, UINT64_MAX);
+		if (!fresh && it->second.first != closed) it->second = {closed, TimerGameTick::counter};
+		since = it->second.second;
+	}
+	const std::string moving_name = fmt::format("azd_zavora_pohyb{}", mirror);
+	const ThreeDVehicleObject *moving_fig = since != UINT64_MAX && TimerGameTick::counter - since < THREE_D_BARRIER_MOVE_TICKS ? GetThreeDFigure(moving_name) : nullptr;
+	const bool moving = moving_fig != nullptr && moving_fig->frames > 1;
+	int barrier_frame = -1;
+	if (moving) {
+		const int last = moving_fig->frames - 1;
+		const int step = static_cast<int>((TimerGameTick::counter - since) * last / THREE_D_BARRIER_MOVE_TICKS);
+		barrier_frame = std::clamp(closed ? last - step : step, 0, last);
+	}
+	const std::string barrier = moving ? moving_name : fmt::format("azd_zavora_{}{}", closed ? "dole" : "nahore", mirror);
 	const double upm = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
 	const double mx = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, my = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
 	for (const int way : {1, -1}) {
@@ -3186,7 +3210,7 @@ static void DrawThreeDCrossingPosts(const TileInfo *ti, Axis rail_axis, bool eye
 		if (!lit.empty()) DrawThreeDLitLight(ti->tile, light, px, py, ti->z, facing, THREE_D_POST_LENS_X, light_y, light_z, eye);
 		if (eye) {
 			AddCabFigure(post, 1.0f, px, py, ti->z, facing);
-			AddCabFigure(barrier, 1.0f, px, py, ti->z, facing);
+			AddCabFigure(barrier, 1.0f, px, py, ti->z, facing, std::max(0, barrier_frame));
 			continue;
 		}
 		/* A box of a part of it on the map: its corners in the post's frame (y mirrored driving on the left), world units. */
@@ -3208,15 +3232,18 @@ static void DrawThreeDCrossingPosts(const TileInfo *ti, Axis rail_axis, bool eye
 		const int ix = static_cast<int>(std::lround(px)), iy = static_cast<int>(std::lround(py));
 		const int pivot = ti->z + static_cast<int>(std::lround(THREE_D_BARRIER_Z * hpm));
 		const std::array<int, 6> post_box = box(THREE_D_POST_X0, THREE_D_POST_X1, THREE_D_POST_Y0, THREE_D_POST_Y1, ti->z, ti->z + static_cast<int>(std::lround(THREE_D_POST_TOP_M * hpm)));
-		const std::array<int, 6> barrier_box = closed ?
+		const std::array<int, 6> barrier_box = moving ?
+				box(THREE_D_BARRIER_X - 0.1, THREE_D_BARRIER_X + 0.1, THREE_D_BARRIER_Y - THREE_D_BARRIER_LEN, THREE_D_BARRIER_Y + 0.1, pivot - 1, pivot + static_cast<int>(std::lround(THREE_D_BARRIER_LEN * hpm))) :
+				closed ?
 				box(THREE_D_BARRIER_X - 0.1, THREE_D_BARRIER_X + 0.1, THREE_D_BARRIER_Y - THREE_D_BARRIER_LEN, THREE_D_BARRIER_Y - 0.2, pivot - 1, pivot + 1) :
 				box(THREE_D_BARRIER_X - 0.1, THREE_D_BARRIER_X + 0.1, THREE_D_BARRIER_Y - 0.1, THREE_D_BARRIER_Y + 0.1, pivot + 1, pivot + static_cast<int>(std::lround(THREE_D_BARRIER_LEN * hpm)));
 		AddThreeDFigureToViewportInBox(post, 1.0f, ix, iy, ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &post_box);
-		AddThreeDFigureToViewportInBox(barrier, 1.0f, ix, iy, ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &barrier_box);
+		AddThreeDFigureToViewportInBox(barrier, 1.0f, ix, iy, ti->z, facing, _cur_dpi->zoom, ti->tile, 0, barrier_frame, 0, &barrier_box);
 	}
 	if (!eye) {
-		NoteThreeDBlinking(ti->tile, THREE_D_CROSSING_BLINK_TICKS, TileX(ti->tile) * TILE_SIZE, TileY(ti->tile) * TILE_SIZE, (TileX(ti->tile) + 1) * TILE_SIZE, (TileY(ti->tile) + 1) * TILE_SIZE,
-				ti->z, ti->z + static_cast<int>(std::lround(THREE_D_POST_TOP_M * hpm)) + 2);
+		/* Drawn again as the lights change; while the barriers move, every other tick, as high as they reach up. */
+		NoteThreeDBlinking(ti->tile, moving ? 2 : THREE_D_CROSSING_BLINK_TICKS, TileX(ti->tile) * TILE_SIZE, TileY(ti->tile) * TILE_SIZE, (TileX(ti->tile) + 1) * TILE_SIZE, (TileY(ti->tile) + 1) * TILE_SIZE,
+				ti->z, ti->z + static_cast<int>(std::lround(std::max(THREE_D_POST_TOP_M, THREE_D_BARRIER_Z + THREE_D_BARRIER_LEN) * hpm)) + 2);
 	}
 }
 
