@@ -9613,14 +9613,36 @@ static void DrawNight(bool turned)
 		});
 	}
 	std::vector<ThreeDPictureLight> model_lights;
-	for (const Vehicle *v : Vehicle::Iterate()) {
-		if (v->vehstatus.Test(VehState::Hidden)) continue;
-		/* Switched off from its cab (F, VehicleLightsOn()). */
-		if (!VehicleLightsOn(v)) continue;
+	/* The vehicles whose lights are on, found once for all the blocks of a frame: every block went through all the
+	 * vehicles of the game for them (the player's stress save, a thousand cars: by night a block of the map took five
+	 * times as long as by day, over a town with cars 1 to 4 frames a second, 20 blocks a frame). Vehicles come and go
+	 * only between the frames (a tick, a command). */
+	extern uint64_t _dirty_blocks_pass;
+	static std::vector<const Vehicle *> lit_vehicles;
+	struct LitModel {
+		bool ok = false;
+		int ax = 0, ay = 0, az = 0;
+		std::vector<ThreeDPictureLight> lights;
+	};
+	static std::map<std::tuple<uint32_t, uint8_t, bool, bool>, LitModel> lit_models;
+	static uint64_t lit_pass = UINT64_MAX, lit_tick = UINT64_MAX;
+	if (lit_pass != _dirty_blocks_pass || lit_tick != TimerGameTick::counter) {
+		lit_pass = _dirty_blocks_pass;
+		lit_tick = TimerGameTick::counter;
+		lit_vehicles.clear();
+		lit_models.clear();
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (v->vehstatus.Test(VehState::Hidden)) continue;
+			if (v->type != VehicleType::Road && v->type != VehicleType::Train && v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) continue;
+			if (v->type == VehicleType::Aircraft && !Aircraft::From(v)->IsNormalAircraft()) continue;
+			/* Switched off from its cab (F, VehicleLightsOn()). */
+			if (!VehicleLightsOn(v)) continue;
+			lit_vehicles.push_back(v);
+		}
+	}
+	for (const Vehicle *v : lit_vehicles) {
 		const bool front = v->Previous() == nullptr;
 		const bool last = v->Next() == nullptr;
-		if (v->type != VehicleType::Road && v->type != VehicleType::Train && v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) continue;
-		if (v->type == VehicleType::Aircraft && !Aircraft::From(v)->IsNormalAircraft()) continue;
 		double cx, cy;
 		project(v->x_pos, v->y_pos, v->z_pos, cx, cy);
 		const double margin = 60 * unit;
@@ -9632,12 +9654,20 @@ static void DrawNight(bool turned)
 		if (ThreeDEnabled() && !v->vehstatus.Test(VehState::Crashed) && v->direction != Direction::Invalid) {
 			RoundTrackPose pose;
 			const bool round = turned && GetRoundTrackPose(v, pose);
-			int ax, ay, az;
-			if (GetThreeDVehicleObjectLights(v, dpi.zoom, round ? &pose : nullptr, model_lights, ax, ay, az)) {
+			/* Its model's lights as placed, found once a frame for the zoom and the way it is drawn: a vehicle near the
+			 * edges of several blocks was placed again for each. */
+			const auto key = std::make_tuple(v->index.base(), to_underlying(dpi.zoom), turned, ViewportVehiclesOnCard());
+			auto found = lit_models.find(key);
+			if (found == lit_models.end()) {
+				LitModel m;
+				m.ok = GetThreeDVehicleObjectLights(v, dpi.zoom, round ? &pose : nullptr, m.lights, m.ax, m.ay, m.az);
+				found = lit_models.emplace(key, std::move(m)).first;
+			}
+			if (found->second.ok) {
 				double hx, hy;
-				project(ax, ay, az, hx, hy);
+				project(found->second.ax, found->second.ay, found->second.az, hx, hy);
 				const bool braking = VehicleBrakeLightsOn(v);
-				for (const ThreeDPictureLight &l : model_lights) model_light(hx, hy, l, braking);
+				for (const ThreeDPictureLight &l : found->second.lights) model_light(hx, hy, l, braking);
 				continue;
 			}
 		}
