@@ -5497,18 +5497,20 @@ const ThreeDObject *GetThreeDWires(TileIndex tile, std::span<const ThreeDWire> w
 	o.name = fmt::format("trakce_draty_{}", tile.base());
 	o.variants = 0; // no house's
 	o.tiles_x = o.tiles_y = 1;
-	/* Its colours, its other materials' (none its own): 1 the contact wire's, 2 the carrier wire's. */
+	/* Its colours, its other materials' (none its own): 1 the contact wire's, 2 the carrier wire's, 3 a power line's
+	 * cable's -- light, the pylon's steel as the eyes see it (the player, 14. 11.: "just swap the colours of the pylons
+	 * and the wires from above": the pylons dark there, the cables light). */
 	o.texture_of = SIZE_MAX;
-	o.material_pngs = {nullptr, nullptr};
-	o.material_flats = {Colour(92, 70, 52).data, Colour(54, 56, 58).data};
-	o.material_levels.assign(2, nullptr);
+	o.material_pngs = {nullptr, nullptr, nullptr};
+	o.material_flats = {Colour(92, 70, 52).data, Colour(54, 56, 58).data, Colour(150, 154, 146).data};
+	o.material_levels.assign(3, nullptr);
 	std::vector<float> nrm;
 	const double h = thick / 2;
 	for (const ThreeDWire &w : wires) {
 		const double dx = w.x1 - w.x0, dy = w.y1 - w.y0, len = std::hypot(dx, dy);
 		if (len < 1e-6) continue;
 		const double nx = -dy / len * h, ny = dx / len * h;
-		const uint8_t tex = w.kind == 0 ? 1 : 2;
+		const uint8_t tex = w.kind == 0 ? 1 : w.kind == 1 ? 2 : 3;
 		/* The flat band across it, the upright band along it: two quads, each seen from both sides. */
 		const std::array<std::array<double, 3>, 4> flat{{{w.x0 + nx, w.y0 + ny, w.z0}, {w.x1 + nx, w.y1 + ny, w.z1}, {w.x1 - nx, w.y1 - ny, w.z1}, {w.x0 - nx, w.y0 - ny, w.z0}}};
 		const std::array<std::array<double, 3>, 4> upright{{{w.x0, w.y0, w.z0 - h}, {w.x1, w.y1, w.z1 - h}, {w.x1, w.y1, w.z1 + h}, {w.x0, w.y0, w.z0 + h}}};

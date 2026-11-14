@@ -1601,7 +1601,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 /** A wire of our catenary (GetThreeDWires()): its ends, world units from its tile's north corner and units of height over the height the wires stand at. */
 struct ThreeDWire {
 	float x0, y0, z0, x1, y1, z1;
-	uint8_t kind; ///< 0 the contact wire, 1 the carrier wire
+	uint8_t kind; ///< 0 the contact wire, 1 the carrier wire, 2 a cable of the power line
 };
 const ThreeDObject *GetThreeDWires(TileIndex tile, std::span<const ThreeDWire> wires, double thick);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);

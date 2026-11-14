@@ -3039,7 +3039,7 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 					if (eye) {
 						AddCabWire(ox + x0, oy + y0, ti->z + g0, ox + x1, oy + y1, ti->z + g1, c[1], CABLE_COLOUR);
 					} else {
-						wires.push_back({static_cast<float>(x0), static_cast<float>(y0), static_cast<float>(g0 + c[1] * hpm), static_cast<float>(x1), static_cast<float>(y1), static_cast<float>(g1 + c[1] * hpm), 1});
+						wires.push_back({static_cast<float>(x0), static_cast<float>(y0), static_cast<float>(g0 + c[1] * hpm), static_cast<float>(x1), static_cast<float>(y1), static_cast<float>(g1 + c[1] * hpm), 2});
 					}
 				}
 			}
@@ -3059,11 +3059,14 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 			const int ix = static_cast<int>(std::lround(px)), iy = static_cast<int>(std::lround(py));
 			const int half = static_cast<int>(std::lround(PYLON_HALF_M * upm));
 			const std::array<int, 6> box{ix - half, iy - half, z, ix + half - 1, iy + half - 1, z + static_cast<int>(std::lround(PYLON_TALL_M * hpm)) - 1};
-			AddThreeDFigureToViewportInBox("vedeni_stozar", 1.0f, ix, iy, z, facing, _cur_dpi->zoom, tile, 0, -1, 0, &box);
+			/* From above its bars thick (vedeni_stozar_mapa): the true ones are under a pixel there (the player, 14. 11.:
+			 * "the electricity from above, the wires less marked, the pylons more"). */
+			AddThreeDFigureToViewportInBox(GetThreeDFigure("vedeni_stozar_mapa") != nullptr ? "vedeni_stozar_mapa" : "vedeni_stozar", 1.0f, ix, iy, z, facing, _cur_dpi->zoom, tile, 0, -1, 0, &box);
 		}
 	}
 	if (!eye && !wires.empty()) {
-		const double thick = 1.2 * std::pow(2.0, to_underlying(_cur_dpi->zoom) - to_underlying(ZoomLevel::Normal));
+		/* Thinner than the catenary's: half a pixel and a little at the zoom, the cables less marked than the pylons. */
+		const double thick = 0.55 * std::pow(2.0, to_underlying(_cur_dpi->zoom) - to_underlying(ZoomLevel::Normal));
 		AddThreeDTileObject(GetThreeDWires(tile, wires, thick), tile, ti->z);
 	}
 }
