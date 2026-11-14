@@ -789,82 +789,80 @@
   },
   "meritko": 1,
   "rozmer_m": [
-   1.27,
-   0.51,
+   1.09,
+   0.42,
    0.71
   ],
   "kde": "farma",
   "klima": "mirne",
   "povaha": "mirumilovne",
-  "trojuhelniku": 864,
+  "trojuhelniku": 5264,
   "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
   "rozmer_nakladu": [
-   1.35,
-   0.58,
+   1.15,
+   0.5,
    0.71
   ],
   "naklad": {
    "sada": "naklady",
    "rozmer_m": [
-    1.35,
-    0.58
+    1.15,
+    0.5
    ],
    "uzel": "pase_00",
    "meritko": 1
   },
-  "autor": "grrrrf: vlastní model tvorove/farma_zvirata.py (stavebnice predmety/stavebnice3d.py)",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): růžové prasátko: kulaté tělo, plochý rypák, uši sklopené dopředu, zatočený ocásek, tmavá kopýtka; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; neplatí od 4. 11. (místo snímků je kostra): 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); od 4. 11. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py); uzel pase_00 je síť na kostře, v klidu (bez animace) stojí s hlavou nahoře jako dřív, na korbě se kreslí tak; kouka je stoji",
-  "kostra": "ctyrnozec",
-  "vyska_kycli": 0.5541,
+  "autor": "Piglet, grs (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/piglet-8343f141936f4c799ed980a3c7c3ae27), převod tvorove/prase_piglet.py (Blender, bez renderu)",
+  "licence": "CC BY 4.0 (uvést grs; změny: otočený, zmenšený na 0,71 m, zjednodušený na 30 % trojúhelníků, jen barevná textura 256 px, přidané pohyby stoji a pase)",
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM), náklad dobytka LVST (sada naklady, dobytek_prase, uzel pase_00) a zvíře běžící za koněm (Special 3D): od 14. 11. model Piglet (grs) místo vlastního nízkopolygonového prasete (hráč: „připrav nove prasatko, nahradí zabudované prasátko z nákladů a z farmy. běhá i za koněm náklad dobytek“); skutečné metry, meritko 1 (musí sedět k plotu pastviny a ke korbě), čelem k +x, počátek na zemi pod tělem; vlastní kostra a pohyby v souboru (ne kostra ctyrnozec): chuze (jeho PigletWalk, krok_m 0.29 za kolo), stoji (kořen a pánev jako první snímek chůze, ostatní kosti v klidu), pase (hruď, krk a hlava sklopené k zemi, čumák 0.28 m nad zemí); klus, cval a beh jsou chůze (nohy jdou rychleji podle ujeté cesty); uzly v souboru stojí (bez animace stojí s hlavou nahoře: tak se kreslí na korbě); 196 kB, glb z gltfpacku. Neplatí: dřívější popis vlastního modelu z tvorove/farma_zvirata.py (864 trojúhelníků, 58 kB)",
   "pozy": {
    "stoji": {
     "animace": "stoji",
-    "snimku": 32,
+    "snimku": 1,
     "tiku": 12
    },
    "klid": {
     "animace": "stoji",
-    "snimku": 32,
+    "snimku": 1,
     "tiku": 12
    },
    "chuze": {
     "animace": "chuze",
     "snimku": 41,
     "tiku": 1,
-    "krok_m": 0.45
+    "krok_m": 0.29
    },
    "klus": {
-    "animace": "klus",
-    "snimku": 27,
+    "animace": "chuze",
+    "snimku": 21,
     "tiku": 1,
-    "krok_m": 0.81
+    "krok_m": 0.29
    },
    "cval": {
-    "animace": "cval",
-    "snimku": 17,
+    "animace": "chuze",
+    "snimku": 21,
     "tiku": 1,
-    "krok_m": 1.36
+    "krok_m": 0.29
    },
    "beh": {
-    "animace": "cval",
-    "snimku": 17,
+    "animace": "chuze",
+    "snimku": 21,
     "tiku": 1,
-    "krok_m": 1.36
+    "krok_m": 0.29
    },
    "pase": {
     "animace": "pase",
-    "snimku": 30,
-    "tiku": 5
+    "snimku": 40,
+    "tiku": 4
    },
    "zere": {
     "animace": "pase",
-    "snimku": 30,
-    "tiku": 5
+    "snimku": 40,
+    "tiku": 4
    },
    "kouka": {
     "animace": "stoji",
-    "snimku": 32,
+    "snimku": 1,
     "tiku": 12
    }
   }
