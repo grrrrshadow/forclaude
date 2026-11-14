@@ -10233,7 +10233,20 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (!std::isnan(this->keep_above)) key += fmt::format("|c{}", this->keep_above);
 	if (!std::isnan(this->floors_over)) key += fmt::format("|w{}", this->floors_over);
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
-	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
+	if (!this->addons.empty()) {
+		/* Of the parts asked for those its add-ons have nodes of: the others (a state's crew, its door, a load with no
+		 * model) add nothing to the shape, and three records of the two-wheel cart, each asked for other parts of that
+		 * kind, each kept its own copy of the same 300 thousand corners (the player's log of 14. 11., the game killed
+		 * for memory). */
+		ThreeDParts of_addons;
+		for (const ThreeDVehicleAddon &a : this->addons) {
+			for (const std::string &n : a.nodes) {
+				auto at = std::ranges::find(this->part_names, a.key + "/" + n);
+				if (at != this->part_names.end() && at != this->part_names.begin() && at - this->part_names.begin() < ThreeDParts::COUNT) of_addons.Set(static_cast<int>(at - this->part_names.begin()));
+			}
+		}
+		key += fmt::format("|p{:x}.{:x}", parts.bits[1] & of_addons.bits[1], parts.bits[0] & of_addons.bits[0]);
+	}
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
 	GlbMesh mesh;
 	if (this->file.starts_with("beamng:")) {
