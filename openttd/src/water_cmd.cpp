@@ -50,6 +50,9 @@
 
 #include "table/strings.h"
 
+#include <map>
+#include <mutex>
+
 #include "safeguards.h"
 
 /**
@@ -1035,22 +1038,41 @@ static bool DrawThreeDLock(const TileInfo *ti, LockPart part, DiagDirection dir)
 	/* The gate: on the lower tile 2 m short of its upper end, on the upper tile at its lower end. */
 	const auto [lower_open, upper_open] = LockGatesOpen(LockMiddle(ti->tile));
 	const bool open = part == LockPart::Lower ? lower_open : upper_open;
+	/* The leaves on their way (the technologies of Godot, the player's point 3: "smooth motion with a run-up and a
+	 * run-out: the barriers, the lock's gates"): for LOCK_GATE_MOVE_TICKS after the gate opened or shut, as it was seen
+	 * drawn, between shut and open by the time since -- slow off, fast in the middle, slow to its end. A lock seen the
+	 * first time is at rest. */
+	static constexpr uint64_t LOCK_GATE_MOVE_TICKS = 40;
+	static std::mutex gates_mutex;
+	static std::map<TileIndex, std::pair<bool, uint64_t>> gates;
+	double opened = open ? 1.0 : 0.0;
+	bool gate_moving = false;
+	{
+		std::lock_guard lock(gates_mutex);
+		auto [it, fresh] = gates.try_emplace(ti->tile, open, UINT64_MAX);
+		if (!fresh && it->second.first != open) it->second = {open, TimerGameTick::counter};
+		if (it->second.second != UINT64_MAX && TimerGameTick::counter - it->second.second < LOCK_GATE_MOVE_TICKS) {
+			const double x = static_cast<double>(TimerGameTick::counter - it->second.second) / LOCK_GATE_MOVE_TICKS;
+			const double eased = x * x * (3.0 - 2.0 * x);
+			opened = open ? eased : 1.0 - eased;
+			gate_moving = true;
+		}
+	}
 	const double along = part == LockPart::Lower ? half - 2.0 * m : -(half - 0.3 * m);
 	const double gx = cx + ax * along, gy = cy + ay * along;
 	for (int side : {-1, 1}) {
 		/* Hinged at the wall's face, a little off it; shut towards the middle and upstream, open along the wall away from the chamber. */
 		const double hinge = half - (WALL_T_M + 0.3) * m;
 		const double hx = gx + side * px * hinge, hy = gy + side * py * hinge;
-		double fx, fy;
-		if (open) {
-			const double away = part == LockPart::Lower ? -1.0 : 1.0;
-			fx = ax * away;
-			fy = ay * away;
-		} else {
-			const double c = std::cos(GATE_ANGLE_DEG * M_PI / 180.0), s = std::sin(GATE_ANGLE_DEG * M_PI / 180.0);
-			fx = -side * px * c + ax * s;
-			fy = -side * py * c + ay * s;
-		}
+		/* The way the leaf points: open, shut, or between them the shorter way round. */
+		const double away = part == LockPart::Lower ? -1.0 : 1.0;
+		const double c = std::cos(GATE_ANGLE_DEG * M_PI / 180.0), s = std::sin(GATE_ANGLE_DEG * M_PI / 180.0);
+		const double open_a = std::atan2(ay * away, ax * away), shut_a = std::atan2(-side * py * c + ay * s, -side * px * c + ax * s);
+		double turn = open_a - shut_a;
+		while (turn > M_PI) turn -= 2 * M_PI;
+		while (turn < -M_PI) turn += 2 * M_PI;
+		const double leaf_a = shut_a + turn * opened;
+		const double fx = std::cos(leaf_a), fy = std::sin(leaf_a);
 		/* Hung from its middle, half its length from the hinge; its box from the hinge to its end, as thick as it is, its
 		 * handrail a metre over its top (zdymadlo.py). */
 		const double mid = leaf_l / 2 * m;
@@ -1059,6 +1081,11 @@ static bool DrawThreeDLock(const TileInfo *ti, LockPart part, DiagDirection dir)
 		const double leaf_tall = (part == LockPart::Upper ? OVER_M : LEVEL_M + OVER_M) + 1.0;
 		put(leaf, hx + fx * mid, hy + fy * mid, ti->z, static_cast<float>(std::atan2(fy, fx) * 180.0 / M_PI),
 				box(std::min(hx, ex) - tx, std::min(hy, ey) - ty, std::max(hx, ex) + tx, std::max(hy, ey) + ty, leaf_tall));
+	}
+	/* Drawn again every other tick while its leaves move. */
+	if (gate_moving) {
+		NoteThreeDBlinking(ti->tile, 2, TileX(ti->tile) * TILE_SIZE, TileY(ti->tile) * TILE_SIZE, (TileX(ti->tile) + 1) * TILE_SIZE, (TileY(ti->tile) + 1) * TILE_SIZE,
+				ti->z, ti->z + static_cast<int>(std::lround((LEVEL_M + OVER_M + 2.0) * OBJECT_HEIGHT_PER_METRE)));
 	}
 	return true;
 }
