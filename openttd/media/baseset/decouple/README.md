@@ -135,6 +135,7 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   (dragonsnap), fenek (Dylan Martínez Sánchez), Falkor (sharksie), roztomilý pes (Tech developers), šedý vlk a veselý
   pes (Stakler), malý pes (samuelsgr art), lovecký pes (Jurassic Radassic), pouliční pes (MAROUANE),
   skákající liška (sheana), šedá kočka (savounited), rezavá kočka (ilhamtr),
+  stožár elektrického vedení (Maasvlakte Rotterdam power line, 3D Warehouse, https://3dwarehouse.sketchup.com/model/6a4b6da2613405ff6b4e767d5ebea257/Maasvlakte-Rotterdam-power-line),
   prasátko farmy, nákladu dobytka a za koněm (Piglet, grs, CC BY 4.0, https://sketchfab.com/3d-models/piglet-8343f141936f4c799ed980a3c7c3ae27),
   dvoubarevná kočka (kenchoo), stylizovaný vlk (ESO), pohyby ležení psů z vlka u dveří (victory_mirosya),
   prodavač Bodi (Jacob Quintana), prodavač dalmatin (iRahulRajput), los, wapiti, jelen, laň, vidloroh, ovce
