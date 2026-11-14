@@ -2979,6 +2979,44 @@ static std::string PackageOf(const std::string &index)
 /** The most parts painted a colour by number an object has: ten of three bits below the top bit of its paint (PaintBits()). */
 static constexpr size_t THREE_D_PAINT_PARTS_MAX = 10;
 
+/** The patterns of the parts read ("tapeta"), by their files: one for all the houses that name it. */
+static std::map<std::string, std::shared_ptr<const std::vector<ThreeDObjectTexture>>> _three_d_patterns;
+
+/** A pattern of a file ("tapeta" "soubor"), its levels halved; nullptr when it cannot be read. */
+static std::shared_ptr<const std::vector<ThreeDObjectTexture>> PatternOfFile(const std::string &path)
+{
+	auto it = _three_d_patterns.find(path);
+	if (it != _three_d_patterns.end()) return it->second;
+	std::shared_ptr<const std::vector<ThreeDObjectTexture>> made;
+	const std::vector<uint8_t> png = ReadWholeFile(path);
+	if (!png.empty()) {
+		auto levels = std::make_shared<std::vector<ThreeDObjectTexture>>();
+		/* Its alpha as it is (soft): the pattern is see-through by it. */
+		DecodeTextureLevels(png, *levels, 0, true, nullptr, true);
+		if (!levels->empty()) made = std::move(levels);
+	}
+	if (made == nullptr) Debug(misc, 0, "3D object: the pattern {} cannot be read", path);
+	_three_d_patterns.emplace(path, made);
+	return made;
+}
+
+/** The pattern of a part ("tapeta": {"soubor": a picture or several, "opakovani_m"}), beside the index. */
+static void ReadPartPattern(const nlohmann::json &b, const std::string &folder, ThreeDObjectColourPart &part)
+{
+	if (!b.contains("tapeta") || !b.at("tapeta").is_object() || !b.at("tapeta").contains("soubor")) return;
+	const auto &t = b.at("tapeta");
+	auto add = [&](const nlohmann::json &f) {
+		if (!f.is_string()) return;
+		if (auto pattern = PatternOfFile(folder + f.get<std::string>()); pattern != nullptr) part.patterns.push_back(std::move(pattern));
+	};
+	if (t.at("soubor").is_array()) {
+		for (const auto &f : t.at("soubor")) add(f);
+	} else {
+		add(t.at("soubor"));
+	}
+	part.pattern_m = std::clamp(t.value("opakovani_m", 1.0f), 0.05f, 100.0f);
+}
+
 /** The parts of a house painted a colour by number ("barvy"), their masks read from beside the index. */
 static void ReadColourParts(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
 {
@@ -3010,6 +3048,7 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 			if (rgb.has_value()) part.palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
 		}
 		part.per_town = b.value("nahoda", std::string()) == "mesto";
+		ReadPartPattern(b, folder, part);
 		if (part.mask_png.empty() || part.palette.empty()) {
 			Debug(misc, 0, "3D object {}: the colour part {} has no mask or no colours", obj.name, part.name);
 			continue;
@@ -14714,6 +14753,83 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 				float l = std::max({c.r, c.g, c.b}) / start;
 				auto mix = [&](uint8_t own, uint8_t to) { return static_cast<uint8_t>(std::clamp(own + (std::min(255.0f, to * l) - own) * m, 0.0f, 255.0f)); };
 				p = Colour(mix(c.r, colour.r), mix(c.g, colour.g), mix(c.b, colour.b)).data;
+			}
+		}
+		/* The part's pattern over its colour ("tapeta"): the picture of the colour's number, laid on the surface by
+		 * the building's own triangles -- along the surface level across, up its slope (a roof's rows of tiles along
+		 * the eaves, a wall's courses of bricks level), "opakovani_m" metres a picture --, where the mask has the part. */
+		if (part.patterns.empty() || this->tri.empty()) continue;
+		const std::vector<ThreeDObjectTexture> &pattern = *part.patterns[number % part.patterns.size()];
+		const double rep = part.pattern_m;
+		for (size_t i = 0; i + 2 < this->tri.size(); i += 3) {
+			if (i / 3 < this->tri_tex.size() && this->tri_tex[i / 3] != 0) continue;
+			double wp[3][3], tp[3][2];
+			for (int c = 0; c < 3; c++) {
+				const uint32_t v = this->tri[i + c];
+				wp[c][0] = this->pos[v * 3] / OBJECT_UNITS_PER_METRE;
+				wp[c][1] = this->pos[v * 3 + 1] / OBJECT_UNITS_PER_METRE;
+				wp[c][2] = this->pos[v * 3 + 2] / OBJECT_HEIGHT_PER_METRE;
+				tp[c][0] = this->uv[v * 2] * t.w;
+				tp[c][1] = this->uv[v * 2 + 1] * t.h;
+			}
+			const double det = (tp[1][0] - tp[0][0]) * (tp[2][1] - tp[0][1]) - (tp[2][0] - tp[0][0]) * (tp[1][1] - tp[0][1]);
+			if (std::abs(det) < 1e-9) continue;
+			const double e1[3] = {wp[1][0] - wp[0][0], wp[1][1] - wp[0][1], wp[1][2] - wp[0][2]}, e2[3] = {wp[2][0] - wp[0][0], wp[2][1] - wp[0][1], wp[2][2] - wp[0][2]};
+			double n[3] = {e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]};
+			const double nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (nl < 1e-12) continue;
+			for (double &c : n) c /= nl;
+			/* Across level, up the slope; a level surface along x and y. */
+			double sd[3] = {1, 0, 0}, td[3] = {0, 1, 0};
+			if (std::abs(n[2]) < 0.985) {
+				const double l = std::hypot(n[0], n[1]);
+				sd[0] = -n[1] / l;
+				sd[1] = n[0] / l;
+				sd[2] = 0;
+				td[0] = n[1] * sd[2] - n[2] * sd[1];
+				td[1] = n[2] * sd[0] - n[0] * sd[2];
+				td[2] = n[0] * sd[1] - n[1] * sd[0];
+				if (td[2] < 0) for (double &c : td) c = -c;
+			}
+			double st[3][2];
+			for (int c = 0; c < 3; c++) {
+				st[c][0] = wp[c][0] * sd[0] + wp[c][1] * sd[1] + wp[c][2] * sd[2];
+				st[c][1] = wp[c][0] * td[0] + wp[c][1] * td[1] + wp[c][2] * td[2];
+			}
+			/* The pattern's level whose texel is about the texture's here. */
+			const double texel_m = std::sqrt(nl / std::abs(det));
+			const ThreeDObjectTexture *pl = &pattern.front();
+			for (const ThreeDObjectTexture &l : pattern) {
+				if (rep / l.w > texel_m * 1.5) break;
+				pl = &l;
+			}
+			const int x0 = std::max(0, static_cast<int>(std::floor(std::min({tp[0][0], tp[1][0], tp[2][0]})) - 1)), x1 = std::min(t.w - 1, static_cast<int>(std::ceil(std::max({tp[0][0], tp[1][0], tp[2][0]})) + 1));
+			const int y0 = std::max(0, static_cast<int>(std::floor(std::min({tp[0][1], tp[1][1], tp[2][1]})) - 1)), y1 = std::min(t.h - 1, static_cast<int>(std::ceil(std::max({tp[0][1], tp[1][1], tp[2][1]})) + 1));
+			/* A texel a little outside the triangle too: the texture's margin about its islands. */
+			const double out = 1.5 / std::sqrt(std::abs(det));
+			for (int y = y0; y <= y1; y++) {
+				const int my = std::min(mask->h - 1, y * mask->h / t.h);
+				for (int x = x0; x <= x1; x++) {
+					const double px = x + 0.5, py = y + 0.5;
+					const double b1 = ((px - tp[0][0]) * (tp[2][1] - tp[0][1]) - (tp[2][0] - tp[0][0]) * (py - tp[0][1])) / det;
+					const double b2 = ((tp[1][0] - tp[0][0]) * (py - tp[0][1]) - (px - tp[0][0]) * (tp[1][1] - tp[0][1])) / det;
+					if (b1 < -out || b2 < -out || b1 + b2 > 1 + out) continue;
+					uint32_t &p = t.px[static_cast<size_t>(y) * t.w + x];
+					if (p == 0) continue;
+					const uint32_t mp = mask->px[static_cast<size_t>(my) * mask->w + std::min(mask->w - 1, x * mask->w / t.w)];
+					const float m = mp == 0 ? 0.0f : Colour(mp).r / 255.0f;
+					if (m <= 0) continue;
+					const double su = (st[0][0] + b1 * (st[1][0] - st[0][0]) + b2 * (st[2][0] - st[0][0])) / rep;
+					const double sv = -(st[0][1] + b1 * (st[1][1] - st[0][1]) + b2 * (st[2][1] - st[0][1])) / rep;
+					const int tx = std::clamp(static_cast<int>((su - std::floor(su)) * pl->w), 0, pl->w - 1);
+					const int ty = std::clamp(static_cast<int>((sv - std::floor(sv)) * pl->h), 0, pl->h - 1);
+					const Colour over(pl->px[static_cast<size_t>(ty) * pl->w + tx]);
+					const float a = over.a / 255.0f * m;
+					if (a <= 0) continue;
+					const Colour c(p);
+					auto lay = [a](uint8_t own, uint8_t to) { return static_cast<uint8_t>(std::clamp(own + (to - own) * a, 0.0f, 255.0f)); };
+					p = Colour(lay(c.r, over.r), lay(c.g, over.g), lay(c.b, over.b), c.a).data;
+				}
 			}
 		}
 	}

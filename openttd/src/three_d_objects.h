@@ -165,6 +165,14 @@ struct ThreeDObjectColourPart {
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the mask, halved for each level of detail (its grey in the red)
 	/** A tree's part ("barvy_casti"): the colours it may be in each use ("barvy_pouziti"), none its texture's own there; palette unused. */
 	std::array<std::vector<uint32_t>, TREE_USES> use_palettes;
+	/**
+	 * "tapeta": the pattern of the part laid over its colour (the tiles of a roof, the bricks of a wall; the player,
+	 * 14. 11.: "transparent painted roof tiles of many shapes laid on the ground we coloured", as the loads cut out of one
+	 * texture, cargo_cutout.h): pictures of the set, each once for all its houses, see-through where the colour shows;
+	 * the one of the colour's number. All of it the set's: which part, which pictures, how big.
+	 */
+	std::vector<std::shared_ptr<const std::vector<ThreeDObjectTexture>>> patterns;
+	float pattern_m = 1.0f;         ///< "opakovani_m": a picture covers so many metres of the surface, each way
 };
 
 /** A figure standing on a building ("postavy" of a house): College Girl smoking by the parasols of the hotel's roof. */

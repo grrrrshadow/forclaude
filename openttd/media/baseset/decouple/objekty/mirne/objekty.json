@@ -270,7 +270,11 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
-    ]
+    ],
+    "tapeta": {
+     "soubor": "../tapety/tasky_bobrovka.png",
+     "opakovani_m": 1.6
+    }
    },
    {
     "cast": "omitka",
@@ -486,7 +490,11 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
-    ]
+    ],
+    "tapeta": {
+     "soubor": "../tapety/tasky_bobrovka.png",
+     "opakovani_m": 1.6
+    }
    },
    {
     "cast": "omitka",
