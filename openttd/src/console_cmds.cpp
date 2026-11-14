@@ -11010,7 +11010,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
 		AutoRestoreBackup cur_company(_current_company, _local_company);
 		const CommandCost depot = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, at, RAILTYPE_PIPE, static_cast<DiagDirection>(*dir & 3));
-		const EngineID pump = _engine_mngr.GetID(VehicleType::Train, 122, EngineOverrideManager::GAMES_OWN_GRFID);
+		/* The pump of the set Rozvody 3D (GRF 'MAXr', train 0x0100). */
+		const EngineID pump = _engine_mngr.GetID(VehicleType::Train, 0x0100, static_cast<uint32_t>('M') | 'A' << 8 | 'X' << 16 | static_cast<uint32_t>('r') << 24);
 		if (depot.Failed()) IConsolePrint(CC_ERROR, "test3d: cerpadlo: depo NEJDE ({})", GetString(depot.GetErrorMessage()));
 		/* The signals the depot told to update, as a command of a player would be followed by (Train::Tick() asserts none wait). */
 		UpdateSignalsInBuffer();

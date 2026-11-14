@@ -6480,7 +6480,7 @@ STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING2}
 ############ end of savegame specific region!
 
 ##id 0x8000
-###length 123
+###length 122
 # Vehicle names
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM        :Kirby Paul Tank (Steam)
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_MJS_250_DIESEL               :MJS 250 (Diesel)
@@ -6604,7 +6604,6 @@ STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_CAR_CARRIER                 :Car Carrier
 STR_VEHICLE_NAME_TRAIN_WAGON_RAIL_MARIJUANA_TRUCK               :Marijuana Truck
 STR_VEHICLE_NAME_TRAIN_WAGON_MONORAIL_MARIJUANA_TRUCK           :Marijuana Truck
 STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_MARIJUANA_TRUCK             :Marijuana Truck
-STR_VEHICLE_NAME_TRAIN_ENGINE_PIPE_PUMP                         :Pipeline Pump
 
 ###length 91
 STR_VEHICLE_NAME_ROAD_VEHICLE_MPS_REGAL_BUS                     :MPS Regal Bus

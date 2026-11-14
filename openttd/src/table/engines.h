@@ -243,10 +243,6 @@ static constexpr EngineInfo _orig_engine_info[] = {
 	MW(  1827,  20,  20,  50, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 119 Marijuana Truck
 	MW(  1827,  20,  20,  50, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 120 Marijuana Truck (monorail)
 	MW(  1827,  20,  20,  50, CT_MARIJUANA   , LandscapeTypes({T,A,S,Y})), // 121 Marijuana Truck (maglev)
-	/* The pump of the game's own pipeline (RAILTYPE_PIPE; the player, 14. 11.: "pipes for the cargoes the tankers
-	 * carry ... the pump, a simple cylinder with a window"): it runs in the pipe and carries the liquid itself, oil
-	 * first, refitted to the other liquids as the oil tanker. At the end of the rail block, as those above. */
-	MW(  1827,  20,  20,  50, CT_OIL         , LandscapeTypes({T,A,S,Y})), // 122 Pipeline Pump
 	MR(  3378,  20,  12,  40, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 119 MPS Regal Bus
 	MR( 16071,  20,  15,  30, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 117 Hereford Leopard Bus
 	MR( 24107,  20,  15,  40, CT_PASSENGERS  , LandscapeTypes({T,A,S  })), // 118 Foster Bus
@@ -581,9 +577,6 @@ static constexpr RailVehicleInfo _orig_rail_vehicle_info[] = {
 	RVI(34, W, 176,   0,       0,  18,     0, RC_W, 30, R, A), // 119 Marijuana Truck
 	RVI(61, W, 176,   0,       0,  18,     0, RC_W, 35, O, A), // 120 Marijuana Truck (monorail)
 	RVI(61, W, 176,   0,       0,  18,     0, RC_W, 37, L, A), // 121 Marijuana Truck (maglev)
-	/* The pump of the pipeline: an engine by itself carrying 40 thousand litres, the oil tanker's picture where it has
-	 * no 3D object. */
-	RVI(36, G,  12,  96,     600,  12,    10, RC_D, 40, RAILTYPE_PIPE, D), // 122 Pipeline Pump
 };
 #undef RC_W
 #undef RC_E
