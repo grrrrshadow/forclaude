@@ -1925,11 +1925,13 @@ void main()
 			int kind = int(l1.w + 0.5);
 			float reach = l0.w, k;
 			if (kind == 0) {
-				/* A house's lamp: down from it only. */
-				if (w.z > l0.z + 0.5) continue;
+				/* A house's lamp: down from it, over it less and less up to 1.2 m (CAB_LAMP_ABOVE of viewport.cpp). */
+				float above = (w.z - l0.z) / u_zu_per_unit;
+				if (above >= 1.294) continue;
 				float d = length(w - l0.xyz);
 				if (d >= reach) continue;
 				k = (1.0 - d / reach) * (1.0 - d / reach) * 0.7;
+				if (above > 0.0) k *= 1.0 - above / 1.294;
 			} else {
 				vec3 o = vec3(w.xy - l0.xy, (w.z - l0.z) / u_zu_per_unit);
 				float d = length(o);

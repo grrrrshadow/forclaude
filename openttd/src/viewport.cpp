@@ -17694,6 +17694,8 @@ static void DrawEyeShadows(const CabEye &eye, uint32_t *dst, const float *zb, in
  */
 /** How far a house's lamp lights (DrawEyeLampLight()), world units. */
 static constexpr double CAB_LAMP_REACH = 6.0 * OBJECT_UNITS_PER_METRE;
+/** How far over itself a house's lamp still lights, fading (DrawEyeLights(), EYE_LAMPS_FRAGMENT of the card: 1.3), world units. */
+static constexpr double CAB_LAMP_ABOVE = 1.2 * OBJECT_UNITS_PER_METRE;
 
 /**
  * The lamps of the houses that light the picture (DrawEyeLampLight()): those ahead within the view, the nearest
@@ -17806,11 +17808,16 @@ static void DrawEyeLights(const CabEye &eye, uint32_t *dst, const float *zb, int
 					const double lx = eye.x + g.x, ly = eye.y + g.y, lzu = g.zu + eye.z * CAB_Z_SCALE;
 					double k;
 					if (g.kind == ThreeDGpuEyeLight::LAMP) {
-						/* Down from it: what is above it it does not light (a lamp shines down, a window out and down). */
-						if (zu > lzu + 0.5) continue;
+						/* Down from it: what is above it it lights less and less, 1.2 m over it not at all (a lamp shines
+						 * down, a window out and down). Cut off sharp just over the lamp, a lantern standing low lit a
+						 * thing by it up to a line across it (the player, 14. 11.: "the headstone is darkened by something
+						 * up to its half at night, by day it is of one colour": the lantern on the grave). */
+						const double above = (zu - lzu) / zu_per_unit;
+						if (above >= CAB_LAMP_ABOVE) continue;
 						const double d = std::sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (zu - lzu) * (zu - lzu));
 						if (d >= g.reach) continue;
 						k = (1.0 - d / g.reach) * (1.0 - d / g.reach) * 0.7;
+						if (above > 0) k *= 1.0 - above / CAB_LAMP_ABOVE;
 					} else {
 						const double ox = x - lx, oy = y - ly, oz = (zu - lzu) / zu_per_unit;
 						const double d = std::sqrt(ox * ox + oy * oy + oz * oz);
