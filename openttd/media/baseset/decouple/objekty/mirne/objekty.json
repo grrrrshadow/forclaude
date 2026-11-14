@@ -124,6 +124,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_03_kostel_maska_podhled.png",
+    "zacatek": 146,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -271,10 +300,35 @@
      "4C6E4C",
      "9A4A30"
     ],
-    "tapeta": {
-     "soubor": "../tapety/tasky_bobrovka.png",
-     "opakovani_m": 1.6
-    }
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_06_mestske_0_maska_podhled.png",
+    "zacatek": 146,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
+    ]
    },
    {
     "cast": "omitka",
@@ -491,10 +545,35 @@
      "4C6E4C",
      "9A4A30"
     ],
-    "tapeta": {
-     "soubor": "../tapety/tasky_bobrovka.png",
-     "opakovani_m": 1.6
-    }
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_06_mestske_2_maska_podhled.png",
+    "zacatek": 97,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
+    ]
    },
    {
     "cast": "omitka",
@@ -700,6 +779,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_0e_obchody_maska_podhled.png",
+    "zacatek": 97,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -820,6 +928,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_0f_obchody_kridlo_maska_podhled.png",
+    "zacatek": 144,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -950,6 +1087,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_10_obchody_vez_maska_podhled.png",
+    "zacatek": 146,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -1067,6 +1233,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_18_stare_0_maska_podhled.png",
+    "zacatek": 144,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -1260,6 +1455,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_18_stare_1_maska_podhled.png",
+    "zacatek": 127,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -1427,6 +1651,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_18_stare_2_maska_podhled.png",
+    "zacatek": 146,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -1620,6 +1873,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_18_stare_3_maska_podhled.png",
+    "zacatek": 97,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -1836,6 +2118,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_19_chatky_maska_podhled.png",
+    "zacatek": 184,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -2061,6 +2372,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_1a_domy_0_maska_podhled.png",
+    "zacatek": 127,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -2236,6 +2576,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_1a_domy_1_maska_podhled.png",
+    "zacatek": 96,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -2419,6 +2788,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_1a_domy_2_maska_podhled.png",
+    "zacatek": 145,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -2586,6 +2984,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_1a_domy_3_maska_podhled.png",
+    "zacatek": 146,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -2760,6 +3187,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_1d_obchody_0_maska_podhled.png",
+    "zacatek": 145,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -2868,6 +3324,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_1d_obchody_2_maska_podhled.png",
+    "zacatek": 143,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {
@@ -4300,6 +4785,35 @@
      "7A5A44",
      "4C6E4C",
      "9A4A30"
+    ],
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
+   },
+   {
+    "cast": "podhled",
+    "maska": "dum_02_bytovky_maska_podhled.png",
+    "zacatek": 97,
+    "paleta": [
+     "6E4A32",
+     "8A6A4A",
+     "E6E2D6",
+     "5A4636",
+     "A08A6A",
+     "4A4A4A",
+     "C8C2B4",
+     "7A5A44"
     ]
    },
    {

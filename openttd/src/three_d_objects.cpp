@@ -3000,21 +3000,25 @@ static std::shared_ptr<const std::vector<ThreeDObjectTexture>> PatternOfFile(con
 	return made;
 }
 
-/** The pattern of a part ("tapeta": {"soubor": a picture or several, "opakovani_m"}), beside the index. */
+/**
+ * The patterns of a part ("tapeta": {"soubor": a picture, "opakovani_m": metres}, or a list of such: the set's choice
+ * of patterns for the part, a place takes one of them by its paint), beside the index.
+ */
 static void ReadPartPattern(const nlohmann::json &b, const std::string &folder, ThreeDObjectColourPart &part)
 {
-	if (!b.contains("tapeta") || !b.at("tapeta").is_object() || !b.at("tapeta").contains("soubor")) return;
-	const auto &t = b.at("tapeta");
-	auto add = [&](const nlohmann::json &f) {
-		if (!f.is_string()) return;
-		if (auto pattern = PatternOfFile(folder + f.get<std::string>()); pattern != nullptr) part.patterns.push_back(std::move(pattern));
+	if (!b.contains("tapeta")) return;
+	auto add = [&](const nlohmann::json &t) {
+		if (!t.is_object() || !t.contains("soubor") || !t.at("soubor").is_string()) return;
+		if (auto pattern = PatternOfFile(folder + t.at("soubor").get<std::string>()); pattern != nullptr) {
+			part.patterns.push_back(std::move(pattern));
+			part.pattern_m.push_back(std::clamp(t.value("opakovani_m", 1.0f), 0.05f, 100.0f));
+		}
 	};
-	if (t.at("soubor").is_array()) {
-		for (const auto &f : t.at("soubor")) add(f);
+	if (b.at("tapeta").is_array()) {
+		for (const auto &t : b.at("tapeta")) add(t);
 	} else {
-		add(t.at("soubor"));
+		add(b.at("tapeta"));
 	}
-	part.pattern_m = std::clamp(t.value("opakovani_m", 1.0f), 0.05f, 100.0f);
 }
 
 /** The parts of a house painted a colour by number ("barvy"), their masks read from beside the index. */
@@ -14759,8 +14763,11 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 		 * the building's own triangles -- along the surface level across, up its slope (a roof's rows of tiles along
 		 * the eaves, a wall's courses of bricks level), "opakovani_m" metres a picture --, where the mask has the part. */
 		if (part.patterns.empty() || this->tri.empty()) continue;
-		const std::vector<ThreeDObjectTexture> &pattern = *part.patterns[number % part.patterns.size()];
-		const double rep = part.pattern_m;
+		/* Which of the part's patterns: by the place's whole paint, not by the part's colour alone -- a red roof here
+		 * of plain tiles, there of pantiles (the player, 14. 11.: "each roof at random another colour and other tiles"). */
+		const size_t which = (static_cast<uint64_t>(paint) * 2654435761u >> 13) % part.patterns.size();
+		const std::vector<ThreeDObjectTexture> &pattern = *part.patterns[which];
+		const double rep = part.pattern_m[which];
 		for (size_t i = 0; i + 2 < this->tri.size(); i += 3) {
 			if (i / 3 < this->tri_tex.size() && this->tri_tex[i / 3] != 0) continue;
 			double wp[3][3], tp[3][2];
@@ -14800,7 +14807,7 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 			const double texel_m = std::sqrt(nl / std::abs(det));
 			const ThreeDObjectTexture *pl = &pattern.front();
 			for (const ThreeDObjectTexture &l : pattern) {
-				if (rep / l.w > texel_m * 1.5) break;
+				if (rep / l.w > texel_m * 1.2) break;
 				pl = &l;
 			}
 			const int x0 = std::max(0, static_cast<int>(std::floor(std::min({tp[0][0], tp[1][0], tp[2][0]})) - 1)), x1 = std::min(t.w - 1, static_cast<int>(std::ceil(std::max({tp[0][0], tp[1][0], tp[2][0]})) + 1));
@@ -14821,14 +14828,25 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 					if (m <= 0) continue;
 					const double su = (st[0][0] + b1 * (st[1][0] - st[0][0]) + b2 * (st[2][0] - st[0][0])) / rep;
 					const double sv = -(st[0][1] + b1 * (st[1][1] - st[0][1]) + b2 * (st[2][1] - st[0][1])) / rep;
-					const int tx = std::clamp(static_cast<int>((su - std::floor(su)) * pl->w), 0, pl->w - 1);
-					const int ty = std::clamp(static_cast<int>((sv - std::floor(sv)) * pl->h), 0, pl->h - 1);
-					const Colour over(pl->px[static_cast<size_t>(ty) * pl->w + tx]);
-					const float a = over.a / 255.0f * m;
-					if (a <= 0) continue;
+					/* The pattern there between its four texels nearest (it repeats): its colour weighed by its alpha. */
+					const double fx = (su - std::floor(su)) * pl->w - 0.5, fy = (sv - std::floor(sv)) * pl->h - 0.5;
+					const int ix = static_cast<int>(std::floor(fx)), iy = static_cast<int>(std::floor(fy));
+					const double wx = fx - ix, wy = fy - iy;
+					double oa = 0, orr = 0, og = 0, ob = 0;
+					for (int k = 0; k < 4; k++) {
+						const int qx = ((ix + (k & 1)) % pl->w + pl->w) % pl->w, qy = ((iy + (k >> 1)) % pl->h + pl->h) % pl->h;
+						const Colour q(pl->px[static_cast<size_t>(qy) * pl->w + qx]);
+						const double wq = ((k & 1) ? wx : 1 - wx) * ((k >> 1) ? wy : 1 - wy) * q.a;
+						oa += wq;
+						orr += wq * q.r;
+						og += wq * q.g;
+						ob += wq * q.b;
+					}
+					if (oa <= 0) continue;
+					const float a = static_cast<float>(oa / 255.0) * m;
 					const Colour c(p);
-					auto lay = [a](uint8_t own, uint8_t to) { return static_cast<uint8_t>(std::clamp(own + (to - own) * a, 0.0f, 255.0f)); };
-					p = Colour(lay(c.r, over.r), lay(c.g, over.g), lay(c.b, over.b), c.a).data;
+					auto lay = [a](uint8_t own, double to) { return static_cast<uint8_t>(std::clamp(own + (static_cast<float>(to) - own) * a, 0.0f, 255.0f)); };
+					p = Colour(lay(c.r, orr / oa), lay(c.g, og / oa), lay(c.b, ob / oa), c.a).data;
 				}
 			}
 		}

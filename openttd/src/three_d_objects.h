@@ -172,7 +172,7 @@ struct ThreeDObjectColourPart {
 	 * the one of the colour's number. All of it the set's: which part, which pictures, how big.
 	 */
 	std::vector<std::shared_ptr<const std::vector<ThreeDObjectTexture>>> patterns;
-	float pattern_m = 1.0f;         ///< "opakovani_m": a picture covers so many metres of the surface, each way
+	std::vector<float> pattern_m;   ///< "opakovani_m" of each: a picture covers so many metres of the surface, each way
 };
 
 /** A figure standing on a building ("postavy" of a house): College Girl smoking by the parasols of the hotel's roof. */

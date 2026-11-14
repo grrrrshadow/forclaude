@@ -1902,7 +1902,11 @@
      "6E3A30",
      "B89270"
     ],
-    "popis": "cihly hlavní budovy"
+    "popis": "cihly hlavní budovy",
+    "tapeta": {
+     "soubor": "../tapety/cihly.png",
+     "opakovani_m": 1.6
+    }
    },
    {
     "cast": "cihly_kotelna",
@@ -1918,7 +1922,11 @@
      "6E3A30",
      "B89270"
     ],
-    "popis": "cihly kotelny a komína"
+    "popis": "cihly kotelny a komína",
+    "tapeta": {
+     "soubor": "../tapety/cihly.png",
+     "opakovani_m": 1.6
+    }
    },
    {
     "cast": "cihly_kvasirna",
@@ -1934,7 +1942,11 @@
      "6E3A30",
      "B89270"
     ],
-    "popis": "cihly kvasírny"
+    "popis": "cihly kvasírny",
+    "tapeta": {
+     "soubor": "../tapety/cihly.png",
+     "opakovani_m": 1.6
+    }
    },
    {
     "cast": "cihly_ostatni",
@@ -1950,7 +1962,11 @@
      "6E3A30",
      "B89270"
     ],
-    "popis": "cihly váhovny a zídek"
+    "popis": "cihly váhovny a zídek",
+    "tapeta": {
+     "soubor": "../tapety/cihly.png",
+     "opakovani_m": 1.6
+    }
    },
    {
     "cast": "omitka",
@@ -2012,7 +2028,21 @@
      "4E4A48",
      "8C5038"
     ],
-    "popis": "pálené tašky"
+    "popis": "pálené tašky",
+    "tapeta": [
+     {
+      "soubor": "../tapety/tasky_bobrovka.png",
+      "opakovani_m": 2.4
+     },
+     {
+      "soubor": "../tapety/tasky_prejzy.png",
+      "opakovani_m": 2.6
+     },
+     {
+      "soubor": "../tapety/bridlice.png",
+      "opakovani_m": 2.4
+     }
+    ]
    },
    {
     "cast": "vrata",
