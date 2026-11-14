@@ -546,6 +546,7 @@ STR_RAIL_MENU_ELRAIL_CONSTRUCTION                               :Electrified rai
 STR_RAIL_MENU_MONORAIL_CONSTRUCTION                             :Monorail construction
 STR_RAIL_MENU_MAGLEV_CONSTRUCTION                               :Maglev construction
 STR_RAIL_MENU_POWER_LINE_CONSTRUCTION                           :Power line construction
+STR_RAIL_MENU_PIPE_CONSTRUCTION                                 :Pipeline construction
 
 # Road construction menu
 STR_ROAD_MENU_ROAD_CONSTRUCTION                                 :Road construction
@@ -3238,6 +3239,7 @@ STR_RAIL_TOOLBAR_ELRAIL_CONSTRUCTION_CAPTION                    :Electrified Rai
 STR_RAIL_TOOLBAR_MONORAIL_CONSTRUCTION_CAPTION                  :Monorail Construction
 STR_RAIL_TOOLBAR_MAGLEV_CONSTRUCTION_CAPTION                    :Maglev Construction
 STR_RAIL_TOOLBAR_POWER_LINE_CONSTRUCTION_CAPTION                :Power Line Construction
+STR_RAIL_TOOLBAR_PIPE_CONSTRUCTION_CAPTION                      :Pipeline Construction
 
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_RAILROAD_TRACK                   :{BLACK}Build railway track. Ctrl+Click to remove railway track. Also press Shift to show cost estimate only
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_AUTORAIL                         :{BLACK}Build railway track using the Autorail mode. Ctrl+Click to remove railway track. Also press Shift to show cost estimate only
@@ -3256,6 +3258,7 @@ STR_RAIL_NAME_ELRAIL                                            :Electrified rai
 STR_RAIL_NAME_MONORAIL                                          :Monorail
 STR_RAIL_NAME_MAGLEV                                            :Maglev
 STR_RAIL_NAME_POWER_LINE                                        :Power line
+STR_RAIL_NAME_PIPE                                              :Pipeline
 
 # Rail depot construction window
 STR_BUILD_DEPOT_TRAIN_ORIENTATION_CAPTION                       :{WHITE}Train Depot Orientation
@@ -4738,6 +4741,7 @@ STR_BUY_VEHICLE_TRAIN_ELRAIL_CAPTION                            :New Electric Ra
 STR_BUY_VEHICLE_TRAIN_MONORAIL_CAPTION                          :New Monorail Vehicles
 STR_BUY_VEHICLE_TRAIN_MAGLEV_CAPTION                            :New Maglev Vehicles
 STR_BUY_VEHICLE_TRAIN_POWER_LINE_CAPTION                        :New Power Line Vehicles
+STR_BUY_VEHICLE_TRAIN_PIPE_CAPTION                              :New Pipeline Pumps
 
 STR_BUY_VEHICLE_ROAD_VEHICLE_CAPTION                            :New Road Vehicles
 STR_BUY_VEHICLE_TRAM_VEHICLE_CAPTION                            :New Tram Vehicles
@@ -4967,6 +4971,7 @@ STR_ENGINE_PREVIEW_ELRAIL_LOCOMOTIVE                            :electrified rai
 STR_ENGINE_PREVIEW_MONORAIL_LOCOMOTIVE                          :monorail locomotive
 STR_ENGINE_PREVIEW_MAGLEV_LOCOMOTIVE                            :maglev locomotive
 STR_ENGINE_PREVIEW_POWER_LINE_LOCOMOTIVE                        :power line vehicle
+STR_ENGINE_PREVIEW_PIPE_LOCOMOTIVE                              :pipeline pump
 
 STR_ENGINE_PREVIEW_ROAD_VEHICLE                                 :road vehicle
 STR_ENGINE_PREVIEW_TRAM_VEHICLE                                 :tramway vehicle
@@ -5030,6 +5035,7 @@ STR_REPLACE_ELRAIL_VEHICLES                                     :Electrified Rai
 STR_REPLACE_MONORAIL_VEHICLES                                   :Monorail Vehicles
 STR_REPLACE_MAGLEV_VEHICLES                                     :Maglev Vehicles
 STR_REPLACE_POWER_LINE_VEHICLES                                 :Power Line Vehicles
+STR_REPLACE_PIPE_VEHICLES                                       :Pipeline Pumps
 
 STR_REPLACE_ROAD_VEHICLES                                       :Road Vehicles
 STR_REPLACE_TRAM_VEHICLES                                       :Tramway Vehicles

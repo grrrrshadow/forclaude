@@ -20,6 +20,8 @@ static const RailTypeLabel RAILTYPE_LABEL_MONO     = 'MONO';
 static const RailTypeLabel RAILTYPE_LABEL_MAGLEV   = 'MGLV';
 /** The game's own power line (the player, 14. 11.: pylons with cables for the cargo electricity): a rail type, drawn in 3D always (DrawThreeDPowerLine() of rail_cmd.cpp). */
 static const RailTypeLabel RAILTYPE_LABEL_POWER_LINE = 'DVED';
+/** The game's own pipeline (the player, 14. 11.: pipes for the cargoes the tankers carry): a rail type, drawn in 3D always, a pipe on saddles in place of the track (DrawThreeDTrack() of rail_cmd.cpp). */
+static const RailTypeLabel RAILTYPE_LABEL_PIPE = 'DPOT';
 
 /**
  * Enumeration for all possible railtypes.

@@ -642,6 +642,7 @@ STR_RAIL_MENU_ELRAIL_CONSTRUCTION                               :Výstavba elekt
 STR_RAIL_MENU_MONORAIL_CONSTRUCTION                             :Výstavba monorailu
 STR_RAIL_MENU_MAGLEV_CONSTRUCTION                               :Výstavba maglevu
 STR_RAIL_MENU_POWER_LINE_CONSTRUCTION                           :Výstavba elektrického vedení
+STR_RAIL_MENU_PIPE_CONSTRUCTION                                 :Výstavba potrubí
 
 # Road construction menu
 STR_ROAD_MENU_ROAD_CONSTRUCTION                                 :Výstavba silnic
@@ -3346,6 +3347,7 @@ STR_RAIL_TOOLBAR_ELRAIL_CONSTRUCTION_CAPTION                    :Výstavba elekt
 STR_RAIL_TOOLBAR_MONORAIL_CONSTRUCTION_CAPTION                  :Výstavba monorailu
 STR_RAIL_TOOLBAR_MAGLEV_CONSTRUCTION_CAPTION                    :Výstavba maglevu
 STR_RAIL_TOOLBAR_POWER_LINE_CONSTRUCTION_CAPTION                :Výstavba elektrického vedení
+STR_RAIL_TOOLBAR_PIPE_CONSTRUCTION_CAPTION                      :Výstavba potrubí
 
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_RAILROAD_TRACK                   :{BLACK}Položit koleje. Ctrl přepíná režim stavba/odstraňování. Podrž Shift pro zobrazení odhadu ceny
 STR_RAIL_TOOLBAR_TOOLTIP_BUILD_AUTORAIL                         :{BLACK}Pokládat koleje v libovolném směru. Ctrl přepíná režim stavba/odstraňování. Podrž Shift pro zobrazení odhadu ceny
@@ -3364,6 +3366,7 @@ STR_RAIL_NAME_ELRAIL                                            :Elektrifikovan�
 STR_RAIL_NAME_MONORAIL                                          :Monorail
 STR_RAIL_NAME_MAGLEV                                            :Maglev
 STR_RAIL_NAME_POWER_LINE                                        :Elektrické vedení
+STR_RAIL_NAME_PIPE                                              :Potrubí
 
 # Rail depot construction window
 STR_BUILD_DEPOT_TRAIN_ORIENTATION_CAPTION                       :{WHITE}Orientace vlakového depa
@@ -4852,6 +4855,7 @@ STR_BUY_VEHICLE_TRAIN_ELRAIL_CAPTION                            :Nové elektrick
 STR_BUY_VEHICLE_TRAIN_MONORAIL_CAPTION                          :Nové lokomotivy a vagony pro monorail
 STR_BUY_VEHICLE_TRAIN_MAGLEV_CAPTION                            :Nové lokomotivy a vagony Maglev
 STR_BUY_VEHICLE_TRAIN_POWER_LINE_CAPTION                        :Nová vozidla elektrického vedení
+STR_BUY_VEHICLE_TRAIN_PIPE_CAPTION                              :Nová čerpadla potrubí
 
 STR_BUY_VEHICLE_ROAD_VEHICLE_CAPTION                            :Nová silniční vozidla
 STR_BUY_VEHICLE_TRAM_VEHICLE_CAPTION                            :Nové tramvaje
@@ -5084,6 +5088,8 @@ STR_ENGINE_PREVIEW_MONORAIL_LOCOMOTIVE.acc                      :lokomotivu pro 
 STR_ENGINE_PREVIEW_MAGLEV_LOCOMOTIVE                            :{G=f}lokomotiva Maglev
 STR_ENGINE_PREVIEW_POWER_LINE_LOCOMOTIVE                        :{G=n}vozidlo elektrického vedení
 STR_ENGINE_PREVIEW_POWER_LINE_LOCOMOTIVE.acc                    :vozidlo elektrického vedení
+STR_ENGINE_PREVIEW_PIPE_LOCOMOTIVE                              :{G=n}čerpadlo potrubí
+STR_ENGINE_PREVIEW_PIPE_LOCOMOTIVE.acc                          :čerpadlo potrubí
 STR_ENGINE_PREVIEW_MAGLEV_LOCOMOTIVE.acc                        :lokomotivu Maglev
 
 STR_ENGINE_PREVIEW_ROAD_VEHICLE                                 :{G=n}silniční vozidlo
@@ -5148,6 +5154,7 @@ STR_REPLACE_ELRAIL_VEHICLES                                     :Elektrické lok
 STR_REPLACE_MONORAIL_VEHICLES                                   :Lokomotivy pro monorail
 STR_REPLACE_MAGLEV_VEHICLES                                     :Lokomotivy Maglev
 STR_REPLACE_POWER_LINE_VEHICLES                                 :Vozidla elektrického vedení
+STR_REPLACE_PIPE_VEHICLES                                       :Čerpadla potrubí
 
 STR_REPLACE_ROAD_VEHICLES                                       :Silniční vozidla
 STR_REPLACE_TRAM_VEHICLES                                       :Tramvaje

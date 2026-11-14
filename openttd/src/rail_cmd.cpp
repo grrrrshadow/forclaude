@@ -99,6 +99,18 @@ void ResetRailTypes()
 		rti.introduction_date = TimerGameCalendar::Date{0};
 		rti.map_colour = PC_YELLOW;
 	}
+	/* And its own pipeline (RAILTYPE_LABEL_PIPE; "pipes for the cargoes the tankers carry"), the same way. */
+	if (const RailType rt = AllocateRailType(RAILTYPE_LABEL_PIPE); rt != INVALID_RAILTYPE) {
+		RailTypeInfo &rti = _railtypes[rt];
+		rti.strings.name = STR_RAIL_NAME_PIPE;
+		rti.strings.toolbar_caption = STR_RAIL_TOOLBAR_PIPE_CONSTRUCTION_CAPTION;
+		rti.strings.menu_text = STR_RAIL_MENU_PIPE_CONSTRUCTION;
+		rti.strings.build_caption = STR_BUY_VEHICLE_TRAIN_PIPE_CAPTION;
+		rti.strings.replace_text = STR_REPLACE_PIPE_VEHICLES;
+		rti.strings.new_loco = STR_ENGINE_PREVIEW_PIPE_LOCOMOTIVE;
+		rti.introduction_date = TimerGameCalendar::Date{0};
+		rti.map_colour = PC_LIGHT_BLUE;
+	}
 }
 
 void ResolveRailTypeGUISprites(RailTypeInfo *rti)
@@ -2709,7 +2721,8 @@ bool ThreeDTrackShownOn(TileIndex tile)
 	if (!ThreeDEnabled() || !IsValidTile(tile)) return false;
 	/* The game's own power line: in 3D always, whatever the rails' setting (the player, 14. 11.: "that must not be
 	 * switched off, there is nothing in place of the wires and the pipes"). */
-	const bool power_line = IsPlainRailTile(tile) && GetRailTypeInfo(GetRailType(tile))->label == RAILTYPE_LABEL_POWER_LINE;
+	const RailTypeLabel own_label = IsPlainRailTile(tile) ? GetRailTypeInfo(GetRailType(tile))->label : RailTypeLabel{};
+	const bool power_line = own_label == RAILTYPE_LABEL_POWER_LINE || own_label == RAILTYPE_LABEL_PIPE; // and the pipeline
 	if (!power_line && !ThreeDGroupShown(ThreeDGroup::Rails)) return false;
 	if (!IsPlainRailTile(tile)) return ThreeDTrackOtherOn(tile);
 	if (GetRailTypeInfo(GetRailType(tile))->acceleration_type != VehicleAccelerationModel::Normal) return false;
@@ -3063,7 +3076,10 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 
 	/* A tile of a round curve (round_track.h): flat, the ground the game draws under no track; its round pieces along
 	 * their arcs, no strip of the game's track drawn after the ground. */
-	const bool round = RoundTrackDrawing() && IsRoundTrackTile(ti->tile);
+	/* The game's own pipeline (RAILTYPE_LABEL_PIPE): a pipe's pieces in place of the track's, straight from tile to tile
+	 * -- a pipeline turns in its joints, not round. */
+	const bool pipe = GetRailTypeInfo(GetRailType(ti->tile))->label == RAILTYPE_LABEL_PIPE;
+	const bool round = !pipe && RoundTrackDrawing() && IsRoundTrackTile(ti->tile);
 	/* The tile after its foundation (ThreeDTrackShownOn(): flat, or as the pieces lie on it). */
 	const Foundation f = GetRailFoundation(ti->tileh, track);
 	Slope s = ti->tileh;
@@ -3083,12 +3099,14 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 	}
 
 	const bool concrete = HasRailCatenary(GetRailType(ti->tile));
-	const std::string_view straight = ThreeDTrackName(concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
-	const std::string_view diagonal = ThreeDTrackName(concrete ? "kolej_sikma_beton" : "kolej_sikma_drevo");
-	const std::string_view slope = ThreeDTrackName(eye ? (concrete ? "kolej_svah_oci_beton" : "kolej_svah_oci_drevo") : (concrete ? "kolej_svah_beton" : "kolej_svah_drevo"));
+	const std::string_view straight = pipe ? std::string_view("potrubi_rovne") : ThreeDTrackName(concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+	const std::string_view diagonal = pipe ? std::string_view("potrubi_sikme") : ThreeDTrackName(concrete ? "kolej_sikma_beton" : "kolej_sikma_drevo");
+	const std::string_view slope = pipe ? std::string_view(eye ? "potrubi_svah_oci" : "potrubi_svah") :
+			ThreeDTrackName(eye ? (concrete ? "kolej_svah_oci_beton" : "kolej_svah_oci_drevo") : (concrete ? "kolej_svah_beton" : "kolej_svah_drevo"));
 	const double ox = TileX(ti->tile) * TILE_SIZE, oy = TileY(ti->tile) * TILE_SIZE;
 	const double half = ThreeDTrackHalfM() * OBJECT_UNITS_PER_METRE;
-	const int rails = std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
+	/* How tall a piece is: to its rails' tops; a pipe's to its top (its axis 1.0 m up, 0.8 m across, objekty/nase potrubi_*). */
+	const int rails = std::max(1, static_cast<int>(std::lround((pipe ? 1.45 : THREE_D_RAIL_TOP_M) * OBJECT_HEIGHT_PER_METRE)));
 
 	/* A piece with its middle at (x, y), from it to its end (ax, ay): in the turned view in its box (along it to its
 	 * ends, across it the embankment's half each side, up from its foot to its rails' tops), from the eyes lying on the
@@ -3139,10 +3157,10 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 		}
 		put(name, ox + p.x, oy + p.y, p.ax, p.ay, z, foot, tall, facing);
 		/* At a dead end of a straight piece on the level its buffer stop (DrawThreeDBufferStops()). */
-		if (s == SLOPE_FLAT) DrawThreeDBufferStops(ti, t, ti->z, eye);
+		if (s == SLOPE_FLAT && !pipe) DrawThreeDBufferStops(ti, t, ti->z, eye);
 	}
 	/* Its catenary over it, when it is electrified (DrawThreeDCatenary()). */
-	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, track, s, round, eye);
+	if (!pipe && ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, track, s, round, eye);
 	return true;
 }
 

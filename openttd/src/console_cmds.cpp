@@ -12859,6 +12859,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (argv[k] == "e") rt = RAILTYPE_ELECTRIC;
 			/* 'v': the game's own power line (RAILTYPE_LABEL_POWER_LINE). */
 			if (argv[k] == "v" && GetRailTypeByLabel(RAILTYPE_LABEL_POWER_LINE) != INVALID_RAILTYPE) rt = GetRailTypeByLabel(RAILTYPE_LABEL_POWER_LINE);
+			/* 'p': its own pipeline (RAILTYPE_LABEL_PIPE). */
+			if (argv[k] == "p" && GetRailTypeByLabel(RAILTYPE_LABEL_PIPE) != INVALID_RAILTYPE) rt = GetRailTypeByLabel(RAILTYPE_LABEL_PIPE);
 			if (argv[k] == "zvedni" && k + 1 < argv.size()) {
 				auto corners = ParseInteger(argv[k + 1]);
 				if (corners.has_value()) Command<Commands::TerraformLand>::Do(DoCommandFlag::Execute, at, static_cast<Slope>(*corners), true);
