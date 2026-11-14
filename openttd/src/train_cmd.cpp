@@ -10975,6 +10975,9 @@ static bool TrainApproachingCrossing(TileIndex tile)
  */
 static inline bool CheckLevelCrossing(TileIndex tile)
 {
+	/* The game's own pipeline and power line cross a road under it and over it (DrawThreeDTrackOn() of rail_cmd.cpp):
+	 * never barred, the cars drive on (the player, 14. 11.). */
+	if (IsOwnConduitRailType(GetRailType(tile))) return false;
 	/* reserved || train on crossing || train approaching crossing */
 	return HasCrossingReservation(tile) || TrainOnCrossing(tile) || TrainApproachingCrossing(tile);
 }
@@ -10992,7 +10995,7 @@ static void UpdateLevelCrossingTile(TileIndex tile, bool sound, bool force_barre
 	bool set_barred;
 
 	/* We force the crossing to be barred when an adjacent crossing is barred, otherwise let it decide for itself. */
-	set_barred = force_barred || CheckLevelCrossing(tile);
+	set_barred = (force_barred && !IsOwnConduitRailType(GetRailType(tile))) || CheckLevelCrossing(tile);
 
 	/* The state has changed */
 	if (set_barred != IsCrossingBarred(tile)) {

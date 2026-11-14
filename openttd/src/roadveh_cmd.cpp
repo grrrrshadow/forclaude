@@ -782,6 +782,8 @@ static bool RoadVehCheckTrainCrash(RoadVehicle *v)
 		VehicleID culprit = VehicleID::Invalid();
 		if (HasVehicleNearTileXY(u->x_pos, u->y_pos, 4, [&u, &culprit](const Vehicle *t) {
 				if (t->type != VehicleType::Train || t->vehstatus.Test(VehState::Crashed) || abs(t->z_pos - u->z_pos) > 6) return false;
+				/* The pump in its pipe under the road and the spark on its cables over it hit no car. */
+				if (IsOwnConduitRailType(Train::From(t)->railtypes.GetNthSetBit(0).value_or(RAILTYPE_RAIL))) return false;
 				culprit = t->First()->index;
 				return true;
 			})) {

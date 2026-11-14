@@ -520,6 +520,17 @@ TrackBits ThreeDTrackBitsOf(TileIndex tile);
 double ThreeDRoadOverTrack(TileIndex tile, double x, double y);
 struct TileInfo;
 bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool crossing);
+
+/**
+ * Whether a rail type is one of the game's own conduits -- the pipeline or the power line (RAILTYPE_LABEL_PIPE,
+ * RAILTYPE_LABEL_POWER_LINE): no track, their vehicles the pump in the pipe and the spark on the cables, which meet
+ * nothing on a road they cross.
+ */
+inline bool IsOwnConduitRailType(RailType rt)
+{
+	const RailTypeLabel label = GetRailTypeInfo(rt)->label;
+	return label == RAILTYPE_LABEL_PIPE || label == RAILTYPE_LABEL_POWER_LINE;
+}
 bool DrawThreeDTrackBridgeHead(const TileInfo *ti);
 void DrawThreeDTrackOverBridge(const TileInfo *ti, TileIndex south);
 bool DrawThreeDTrackTunnel(const TileInfo *ti);
