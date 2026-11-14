@@ -5326,6 +5326,23 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 	const double half_bed = BED_W / 2 * units, bed_top = BED_H * hpm;
 	const double rail_c = (GAUGE / 2 + RAIL_W / 2) * units, rail_hw = RAIL_W / 2 * units;
 	const double rail_z0 = (BED_H + SLEEPER_OVER) * hpm, rail_z1 = (BED_H + SLEEPER_OVER + PLATE + RAIL_TALL) * hpm;
+	/* Over the straight way of a switch (At::over): the straight way's line -- the arc leaves it at the arc's end that
+	 * is over it, along it there -- and how far aside of it a point is, across the straight way. The straight piece's
+	 * bed and sleepers are there; of the arc's own only what lies outside them is made: its bed from the straight
+	 * bed's edge out to its own outer edge, and of each sleeper the piece beyond the straight way's sleepers (the
+	 * player, 14. 11., a switch from the eyes: the branch's rails hung over the grass beside the straight bed; "the
+	 * gravel may go on till it would stick out on the other side, such a rule ... put a few sleepers there, quarter
+	 * sleepers or something under that rail"). */
+	const At &main_at = at.front().over ? at.front() : at.back();
+	const double main_nx = -main_at.ty, main_ny = main_at.tx;
+	auto aside = [&](double x, double y) { return (x - main_at.x) * main_nx + (y - main_at.y) * main_ny; };
+	/* From which offset across the arc (towards its outer side, as `side` says) it is outside the straight way's strip of a half-width. */
+	auto outside_from = [&](double x, double y, double nx, double ny, double half, int &side) {
+		const double e = aside(x, y);
+		side = e >= 0 ? 1 : -1;
+		const double c = std::max(0.5, nx * main_nx + ny * main_ny);
+		return (half - std::abs(e)) / c;
+	};
 	for (size_t i = 0; i + 1 < at.size(); i++) {
 		const At &a = at[i], &b = at[i + 1];
 		if (b.s - a.s < 1e-6) continue;
@@ -5345,6 +5362,29 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 				{{{sl, v0}, {sl, v1}, {t0, v1}, {t0, v0}}}, snx, sny, 0);
 		if (!over) quad(1, {across(b, bnx, bny, -half_bed, 0), across(a, anx, any, -half_bed, 0), across(a, anx, any, -half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top)},
 				{{{sr, v1}, {sr, v0}, {t1, v0}, {t1, v1}}}, -snx, -sny, 0);
+		if (over) {
+			/* Its bed outside the straight way's: from there to its own outer edge, and that edge's side. */
+			int sa, sb;
+			const double fa = std::clamp(outside_from(a.x, a.y, anx, any, half_bed, sa), -half_bed, half_bed);
+			const double fb = std::clamp(outside_from(b.x, b.y, bnx, bny, half_bed, sb), -half_bed, half_bed);
+			if (sa == sb && (fa < half_bed - 1e-6 || fb < half_bed - 1e-6)) {
+				const double sg = sa;
+				auto tu = [&](double off) { return t0 + (t1 - t0) * (half_bed - off) / (2 * half_bed); };
+				/* A hair under the straight bed's edge, so that no gap shows between them. */
+				const double ia = std::max(-half_bed, fa - 0.02 * units), ib = std::max(-half_bed, fb - 0.02 * units);
+				if (sg > 0) {
+					quad(1, {across(a, anx, any, half_bed, bed_top), across(b, bnx, bny, half_bed, bed_top), across(b, bnx, bny, ib, bed_top), across(a, anx, any, ia, bed_top)},
+							{{{t0, v0}, {t0, v1}, {tu(ib), v1}, {tu(ia), v0}}}, 0, 0, 1);
+					quad(1, {across(a, anx, any, half_bed, 0), across(b, bnx, bny, half_bed, 0), across(b, bnx, bny, half_bed, bed_top), across(a, anx, any, half_bed, bed_top)},
+							{{{sl, v0}, {sl, v1}, {t0, v1}, {t0, v0}}}, snx, sny, 0);
+				} else {
+					quad(1, {across(a, anx, any, -ia, bed_top), across(b, bnx, bny, -ib, bed_top), across(b, bnx, bny, -half_bed, bed_top), across(a, anx, any, -half_bed, bed_top)},
+							{{{tu(-ia), v0}, {tu(-ib), v1}, {t1, v1}, {t1, v0}}}, 0, 0, 1);
+					quad(1, {across(b, bnx, bny, -half_bed, 0), across(a, anx, any, -half_bed, 0), across(a, anx, any, -half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top)},
+							{{{sr, v1}, {sr, v0}, {t1, v0}, {t1, v1}}}, -snx, -sny, 0);
+				}
+			}
+		}
 		/* The rails: each its two sides and its head's top. */
 		for (int side : {-1, 1}) {
 			const double c = side * rail_c;
@@ -5368,14 +5408,31 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 		dx /= dl;
 		dy /= dl;
 		const double nx = -dy, ny = dx;
-		if (a.over && b.over) continue;
 		/* Its corners: along it (its width) and across (its length), as koleje.py's sleeper(): u along its length, v across. */
 		auto p = [&](double along, double acr, double z) { return std::array<double, 3>{cx + dx * along + nx * acr, cy + dy * along + ny * acr, z}; };
-		quad(2, {p(-half_w, half_l, z1), p(half_w, half_l, z1), p(half_w, -half_l, z1), p(-half_w, -half_l, z1)}, {{{0, 0}, {0, 1}, {1, 1}, {1, 0}}}, 0, 0, 1);
-		quad(2, {p(half_w, half_l, z0), p(half_w, -half_l, z0), p(half_w, -half_l, z1), p(half_w, half_l, z1)}, {{{0, 1}, {1, 1}, {1, 0.75}, {0, 0.75}}}, dx, dy, 0);
-		quad(2, {p(-half_w, -half_l, z0), p(-half_w, half_l, z0), p(-half_w, half_l, z1), p(-half_w, -half_l, z1)}, {{{1, 1}, {0, 1}, {0, 0.75}, {1, 0.75}}}, -dx, -dy, 0);
-		quad(2, {p(-half_w, half_l, z0), p(half_w, half_l, z0), p(half_w, half_l, z1), p(-half_w, half_l, z1)}, {{{0, 1}, {0.05, 1}, {0.05, 0}, {0, 0}}}, nx, ny, 0);
-		quad(2, {p(half_w, -half_l, z0), p(-half_w, -half_l, z0), p(-half_w, -half_l, z1), p(half_w, -half_l, z1)}, {{{1, 1}, {0.95, 1}, {0.95, 0}, {1, 0}}}, -nx, -ny, 0);
+		/* From hi (towards +n) to lo across the way: the whole sleeper, or a piece of it; the picture as far along as the piece is. */
+		auto sleeper = [&](double hi, double lo) {
+			const double u0 = (half_l - hi) / (2 * half_l), u1 = (half_l - lo) / (2 * half_l);
+			quad(2, {p(-half_w, hi, z1), p(half_w, hi, z1), p(half_w, lo, z1), p(-half_w, lo, z1)}, {{{u0, 0}, {u0, 1}, {u1, 1}, {u1, 0}}}, 0, 0, 1);
+			quad(2, {p(half_w, hi, z0), p(half_w, lo, z0), p(half_w, lo, z1), p(half_w, hi, z1)}, {{{u0, 1}, {u1, 1}, {u1, 0.75}, {u0, 0.75}}}, dx, dy, 0);
+			quad(2, {p(-half_w, lo, z0), p(-half_w, hi, z0), p(-half_w, hi, z1), p(-half_w, lo, z1)}, {{{u1, 1}, {u0, 1}, {u0, 0.75}, {u1, 0.75}}}, -dx, -dy, 0);
+			quad(2, {p(-half_w, hi, z0), p(half_w, hi, z0), p(half_w, hi, z1), p(-half_w, hi, z1)}, {{{0, 1}, {0.05, 1}, {0.05, 0}, {0, 0}}}, nx, ny, 0);
+			quad(2, {p(half_w, lo, z0), p(-half_w, lo, z0), p(-half_w, lo, z1), p(half_w, lo, z1)}, {{{1, 1}, {0.95, 1}, {0.95, 0}, {1, 0}}}, -nx, -ny, 0);
+		};
+		if (a.over && b.over) {
+			/* Over the straight way: the piece of it beyond the straight way's sleepers, when that is a quarter of a
+			 * metre and more -- under the arc's outer rail. */
+			int side;
+			const double from = outside_from(cx, cy, nx, ny, half_l, side) + 0.03 * units;
+			if (half_l - from < 0.25 * units) continue;
+			if (side > 0) {
+				sleeper(half_l, std::max(-half_l, from));
+			} else {
+				sleeper(-std::max(-half_l, from), -half_l);
+			}
+			continue;
+		}
+		sleeper(half_l, -half_l);
 	}
 	o.light = CornerLight(nrm);
 	o.top = static_cast<float>(rail_z1);
