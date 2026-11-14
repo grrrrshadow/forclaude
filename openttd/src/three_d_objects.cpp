@@ -3001,8 +3001,8 @@ static std::shared_ptr<const std::vector<ThreeDObjectTexture>> PatternOfFile(con
 }
 
 /**
- * The patterns of a part ("tapeta": {"soubor": a picture, "opakovani_m": metres}, or a list of such: the set's choice
- * of patterns for the part, a place takes one of them by its paint), beside the index.
+ * The patterns of a part ("tapeta": {"soubor": a picture, "opakovani_m": metres, "jen_sikme": not on a level surface},
+ * or a list of such: the set's choice of patterns for the part, a place takes one of them by its paint), beside the index.
  */
 static void ReadPartPattern(const nlohmann::json &b, const std::string &folder, ThreeDObjectColourPart &part)
 {
@@ -3012,6 +3012,7 @@ static void ReadPartPattern(const nlohmann::json &b, const std::string &folder, 
 		if (auto pattern = PatternOfFile(folder + t.at("soubor").get<std::string>()); pattern != nullptr) {
 			part.patterns.push_back(std::move(pattern));
 			part.pattern_m.push_back(std::clamp(t.value("opakovani_m", 1.0f), 0.05f, 100.0f));
+			part.pattern_sloped.push_back(t.value("jen_sikme", false) ? 1 : 0);
 		}
 	};
 	if (b.at("tapeta").is_array()) {
@@ -14768,6 +14769,7 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 		const size_t which = (static_cast<uint64_t>(paint) * 2654435761u >> 13) % part.patterns.size();
 		const std::vector<ThreeDObjectTexture> &pattern = *part.patterns[which];
 		const double rep = part.pattern_m[which];
+		const bool only_sloped = part.pattern_sloped[which] != 0;
 		for (size_t i = 0; i + 2 < this->tri.size(); i += 3) {
 			if (i / 3 < this->tri_tex.size() && this->tri_tex[i / 3] != 0) continue;
 			double wp[3][3], tp[3][2];
@@ -14786,6 +14788,8 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 			const double nl = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
 			if (nl < 1e-12) continue;
 			for (double &c : n) c /= nl;
+			/* Not on a level surface when the set says so ("jen_sikme": the tiles of a roof not on its flat terrace). */
+			if (only_sloped && std::abs(n[2]) >= 0.985) continue;
 			/* Across level, up the slope; a level surface along x and y. */
 			double sd[3] = {1, 0, 0}, td[3] = {0, 1, 0};
 			if (std::abs(n[2]) < 0.985) {

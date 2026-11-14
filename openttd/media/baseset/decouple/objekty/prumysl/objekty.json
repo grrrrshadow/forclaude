@@ -2032,15 +2032,18 @@
     "tapeta": [
      {
       "soubor": "../tapety/tasky_bobrovka.png",
-      "opakovani_m": 2.4
+      "opakovani_m": 2.4,
+      "jen_sikme": true
      },
      {
       "soubor": "../tapety/tasky_prejzy.png",
-      "opakovani_m": 2.6
+      "opakovani_m": 2.6,
+      "jen_sikme": true
      },
      {
       "soubor": "../tapety/bridlice.png",
-      "opakovani_m": 2.4
+      "opakovani_m": 2.4,
+      "jen_sikme": true
      }
     ]
    },

@@ -173,6 +173,7 @@ struct ThreeDObjectColourPart {
 	 */
 	std::vector<std::shared_ptr<const std::vector<ThreeDObjectTexture>>> patterns;
 	std::vector<float> pattern_m;   ///< "opakovani_m" of each: a picture covers so many metres of the surface, each way
+	std::vector<uint8_t> pattern_sloped; ///< "jen_sikme" of each: laid only where the surface slopes or stands, not on a level one (a roof's tiles not on its flat terrace)
 };
 
 /** A figure standing on a building ("postavy" of a house): College Girl smoking by the parasols of the hotel's roof. */
