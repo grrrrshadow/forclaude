@@ -83,6 +83,22 @@ void ResetRailTypes()
 	std::fill(insert, std::end(_railtypes), RailTypeInfo{});
 
 	_railtypes_hidden_mask = {};
+
+	/* The game's own power line (RAILTYPE_LABEL_POWER_LINE; the player, 14. 11.: "I would like to build electric
+	 * pylons for the cargo electricity ... 3D built into the game", as the sets PIPE and WIRES do it in 2D: a rail
+	 * type the cargo's 'trains' run on): a rail type of its own after the game's four, a set's after it; there from
+	 * the first day, for itself alone. */
+	if (const RailType rt = AllocateRailType(RAILTYPE_LABEL_POWER_LINE); rt != INVALID_RAILTYPE) {
+		RailTypeInfo &rti = _railtypes[rt];
+		rti.strings.name = STR_RAIL_NAME_POWER_LINE;
+		rti.strings.toolbar_caption = STR_RAIL_TOOLBAR_POWER_LINE_CONSTRUCTION_CAPTION;
+		rti.strings.menu_text = STR_RAIL_MENU_POWER_LINE_CONSTRUCTION;
+		rti.strings.build_caption = STR_BUY_VEHICLE_TRAIN_POWER_LINE_CAPTION;
+		rti.strings.replace_text = STR_REPLACE_POWER_LINE_VEHICLES;
+		rti.strings.new_loco = STR_ENGINE_PREVIEW_POWER_LINE_LOCOMOTIVE;
+		rti.introduction_date = TimerGameCalendar::Date{0};
+		rti.map_colour = PC_YELLOW;
+	}
 }
 
 void ResolveRailTypeGUISprites(RailTypeInfo *rti)
@@ -2690,7 +2706,11 @@ static bool ThreeDTrackOtherOn(TileIndex tile)
 
 bool ThreeDTrackShownOn(TileIndex tile)
 {
-	if (!ThreeDEnabled() || !IsValidTile(tile) || !ThreeDGroupShown(ThreeDGroup::Rails)) return false;
+	if (!ThreeDEnabled() || !IsValidTile(tile)) return false;
+	/* The game's own power line: in 3D always, whatever the rails' setting (the player, 14. 11.: "that must not be
+	 * switched off, there is nothing in place of the wires and the pipes"). */
+	const bool power_line = IsPlainRailTile(tile) && GetRailTypeInfo(GetRailType(tile))->label == RAILTYPE_LABEL_POWER_LINE;
+	if (!power_line && !ThreeDGroupShown(ThreeDGroup::Rails)) return false;
 	if (!IsPlainRailTile(tile)) return ThreeDTrackOtherOn(tile);
 	if (GetRailTypeInfo(GetRailType(tile))->acceleration_type != VehicleAccelerationModel::Normal) return false;
 	if (GetRailGroundType(tile) == RailGroundType::HalfTileWater) return false;
@@ -2959,6 +2979,82 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
  */
 static void DrawThreeDBufferStops(const TileInfo *ti, Track t, int z, bool eye);
 
+/**
+ * The game's own power line on a tile (RAILTYPE_LABEL_POWER_LINE; the player, 14. 11.: "pylons ... and you stretch
+ * strings there as the fishing rod's line, as cables"): no track; its six cables along each piece's way -- along its
+ * arc on a round curve --, each so far aside and so high as the pylon's arms hold them (the record's "draty" of
+ * vedeni_stozar, objekty/nase), and every third tile along the line the pylon at the piece's middle, its arms across
+ * the way. The cables as the catenary's wires: from the eyes each a line, from above gathered into the tile's object.
+ * @param s the tile's slope after its foundation
+ * @param round the tile is of a round curve drawn round
+ */
+static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye)
+{
+	/* Where the cables hang, metres: aside of the line (to both sides) and up. */
+	static constexpr std::array<std::array<double, 2>, 3> CABLES{{{9.74, 26.7}, {9.74, 19.77}, {5.36, 19.77}}};
+	static constexpr double PYLON_TALL_M = 30.3, PYLON_HALF_M = 9.6;
+	static constexpr int PYLON_EVERY = 3;
+	static const uint32_t CABLE_COLOUR = Colour(40, 42, 46).data;
+	const TileIndex tile = ti->tile;
+	const int tx = TileX(tile), ty = TileY(tile);
+	const double ox = tx * TILE_SIZE, oy = ty * TILE_SIZE;
+	const double hpm = OBJECT_HEIGHT_PER_METRE, upm = OBJECT_UNITS_PER_METRE;
+	auto ground = [&](double lx, double ly) -> double {
+		return s == SLOPE_FLAT ? 0.0 : GetPartialPixelZ(std::clamp(static_cast<int>(lx), 0, 15), std::clamp(static_cast<int>(ly), 0, 15), s);
+	};
+	std::vector<ThreeDWire> wires;
+	for (Track t : track) {
+		/* The piece's way, points of the tile: its arc, or straight from its end to its end. */
+		std::vector<std::array<double, 2>> way;
+		if (round) {
+			for (const RoundTrackPoint &p : RoundTrackCentreLine(tile, t, 2.0 * upm)) way.push_back({p.x - ox, p.y - oy});
+		}
+		if (way.size() < 2) {
+			const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
+			way = {{p.x - p.ax, p.y - p.ay}, {p.x + p.ax, p.y + p.ay}};
+		}
+		for (size_t i = 0; i + 1 < way.size(); i++) {
+			const double ax = way[i][0], ay = way[i][1], bx = way[i + 1][0], by = way[i + 1][1];
+			const double len = std::hypot(bx - ax, by - ay);
+			if (len < 1e-6) continue;
+			const double nx = -(by - ay) / len, ny = (bx - ax) / len;
+			for (const std::array<double, 2> &c : CABLES) {
+				for (double side : {1.0, -1.0}) {
+					const double off = side * c[0] * upm;
+					const double x0 = ax + nx * off, y0 = ay + ny * off, x1 = bx + nx * off, y1 = by + ny * off;
+					const double g0 = ground(ax, ay), g1 = ground(bx, by);
+					if (eye) {
+						AddCabWire(ox + x0, oy + y0, ti->z + g0, ox + x1, oy + y1, ti->z + g1, c[1], CABLE_COLOUR);
+					} else {
+						wires.push_back({static_cast<float>(x0), static_cast<float>(y0), static_cast<float>(g0 + c[1] * hpm), static_cast<float>(x1), static_cast<float>(y1), static_cast<float>(g1 + c[1] * hpm), 1});
+					}
+				}
+			}
+		}
+		/* Its pylon: every third tile along the line (across a corner counted along the diagonal), at its way's middle. */
+		const int along = t == Track::X ? tx : t == Track::Y ? ty : (t == Track::Upper || t == Track::Lower) ? tx - ty : tx + ty;
+		if (((along % PYLON_EVERY) + PYLON_EVERY) % PYLON_EVERY != 0) continue;
+		const size_t mid = way.size() / 2;
+		const std::array<double, 2> a = way[mid - (way.size() > 2 ? 0 : 1)], b = way[std::min(mid + 1, way.size() - 1)];
+		const double mx = way.size() > 2 ? way[mid][0] : (way[0][0] + way[1][0]) / 2, my = way.size() > 2 ? way[mid][1] : (way[0][1] + way[1][1]) / 2;
+		const float facing = static_cast<float>(std::atan2(b[1] - a[1], b[0] - a[0]) * 180.0 / M_PI);
+		const double px = ox + mx, py = oy + my;
+		const int z = ti->z + static_cast<int>(std::lround(ground(mx, my)));
+		if (eye) {
+			AddCabFigure("vedeni_stozar", 1.0f, px, py, z, facing);
+		} else {
+			const int ix = static_cast<int>(std::lround(px)), iy = static_cast<int>(std::lround(py));
+			const int half = static_cast<int>(std::lround(PYLON_HALF_M * upm));
+			const std::array<int, 6> box{ix - half, iy - half, z, ix + half - 1, iy + half - 1, z + static_cast<int>(std::lround(PYLON_TALL_M * hpm)) - 1};
+			AddThreeDFigureToViewportInBox("vedeni_stozar", 1.0f, ix, iy, z, facing, _cur_dpi->zoom, tile, 0, -1, 0, &box);
+		}
+	}
+	if (!eye && !wires.empty()) {
+		const double thick = 1.2 * std::pow(2.0, to_underlying(_cur_dpi->zoom) - to_underlying(ZoomLevel::Normal));
+		AddThreeDTileObject(GetThreeDWires(tile, wires, thick), tile, ti->z);
+	}
+}
+
 static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 {
 	const bool eye = ViewportDrawingEye();
@@ -3009,6 +3105,12 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 		const std::array<int, 6> box{bx0, by0, foot, bx1, by1, foot + tall - 1};
 		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
 	};
+
+	/* The game's own power line: no track, its pylons and cables (DrawThreeDPowerLine()). */
+	if (GetRailTypeInfo(GetRailType(ti->tile))->label == RAILTYPE_LABEL_POWER_LINE) {
+		DrawThreeDPowerLine(ti, track, s, round, eye);
+		return true;
+	}
 
 	for (Track t : track) {
 		/* A round piece along its arc in one (GetThreeDTrackArc(); the player: "like the fishing rod's line, a thick square

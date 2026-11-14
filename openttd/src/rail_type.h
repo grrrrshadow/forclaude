@@ -18,6 +18,8 @@ static const RailTypeLabel RAILTYPE_LABEL_RAIL     = 'RAIL';
 static const RailTypeLabel RAILTYPE_LABEL_ELECTRIC = 'ELRL';
 static const RailTypeLabel RAILTYPE_LABEL_MONO     = 'MONO';
 static const RailTypeLabel RAILTYPE_LABEL_MAGLEV   = 'MGLV';
+/** The game's own power line (the player, 14. 11.: pylons with cables for the cargo electricity): a rail type, drawn in 3D always (DrawThreeDPowerLine() of rail_cmd.cpp). */
+static const RailTypeLabel RAILTYPE_LABEL_POWER_LINE = 'DVED';
 
 /**
  * Enumeration for all possible railtypes.
