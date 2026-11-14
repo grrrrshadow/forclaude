@@ -6745,7 +6745,7 @@ STR_SV_STNAME_STATION_WAYPOINT                                  :{STRING}
 ############ end of savegame specific region!
 
 ##id 0x8000
-###length 122
+###length 123
 # Vehicle names
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_KIRBY_PAUL_TANK_STEAM        :Kirby Paul Tank (parní)
 STR_VEHICLE_NAME_TRAIN_ENGINE_RAIL_MJS_250_DIESEL               :MJS 250 (dieselová)
@@ -6869,6 +6869,7 @@ STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_CAR_CARRIER                 :Vagon na auta
 STR_VEHICLE_NAME_TRAIN_WAGON_RAIL_MARIJUANA_TRUCK               :Vagon na marihuanu
 STR_VEHICLE_NAME_TRAIN_WAGON_MONORAIL_MARIJUANA_TRUCK           :Vagon na marihuanu
 STR_VEHICLE_NAME_TRAIN_WAGON_MAGLEV_MARIJUANA_TRUCK             :Vagon na marihuanu
+STR_VEHICLE_NAME_TRAIN_ENGINE_PIPE_PUMP                         :Čerpadlo potrubí
 
 ###length 91
 STR_VEHICLE_NAME_ROAD_VEHICLE_MPS_REGAL_BUS                     :Autobus MPS Regal

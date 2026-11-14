@@ -10996,6 +10996,34 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_DEFAULT, "test3d:   {}", half);
 			}
 		}
+	} else if (what == "cerpadlo" && argv.size() > 4) {
+		/* 'cerpadlo <x> <y> <diagdir 0..3>': a depot of the game's own pipeline on a tile, its door to that side, and the
+		 * pipeline's pump (the game's own train engine 122) bought in it and sent out. */
+		auto x = number(2), y = number(3), dir = number(4);
+		if (!x.has_value() || !y.has_value() || !dir.has_value()) return true;
+		const TileIndex at = TileXY(*x, *y);
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		const CommandCost depot = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, at, RAILTYPE_PIPE, static_cast<DiagDirection>(*dir & 3));
+		const EngineID pump = _engine_mngr.GetID(VehicleType::Train, 122, EngineOverrideManager::GAMES_OWN_GRFID);
+		if (depot.Failed()) IConsolePrint(CC_ERROR, "test3d: cerpadlo: depo NEJDE ({})", GetString(depot.GetErrorMessage()));
+		/* The signals the depot told to update, as a command of a player would be followed by (Train::Tick() asserts none wait). */
+		UpdateSignalsInBuffer();
+		if (pump == EngineID::Invalid()) {
+			IConsolePrint(CC_ERROR, "test3d: cerpadlo: no such engine (depot {})", depot.Succeeded() ? "ok" : "NEJDE");
+			return true;
+		}
+		const Engine *e = Engine::Get(pump);
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, at, pump, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Succeeded()) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+		IConsolePrint(CC_DEFAULT, "test3d: cerpadlo: depo {}, motor {} ({}) dostupny {}, koupeno {}", depot.Succeeded() ? "ok" : "NEJDE", pump.base(),
+				GetString(e->info.string_id), e->company_avail.Test(_local_company) ? "ano" : "ne", cost.Succeeded() ? "ano" : "NE");
+		return true;
 	} else if (what == "vyjed") {
 		/* 'vyjed': a save's vehicles standing stopped in their depots sent out, the game going (the player's sxs.sav, 14. 11.:
 		 * "it is enough to let the vehicles out of the depot; there are two depots"): how many, and where. */

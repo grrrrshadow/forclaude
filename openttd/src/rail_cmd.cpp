@@ -89,6 +89,7 @@ void ResetRailTypes()
 	 * type the cargo's 'trains' run on): a rail type of its own after the game's four, a set's after it; there from
 	 * the first day, for itself alone. */
 	if (const RailType rt = AllocateRailType(RAILTYPE_LABEL_POWER_LINE); rt != INVALID_RAILTYPE) {
+		assert(rt == RAILTYPE_POWER_LINE); // the game's own vehicles for it name it by its number (table/engines.h)
 		RailTypeInfo &rti = _railtypes[rt];
 		rti.strings.name = STR_RAIL_NAME_POWER_LINE;
 		rti.strings.toolbar_caption = STR_RAIL_TOOLBAR_POWER_LINE_CONSTRUCTION_CAPTION;
@@ -101,6 +102,7 @@ void ResetRailTypes()
 	}
 	/* And its own pipeline (RAILTYPE_LABEL_PIPE; "pipes for the cargoes the tankers carry"), the same way. */
 	if (const RailType rt = AllocateRailType(RAILTYPE_LABEL_PIPE); rt != INVALID_RAILTYPE) {
+		assert(rt == RAILTYPE_PIPE);
 		RailTypeInfo &rti = _railtypes[rt];
 		rti.strings.name = STR_RAIL_NAME_PIPE;
 		rti.strings.toolbar_caption = STR_RAIL_TOOLBAR_PIPE_CONSTRUCTION_CAPTION;

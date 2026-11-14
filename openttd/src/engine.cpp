@@ -274,6 +274,8 @@ Engine::Engine(EngineID index, VehicleType type, uint16_t local_id) : EnginePool
 
 			/* Set the default model life of original wagons to "infinite" */
 			if (rvi.railveh_type == RailVehicleType::Wagon) this->info.base_life = TimerGameCalendar::Year{0xFF};
+			/* And of the game's own pump of the pipeline: there is no other vehicle for the pipe. */
+			if (rvi.railtypes.Test(RAILTYPE_PIPE) || rvi.railtypes.Test(RAILTYPE_POWER_LINE)) this->info.base_life = TimerGameCalendar::Year{0xFF};
 
 			break;
 		}

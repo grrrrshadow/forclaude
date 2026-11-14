@@ -32,6 +32,8 @@ enum RailType : uint8_t {
 	RAILTYPE_ELECTRIC = 1,          ///< Electric rails
 	RAILTYPE_MONO     = 2,          ///< Monorail
 	RAILTYPE_MAGLEV   = 3,          ///< Maglev
+	RAILTYPE_POWER_LINE = 4,        ///< The game's own power line (RAILTYPE_LABEL_POWER_LINE): allocated right after the four (ResetRailTypes())
+	RAILTYPE_PIPE     = 5,          ///< The game's own pipeline (RAILTYPE_LABEL_PIPE): after it
 	RAILTYPE_END      = 64,         ///< Used for iterations
 	INVALID_RAILTYPE  = 0xFF,       ///< Flag for invalid railtype
 };
