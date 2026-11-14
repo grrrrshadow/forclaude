@@ -48,6 +48,9 @@
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
 
+#include <map>
+#include <mutex>
+
 #include "safeguards.h"
 
 /** Helper type for lists/vectors of trains */
