@@ -12650,7 +12650,9 @@ std::span<const ThreeDObjectFigure> GetThreeDIndustryTileVehicles(const ThreeDIn
  */
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile)
 {
-	const IndustryGfx gfx = GetIndustryGfx(tile);
+	IndustryGfx gfx = GetIndustryGfx(tile);
+	/* The substation (IT_SUBSTATION): the power station's tile of transformers by itself, its part. */
+	if (gfx == GFX_SUBSTATION) gfx = 10;
 	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
 	return GetThreeDOriginalIndustryTile(gfx);
 }

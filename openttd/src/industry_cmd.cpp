@@ -911,6 +911,17 @@ static void SetupPotatoChain()
 	_industry_specs[IT_DRAGON_FARM].behaviour.Reset(IndustryBehaviour::OnlyInTown);
 
 	SetupGameForest();
+
+	/* The electricity (the player, 14. 11.): the power station makes it of all the coal it is given, as the distillery
+	 * its alcohol; the substation, a tile in a town -- the power station's transformers by themselves --, takes it. */
+	IndustrySpec &power = _industry_specs[IT_POWER_STATION];
+	if (power.enabled && !power.grf_prop.HasGrfFile()) {
+		power.life_type = IndustryLifeType::Processing;
+		power.produced_cargo_label[0] = CT_ELECTRICITY;
+		power.production_rate[0] = 0;
+		power.input_cargo_multiplier[0][0] = 256;
+	}
+	SetupTownIndustry(IT_SUBSTATION, {IndustryTileLayoutTile{TileIndexDiffC{0, 0}, GFX_SUBSTATION}}, STR_INDUSTRY_NAME_SUBSTATION, 0xBF);
 }
 
 /**
@@ -966,6 +977,7 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE_ON(SPR_FLAT_BARE_LAND, 0x5D4, 22), // GFX_DRAGON_FARM: the old house (house 0x18), the castle drawn as a 3D object
 	OWN_TILE_ON(0x81D, 0x81B, 39),              // GFX_GAME_FOREST: the original forest's trees, the parts drawn as 3D objects
 	OWN_TILE_ON(0x925, 0x926, 30),              // GFX_PALM_PLANTATION: the original fruit plantation's trees, the parts drawn as 3D objects
+	OWN_TILE_ON(0x7E6, 0x7E5, 30),              // GFX_SUBSTATION: the power station's transformers on their concrete (the original tile 10)
 };
 static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
 
@@ -1480,6 +1492,8 @@ static const std::array<CargoLabel, 1> DISTILLERY_CARGOES{CT_POTATOES};
 
 /** What the pub takes: the alcohol its guests drink, and the mushrooms of its goulash (PubCooksGoulash()). */
 static const std::array<CargoLabel, 2> PUB_CARGOES{CT_ALCOHOL, CT_MUSHROOMS};
+/** What the substation takes. */
+static const std::array<CargoLabel, 1> SUBSTATION_CARGOES{CT_ELECTRICITY};
 
 /** What the dragon farm takes: the marijuana hay its dragons eat, and the studentky who tend them. */
 static const std::array<CargoLabel, 2> DRAGON_FARM_CARGOES{CT_HEMP_FIBRE, CT_STUDENTKY};
@@ -1665,7 +1679,7 @@ void UpdateExtraIndustryCargoes()
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
 		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE &&
-				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM && i->type != IT_GAME_FOREST &&
+				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM && i->type != IT_GAME_FOREST && i->type != IT_SUBSTATION && i->type != IT_POWER_STATION &&
 				i->type != IT_FRUIT_PLANTATION && i->type != IT_PALM_PLANTATION) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
@@ -1735,6 +1749,7 @@ void ResolveExtraIndustryCargoes()
 	ResolveTownIndustryCargoes(IT_POTATO_FIELD, PLANTATION_CARGOES);
 	ResolveTownIndustryCargoes(IT_DISTILLERY, DISTILLERY_CARGOES);
 	ResolveTownIndustryCargoes(IT_PUB, PUB_CARGOES);
+	ResolveTownIndustryCargoes(IT_SUBSTATION, SUBSTATION_CARGOES);
 	ResolveTownIndustryCargoes(IT_DRAGON_FARM, DRAGON_FARM_CARGOES);
 	ResolveTownIndustryCargoes(IT_GAME_FOREST, GAME_FOREST_CARGOES);
 	/* The palm plantation (the player, 2. 11.): worked by the girls. And the original fruit plantation, the palm
@@ -1924,6 +1939,7 @@ std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
 		labels.push_back(CT_POTATOES);
 		labels.push_back(CT_ALCOHOL);
 		labels.push_back(CT_MUSHROOMS);
+		labels.push_back(CT_ELECTRICITY);
 		labels.push_back(CT_FRUIT); // the palm plantation's, in every climate (SetupPalmPlantation())
 	}
 	if (IndustryClimatesOn().None()) return labels;

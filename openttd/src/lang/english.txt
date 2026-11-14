@@ -64,6 +64,7 @@ STR_CARGO_PLURAL_POTATOES                                       :Potatoes
 STR_CARGO_PLURAL_ALCOHOL                                        :Alcohol
 STR_CARGO_PLURAL_MUSHROOMS                                      :Mushrooms
 STR_CARGO_PLURAL_EXPLOSIVES                                     :Explosives
+STR_CARGO_PLURAL_ELECTRICITY                                    :Electricity
 
 # Singular cargo name
 STR_CARGO_SINGULAR_NOTHING                                      :
@@ -106,6 +107,7 @@ STR_CARGO_SINGULAR_POTATOES                                     :Potatoes
 STR_CARGO_SINGULAR_ALCOHOL                                      :Alcohol
 STR_CARGO_SINGULAR_MUSHROOMS                                    :Mushrooms
 STR_CARGO_SINGULAR_EXPLOSIVE                                    :Explosive
+STR_CARGO_SINGULAR_ELECTRICITY                                  :Electricity
 
 # Quantity of cargo
 STR_QUANTITY_NOTHING                                            :
@@ -148,6 +150,7 @@ STR_QUANTITY_POTATOES                                           :{WEIGHT_LONG} o
 STR_QUANTITY_ALCOHOL                                            :{VOLUME_LONG} of alcohol
 STR_QUANTITY_MUSHROOMS                                          :{WEIGHT_LONG} of mushrooms
 STR_QUANTITY_EXPLOSIVES                                         :{COMMA}{NBSP}crate{P "" s} of explosives
+STR_QUANTITY_ELECTRICITY                                        :{COMMA}{NBSP}MWh of electricity
 STR_QUANTITY_N_A                                                :N/A
 
 # Two letter abbreviation of cargo name
@@ -191,6 +194,7 @@ STR_ABBREV_POTATOES                                             :PO
 STR_ABBREV_ALCOHOL                                              :AL
 STR_ABBREV_MUSHROOMS                                            :MU
 STR_ABBREV_EXPLOSIVES                                           :EX
+STR_ABBREV_ELECTRICITY                                          :EL
 STR_ABBREV_ALL                                                  :ALL
 
 # 'Mode' of transport for cargoes
@@ -6434,6 +6438,7 @@ STR_INDUSTRY_NAME_PUB                                           :Pub
 STR_INDUSTRY_NAME_DRAGON_FARM                                   :Dragon Farm
 STR_INDUSTRY_NAME_GAME_FOREST                                   :Forest
 STR_INDUSTRY_NAME_PALM_PLANTATION                               :Palm Plantation
+STR_INDUSTRY_NAME_SUBSTATION                                    :Substation
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

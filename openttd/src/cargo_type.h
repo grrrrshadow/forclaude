@@ -96,6 +96,8 @@ static constexpr CargoLabel CT_EXPLOSIVES{'BOOM'};
 static constexpr CargoLabel CT_STUDENTKY{'STUD'};
 /** Potatoes ("brambory"), of the game's own potato field, to the distillery (the player's sets carry them by this label). */
 static constexpr CargoLabel CT_POTATOES{'BRAM'};
+/** Electricity (the player, 14. 11.): the power station makes it of its coal, the substation in a town takes it; carried along the game's own power line. */
+static constexpr CargoLabel CT_ELECTRICITY{'ELTR'};
 /** Alcohol, of the game's own distillery, to the pub (FIRS's label for it). */
 static constexpr CargoLabel CT_ALCOHOL{'BEER'};
 /** Mushrooms, which the girls pick in the game's own forest (the player, 23. 10.: "the cars will carry the mushrooms"). */

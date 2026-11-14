@@ -164,6 +164,11 @@ static const CargoSpec _default_cargo[] = {
 	 * marijuana is (the player, 23. 10.: "the mushrooms the cars will carry"). Weighed, paid and carried like fruit,
 	 * quick to spoil; express, as the colleague's cars name them outright, and of the game's own vehicles the mail vans
 	 * and lorries take them (OfferIndustryCargoesToOriginalVehicles()). */
+	/* Electricity (CT_ELECTRICITY), with economy.extra_industries (the player, 14. 11.: "the power station will produce
+	 * electricity and the substation will take it"): of no class, so that nothing carries it but what names it -- the
+	 * spark of the game's own power line (the set Rozvody 3D). */
+	MK(  55, CT_ELECTRICITY,  191,  0, 0x100, 4300,  0,  10, false,       TownAcceptanceEffect::None,  ELECTRICITY,  ELECTRICITY, STR_QUANTITY_ELECTRICITY, CargoClasses({})),
+
 	MK(  56, CT_MUSHROOMS,     70,  8, 0x100, 4500,  0,  10,  true,       TownAcceptanceEffect::None,    MUSHROOMS,    MUSHROOMS,       STR_TONS, CargoClasses({CargoClass::Express, CargoClass::Refrigerated})),
 };
 

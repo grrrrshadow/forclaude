@@ -11025,6 +11025,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: cerpadlo: depo {}, motor {} ({}) dostupny {}, koupeno {}", depot.Succeeded() ? "ok" : "NEJDE", pump.base(),
 				GetString(e->info.string_id), e->company_avail.Test(_local_company) ? "ano" : "ne", cost.Succeeded() ? "ano" : "NE");
 		return true;
+	} else if (what == "prumysly") {
+		/* 'prumysly': how many industries of each kind the map has, and of each what it takes and makes. */
+		std::map<IndustryType, int> count;
+		for (const Industry *i : Industry::Iterate()) count[i->type]++;
+		for (const auto &[type, n] : count) {
+			const IndustrySpec *spec = GetIndustrySpec(type);
+			std::string in, out;
+			for (CargoType c : spec->accepts_cargo) if (IsValidCargoType(c)) in += " " + GetString(CargoSpec::Get(c)->name);
+			for (CargoType c : spec->produced_cargo) if (IsValidCargoType(c)) out += " " + GetString(CargoSpec::Get(c)->name);
+			IConsolePrint(CC_DEFAULT, "test3d: prumysl {} ({}): {}x, bere:{} dava:{}", GetString(spec->name), type, n, in, out);
+		}
+		return true;
 	} else if (what == "vyjed") {
 		/* 'vyjed': a save's vehicles standing stopped in their depots sent out, the game going (the player's sxs.sav, 14. 11.:
 		 * "it is enough to let the vehicles out of the depot; there are two depots"): how many, and where. */

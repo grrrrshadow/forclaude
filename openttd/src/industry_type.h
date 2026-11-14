@@ -92,6 +92,12 @@ static const IndustryType IT_GAME_FOREST = NUM_INDUSTRYTYPES - 10;
  * the forest with a clearing is; its fruit only while the girls of a delivery of studentky work there.
  */
 static const IndustryType IT_PALM_PLANTATION = NUM_INDUSTRYTYPES - 11;
+/**
+ * The substation, a tile in a town (economy.extra_industries; the player, 14. 11.: "we have a substation, it will be one
+ * tile only, we take it from the power station here; the power station will produce electricity and the substation will
+ * take it"): takes the electricity the power station makes of its coal.
+ */
+static const IndustryType IT_SUBSTATION = NUM_INDUSTRYTYPES - 12;
 /** The first of the game's own industry types (economy.extra_industries). */
 static const IndustryType IT_GAME_OWN_FIRST = IT_PALM_PLANTATION;
 
@@ -148,7 +154,9 @@ static const IndustryGfx  GFX_GAME_FOREST = NUM_INDUSTRYTILES - 18;
 /** The tiles of the palm plantation (IT_PALM_PLANTATION), all one: each laid of a part by its place (ThreeDPalmPlantationPartAt()). */
 static const IndustryGfx  GFX_PALM_PLANTATION = NUM_INDUSTRYTILES - 19;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_PALM_PLANTATION;
+/** The tile of the substation (IT_SUBSTATION): the power station's tile of transformers (the original tile 10) by itself. */
+static const IndustryGfx  GFX_SUBSTATION = NUM_INDUSTRYTILES - 20;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_SUBSTATION;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

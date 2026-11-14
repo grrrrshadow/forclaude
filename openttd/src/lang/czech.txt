@@ -158,6 +158,7 @@ STR_CARGO_PLURAL_EXPLOSIVES                                     :Výbušniny
 STR_CARGO_PLURAL_EXPLOSIVES.gen                                 :Výbušnin
 STR_CARGO_PLURAL_EXPLOSIVES.acc                                 :Výbušniny
 STR_CARGO_PLURAL_EXPLOSIVES.big                                 :Výbušniny
+STR_CARGO_PLURAL_ELECTRICITY                                    :Elektřina
 
 # Singular cargo name
 STR_CARGO_SINGULAR_NOTHING                                      :
@@ -202,6 +203,7 @@ STR_CARGO_SINGULAR_POTATOES                                     :brambor
 STR_CARGO_SINGULAR_ALCOHOL                                      :alkoholu
 STR_CARGO_SINGULAR_MUSHROOMS                                    :hub
 STR_CARGO_SINGULAR_EXPLOSIVE                                    :výbušnin
+STR_CARGO_SINGULAR_ELECTRICITY                                  :elektřina
 
 # Quantity of cargo
 STR_QUANTITY_NOTHING                                            :
@@ -244,6 +246,7 @@ STR_QUANTITY_POTATOES                                           :{WEIGHT_LONG} b
 STR_QUANTITY_ALCOHOL                                            :{VOLUME_LONG} alkoholu
 STR_QUANTITY_MUSHROOMS                                          :{WEIGHT_LONG} hub
 STR_QUANTITY_EXPLOSIVES                                         :{COMMA}{NBSP}bed{P na ny en} výbušnin
+STR_QUANTITY_ELECTRICITY                                        :{COMMA}{NBSP}MWh elektřiny
 STR_QUANTITY_N_A                                                :N/A
 
 # Two letter abbreviation of cargo name
@@ -287,6 +290,7 @@ STR_ABBREV_POTATOES                                             :BR
 STR_ABBREV_ALCOHOL                                              :AL
 STR_ABBREV_MUSHROOMS                                            :HU
 STR_ABBREV_EXPLOSIVES                                           :VY
+STR_ABBREV_ELECTRICITY                                          :EL
 STR_ABBREV_ALL                                                  :VŠE
 
 # 'Mode' of transport for cargoes
@@ -6699,6 +6703,10 @@ STR_INDUSTRY_NAME_PALM_PLANTATION                               :{G=f}Palmová p
 STR_INDUSTRY_NAME_PALM_PLANTATION.gen                           :palmové plantáže
 STR_INDUSTRY_NAME_PALM_PLANTATION.loc                           :na palmové plantáži
 STR_INDUSTRY_NAME_PALM_PLANTATION.small                         :palmová plantáž
+STR_INDUSTRY_NAME_SUBSTATION                                    :{G=f}Rozvodna
+STR_INDUSTRY_NAME_SUBSTATION.gen                                :rozvodny
+STR_INDUSTRY_NAME_SUBSTATION.loc                                :v rozvodně
+STR_INDUSTRY_NAME_SUBSTATION.small                              :rozvodna
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!
