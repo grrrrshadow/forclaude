@@ -11095,6 +11095,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (const auto &[tile, n] : depots) where += fmt::format(" {}x na {},{}", n, TileX(TileIndex(tile)), TileY(TileIndex(tile)));
 		IConsolePrint(CC_DEFAULT, "test3d: vyjed: {} vozidel:{}", started, where);
 		return true;
+	} else if (what == "sprityvek" && argv.size() > 2) {
+		/* 'sprityvek <n>': the sprites not drawn for n half minutes let go of (IncreaseSpriteLRU()); 0 never. */
+		extern size_t _sprite_age_marks;
+		_sprite_age_marks = static_cast<size_t>(std::max(0, number(2).value_or(8)));
+		IConsolePrint(CC_DEFAULT, "test3d: sprityvek {}", _sprite_age_marks);
+		return true;
 	} else if (what == "texturykarty" && argv.size() > 2) {
 		/* 'texturykarty 0|1': the pixels of the vehicles' textures the card holds let go of (1), or kept in the memory too (0). */
 		extern bool _textures_card_only;

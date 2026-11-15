@@ -36,6 +36,9 @@
 
 #include "three_d_shape.h"
 
+#include <deque>
+#include <chrono>
+
 #include "safeguards.h"
 
 
@@ -1772,6 +1775,9 @@ static void DeleteEntriesFromSpriteCache(size_t to_remove)
 			candidates.size(), candidate_bytes, initial_in_use, _spritecache_bytes_used, to_remove);
 }
 
+/** After how many half minutes a sprite not drawn is let go of (IncreaseSpriteLRU()): four minutes; 0 never. The rig: 'test3d sprityvek <n>'. */
+size_t _sprite_age_marks = 8;
+
 void IncreaseSpriteLRU()
 {
 	/* The player's sprite memory (gui.sprite_cache_size_mb) is given for a
@@ -1780,6 +1786,36 @@ void IncreaseSpriteLRU()
 	size_t target_size = (bpp > 0 ? static_cast<size_t>(_settings_client.gui.sprite_cache_size_mb) * bpp / 32 : 1) * 1024 * 1024;
 	if (_spritecache_bytes_used > target_size) {
 		DeleteEntriesFromSpriteCache(_spritecache_bytes_used - target_size + 512 * 1024);
+	}
+
+	/* The sprites not drawn for a few minutes let go of, under the limit too: the cache only grew as the player went
+	 * about the map -- 1861 MB of its 2048 after two hours, the biggest thing the game held when the phone ended it
+	 * for its memory (the player's logs of 15. 11., build #369: the process 5.3 GB, "LOW_MEMORY"). One wanted again
+	 * is read again (GetRawSprite()). The counter of uses as it stood every half a minute tells which were not used
+	 * since. */
+	extern size_t _sprite_age_marks;
+	const size_t MARKS = _sprite_age_marks;
+	static std::deque<uint32_t> marks;
+	static auto last_mark = std::chrono::steady_clock::now();
+	if (const auto now = std::chrono::steady_clock::now(); now - last_mark >= std::chrono::seconds(30)) {
+		last_mark = now;
+		marks.push_back(_sprite_lru_counter);
+		if (MARKS > 0 && marks.size() > MARKS) {
+			while (marks.size() > MARKS + 1) marks.pop_front();
+			const uint32_t before = marks.front();
+			marks.pop_front();
+			size_t count = 0, bytes = 0;
+			for (SpriteCache &sc : _spritecache) {
+				if (sc.ptr == nullptr || sc.lru >= before || sc.type != SpriteType::Normal) continue;
+				bytes += sc.length;
+				count++;
+				sc.ClearSpriteData();
+				sc.dropped = true;
+				_sprite_churn.dropped++;
+				_sprite_churn.dropped_bytes += sc.length;
+			}
+			if (count > 0) Debug(sprite, 1, "Sprites not drawn for four minutes let go of: {}, {:.1f} MB; held {:.1f} MB", count, bytes / (1024.0 * 1024.0), _spritecache_bytes_used / (1024.0 * 1024.0));
+		}
 	}
 
 	if (_sprite_lru_counter >= 0xC0000000) {
@@ -1795,6 +1831,7 @@ void IncreaseSpriteLRU()
 			}
 		}
 		_sprite_lru_counter -= 0x80000000;
+		marks.clear(); // the counter stepped back: the marks of before tell nothing
 	}
 }
 
