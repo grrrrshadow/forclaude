@@ -3011,8 +3011,10 @@ static void DrawThreeDBufferStops(const TileInfo *ti, Track t, int z, bool eye);
  * @param pylon -1 its pylon by its turn along the line; 0 none (over a bridge); 1 always (a bridge's end, a tunnel's)
  * @param part 0 the cables all along the piece; 1 from its start to its middle, 2 from its middle to its end (they end
  *             at the pylon before a tunnel)
+ * @param heights a bridge's: the ground the cables hang over at the piece's start, middle and end, over the tile's
+ *                height -- straight from pylon to pylon over the bridge, the pylon on the land at its end
  */
-static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye, int pylon = -1, int part = 0)
+static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye, int pylon = -1, int part = 0, const std::array<double, 3> *heights = nullptr)
 {
 	/* Where the cables hang, metres: aside of the line (to both sides) and up. */
 	static constexpr std::array<std::array<double, 2>, 3> CABLES{{{9.6, 25.95}, {9.6, 18.75}, {5.28, 18.68}}};
@@ -3038,6 +3040,7 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 			way = {{p.x - p.ax, p.y - p.ay}, {p.x + p.ax, p.y + p.ay}};
 		}
 		/* Where its pylon stands: its way's middle. */
+		if (heights != nullptr && way.size() == 2) way = {way[0], {(way[0][0] + way[1][0]) / 2, (way[0][1] + way[1][1]) / 2}, way[1]};
 		const std::vector<std::array<double, 2>> whole = way;
 		if (part != 0 && way.size() == 2) {
 			const std::array<double, 2> middle{(way[0][0] + way[1][0]) / 2, (way[0][1] + way[1][1]) / 2};
@@ -3052,7 +3055,7 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 				for (double side : {1.0, -1.0}) {
 					const double off = side * c[0] * upm;
 					const double x0 = ax + nx * off, y0 = ay + ny * off, x1 = bx + nx * off, y1 = by + ny * off;
-					const double g0 = ground(ax, ay), g1 = ground(bx, by);
+					const double g0 = heights != nullptr && way.size() == 3 ? (*heights)[i] : ground(ax, ay), g1 = heights != nullptr && way.size() == 3 ? (*heights)[i + 1] : ground(bx, by);
 					if (eye) {
 						AddCabWire(ox + x0, oy + y0, ti->z + g0, ox + x1, oy + y1, ti->z + g1, c[1], CABLE_COLOUR);
 					} else {
@@ -3070,7 +3073,7 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 		const double mx = way.size() > 2 ? way[mid][0] : (way[0][0] + way[1][0]) / 2, my = way.size() > 2 ? way[mid][1] : (way[0][1] + way[1][1]) / 2;
 		const float facing = static_cast<float>(std::atan2(b[1] - a[1], b[0] - a[0]) * 180.0 / M_PI);
 		const double px = ox + mx, py = oy + my;
-		const int z = ti->z + static_cast<int>(std::lround(ground(mx, my)));
+		const int z = ti->z + static_cast<int>(std::lround(heights != nullptr ? (*heights)[1] : ground(mx, my)));
 		if (eye) {
 			AddCabFigure("vedeni_stozar", 1.0f, px, py, z, facing);
 		} else {
@@ -3579,6 +3582,17 @@ bool ThreeDConduitTunnelBridge(TileIndex tile)
 	return GetTunnelBridgeTransportType(tile) == TransportType::Rail && IsOwnConduitRailType(GetRailType(tile));
 }
 
+/**
+ * The land at the middle of a bridge's end of the game's power line, where its pylon stands: the tile's as it lies
+ * after its foundation -- not the bridge's ramp over it (no ramp is drawn).
+ */
+static double ThreeDConduitPylonLand(TileIndex head)
+{
+	auto [slope, z] = GetTileSlopeZ(head);
+	z += ApplyFoundationToSlope(GetBridgeFoundation(slope, DiagDirToAxis(GetTunnelBridgeDirection(head))), slope);
+	return static_cast<double>(z) * TILE_HEIGHT + GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, slope);
+}
+
 /** How wide and tall a pipe's piece is on the map (objekty/nase potrubi_*), world units. */
 static constexpr double THREE_D_PIPE_HALF_M = 0.6, THREE_D_PIPE_TALL_M = 1.45;
 
@@ -3599,13 +3613,6 @@ void DrawThreeDConduitBridgeHead(const TileInfo *ti)
 	const int out_z = GetSlopePixelZ(static_cast<int>(ox + (axis == Axis::X ? out : TILE_SIZE / 2)), static_cast<int>(oy + (axis == Axis::X ? TILE_SIZE / 2 : out)), true);
 	const bool rises = bz - out_z >= static_cast<int>(TILE_HEIGHT) / 2;
 	const double x = ox + TILE_SIZE / 2.0, y = oy + TILE_SIZE / 2.0;
-	TileInfo deck = *ti;
-	deck.tileh = SLOPE_FLAT;
-	deck.z = bz;
-	if (rises) {
-		deck.z = bz - static_cast<int>(TILE_HEIGHT);
-		deck.tileh = dir == DiagDirection::SW ? SLOPE_SW : dir == DiagDirection::SE ? SLOPE_SE : dir == DiagDirection::NE ? SLOPE_NE : SLOPE_NW;
-	}
 	if (GetRailTypeInfo(GetRailType(ti->tile))->label == RAILTYPE_LABEL_PIPE) {
 		const int tall = std::max(1, static_cast<int>(std::lround(THREE_D_PIPE_TALL_M * OBJECT_HEIGHT_PER_METRE)));
 		if (rises) {
@@ -3616,7 +3623,19 @@ void DrawThreeDConduitBridgeHead(const TileInfo *ti)
 			PutThreeDStraight(ti, "potrubi_rovne", axis, x, y, bz, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_PIPE_HALF_M * OBJECT_UNITS_PER_METRE, bz, tall);
 		}
 	} else {
-		DrawThreeDPowerLine(&deck, TrackBits{AxisToTrack(axis)}, deck.tileh, false, eye, 1);
+		/* Its pylon on the land at the tile's middle, not on the bridge's ramp, which is not there (the player, 15. 11.:
+		 * "the bridge's pylon is high over the surface"); its cables from the land at its outer edge to it, and on
+		 * towards the pylon of the other end. */
+		const TileIndex other = GetOtherBridgeEnd(ti->tile);
+		const double own_z = ThreeDConduitPylonLand(ti->tile), other_z = ThreeDConduitPylonLand(other);
+		const double tiles = std::max<double>(1.0, DistanceManhattan(ti->tile, other));
+		const double inner = own_z + (other_z - own_z) * 0.5 / tiles;
+		TileInfo land = *ti;
+		land.tileh = SLOPE_FLAT;
+		land.z = static_cast<int>(std::lround(own_z));
+		const std::array<double, 3> heights = inner_low ? std::array<double, 3>{inner - land.z, own_z - land.z, static_cast<double>(out_z - land.z)} :
+				std::array<double, 3>{static_cast<double>(out_z - land.z), own_z - land.z, inner - land.z};
+		DrawThreeDPowerLine(&land, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, 1, 0, &heights);
 	}
 }
 
@@ -3637,10 +3656,16 @@ void DrawThreeDConduitOverBridge(const TileInfo *ti, TileIndex south)
 				std::max(1, static_cast<int>(std::lround(THREE_D_PIPE_TALL_M * OBJECT_HEIGHT_PER_METRE))));
 		return;
 	}
+	/* Its cables straight from the pylon on the land of one end to the one of the other. */
+	const TileIndex north = GetOtherBridgeEnd(south);
+	const double north_z = ThreeDConduitPylonLand(north), south_z = ThreeDConduitPylonLand(south);
+	const double tiles = std::max<double>(1.0, DistanceManhattan(north, south)), at = DistanceManhattan(north, ti->tile);
+	auto over = [&](double along) { return north_z + (south_z - north_z) * std::clamp(along / tiles, 0.0, 1.0); };
 	TileInfo deck = *ti;
 	deck.tileh = SLOPE_FLAT;
-	deck.z = bz;
-	DrawThreeDPowerLine(&deck, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, 0);
+	deck.z = static_cast<int>(std::lround(over(at)));
+	const std::array<double, 3> heights{over(at - 0.5) - deck.z, over(at) - deck.z, over(at + 0.5) - deck.z};
+	DrawThreeDPowerLine(&deck, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, 0, 0, &heights);
 }
 
 /**
@@ -3667,10 +3692,8 @@ void DrawThreeDConduitTunnel(const TileInfo *ti)
 		}
 		return;
 	}
-	TileInfo floor = *ti;
-	floor.tileh = SLOPE_FLAT;
-	/* Its cables from the tile's outer edge to the pylon at its middle. */
-	DrawThreeDPowerLine(&floor, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, 1, dir == DiagDirection::SW || dir == DiagDirection::SE ? 1 : 2);
+	/* Its cables from the tile's outer edge to the pylon at its middle, on the hill as it lies. */
+	DrawThreeDPowerLine(ti, TrackBits{AxisToTrack(axis)}, ti->tileh, false, eye, 1, dir == DiagDirection::SW || dir == DiagDirection::SE ? 1 : 2);
 }
 
 /**
