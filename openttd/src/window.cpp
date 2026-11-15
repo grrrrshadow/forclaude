@@ -2008,9 +2008,12 @@ static void HandlePlacePresize()
 	Point pt = GetTileBelowCursor();
 	if (pt.x == -1) {
 		_thd.selend.x = -1;
+		_thd.presize_at = {-1, -1};
 		return;
 	}
 
+	/* The tile the marker's range is worked out for: a click builds there (PlaceObject() of viewport.cpp). */
+	_thd.presize_at = pt;
 	w->OnPlacePresize(pt, TileVirtXY(pt.x, pt.y));
 }
 

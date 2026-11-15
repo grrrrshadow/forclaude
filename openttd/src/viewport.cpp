@@ -11311,8 +11311,19 @@ static void PlaceObject()
 	 * comes from the marker the player was actually looking at when they
 	 * pressed, which is the one from before this frame moved anything. The
 	 * sub-tile position is kept, since tools that care which half of a tile
-	 * was clicked still need it. */
-	if ((_thd_drawn.drawstyle & HT_DRAG_MASK) != HT_NONE) {
+	 * was clicked still need it.
+	 *
+	 * A tool whose marker is a range of its own (a lock's three tiles, a dock's two, a tunnel to its other end:
+	 * OnPlacePresize()) is built from the tile the range was worked out for, not from the range's northern tile --
+	 * that is its end, not the tile pointed at: the lock and the dock were asked for on the flat tile at the range's
+	 * end and refused ("land sloped in the wrong direction") wherever the slope was not the range's northern tile
+	 * (the player, 15. 11.: "I cannot build a lock, I must make a hill ... the dock had the same problem"). */
+	if ((_thd.place_mode & HT_DRAG_MASK) == HT_SPECIAL) {
+		if (_thd_drawn.presize_at.x != -1) {
+			pt.x = (_thd_drawn.presize_at.x & ~TILE_UNIT_MASK) + (pt.x & TILE_UNIT_MASK);
+			pt.y = (_thd_drawn.presize_at.y & ~TILE_UNIT_MASK) + (pt.y & TILE_UNIT_MASK);
+		}
+	} else if ((_thd_drawn.drawstyle & HT_DRAG_MASK) != HT_NONE) {
 		pt.x = _thd_drawn.pos.x + (pt.x & TILE_UNIT_MASK);
 		pt.y = _thd_drawn.pos.y + (pt.y & TILE_UNIT_MASK);
 	}
@@ -12411,6 +12422,9 @@ void SetObjectToPlaceWnd(CursorID icon, PaletteID pal, HighLightStyle mode, Wind
  */
 void SetObjectToPlace(CursorID icon, PaletteID pal, HighLightStyle mode, WindowClass window_class, WindowNumber window_num)
 {
+	/* Another tool: no tile of the tool before (PlaceObject()). */
+	_thd.presize_at = {-1, -1};
+	_thd_drawn.presize_at = {-1, -1};
 	if (_thd.window_class != WindowClass::Invalid) {
 		/* Undo clicking on button and drag & drop */
 		Window *w = _thd.GetCallbackWnd();

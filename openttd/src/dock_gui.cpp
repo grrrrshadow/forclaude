@@ -112,32 +112,6 @@ static TileIndex GetOtherAqueductEnd(TileIndex tile_from, TileIndex *tile_to = n
 }
 
 /** Toolbar window for constructing water infrastructure. */
-/**
- * The tile a lock or a dock is built on for the tile clicked: that one when it is an inclined slope; else the inclined
- * slope by water next to it it belongs to -- the land right above it or the water right below it clicked (the player,
- * 15. 11.: "I put the dock or the lock's middle on the even slope of the shore, click, and it must be built ... I had
- * to make a hill"): the shore's slope is half under the water and looks as the sea with a line of sand, the first tile
- * that looks as land is the flat one behind it.
- */
-static TileIndex SnapToWaterSlope(TileIndex tile)
-{
-	if (!IsValidTile(tile) || IsValidDiagDirection(GetInclinedSlopeDirection(GetTileSlope(tile)))) return tile;
-	TileIndex found = INVALID_TILE;
-	for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
-		const TileIndex n = TileAddByDiagDir(tile, d);
-		if (!IsValidTile(n)) continue;
-		const DiagDirection up = GetInclinedSlopeDirection(GetTileSlope(n));
-		if (!IsValidDiagDirection(up)) continue;
-		const TileIndex above = TileAddByDiagDir(n, up), below = TileAddByDiagDir(n, ReverseDiagDir(up));
-		if (above != tile && below != tile) continue;
-		/* By water: a coast itself, or water at its foot. */
-		const bool coast = IsTileType(n, TileType::Water);
-		if (!coast && !(IsValidTile(below) && IsTileType(below, TileType::Water))) continue;
-		if (found == INVALID_TILE || coast) found = n;
-	}
-	return found != INVALID_TILE ? found : tile;
-}
-
 struct BuildDocksToolbarWindow : Window {
 	WidgetID last_clicked_widget = INVALID_WIDGET; ///< Contains the last widget that has been clicked on this toolbar.
 
@@ -239,7 +213,6 @@ struct BuildDocksToolbarWindow : Window {
 
 	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
 	{
-		if (this->last_clicked_widget == WID_DT_LOCK || this->last_clicked_widget == WID_DT_STATION) tile = SnapToWaterSlope(tile);
 		switch (this->last_clicked_widget) {
 			case WID_DT_CANAL: // Build canal button
 				VpStartPlaceSizing(tile, VPM_X_AND_Y, DDSP_CREATE_WATER);
@@ -351,7 +324,6 @@ struct BuildDocksToolbarWindow : Window {
 			Command<Commands::BuildTunnel>::Do(DoCommandFlag::Auto, tile_from, TransportType::Water, INVALID_RAILTYPE, INVALID_ROADTYPE);
 			tile_to = _build_tunnel_endtile == INVALID_TILE ? tile_from : _build_tunnel_endtile;
 		} else {
-			if (this->last_clicked_widget == WID_DT_LOCK || this->last_clicked_widget == WID_DT_STATION) tile_from = SnapToWaterSlope(tile_from);
 			DiagDirection dir = GetInclinedSlopeDirection(GetTileSlope(tile_from));
 			if (IsValidDiagDirection(dir)) {
 				/* Locks and docks always select the tile "down" the slope. */

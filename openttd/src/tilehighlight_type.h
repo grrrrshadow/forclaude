@@ -60,6 +60,7 @@ struct TileHighlightData {
 
 	Point selstart;      ///< The location where the dragging started.
 	Point selend;        ///< The location where the drag currently ends.
+	Point presize_at{-1, -1}; ///< A tool with a marker of its own range (a lock, a dock, a tunnel: OnPlacePresize()): the tile under the pointer the range was worked out for, -1 none.
 	uint8_t sizelimit;      ///< Whether the selection is limited in length, and what the maximum length is.
 
 	HighLightStyle drawstyle;      ///< Lower bits 0-3 are reserved for detailed highlight information.
