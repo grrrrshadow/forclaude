@@ -11095,6 +11095,34 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (const auto &[tile, n] : depots) where += fmt::format(" {}x na {},{}", n, TileX(TileIndex(tile)), TileY(TileIndex(tile)));
 		IConsolePrint(CC_DEFAULT, "test3d: vyjed: {} vozidel:{}", started, where);
 		return true;
+	} else if (what == "breh" && argv.size() > 5) {
+		/* 'breh <x0> <y0> <x1> <y1>': each tile of the rectangle -- its kind (v water, p coast, . land, other its number),
+		 * its slope, its height, and whether a lock (Z) or a dock (P) can be built with it as the tile clicked, else why not. */
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			DoStartupNewCompany(false, CompanyID::Invalid());
+		}
+		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+		Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
+		for (int y = number(3).value_or(0); y <= number(5).value_or(0); y++) {
+			std::string row = fmt::format("y{:3}:", y);
+			for (int x = number(2).value_or(0); x <= number(4).value_or(0); x++) {
+				const TileIndex t = TileXY(x, y);
+				const char kind = IsTileType(t, TileType::Water) ? (IsCoast(t) ? 'p' : 'v') : IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees) ? '.' : static_cast<char>('0' + to_underlying(GetTileType(t)));
+				const CommandCost lock = Command<Commands::BuildLock>::Do(DoCommandFlags{}, t);
+				row += fmt::format(" {}{:x}/{}{}", kind, to_underlying(GetTileSlope(t)), GetTileZ(t), lock.Succeeded() ? "Z" : "-");
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: breh {}", row);
+		}
+		for (int y = number(3).value_or(0); y <= number(5).value_or(0); y++) {
+			for (int x = number(2).value_or(0); x <= number(4).value_or(0); x++) {
+				const TileIndex t = TileXY(x, y);
+				if (!IsTileType(t, TileType::Water) || !IsCoast(t)) continue;
+				const CommandCost lock = Command<Commands::BuildLock>::Do(DoCommandFlags{}, t);
+				if (lock.Failed()) IConsolePrint(CC_DEFAULT, "test3d: breh {},{} svah {:x}: zdymadlo ne: {}", x, y, to_underlying(GetTileSlope(t)), RefusalReason(lock));
+			}
+		}
+		return true;
 	} else if (what == "sprityvek" && argv.size() > 2) {
 		/* 'sprityvek <n>': the sprites not drawn for n half minutes let go of (IncreaseSpriteLRU()); 0 never. */
 		extern size_t _sprite_age_marks;
