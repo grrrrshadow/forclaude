@@ -1346,6 +1346,18 @@ static int GetViewportY(Point tile)
 	return (tile.y * (int)(TILE_PIXELS / 2) + tile.x * (int)(TILE_PIXELS / 2) - TilePixelHeightOutsideMap(tile.x, tile.y)) << ZOOM_BASE_SHIFT;
 }
 
+/**
+ * Whether a view draws the round curves of rails (round_track.h): turned away from north; and facing north too where
+ * it shows our 3D track from above (gui.three_d_rails_map) -- its straight and diagonal pieces met at a corner each
+ * with its square end over the other's tile, round only once the view was turned (the player, 15. 11.: "the rails
+ * reach over onto the next tile, that goes when turning but the view 0 is bad"). Facing north with the game's own
+ * sprites of track the curves are as always.
+ */
+static bool RoundTrackInView(const Viewport &vp)
+{
+	return IsViewportTurnedAway(vp) || (IsViewportTurned(vp) && ThreeDGroupShown(ThreeDGroup::Rails));
+}
+
 /** The tiles of buildings drawn as their sprites while their objects are made ready in the background (ThreeDObjectReadyToDraw()). */
 static std::vector<TileIndex> _tiles_owed_objects;
 
@@ -9954,7 +9966,7 @@ static bool TurnedCardRectOnCard(const Viewport &vp, int x0, int y0, int x1, int
 	const int vs = ScaleByZoom(1, vp.zoom);
 	AutoRestoreBackup stand_in(_three_d_pictures_stand_in, true);
 	KeepThreeDPicturesOfBlock();
-	RoundTrackPass round_track_pass(IsViewportTurnedAway(vp));
+	RoundTrackPass round_track_pass(RoundTrackInView(vp));
 	static std::vector<uint32_t> scratch;
 	return TurnedPassOnCard(vp, (g.l + x0) * vs, (g.t + y0) * vs, (x1 - x0) * vs, (y1 - y0) * vs, scratch);
 }
@@ -10133,7 +10145,7 @@ void TurnedCardLayMovers()
 	AutoRestoreBackup whole_pass(_turned_whole_view_pass, true);
 	AutoRestoreBackup stand_in(_three_d_pictures_stand_in, true);
 	KeepThreeDPicturesOfBlock();
-	RoundTrackPass round_track_pass(IsViewportTurnedAway(vp));
+	RoundTrackPass round_track_pass(RoundTrackInView(vp));
 	_vd.combine_sprites = SpriteCombineMode::None;
 	_vd.last_child = LAST_CHILD_NONE;
 	_turned_vehicle_pictures.clear();
@@ -10442,8 +10454,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	AutoRestoreBackup stand_in(_three_d_pictures_stand_in, true);
 	/* The pictures it asks for kept till it draws them (the memory of the pictures is bounded, MakeRoomForPicture()). */
 	KeepThreeDPicturesOfBlock();
-	/* The round curves of rails (round_track.h), only turned away from north: facing north the player builds, the curves are as always. */
-	RoundTrackPass round_track_pass(IsViewportTurnedAway(vp));
+	/* The round curves of rails (round_track.h): RoundTrackInView(). */
+	RoundTrackPass round_track_pass(RoundTrackInView(vp));
 	/* The whole turned main view laid by the card this pass: the block only a hole for it. */
 	const bool whole_on_card = IsViewportTurned(vp) && TurnedViewWholeOnCard(vp);
 	_vd.dpi.zoom = vp.zoom;
