@@ -636,6 +636,14 @@ struct ThreeDVehicleShape {
 	static constexpr int SIMPLER_LEVELS = 7;
 	/** The cell of the first of them, metres. */
 	static constexpr double SIMPLER_CELL_M = 0.01;
+	/**
+	 * A simpler shape is kept by itself only when it has no more than this many percent of the triangles of the nearest
+	 * finer one kept (or of the whole); else that one is drawn in its place. Three quarters before: a Tatra of 312
+	 * thousand triangles kept its level of 1 cm with 217 thousand beside the whole -- the simpler shapes of the
+	 * vehicles as much memory as the whole ones, 266 MB of 542 on the player's save with its lorries out (test 11,
+	 * build #370: the vehicles' shapes 1.6 GB from the eyes, "LOW_MEMORY").
+	 */
+	static constexpr size_t SIMPLER_WORTH_PERCENT = 55;
 	/** A shape of fewer triangles than this is drawn as it is (Simpler()): a simpler one saves little -- unless it is a plant, drawn by the hundred. */
 	static constexpr size_t SIMPLER_FEWEST = 512;
 	const ThreeDVehicleShape *Simpler(double cell_m, bool plant = false) const;

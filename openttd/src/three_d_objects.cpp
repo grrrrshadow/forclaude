@@ -9683,7 +9683,7 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, bool plant)
 				finer_level = l;
 			}
 		}
-		if (out != nullptr && out->tri.size() * 4 > finer->tri.size() * 3) {
+		if (out != nullptr && out->tri.size() * 100 > finer->tri.size() * ThreeDVehicleShape::SIMPLER_WORTH_PERCENT) {
 			made = finer_level >= 0 ? this->simpler.shapes[finer_level] : std::shared_ptr<const ThreeDVehicleShape>(std::shared_ptr<void>(), this);
 		} else {
 			made = std::move(out);
@@ -10327,6 +10327,36 @@ static void BendThreeDThingPoint(const ThreeDVehicleObject &o, float *point, flo
  * are asked for (a texture is asked for by its index: ThreeDVehicleObject::GetTexture()).
  * @param parts the parts of its states (PartsOf()), bit n the part n
  */
+/**
+ * A file's part of a shape's key (ThreeDVehicleObject::MakeShape()): its path; of a small file what is in it -- the
+ * trailers of the colleague's lorries have each a file of its own for its length (nt_delka_naves_0125.glb, _0132,
+ * _0135 ...), the same 2.4 kB byte for byte, and all the rest of them the same add-ons: by the path each record kept
+ * its own copy of the same trailer of 177 thousand corners, 16 MB each (the player's test 11, build #370: the
+ * vehicles' shapes 1.6 GB from the eyes).
+ */
+static std::string ShapeKeyOfFile(const std::string &path)
+{
+	static std::mutex mutex;
+	static std::map<std::string, std::string> keys;
+	{
+		std::lock_guard lock(mutex);
+		auto it = keys.find(path);
+		if (it != keys.end()) return it->second;
+	}
+	std::string key = path;
+	if (!path.empty() && !path.starts_with("beamng:")) {
+		static constexpr size_t SMALL = 16 * 1024;
+		const std::vector<uint8_t> head = ReadFileHead(path, SMALL + 1);
+		if (!head.empty() && head.size() <= SMALL) {
+			uint64_t h = 1469598103934665603ull;
+			for (uint8_t b : head) h = (h ^ b) * 1099511628211ull;
+			key = fmt::format("={:016x}.{}", h, head.size());
+		}
+	}
+	std::lock_guard lock(mutex);
+	return keys.emplace(path, std::move(key)).first->second;
+}
+
 std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame, const ThreeDParts &parts) const
 {
 	GlbFilesScope files;
@@ -10337,7 +10367,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		return fig != nullptr ? fig->MakeShape(frame, ThreeDParts{}) : nullptr;
 	}
 	const auto started = std::chrono::steady_clock::now();
-	std::string key = this->file;
+	std::string key = ShapeKeyOfFile(this->file);
 	if (!this->frame_prefix.empty()) key += fmt::format("#{}{}", this->frame_prefix, frame);
 	for (const ThreeDVehicleWheels &w : this->wheels) {
 		key += fmt::format("|{}{}", w.file, w.both_sides ? "*2" : "");
@@ -15733,7 +15763,7 @@ int ThreeDVehicleShape::JoinSimpler() const
 		std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[l];
 		if (made == nullptr) continue;
 		if (made.get() == finer) continue;
-		if (made->tri.size() * 4 > finer->tri.size() * 3) {
+		if (made->tri.size() * 100 > finer->tri.size() * SIMPLER_WORTH_PERCENT) {
 			made = finer_level >= 0 ? this->simpler.shapes[finer_level] : std::shared_ptr<const ThreeDVehicleShape>(std::shared_ptr<void>(), this);
 			joined++;
 		} else {
@@ -15825,6 +15855,7 @@ std::string RigDescribeBiggestShapes()
 	std::string out = fmt::format("tvary {}: celkem {:.1f} MB, vlastni rohy a trojuhelniky {:.1f}, zjednodusene {:.1f}, nocni {:.1f}, po trojuhelnicich {:.1f}", rows.size(), mb(all), mb(geo), mb(simpler), mb(night), mb(per_tri));
 	for (size_t i = 0; i < std::min<size_t>(rows.size(), 8); i++) {
 		const Row &r = rows[i];
+		Debug(misc, 1, "3D shape {} of {} corners, its whole key: {}", i, r.corners, r.key);
 		out += fmt::format("\n  {:.1f} MB (rohy {:.1f}, zjednodusene {}x {:.1f}, nocni {:.1f}, po trojuhelnicich {:.1f}) {} rohu {} trojuhelniku: {}", mb(r.all), mb(r.geo), r.simpler_n, mb(r.simpler), mb(r.night), mb(r.per_tri), r.corners, r.tris, r.key.size() > 150 ? r.key.substr(r.key.size() - 150) : r.key);
 	}
 	return out;
