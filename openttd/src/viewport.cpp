@@ -2617,10 +2617,14 @@ std::string TakeTurnedTimesForDiary(int frames)
 	extern uint64_t _turned_moving_passes;
 	extern double _turned_moving_ms;
 	if (s != "-" || _turned_moving_passes > 0) {
-		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek (karta {})", _turned_moving_passes, _turned_moving_ms / n, ThreeDGpuMovingTimes());
+		extern double _turned_moving_collect_ms, _turned_moving_card_ms;
+		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms a cekani na kartu {:.0f} ms (karta {})", _turned_moving_passes, _turned_moving_ms / n,
+				_turned_moving_collect_ms / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes());
 	}
 	_turned_moving_passes = 0;
 	_turned_moving_ms = 0;
+	extern double _turned_moving_collect_ms, _turned_moving_card_ms;
+	_turned_moving_collect_ms = _turned_moving_card_ms = 0;
 	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
 	extern std::string TakeCardReachForRig();
 	if (s != "-") s += "; " + TakeCardReachForRig();
@@ -7259,6 +7263,8 @@ static bool _turned_movers_moved = false; ///< a moving thing on the main view t
 static bool _turned_moving_due = false;   ///< what stands, or the view, changed since: they are laid again
 uint64_t _turned_moving_passes = 0;       ///< the diary: times they were laid
 double _turned_moving_ms = 0;             ///< and how long that took on the main thread, the card's part waited for
+double _turned_moving_collect_ms = 0;     ///< of it: gathering the vehicles and figures (AddTurnedMovers())
+double _turned_moving_card_ms = 0;        ///< of it: handing them to the card and waiting for it (ThreeDGpuDrawStanding())
 
 /** The picture of the view's ground shown no more: the blocks of holes are drawn again with their ground. */
 static void HideTurnedCardGround()
@@ -10135,7 +10141,9 @@ void TurnedCardLayMovers()
 	DrawPixelInfo cdpi;
 	TurnedWorldBox(frame, tx0, tx1, ty0, ty1, cdpi);
 	_vd.dpi = cdpi;
+	const double t_collect = TurnedNow();
 	AddTurnedMovers(vp.zoom, &cdpi);
+	_turned_moving_collect_ms += TurnedNow() - t_collect;
 	_vd.dpi = frame;
 	TurnParentSprites(0);
 	const std::vector<TurnedSprite> standing = SortedTurnedSprites();
@@ -10150,7 +10158,9 @@ void TurnedCardLayMovers()
 	movers.height = fh;
 	TurnedStandingNear(movers, frame, standing);
 	for (const TurnedSprite &s : standing) AddTurnedStandingThingInOrder(movers, frame, s);
+	const double t_card = TurnedNow();
 	const bool laid = ThreeDGpuDrawStanding(movers);
+	_turned_moving_card_ms += TurnedNow() - t_card;
 	_night_lit.clear();
 	_night_lit_through.clear();
 	_night_glows.clear();

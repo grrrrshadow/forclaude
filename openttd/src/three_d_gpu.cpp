@@ -832,6 +832,9 @@ static constexpr int STANDING_BOXED_FLOATS = 14;
 /** The diary: the moving things laid over the views (ThreeDGpuStanding::moving) -- times, things, pixels copied, card ms. */
 std::atomic<uint64_t> _gpu_moving_passes = 0, _gpu_moving_things = 0, _gpu_moving_copied = 0;
 std::atomic<double> _gpu_moving_ms = 0;
+/** Of the vehicles' layer on the card, for the diary: the copying under them, the vehicles drawn anew and shrunk into their pictures (how many, how long). */
+std::atomic<double> _gpu_moving_copy_ms = 0, _gpu_moving_draw_ms = 0;
+std::atomic<uint64_t> _gpu_moving_drawn = 0;
 /** Whether the card's glClear() keeps to the scissor's rect (TestScissoredClear()); else ClearInScissor() draws over it. */
 static bool _scissored_clear_ok = true;
 /** Whether the card divides an attribute by instance (TestInstancedArrays()); else the meshes alike drawn each on its own. */
@@ -4881,6 +4884,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			gl.glEnable(GL_SCISSOR_TEST);
 		}
 		_gpu_moving_copied += copied;
+		_gpu_moving_copy_ms = _gpu_moving_copy_ms + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - moving_started).count();
 	}
 	gl.glEnable(GL_BLEND);
 	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -5372,8 +5376,13 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					_gpu_standing_vehicles_kept++;
 				} else {
 					flush();
+					const auto draw_started = std::chrono::steady_clock::now();
 					if (vehicle_at[k][0] == -1) draw_vehicles(k);
 					const bool shrunk = vehicle_at[k][0] >= 0 && shrink_vehicle(v, vehicle_at[k], key, place);
+					if (s.moving) {
+						_gpu_moving_drawn++;
+						_gpu_moving_draw_ms = _gpu_moving_draw_ms + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - draw_started).count();
+					}
 					use_pictures();
 					drawing = 0;
 					if (!shrunk) continue;
@@ -7230,9 +7239,10 @@ void ThreeDGpuMovingLayer(int view, bool on)
 std::string ThreeDGpuMovingTimes()
 {
 	const uint64_t passes = _gpu_moving_passes.exchange(0), things = _gpu_moving_things.exchange(0), copied = _gpu_moving_copied.exchange(0);
-	const double ms = _gpu_moving_ms.exchange(0);
+	const double ms = _gpu_moving_ms.exchange(0), copy_ms = _gpu_moving_copy_ms.exchange(0), draw_ms = _gpu_moving_draw_ms.exchange(0);
+	const uint64_t drawn = _gpu_moving_drawn.exchange(0);
 	if (passes == 0) return "-";
-	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms", passes, things, copied / 1e6, ms);
+	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms (z toho kopie {:.0f} ms, {} aut nakresleno znovu {:.0f} ms)", passes, things, copied / 1e6, ms, copy_ms, drawn, draw_ms);
 }
 
 /**
