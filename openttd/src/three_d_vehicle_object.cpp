@@ -2573,18 +2573,60 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 	s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
 	/* The object's origin from the point the sprite is drawn about, in pixels of the zoom (RemapCoords()). */
 	const double ox = (req->off_y - req->off_x) * 2.0 * ZOOM_BASE / (1 << to_underlying(zoom)), oy = (req->off_x + req->off_y) * static_cast<double>(ZOOM_BASE) / (1 << to_underlying(zoom));
-	s.width = static_cast<uint16_t>(r.width);
-	s.height = static_cast<uint16_t>(r.height);
-	s.x_offs = static_cast<int16_t>(r.left + std::lround(ox));
-	s.y_offs = static_cast<int16_t>(r.top + std::lround(oy));
-	s.AllocateData(zoom, static_cast<size_t>(r.width) * r.height);
-	for (size_t i = 0; i < r.px.size(); i++) {
-		SpriteLoader::CommonPixel &d = s.data[i];
-		d.r = r.px[i].r;
-		d.g = r.px[i].g;
-		d.b = r.px[i].b;
-		d.a = r.px[i].a;
-		d.m = 0;
+	/* For the windows: no bigger than the cell of the list of its kind of vehicle -- an object taller or longer than
+	 * that made smaller as a whole (the player, 15. 11.: "the ships' purchase list, the yacht's picture is too big,
+	 * the submarine's too": the yacht with its mast three rows tall over its neighbours). */
+	double fit = 1.0;
+	if (req->gui && r.width > 0 && r.height > 0) {
+		const VehicleCellSize cell = GetVehicleImageCellSize(req->obj->type, EngineImageType::Purchase);
+		const int cell_w = static_cast<int>(cell.extend_left + cell.extend_right), cell_h = static_cast<int>(cell.height);
+		if (cell_w > 0 && cell_h > 0) fit = std::min({1.0, static_cast<double>(cell_w) / r.width, static_cast<double>(cell_h) / r.height});
+	}
+	if (fit < 1.0) {
+		const int w = std::max(1, static_cast<int>(std::lround(r.width * fit))), h = std::max(1, static_cast<int>(std::lround(r.height * fit)));
+		s.width = static_cast<uint16_t>(w);
+		s.height = static_cast<uint16_t>(h);
+		s.x_offs = static_cast<int16_t>(std::lround((r.left + ox) * fit));
+		s.y_offs = static_cast<int16_t>(std::lround((r.top + oy) * fit));
+		s.AllocateData(zoom, static_cast<size_t>(w) * h);
+		for (int y = 0; y < h; y++) {
+			const int y0 = y * r.height / h, y1 = std::max(y0 + 1, (y + 1) * r.height / h);
+			for (int x = 0; x < w; x++) {
+				const int x0 = x * r.width / w, x1 = std::max(x0 + 1, (x + 1) * r.width / w);
+				/* The pixels under it averaged, their colours by how opaque they are. */
+				uint64_t sr = 0, sg = 0, sb = 0, sa = 0, n = 0;
+				for (int yy = y0; yy < y1; yy++) {
+					for (int xx = x0; xx < x1; xx++) {
+						const Colour c = r.px[static_cast<size_t>(yy) * r.width + xx];
+						sr += static_cast<uint64_t>(c.r) * c.a;
+						sg += static_cast<uint64_t>(c.g) * c.a;
+						sb += static_cast<uint64_t>(c.b) * c.a;
+						sa += c.a;
+						n++;
+					}
+				}
+				SpriteLoader::CommonPixel &d = s.data[static_cast<size_t>(y) * w + x];
+				d.r = sa > 0 ? static_cast<uint8_t>(sr / sa) : 0;
+				d.g = sa > 0 ? static_cast<uint8_t>(sg / sa) : 0;
+				d.b = sa > 0 ? static_cast<uint8_t>(sb / sa) : 0;
+				d.a = static_cast<uint8_t>(sa / std::max<uint64_t>(n, 1));
+				d.m = 0;
+			}
+		}
+	} else {
+		s.width = static_cast<uint16_t>(r.width);
+		s.height = static_cast<uint16_t>(r.height);
+		s.x_offs = static_cast<int16_t>(r.left + std::lround(ox));
+		s.y_offs = static_cast<int16_t>(r.top + std::lround(oy));
+		s.AllocateData(zoom, static_cast<size_t>(r.width) * r.height);
+		for (size_t i = 0; i < r.px.size(); i++) {
+			SpriteLoader::CommonPixel &d = s.data[i];
+			d.r = r.px[i].r;
+			d.g = r.px[i].g;
+			d.b = r.px[i].b;
+			d.a = r.px[i].a;
+			d.m = 0;
+		}
 	}
 	avail.Set(zoom);
 	if (_debug_sprite_level >= 3) {
