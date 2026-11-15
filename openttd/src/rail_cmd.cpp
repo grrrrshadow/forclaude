@@ -3395,7 +3395,8 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 	/* The game's own power line and pipeline on such a tile (the player, 14. 11.: the depot the train depot, "we save
 	 * megabytes"; the pipe under a road): no track. The power line's cables go on over it (its pylons by their turn,
 	 * none in a depot's half); the pipe lies along a station's tile, under a level crossing it is in the ground -- the
-	 * road as it is, no posts and barriers -- and into a depot it goes underground too. */
+	 * road as it is, no posts and barriers; its ends go down into the ground before the road -- and into a depot it goes
+	 * underground too. */
 	const RailTypeLabel own = GetRailTypeInfo(GetRailType(ti->tile))->label;
 	if (own == RAILTYPE_LABEL_POWER_LINE) {
 		if (!half) DrawThreeDPowerLine(ti, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye);
@@ -3405,6 +3406,31 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 		if (!crossing && !half) {
 			PutThreeDStraight(ti, "potrubi_rovne", axis, TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, ti->z, axis == Axis::X ? 0.0f : 90.0f,
 					TILE_SIZE / 2.0, 0.6 * OBJECT_UNITS_PER_METRE, ti->z, std::max(1, static_cast<int>(std::lround(1.45 * OBJECT_HEIGHT_PER_METRE))));
+		}
+		if (crossing) {
+			/* At a road: from each edge of the tile the pipe a short way, an elbow down and into the ground before the
+			 * road's verge, out of it again beyond (the player, 15. 11.: "the pipes lead into the ground before the verge
+			 * and out of it on the other side ... the pipes alone, so that the road's graphics can be changed"): the piece
+			 * (objekty/nase potrubi_do_zeme: its origin the tile's middle, its pipe at its -x edge) twice, the second
+			 * turned half round; each in a box of its own at its edge -- the cars on the road sort against no pipe. */
+			const double cx = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, cy = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+			const float way = axis == Axis::X ? 0.0f : 90.0f;
+			const int tall = std::max(1, static_cast<int>(std::lround(1.45 * OBJECT_HEIGHT_PER_METRE)));
+			/* Where the piece lies from the tile's middle along the pipe, and half its length (metres: 5.0 to 7.42). */
+			const double at = 6.21 * OBJECT_UNITS_PER_METRE, half_long = 1.21 * OBJECT_UNITS_PER_METRE, across = 0.75 * OBJECT_UNITS_PER_METRE;
+			for (int side = -1; side <= 1; side += 2) {
+				const float facing = way + (side < 0 ? 0.0f : 180.0f);
+				if (eye) {
+					AddCabGroundFigure("potrubi_do_zeme", cx, cy, ti->z, facing);
+					continue;
+				}
+				const double bx = cx + (axis == Axis::X ? side * at : 0.0), by = cy + (axis == Axis::Y ? side * at : 0.0);
+				const double hx = axis == Axis::X ? half_long : across, hy = axis == Axis::X ? across : half_long;
+				const int bx0 = static_cast<int>(std::lround(bx - hx)), by0 = static_cast<int>(std::lround(by - hy));
+				const int bx1 = std::max(bx0, static_cast<int>(std::lround(bx + hx)) - 1), by1 = std::max(by0, static_cast<int>(std::lround(by + hy)) - 1);
+				const std::array<int, 6> box{bx0, by0, ti->z, bx1, by1, ti->z + tall - 1};
+				AddThreeDFigureToViewportInBox("potrubi_do_zeme", 1.0f, static_cast<int>(std::lround(cx)), static_cast<int>(std::lround(cy)), ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+			}
 		}
 		return true;
 	}
