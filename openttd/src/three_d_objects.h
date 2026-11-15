@@ -437,6 +437,8 @@ struct ThreeDObject {
 	ThreeDObjectShapeView GetShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
 	bool TryGetCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<struct ThreeDGpuBuildingPaint> &paints) const;
+	bool CardPaints(uint32_t paint) const;
+	bool DrawnCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<struct ThreeDGpuBuildingPaint> &paints) const;
 	ThreeDObjectShapeView TryGetShape(int level) const;
 	bool Blocks(double x, double y, double feet = 0) const;
 	void Forget() const;
@@ -1687,7 +1689,7 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted);
 void StartReadingThreeDObjects();
 void WaitForReadingThreeDObjects();
 bool ThreeDObjectsIndexRead();
-bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact = nullptr);
+bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact = nullptr, bool card_paint = false);
 uint64_t ThreeDObjectsReadied();
 uint64_t ThreeDTexturesStoodIn();
 void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted);

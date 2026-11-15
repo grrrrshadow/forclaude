@@ -11079,6 +11079,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * their textures the processor paints (0). */
 		extern bool _eye_buildings_card_paint;
 		_eye_buildings_card_paint = number(2).value_or(1) != 0;
+		/* The side a surface's normal is taken to on the map (the patterns' way across a wall): 1 or -1. */
+		extern float _standing_paint_turn;
+		if (number(3).has_value()) _standing_paint_turn = *number(3) < 0 ? -1.0f : 1.0f;
 		IConsolePrint(CC_DEFAULT, "test3d: domykartou {}", _eye_buildings_card_paint ? 1 : 0);
 		return true;
 	} else if (what == "pamet" && argv.size() > 2 && argv[2] == "tvary") {

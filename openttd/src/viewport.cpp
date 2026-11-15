@@ -1359,7 +1359,11 @@ static std::vector<TileIndex> _tiles_owed_objects;
 static bool ObjectReadyOrOwed(const ThreeDObject *o, TileIndex origin, TileIndex tile)
 {
 	bool exact = true;
-	const bool ready = ThreeDObjectReadyToDraw(o, to_underlying(_vd.dpi.zoom), o->PaintAt(origin), &exact);
+	/* Where the card draws the block's buildings it paints them as it draws them (AddTurnedStandingObject()): no
+	 * painted copy of the texture waited for. */
+	extern bool _eye_buildings_card_paint;
+	const bool card_paint = _eye_buildings_card_paint && ViewportVehiclesOnCard() && !ViewportDrawingNorthObjects();
+	const bool ready = ThreeDObjectReadyToDraw(o, to_underlying(_vd.dpi.zoom), o->PaintAt(origin), &exact, card_paint);
 	/* Not ready, or drawn with its texture of another zoom standing in: drawn again when its own is there. */
 	if ((!ready || !exact) && _tiles_owed_objects.size() < 4096) _tiles_owed_objects.push_back(tile);
 	return ready;
@@ -8299,7 +8303,19 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				b.cull = _turned_cull;
 				/* Its textures as DrawObjectInto() has them: its own painted, its add-ons' each in its colour at this place --
 				 * of another zoom while this one's are painted, the drawing waiting for no painting (DrawnTexture()). */
-				b.textures.push_back(p.o->DrawnTexture(to_underlying(lay.zoom), p.o->PaintAt(to.origin)));
+				/* Its own painted by the card as it draws it where it can (the player, 14. 11.: "why does the card not keep
+				 * one pattern and colour it?"): the texture unpainted, one for all the houses of the kind, and the
+				 * paint's parts -- no painted copy a house and a zoom. The rig: 'test3d domykartou 0'. */
+				extern bool _eye_buildings_card_paint;
+				const uint32_t paint = p.o->PaintAt(to.origin);
+				const ThreeDObjectTexture *plain = nullptr;
+				if (_eye_buildings_card_paint && p.o->DrawnCardPaint(to_underlying(lay.zoom), paint, plain, b.paints)) {
+					b.textures.push_back(plain);
+					b.to_metres = {static_cast<float>(1.0 / OBJECT_UNITS_PER_METRE), static_cast<float>(1.0 / OBJECT_UNITS_PER_METRE), static_cast<float>(1.0 / OBJECT_HEIGHT_PER_METRE)};
+				} else {
+					b.paints.clear();
+					b.textures.push_back(p.o->DrawnTexture(to_underlying(lay.zoom), paint));
+				}
 				for (uint8_t t = 1; t < p.o->Textures(); t++) b.textures.push_back(p.o->DrawnTextureOf(t, to_underlying(lay.zoom), p.o->AddonPaintAt(to.origin, t)));
 				/* A corner to the block: affine, so where its origin and unit steps go. */
 				double o0[3], e[3][3];
@@ -15114,6 +15130,8 @@ struct CabFigure {
 static std::vector<CabFigure> _cab_figures;
 /** The buildings of the view from the eyes painted by the card as it draws them (ThreeDGpuBuildingPaint); the rig: 'test3d domykartou 0|1'. */
 bool _eye_buildings_card_paint = true;
+/** The side a surface's normal is taken to among the buildings the card paints on the map (STANDING_BUILDING_FRAGMENT's u_turn of three_d_gpu.cpp); the rig: 'test3d domykartou 1 -1'. */
+float _standing_paint_turn = 1.0f;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
 double _cab_detail_pixels = 2.0;
 /** The rig: 'test3d detail <px> textura': its textures at their full size, whatever its distance. */

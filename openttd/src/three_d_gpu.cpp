@@ -237,6 +237,9 @@ std::atomic<bool> _card_poses_bones = true;
 
 #if defined(THREE_D_GPU_WGL) || defined(THREE_D_GPU_EGL)
 
+/** The side a surface's normal is taken to among the buildings the card paints on the map (viewport.cpp). */
+extern float _standing_paint_turn;
+
 namespace {
 
 /* What of OpenGL is used, by its own names: no header of it is needed. */
@@ -1108,13 +1111,16 @@ layout(location = 1) in vec2 a_uv;
 layout(location = 2) in float a_light;
 uniform mat4 u_matrix;
 uniform vec2 u_depth_range;
+uniform vec3 u_metres;
 noperspective out vec2 v_uv;
 noperspective out float v_light;
 noperspective out float v_near;
+noperspective out vec3 v_m;
 void main()
 {
 	gl_Position = u_matrix * vec4(a_pos, 1.0);
 	v_uv = a_uv;
+	v_m = a_pos * u_metres;
 	v_light = a_light;
 	v_near = u_depth_range.x + (gl_Position.z + 1.0) * 0.5 * (u_depth_range.y - u_depth_range.x);
 }
@@ -1472,20 +1478,52 @@ void main()
  * middle the texel under it -- one the texture has nothing for (0) takes the nearest drawn within three, as the
  * processor (DrawTexturedTriangle() of viewport.cpp) --, as see-through as its texel (a yard's grass with the paths of the ground through it,
  * the colleague's pv_dvur_trava), not lit; or its lit glass at night (u_night), each pixel its texel as it is where the
- * texture has one, whole, marked lit. */
+ * texture has one, whole, marked lit. Its first texture painted as it is drawn where the card paints it (u_parts, as
+ * EYE_BUILDING_FRAGMENT: no painted copy of the texture a house; u_turn the side the surface's normal is taken to, the
+ * block's rows running down). */
 const char *const STANDING_BUILDING_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL R"(
 uniform sampler2D u_tex;
 uniform int u_night;
 uniform float u_order;
+uniform int u_parts;
+uniform float u_turn;
+uniform sampler2D u_mask0, u_mask1, u_mask2, u_mask3;
+uniform sampler2D u_pattern0, u_pattern1, u_pattern2, u_pattern3;
+uniform vec4 u_colour[4]; // red, green, blue (0 .. 255), start
+uniform vec4 u_about[4];  // metres a picture of the pattern (0: none), only on a slope
 noperspective in vec2 v_uv;
 noperspective in float v_light;
 noperspective in float v_near;
+noperspective in vec3 v_m;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
 layout(location = 2) out vec4 o_order;
 const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
 		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
 		ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
+float part_of(sampler2D mask, ivec2 at, ivec2 size)
+{
+	ivec2 ms = textureSize(mask, 0);
+	vec4 mp = texelFetch(mask, min(ms - 1, at * ms / size), 0);
+	return mp == vec4(0.0) ? 0.0 : mp.r;
+}
+vec3 painted(vec3 c, float m, vec4 colour, vec4 about, sampler2D pattern, vec3 n, float nl)
+{
+	if (m <= 0.0) return c;
+	float l = max(c.r, max(c.g, c.b)) / colour.a;
+	c = clamp(floor(c + (min(vec3(255.0), colour.rgb * l) - c) * m), 0.0, 255.0);
+	if (about.x <= 0.0 || nl < 1e-12) return c;
+	if (about.y > 0.5 && abs(n.z) >= 0.985) return c;
+	vec3 sd = vec3(1.0, 0.0, 0.0), td = vec3(0.0, 1.0, 0.0);
+	if (abs(n.z) < 0.985) {
+		float nxy = length(n.xy);
+		sd = vec3(-n.y / nxy, n.x / nxy, 0.0);
+		td = cross(n, sd);
+		if (td.z < 0.0) td = -td;
+	}
+	vec4 q = texture(pattern, vec2(dot(v_m, sd), -dot(v_m, td)) / about.x);
+	return clamp(floor(c + (q.rgb * 255.0 - c) * (q.a * m)), 0.0, 255.0);
+}
 void main()
 {
 	ivec2 size = textureSize(u_tex, 0);
@@ -1498,13 +1536,25 @@ void main()
 			ivec2 n = at + NEAR[k];
 			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
 			t = texelFetch(u_tex, n, 0);
-			if (t != vec4(0.0)) break;
+			if (t != vec4(0.0)) {
+				at = n;
+				break;
+			}
 		}
 		if (t == vec4(0.0)) discard;
 	}
 	float a = u_night != 0 ? 1.0 : t.a;
 	if (a == 0.0) discard;
 	vec3 c = floor(t.rgb * 255.0 + 0.5);
+	if (u_parts > 0) {
+		vec3 n = cross(dFdx(v_m), dFdy(v_m)) * u_turn;
+		float nl = length(n);
+		if (nl >= 1e-12) n /= nl;
+		c = painted(c, part_of(u_mask0, at, size), u_colour[0], u_about[0], u_pattern0, n, nl);
+		if (u_parts > 1) c = painted(c, part_of(u_mask1, at, size), u_colour[1], u_about[1], u_pattern1, n, nl);
+		if (u_parts > 2) c = painted(c, part_of(u_mask2, at, size), u_colour[2], u_about[2], u_pattern2, n, nl);
+		if (u_parts > 3) c = painted(c, part_of(u_mask3, at, size), u_colour[3], u_about[3], u_pattern3, n, nl);
+	}
 	if (u_night == 0) {
 		float l = floor(max(0.0, v_light));
 		c = min(vec3(255.0), floor(c * l / 256.0));
@@ -4909,6 +4959,20 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 			textures.push_back(g != nullptr ? g->name : 0);
 		}
+		/* What paints its first texture (ThreeDGpuBuildingPaint): the masks as they are, the patterns repeating and
+		 * smoothed. One that cannot be put on the card: the processor draws the building, its texture painted. */
+		std::array<std::array<GLuint, 2>, THREE_D_GPU_BUILDING_PAINTS> parts{};
+		const int part_count = static_cast<int>(std::min(b.building.paints.size(), THREE_D_GPU_BUILDING_PAINTS));
+		for (int k = 0; k < part_count; k++) {
+			const ThreeDGpuBuildingPaint &bp = b.building.paints[k];
+			const GpuTexture *mask = bp.mask != nullptr ? TextureOnCard(*bp.mask) : nullptr;
+			const GpuTexture *pattern = bp.pattern != nullptr ? PatternOnCard(*bp.pattern) : nullptr;
+			if (mask == nullptr || (bp.pattern != nullptr && pattern == nullptr)) {
+				building_failed = 2;
+				return false;
+			}
+			parts[k] = {mask->name, pattern != nullptr ? pattern->name : mask->name};
+		}
 		/* Its depth not cleared: its triangles laid in the depth of all on the block (ThreeDGpuStanding::depth), where
 		 * they are nearer than what is there. */
 		const ThreeDGpuMatrix m = Multiply(to_view, b.matrix);
@@ -4954,10 +5018,46 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		/* How near its depth's 0 and 1 are: each pixel's order by it (STANDING_BUILDING_FRAGMENT). */
 		gl.glUniform2f(bp.depth_range, s.depth[0], s.depth[0] + std::max(1e-3f, s.depth[1]));
 		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
+		/* Its paint (STANDING_BUILDING_FRAGMENT): the masks on the units 1 to 4, the patterns on 5 to 8, for its runs
+		 * of its first texture. */
+		static GLuint paint_program = 0;
+		static GLint u_parts = -1, u_metres = -1, u_turn = -1;
+		static std::array<GLint, THREE_D_GPU_BUILDING_PAINTS> u_colour, u_about;
+		if (paint_program != bp.program) {
+			paint_program = bp.program;
+			u_parts = gl.glGetUniformLocation(bp.program, "u_parts");
+			u_metres = gl.glGetUniformLocation(bp.program, "u_metres");
+			u_turn = gl.glGetUniformLocation(bp.program, "u_turn");
+			for (int k = 0; k < static_cast<int>(THREE_D_GPU_BUILDING_PAINTS); k++) {
+				gl.glUniform1i(gl.glGetUniformLocation(bp.program, fmt::format("u_mask{}", k).c_str()), 1 + k);
+				gl.glUniform1i(gl.glGetUniformLocation(bp.program, fmt::format("u_pattern{}", k).c_str()), 5 + k);
+				u_colour[k] = gl.glGetUniformLocation(bp.program, fmt::format("u_colour[{}]", k).c_str());
+				u_about[k] = gl.glGetUniformLocation(bp.program, fmt::format("u_about[{}]", k).c_str());
+			}
+		}
+		for (int k = 0; k < part_count; k++) {
+			const ThreeDGpuBuildingPaint &p = b.building.paints[k];
+			gl.glUniform4f(u_colour[k], p.colour[0], p.colour[1], p.colour[2], std::max(1.0f, p.start));
+			gl.glUniform4f(u_about[k], p.pattern != nullptr ? p.pattern_m : 0.0f, p.only_sloped ? 1.0f : 0.0f, 0.0f, 0.0f);
+			gl.glActiveTexture(GL_TEXTURE1 + k);
+			gl.glBindTexture(GL_TEXTURE_2D, parts[k][0]);
+			gl.glActiveTexture(GL_TEXTURE5 + k);
+			gl.glBindTexture(GL_TEXTURE_2D, parts[k][1]);
+		}
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glUniform3f(u_metres, b.building.to_metres[0], b.building.to_metres[1], b.building.to_metres[2]);
+		gl.glUniform1f(u_turn, _standing_paint_turn);
+		gl.glUniform1i(u_parts, 0);
+		int parts_set = 0;
 		gl.glEnable(GL_DEPTH_TEST);
 		gl.glBindVertexArray(on->vao);
 		for (const GpuBuilding::Run &r : on->runs) {
 			if (r.texture >= textures.size() || textures[r.texture] == 0) continue;
+			const int run_parts = r.texture == 0 ? part_count : 0;
+			if (run_parts != parts_set) {
+				gl.glUniform1i(u_parts, run_parts);
+				parts_set = run_parts;
+			}
 			/* Its ranges in the cells that reach into the block, one after the other joined. */
 			firsts.clear();
 			counts.clear();
@@ -4996,6 +5096,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glDisable(GL_CULL_FACE);
 		if (!b.night.empty()) {
 			gl.glUniform1i(night_at, 1);
+			gl.glUniform1i(u_parts, 0);
 			gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, to_view.data());
 			gl.glBindVertexArray(_standing_tri_vao);
 			gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_tri_vbo);

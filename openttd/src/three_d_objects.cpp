@@ -14716,6 +14716,21 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
  * @param may_drop whether the painted textures of every object may be dropped here when they take too much memory;
  *                 not while textures are made on several cores at once (PrepareThreeDObjectTextures())
  */
+/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
+static std::atomic<uint64_t> _three_d_objects_readied = 0;
+/** How many times a building was drawn with a texture of another level standing in (ThreeDObject::DrawnTexture()). */
+static std::atomic<uint64_t> _three_d_textures_stood_in = 0;
+
+/** The mask of a part of a building painted a colour, read the first time (on either thread). */
+static void MakeHouseMask(const ThreeDObjectColourPart &part, size_t k)
+{
+	MakeOnce(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part] {
+		std::vector<ThreeDObjectTexture> made;
+		DecodeTextureLevels(part.mask_png, made);
+		return made;
+	}, [&part](std::vector<ThreeDObjectTexture> made) { part.levels = std::move(made); });
+}
+
 /** Which thing of a building a painted texture is (MakeOnce()): its level and paint. */
 static int LazyHousePaint(int level, uint32_t paint)
 {
@@ -14900,11 +14915,8 @@ bool ThreeDObject::TryGetCardPaint(int level, uint32_t paint, const ThreeDObject
 		if (part.palette.empty()) continue;
 		/* Its mask, read in the background the first time. */
 		if (!MadeOrAsked(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part, k] {
-			MakeOnce(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part] {
-				std::vector<ThreeDObjectTexture> made;
-				DecodeTextureLevels(part.mask_png, made);
-				return made;
-			}, [&part](std::vector<ThreeDObjectTexture> made) { part.levels = std::move(made); });
+			MakeHouseMask(part, k);
+			_three_d_objects_readied++;
 		})) {
 			paints.clear();
 			return true;
@@ -14936,6 +14948,38 @@ bool ThreeDObject::TryGetCardPaint(int level, uint32_t paint, const ThreeDObject
 }
 
 /**
+ * Whether the card paints the building's texture as it draws it (TryGetCardPaint()), no painted copy of it made: it has
+ * colours, a paint, and no more parts than the card takes; not a tree in the colours of its use.
+ */
+bool ThreeDObject::CardPaints(uint32_t paint) const
+{
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].CardPaints(paint);
+	return paint != 0 && !this->colours.empty() && !this->tree_uses && this->colours.size() <= THREE_D_GPU_BUILDING_PAINTS;
+}
+
+/**
+ * The building's texture and paint for the card to paint as it draws it on the map (the buildings standing on a block,
+ * AddTurnedStandingObject() of viewport.cpp), the drawing waiting for nothing: as TryGetCardPaint(); its level let go
+ * of and being read again, a coarser one stands in and its place is drawn again when it is there (ThreeDTexturesStoodIn(),
+ * ThreeDObjectsReadied()).
+ * @return false: not painted by the card, or its texture or a mask not read yet (ThreeDObjectReadyToDraw() has them
+ *         read before the building is drawn) -- as DrawnTexture() then
+ */
+bool ThreeDObject::DrawnCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<ThreeDGpuBuildingPaint> &paints) const
+{
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].DrawnCardPaint(level, paint, plain, paints);
+	if (!this->CardPaints(paint)) return false;
+	plain = nullptr;
+	if (!this->TryGetCardPaint(level, paint, plain, paints) || plain == nullptr) return false;
+	std::lock_guard lock(_lazy_mutex);
+	for (const ThreeDObjectColourPart &part : this->colours) {
+		if (!part.palette.empty() && part.levels.empty()) return false;
+	}
+	if (plain != &this->levels[std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1)]) _three_d_textures_stood_in++;
+	return true;
+}
+
+/**
  * The building's texture at a level of detail if it is read already, painted (PaintAt()) if that is made already;
  * else nullptr (nothing read yet) or the texture unpainted (its paint not made yet), and what is missing is made in the
  * background (MadeOrAsked()).
@@ -14945,7 +14989,10 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint
 	MarkThreeDUsed(this->used);
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].TryGetTexture(level, paint);
 	if (!this->TryRead()) return nullptr;
-	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this, level] { return HouseLevelHeld(*this, level); }, [this, level, paint] { this->GetTexture(level, paint, false); })) {
+	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this, level] { return HouseLevelHeld(*this, level); }, [this, level, paint] {
+		this->GetTexture(level, paint, false);
+		_three_d_objects_readied++; // the map drawn with a coarser one meanwhile draws its place again (DrawnCardPaint())
+	})) {
 		/* Its level let go of and being read again: the nearest coarser one it has meanwhile; nothing read yet, nothing. */
 		std::lock_guard lock(_lazy_mutex);
 		if (this->levels.empty()) return nullptr;
@@ -15006,11 +15053,7 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 		}
 		if (palette->empty()) continue;
 		/* The mask, read the first time (on either thread). */
-		MakeOnce(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part] {
-			std::vector<ThreeDObjectTexture> made;
-			DecodeTextureLevels(part.mask_png, made);
-			return made;
-		}, [&part](std::vector<ThreeDObjectTexture> made) { part.levels = std::move(made); });
+		MakeHouseMask(part, k);
 		/* The mask's level nearest the texture's, read at the same place. */
 		const ThreeDObjectTexture *mask = &part.levels.back();
 		for (const ThreeDObjectTexture &m : part.levels) {
@@ -15181,8 +15224,6 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 	for (std::thread &t : threads) t.join();
 }
 
-/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
-static std::atomic<uint64_t> _three_d_objects_readied = 0;
 
 /**
  * Whether a building's object can be drawn on the map now: its shape read and its texture of the level and paint
@@ -15195,8 +15236,10 @@ static std::atomic<uint64_t> _three_d_objects_readied = 0;
  * @param level its level of detail (the zoom's)
  * @param paint its colours (ThreeDObject::PaintAt())
  * @param[out] exact if given: whether its texture of the level is there, not one of another level standing in
+ * @param card_paint the card paints it as it draws it where it can (ThreeDObject::CardPaints()): ready with its texture
+ *                   and its masks read, nothing painted (no copy of the texture a house and a paint)
  */
-bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact)
+bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact, bool card_paint)
 {
 	if (exact != nullptr) *exact = true;
 	if (o == nullptr) return true;
@@ -15204,10 +15247,17 @@ bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, b
 	/* Read, or tried (a file that cannot be read is drawn as it was, as nothing). */
 	auto tried = [](const ThreeDObject *x) { return x->IsRead() || x->glb_state.value.load(std::memory_order_acquire) != 0; };
 	bool other_level = false;
-	auto ready = [o, t, level, paint, tried, &other_level] {
+	const bool card = card_paint && t->CardPaints(paint);
+	auto ready = [o, t, level, paint, tried, card, &other_level] {
 		other_level = false;
 		if (!tried(o) || !tried(t) || t->levels.empty()) return false;
 		if (paint == 0 || t->colours.empty()) return true;
+		if (card) {
+			for (const ThreeDObjectColourPart &part : t->colours) {
+				if (!part.palette.empty() && part.levels.empty()) return false;
+			}
+			return true;
+		}
 		if (t->painted.contains({std::clamp<int>(level, 0, static_cast<int>(t->levels.size()) - 1), paint})) return true;
 		/* Painted at another level already (another zoom): that one stands in (ThreeDObject::DrawnTexture()). */
 		for (const auto &[key, tex] : t->painted) {
@@ -15215,9 +15265,16 @@ bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, b
 		}
 		return other_level;
 	};
-	const bool is_ready = MadeOrAsked(o, LAZY_HOUSE_READY, ready, [o, level, paint] {
+	const bool is_ready = MadeOrAsked(o, LAZY_HOUSE_READY, ready, [o, t, level, paint, card] {
 		o->Read();
-		o->GetTexture(level, paint, false);
+		if (card) {
+			t->GetTexture(level, 0, false);
+			for (size_t k = 0; k < t->colours.size(); k++) {
+				if (!t->colours[k].palette.empty()) MakeHouseMask(t->colours[k], k);
+			}
+		} else {
+			o->GetTexture(level, paint, false);
+		}
 		{
 			std::lock_guard lock(_lazy_mutex);
 			_lazy_asked.erase({o, LAZY_HOUSE_READY});
@@ -15242,8 +15299,6 @@ uint64_t ThreeDObjectsReadied()
 	return _three_d_objects_readied.load();
 }
 
-/** How many times a building was drawn with a texture of another level standing in (ThreeDObject::DrawnTexture()). */
-static std::atomic<uint64_t> _three_d_textures_stood_in = 0;
 
 /** How many textures of another level stood in so far: a building drawn with one is drawn again when its own comes (ThreeDObjectsReadied()). */
 uint64_t ThreeDTexturesStoodIn()
