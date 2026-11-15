@@ -3289,28 +3289,36 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 	buffer(g.pos, s.pos, corners * 3, 0, 3);
 	if (g.has_nrm) buffer(g.nrm, s.nrm, corners * 3, 1, 3);
 	buffer(g.uv, s.uv, corners * 2, 2, 2);
-	/* Each corner's turning wheel, a byte (the view from the eyes turns them, EyeMeshSource()). */
+	/* Each corner's turning wheel (the view from the eyes turns them, EyeMeshSource()), as a float: a byte read as a
+	 * whole number (not normalized) is a format the phone's card has not, and zink then rewrites the vertex shader for
+	 * it as the first figure is drawn. In every one of the player's diaries where the first figure from the eyes was
+	 * one with turning wheels the phone's driver fell in its shader compiler there or a step later (five of five, 6. to
+	 * 15. 11.: SIGSEGV in Mali's cmpbe_v2_compile_multiple_shaders, Winlator "CRASH_NATIVE"); where another figure was
+	 * first, all its kinds passed, the wheels too. Plain floats need no such rewriting. */
 	g.has_wheel = s.corner_wheel.size() == corners;
 	if (g.has_wheel) {
+		std::vector<float> wheel(s.corner_wheel.begin(), s.corner_wheel.end());
 		gl.glGenBuffers(1, &g.wheel);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, g.wheel);
-		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners), s.corner_wheel.data(), GL_STATIC_DRAW);
-		gl.glVertexAttribPointer(3, 1, GL_UNSIGNED_BYTE, GL_FALSE, 0, nullptr);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(wheel.size() * sizeof(float)), wheel.data(), GL_STATIC_DRAW);
+		gl.glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 0, nullptr);
 		gl.glEnableVertexAttribArray(3);
 	}
 	/* A figure on bones at rest (ThreeDBonesFrame): each corner's four joints, bytes read as whole numbers in floats,
 	 * and how much each moves it -- the card poses it by its frame's joints (MESH_VERTEX). */
 	g.has_bones = s.corner_joints.size() == corners * 4 && s.corner_weights.size() == corners * 4;
 	if (g.has_bones) {
+		/* The joints as floats too, for the same reason as the wheels. */
+		std::vector<float> joints(s.corner_joints.begin(), s.corner_joints.end());
 		gl.glGenBuffers(1, &g.joints);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, g.joints);
-		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners * 4), s.corner_joints.data(), GL_STATIC_DRAW);
-		gl.glVertexAttribPointer(9, 4, GL_UNSIGNED_BYTE, GL_FALSE, 0, nullptr);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(joints.size() * sizeof(float)), joints.data(), GL_STATIC_DRAW);
+		gl.glVertexAttribPointer(9, 4, GL_FLOAT, GL_FALSE, 0, nullptr);
 		gl.glEnableVertexAttribArray(9);
 		buffer(g.weights, s.corner_weights, corners * 4, 10, 4);
 	}
 	gl.glBindVertexArray(0);
-	g.bytes = corners * (sizeof(float) * (g.has_nrm ? 8 : 5) + (g.has_wheel ? 1 : 0) + (g.has_bones ? 4 + 4 * sizeof(float) : 0));
+	g.bytes = corners * (sizeof(float) * (g.has_nrm ? 8 : 5) + (g.has_wheel ? sizeof(float) : 0) + (g.has_bones ? 8 * sizeof(float) : 0));
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
 	_card_bytes_of[0] += g.bytes;
