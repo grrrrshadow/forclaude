@@ -4527,7 +4527,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 	if (shape == nullptr) return nullptr;
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	const ThreeDObjectTexture *raw = obj->GetTexture(level, index);
-	if (state == 0 || raw == nullptr) return raw;
+	if ((state == 0 && !obj->paint.coloured) || raw == nullptr) return raw; // a colour of its record is painted without a state too
 	const std::tuple<const ThreeDVehicleObject *, int, int, int> key(obj, state, level, index);
 	{
 		std::lock_guard lock(_eye_painted_mutex);
@@ -4625,7 +4625,7 @@ const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObje
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	const ThreeDObjectTexture *raw = obj->TryGetTexture(level, index);
 	if (raw == nullptr) return nullptr;
-	if (state == 0) return raw;
+	if (state == 0 && !obj->paint.coloured) return raw; // a colour of its record is painted without a state too
 	const std::tuple<const ThreeDVehicleObject *, int, int, int> key(obj, state, level, index);
 	{
 		std::lock_guard lock(_eye_painted_mutex);
@@ -4686,7 +4686,10 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 		textures[i] = obj->GetTexture(levels[i], static_cast<int>(i));
 		if (textures[i] == nullptr) return false;
 	}
-	if (state == 0) return !no_wait.Missed();
+	/* No state: as its textures are -- but one painted a colour of its record ("lak" "barva") is painted in it without
+	 * a state too (the Tatra VB that drives by itself between the ÚV KSČ houses has no set's states: the player, 15. 11.:
+	 * the one bought is coloured, the one that drives is not). */
+	if (state == 0 && !obj->paint.coloured) return !no_wait.Missed();
 	const ThreeDVehicleState *st = obj->State(state);
 	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state), RustVariant(obj, state));
 	const ObjectDetailPaint details(*obj, *shape, st, textures.size(), textures);
