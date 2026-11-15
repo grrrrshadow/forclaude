@@ -534,6 +534,10 @@ inline bool IsOwnConduitRailType(RailType rt)
 bool DrawThreeDTrackBridgeHead(const TileInfo *ti);
 void DrawThreeDTrackOverBridge(const TileInfo *ti, TileIndex south);
 bool DrawThreeDTrackTunnel(const TileInfo *ti);
+bool ThreeDConduitTunnelBridge(TileIndex tile);
+void DrawThreeDConduitBridgeHead(const TileInfo *ti);
+void DrawThreeDConduitOverBridge(const TileInfo *ti, TileIndex south);
+void DrawThreeDConduitTunnel(const TileInfo *ti);
 
 
 bool HasRailTypeAvail(const CompanyID company, const RailType railtype);

@@ -14024,6 +14024,8 @@ static uint32_t EyeWallHash(uint32_t a);
 /** The game's bridge type of a bridge (its end) with 3D pieces (GetThreeDBridgePiece()), an aqueduct's THREE_D_AQUEDUCT; nullopt none. */
 static std::optional<uint> EyeBridgeType(TileIndex end)
 {
+	/* A bridge of the game's own pipeline or power line has no pieces: its pipe or its cables alone (ThreeDConduitTunnelBridge()). */
+	if (GetTunnelBridgeTransportType(end) == TransportType::Rail && IsOwnConduitRailType(GetRailType(end))) return std::nullopt;
 	const uint type = GetTunnelBridgeTransportType(end) == TransportType::Water ? THREE_D_AQUEDUCT : GetBridgeType(end);
 	if (GetThreeDBridgePiece(type, ThreeDBridgePiece::Middle, 0) == nullptr) return std::nullopt;
 	return type;
@@ -14153,6 +14155,8 @@ static void CabDrawAqueductWater(const CabCanvas &cv, const CabEye &eye, Axis ax
  */
 static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileIndex tile, const std::vector<const ParentSpriteToDraw *> &sprites)
 {
+	/* Of the game's own pipeline or power line: no deck, its pipe or its cables alone (DrawThreeDConduitOverBridge()). */
+	if (const TileIndex south = GetSouthernBridgeEnd(tile); GetTunnelBridgeTransportType(south) == TransportType::Rail && IsOwnConduitRailType(GetRailType(south))) return;
 	const Axis axis = GetBridgeAxis(tile);
 	const int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
 	/* The deck at its height from the eyes (EyeLevelZ()), with its railings and its thickness as they are. */
@@ -18703,8 +18707,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		t.z = _cur_ti.z;
 		t.building = tile_type == TileType::House || tile_type == TileType::Industry;
 		t.foundation = _vd.foundation[FoundationPart::Normal] != -1 || _vd.foundation[FoundationPart::Halftile] != -1;
-		bool tunnel_end = tile_type == TileType::TunnelBridge && IsTunnel(_cur_ti.tile);
-		bool ramp = tile_type == TileType::TunnelBridge && !tunnel_end;
+		/* A tunnel's or a bridge's end of the game's own pipeline or power line (ThreeDConduitTunnelBridge()): the land as
+		 * it lies, no portal and no ramp built. */
+		const bool conduit_end = tile_type == TileType::TunnelBridge && ThreeDConduitTunnelBridge(_cur_ti.tile);
+		bool tunnel_end = tile_type == TileType::TunnelBridge && IsTunnel(_cur_ti.tile) && !conduit_end;
+		bool ramp = tile_type == TileType::TunnelBridge && !IsTunnel(_cur_ti.tile) && !conduit_end;
 		if (tunnel_end) {
 			/* Level, with the track or road into the portal, which is built anew. */
 			_vd.tile_sprites_to_draw.resize(t.first);

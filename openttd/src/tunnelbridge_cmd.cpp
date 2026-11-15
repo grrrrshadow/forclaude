@@ -1403,6 +1403,27 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 	extern void DrawTunnelBridgePortalSignal(const TileInfo *ti);
 	DrawTunnelBridgePortalSignal(ti);
 
+	/* The game's own pipeline or power line (ThreeDConduitTunnelBridge()): no portal and no bridge of the game's -- the
+	 * land as it lies, the pipe into the hill or up to the bridge's height, the power line's pylon. */
+	if (ThreeDConduitTunnelBridge(ti->tile)) {
+		const bool tunnel = IsTunnel(ti->tile);
+		if (!tunnel) DrawFoundation(ti, GetBridgeFoundation(ti->tileh, DiagDirToAxis(tunnelbridge_direction)));
+		if (HasTunnelBridgeSnowOrDesert(ti->tile)) {
+			DrawGroundSprite(SPR_FLAT_SNOW_DESERT_TILE + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		} else {
+			DrawClearLandTile(ti, 3);
+		}
+		if (tunnel) {
+			DrawThreeDConduitTunnel(ti);
+			DrawBridgeMiddle(ti, BridgePillarFlag::EdgeNE + tunnelbridge_direction);
+		} else {
+			DrawThreeDConduitBridgeHead(ti);
+			DrawBridgeMiddle(ti, DiagDirToAxis(tunnelbridge_direction) == Axis::X ? BridgePillarFlags{BridgePillarFlag::EdgeSW, BridgePillarFlag::EdgeNE} :
+					BridgePillarFlags{BridgePillarFlag::EdgeNW, BridgePillarFlag::EdgeSE});
+		}
+		return;
+	}
+
 	if (IsTunnel(ti->tile)) {
 		/* Front view of tunnel bounding boxes:
 		 *
@@ -1817,6 +1838,12 @@ void DrawBridgeMiddle(const TileInfo *ti, BridgePillarFlags blocked_pillars)
 	TileIndex rampsouth = GetSouthernBridgeEnd(ti->tile);
 	TransportType transport_type = GetTunnelBridgeTransportType(rampsouth);
 	Axis axis = GetBridgeAxis(ti->tile);
+	/* The game's own pipeline or power line over the tile (ThreeDConduitTunnelBridge()): its pipe or its cables alone,
+	 * no deck and no pillars. */
+	if (ThreeDConduitTunnelBridge(rampsouth)) {
+		if (!IsInvisibilitySet(TransparencyOption::Bridges)) DrawThreeDConduitOverBridge(ti, rampsouth);
+		return;
+	}
 	BridgePillarFlags pillars;
 	bool is_custom_layout; // Set if rail/road bridge uses a custom layout.
 

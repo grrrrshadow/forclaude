@@ -2796,7 +2796,8 @@ double ThreeDTrackRailTop(TileIndex tile)
 	if (!ThreeDTrackShownOn(tile)) return 0.0;
 	/* The game's pipeline has no rails: its valve (the pump of the set Rozvody 3D) sits on the pipe as its model has it,
 	 * not a rail's height over it (the player, 15. 11.: "put the valve a little lower ... this is a big gap"). */
-	if (IsValidTile(tile) && (IsPlainRailTile(tile) || IsRailDepotTile(tile) || IsLevelCrossingTile(tile) || HasStationTileRail(tile)) &&
+	if (IsValidTile(tile) && (IsPlainRailTile(tile) || IsRailDepotTile(tile) || IsLevelCrossingTile(tile) || HasStationTileRail(tile) ||
+			(IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Rail)) &&
 			GetRailTypeInfo(GetRailType(tile))->label == RAILTYPE_LABEL_PIPE) return 0.0;
 	return THREE_D_RAIL_TOP_M;
 }
@@ -3007,8 +3008,11 @@ static void DrawThreeDBufferStops(const TileInfo *ti, Track t, int z, bool eye);
  * the way. The cables as the catenary's wires: from the eyes each a line, from above gathered into the tile's object.
  * @param s the tile's slope after its foundation
  * @param round the tile is of a round curve drawn round
+ * @param pylon -1 its pylon by its turn along the line; 0 none (over a bridge); 1 always (a bridge's end, a tunnel's)
+ * @param part 0 the cables all along the piece; 1 from its start to its middle, 2 from its middle to its end (they end
+ *             at the pylon before a tunnel)
  */
-static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye)
+static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye, int pylon = -1, int part = 0)
 {
 	/* Where the cables hang, metres: aside of the line (to both sides) and up. */
 	static constexpr std::array<std::array<double, 2>, 3> CABLES{{{9.6, 25.95}, {9.6, 18.75}, {5.28, 18.68}}};
@@ -3033,6 +3037,12 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 			const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
 			way = {{p.x - p.ax, p.y - p.ay}, {p.x + p.ax, p.y + p.ay}};
 		}
+		/* Where its pylon stands: its way's middle. */
+		const std::vector<std::array<double, 2>> whole = way;
+		if (part != 0 && way.size() == 2) {
+			const std::array<double, 2> middle{(way[0][0] + way[1][0]) / 2, (way[0][1] + way[1][1]) / 2};
+			way[part == 1 ? 1 : 0] = middle;
+		}
 		for (size_t i = 0; i + 1 < way.size(); i++) {
 			const double ax = way[i][0], ay = way[i][1], bx = way[i + 1][0], by = way[i + 1][1];
 			const double len = std::hypot(bx - ax, by - ay);
@@ -3053,7 +3063,8 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 		}
 		/* Its pylon: every third tile along the line (across a corner counted along the diagonal), at its way's middle. */
 		const int along = t == Track::X ? tx : t == Track::Y ? ty : (t == Track::Upper || t == Track::Lower) ? tx - ty : tx + ty;
-		if (((along % PYLON_EVERY) + PYLON_EVERY) % PYLON_EVERY != 0) continue;
+		if (pylon == 0 || (pylon < 0 && ((along % PYLON_EVERY) + PYLON_EVERY) % PYLON_EVERY != 0)) continue;
+		way = whole;
 		const size_t mid = way.size() / 2;
 		const std::array<double, 2> a = way[mid - (way.size() > 2 ? 0 : 1)], b = way[std::min(mid + 1, way.size() - 1)];
 		const double mx = way.size() > 2 ? way[mid][0] : (way[0][0] + way[1][0]) / 2, my = way.size() > 2 ? way[mid][1] : (way[0][1] + way[1][1]) / 2;
@@ -3551,6 +3562,115 @@ bool DrawThreeDTrackTunnel(const TileInfo *ti)
 	floor.tileh = SLOPE_FLAT;
 	DrawThreeDCatenary(&floor, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, DiagDirection::Invalid, true, dir);
 	return true;
+}
+
+/**
+ * Whether a tile is a bridge's end or a tunnel's of the game's own pipeline or power line drawn as such now (the
+ * player, 15. 11.: "we need no graphics of the bridges there. The pipes alone would do, a piece up the slope, level
+ * over the river and a piece down ... of the electricity the bridge's first tile a pylon, the wires over the river and
+ * at its end a pylon again; at a tunnel a pylon stands at its entrance, and of the pipes the pipe goes into it"): no
+ * bridge and no portal of the game's is drawn for it (DrawThreeDConduitBridgeHead(), DrawThreeDConduitOverBridge(),
+ * DrawThreeDConduitTunnel()). Whichever bridge is built, it is this one.
+ */
+bool ThreeDConduitTunnelBridge(TileIndex tile)
+{
+	if (!ViewportDrawingEye() && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	if (!ThreeDEnabled() || !IsValidTile(tile) || !IsTileType(tile, TileType::TunnelBridge)) return false;
+	return GetTunnelBridgeTransportType(tile) == TransportType::Rail && IsOwnConduitRailType(GetRailType(tile));
+}
+
+/** How wide and tall a pipe's piece is on the map (objekty/nase potrubi_*), world units. */
+static constexpr double THREE_D_PIPE_HALF_M = 0.6, THREE_D_PIPE_TALL_M = 1.45;
+
+/**
+ * A bridge's end of the game's own pipeline or power line (ThreeDConduitTunnelBridge()): the pipe up to the bridge's
+ * height (a piece up a slope, or level on a foundation); the power line's pylon on it, its cables over it.
+ */
+void DrawThreeDConduitBridgeHead(const TileInfo *ti)
+{
+	const bool eye = ViewportDrawingEye();
+	const DiagDirection dir = GetTunnelBridgeDirection(ti->tile);
+	const Axis axis = DiagDirToAxis(dir);
+	const int bz = GetBridgePixelHeight(ti->tile);
+	const double ox = TileX(ti->tile) * TILE_SIZE, oy = TileY(ti->tile) * TILE_SIZE;
+	/* As our track's (DrawThreeDTrackBridgeHead()): up from the ground at its outer end, or level with the bridge. */
+	const bool inner_low = dir == DiagDirection::NE || dir == DiagDirection::NW;
+	const double out = inner_low ? TILE_SIZE - 1 : 0;
+	const int out_z = GetSlopePixelZ(static_cast<int>(ox + (axis == Axis::X ? out : TILE_SIZE / 2)), static_cast<int>(oy + (axis == Axis::X ? TILE_SIZE / 2 : out)), true);
+	const bool rises = bz - out_z >= static_cast<int>(TILE_HEIGHT) / 2;
+	const double x = ox + TILE_SIZE / 2.0, y = oy + TILE_SIZE / 2.0;
+	TileInfo deck = *ti;
+	deck.tileh = SLOPE_FLAT;
+	deck.z = bz;
+	if (rises) {
+		deck.z = bz - static_cast<int>(TILE_HEIGHT);
+		deck.tileh = dir == DiagDirection::SW ? SLOPE_SW : dir == DiagDirection::SE ? SLOPE_SE : dir == DiagDirection::NE ? SLOPE_NE : SLOPE_NW;
+	}
+	if (GetRailTypeInfo(GetRailType(ti->tile))->label == RAILTYPE_LABEL_PIPE) {
+		const int tall = std::max(1, static_cast<int>(std::lround(THREE_D_PIPE_TALL_M * OBJECT_HEIGHT_PER_METRE)));
+		if (rises) {
+			const float facing = dir == DiagDirection::SW ? 0.0f : dir == DiagDirection::SE ? 90.0f : dir == DiagDirection::NE ? 180.0f : 270.0f;
+			PutThreeDStraight(ti, eye ? "potrubi_svah_oci" : "potrubi_svah", axis, x, y, bz - static_cast<int>(TILE_HEIGHT) / 2, facing, TILE_SIZE / 2.0,
+					THREE_D_PIPE_HALF_M * OBJECT_UNITS_PER_METRE, bz - static_cast<int>(TILE_HEIGHT), tall + static_cast<int>(TILE_HEIGHT));
+		} else {
+			PutThreeDStraight(ti, "potrubi_rovne", axis, x, y, bz, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_PIPE_HALF_M * OBJECT_UNITS_PER_METRE, bz, tall);
+		}
+	} else {
+		DrawThreeDPowerLine(&deck, TrackBits{AxisToTrack(axis)}, deck.tileh, false, eye, 1);
+	}
+}
+
+/**
+ * The game's own pipeline or power line over a tile under its bridge (DrawBridgeMiddle()): the pipe alone at the
+ * bridge's height, no deck and no pillars; of the power line its cables alone, from the pylon on one end to the one on
+ * the other.
+ * @param south the bridge's southern end
+ */
+void DrawThreeDConduitOverBridge(const TileInfo *ti, TileIndex south)
+{
+	const bool eye = ViewportDrawingEye();
+	const Axis axis = GetBridgeAxis(ti->tile);
+	const int bz = GetBridgePixelHeight(south);
+	if (GetRailTypeInfo(GetRailType(south))->label == RAILTYPE_LABEL_PIPE) {
+		const double x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+		PutThreeDStraight(ti, "potrubi_rovne", axis, x, y, bz, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_PIPE_HALF_M * OBJECT_UNITS_PER_METRE, bz,
+				std::max(1, static_cast<int>(std::lround(THREE_D_PIPE_TALL_M * OBJECT_HEIGHT_PER_METRE))));
+		return;
+	}
+	TileInfo deck = *ti;
+	deck.tileh = SLOPE_FLAT;
+	deck.z = bz;
+	DrawThreeDPowerLine(&deck, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, 0);
+}
+
+/**
+ * A tunnel's end of the game's own pipeline or power line (ThreeDConduitTunnelBridge()), no portal: the pipe goes level
+ * into the hill's grass; the power line's pylon stands at the entrance, its cables end at it.
+ */
+void DrawThreeDConduitTunnel(const TileInfo *ti)
+{
+	const bool eye = ViewportDrawingEye();
+	const DiagDirection dir = GetTunnelBridgeDirection(ti->tile);
+	const Axis axis = DiagDirToAxis(dir);
+	const double x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	if (GetRailTypeInfo(GetRailType(ti->tile))->label == RAILTYPE_LABEL_PIPE) {
+		const int tall = std::max(1, static_cast<int>(std::lround(THREE_D_PIPE_TALL_M * OBJECT_HEIGHT_PER_METRE)));
+		if (eye) {
+			/* From the eyes the hill hides what of it is inside. */
+			PutThreeDStraight(ti, "potrubi_rovne", axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_PIPE_HALF_M * OBJECT_UNITS_PER_METRE, ti->z, tall);
+		} else {
+			/* On the map the hill hides nothing: the piece half a tile out, its end in the tile's middle, where the
+			 * hill is as high as the pipe. */
+			const TileIndexDiffC d = TileIndexDiffCByDiagDir(dir);
+			PutThreeDStraight(ti, "potrubi_rovne", axis, x - d.x * (TILE_SIZE / 2.0), y - d.y * (TILE_SIZE / 2.0), ti->z, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0,
+					THREE_D_PIPE_HALF_M * OBJECT_UNITS_PER_METRE, ti->z, tall);
+		}
+		return;
+	}
+	TileInfo floor = *ti;
+	floor.tileh = SLOPE_FLAT;
+	/* Its cables from the tile's outer edge to the pylon at its middle. */
+	DrawThreeDPowerLine(&floor, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, 1, dir == DiagDirection::SW || dir == DiagDirection::SE ? 1 : 2);
 }
 
 /**

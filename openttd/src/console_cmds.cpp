@@ -11036,7 +11036,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		const RailType rt = argv[5] == "v" ? RAILTYPE_POWER_LINE : RAILTYPE_PIPE;
 		AutoRestoreBackup cur_company(_current_company, _local_company);
 		CommandCost done;
-		if (argv[4] == "stanice") {
+		if (argv[4] == "most" || argv[4] == "tunel") {
+			/* 'rozvod <x> <y> most|tunel p|v': on levelled land a bridge of it along x (its ends x+2 and x+6), or a hill
+			 * a level high and a tunnel of it through (x+3 to x+9); two tiles of it before and after. */
+			if (Company::GetIfValid(_local_company) == nullptr) {
+				extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+				Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+				if (made != nullptr) SetLocalCompany(made->index);
+			}
+			Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+			AutoRestoreBackup company(_current_company, _local_company);
+			Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(*x + 12, *y + 4), TileXY(*x, *y - 4), false, LevelMode::Level);
+			const bool bridge = argv[4] == "most";
+			if (bridge) {
+				done = Command<Commands::BuildBridge>::Do(DoCommandFlag::Execute, TileXY(*x + 6, *y), TileXY(*x + 2, *y), TransportType::Rail, 0, rt, INVALID_ROADTYPE);
+			} else {
+				Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(*x + 8, *y + 2), TileXY(*x + 4, *y - 2), false, LevelMode::Raise);
+				done = Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, TileXY(*x + 3, *y), TransportType::Rail, rt, INVALID_ROADTYPE);
+			}
+			for (int along : bridge ? std::array<int, 4>{0, 1, 7, 8} : std::array<int, 4>{1, 2, 10, 11}) {
+				Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(*x + along, *y), rt, Track::X, false);
+			}
+		} else if (argv[4] == "stanice") {
 			done = Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, at, rt, Axis::X, 1, 1, STAT_CLASS_DFLT, 0, StationID::Invalid(), false);
 		} else {
 			done = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(*x, *y + 1), TileXY(*x, *y - 1), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false);
