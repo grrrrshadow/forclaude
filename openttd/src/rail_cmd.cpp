@@ -2675,10 +2675,12 @@ struct ThreeDTrackPiece {
 static const TrackIndexArray<ThreeDTrackPiece> THREE_D_TRACK_PIECES = {{{
 	{8, 8, 8, 0, 0.0f},     // X
 	{8, 8, 0, 8, 90.0f},    // Y
+	/* A diagonal piece's ends are cut along the tile's edges, the tile's corner on one side of it (koleje.py
+	 * diagonal_piece()): turned half round where the corner is on the other. */
 	{4, 4, 4, -4, -45.0f},  // upper (north corner)
-	{12, 12, 4, -4, -45.0f}, // lower (south corner)
+	{12, 12, 4, -4, 135.0f}, // lower (south corner)
 	{12, 4, 4, 4, 45.0f},   // left (west corner)
-	{4, 12, 4, 4, 45.0f},   // right (east corner)
+	{4, 12, 4, 4, 225.0f},  // right (east corner)
 }}};
 
 /**

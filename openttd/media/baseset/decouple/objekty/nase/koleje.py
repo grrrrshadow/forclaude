@@ -164,6 +164,47 @@ class Mesh:
         idx += [base, base + 1, base + 2, base, base + 2, base + 3]
 
 
+def clip(m, a, c, d):
+    """Cut a mesh by an upright plane: what has a * x + c * z <= d stays (its pieces along the cut left open -- the next
+    tile's piece lies against it)."""
+    for mat, (pos, nrm, uv, idx) in list(m.prims.items()):
+        npos, nnrm, nuv, nidx = [], [], [], []
+        for t in range(0, len(idx), 3):
+            poly = [(pos[idx[t + k]], uv[idx[t + k]]) for k in range(3)]
+            normal = nrm[idx[t]]
+            out = []
+            for k in range(len(poly)):
+                (p0, t0), (p1, t1) = poly[k], poly[(k + 1) % len(poly)]
+                s0, s1 = d - (a * p0[0] + c * p0[2]), d - (a * p1[0] + c * p1[2])
+                if s0 >= 0:
+                    out.append((p0, t0))
+                if (s0 >= 0) != (s1 >= 0):
+                    f = s0 / (s0 - s1)
+                    out.append((tuple(p0[i] + (p1[i] - p0[i]) * f for i in range(3)), tuple(t0[i] + (t1[i] - t0[i]) * f for i in range(2))))
+            for k in range(1, len(out) - 1):
+                base = len(npos)
+                for q, tq in (out[0], out[k], out[k + 1]):
+                    npos.append(q)
+                    nnrm.append(normal)
+                    nuv.append(tq)
+                nidx += [base, base + 1, base + 2]
+        m.prims[mat] = (npos, nnrm, nuv, nidx)
+
+
+def diagonal_piece(kind):
+    """The diagonal piece, its ends cut along the tile's edges (not square across the track): the piece lies from the
+    middle of an edge to the middle of the next across a corner of the tile, the edges at 45 degrees to it. Square, an
+    end reached over the edge onto the next tile on the corner's side and left a wedge open on the other (the player,
+    15. 11.: "the rails reach over onto the next tile ... straight rails that join between the tiles, as the original
+    ones"). Made longer by the embankment's width and cut back by the two edges; the tile's corner is on its +Z side
+    (the game turns it half round for the two tracks whose corner is on the other side)."""
+    longer = DIAGONAL_M + BED_W
+    m = piece(longer, 0.0, kind)
+    clip(m, 1.0, 1.0, DIAGONAL_M / 2)
+    clip(m, -1.0, 1.0, DIAGONAL_M / 2)
+    return m, longer
+
+
 def block(m, mat, x0, x1, y0, y1, z0, z1, rise, uvs):
     """A box along X, x0..x1, heights y0..y1 raised by rise(x), across Z z0..z1: its top and its two long sides; uvs
     the u of its sides' and its top's columns (left side's outer, top from, top to, right side's outer), v 0 at x0."""
@@ -362,9 +403,12 @@ def main():
     for suffix, factor in (('', 1.0), ('_siroka', WIDE)):
         widen(factor)
         for kind in ('drevo', 'beton'):
-            for name, length, climb in (('rovna', TILE_M, 0.0), ('sikma', DIAGONAL_M, 0.0), ('svah', TILE_M, LEVEL_MAP_M), ('svah_oci', TILE_M, LEVEL_EYE_M)):
+            for name, length, climb in (('rovna', TILE_M, 0.0), ('svah', TILE_M, LEVEL_MAP_M), ('svah_oci', TILE_M, LEVEL_EYE_M)):
                 full = f'kolej_{name}_{kind}{suffix}'
                 write(os.path.join(HERE, full + '.glb'), piece(length, climb, kind), full, {'nasep': top_png(length, kind), 'prazec': sleeper_png(kind)})
+            full = f'kolej_sikma_{kind}{suffix}'
+            mesh, longer = diagonal_piece(kind)
+            write(os.path.join(HERE, full + '.glb'), mesh, full, {'nasep': top_png(longer, kind), 'prazec': sleeper_png(kind)})
             full = f'kolej_pul_{kind}{suffix}'
             write(os.path.join(HERE, full + '.glb'), piece(TILE_M / 2, 0.0, kind), full, {'nasep': top_png(TILE_M / 2, kind), 'prazec': sleeper_png(kind)})
             full = f'kolej_prejezd_{kind}{suffix}'

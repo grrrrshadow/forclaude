@@ -1347,15 +1347,14 @@ static int GetViewportY(Point tile)
 }
 
 /**
- * Whether a view draws the round curves of rails (round_track.h): turned away from north; and facing north too where
- * it shows our 3D track from above (gui.three_d_rails_map) -- its straight and diagonal pieces met at a corner each
- * with its square end over the other's tile, round only once the view was turned (the player, 15. 11.: "the rails
- * reach over onto the next tile, that goes when turning but the view 0 is bad"). Facing north with the game's own
- * sprites of track the curves are as always.
+ * Whether a view draws the round curves of rails (round_track.h): only turned away from north. Facing north is the
+ * view to build in: the track straight, tile by tile, as the original (the player, 15. 11.: "the view from above at
+ * angle 0, put the straight ones back ... that is the view of building"; the diagonal pieces' ends are cut along the
+ * tiles' edges instead, koleje.py).
  */
 static bool RoundTrackInView(const Viewport &vp)
 {
-	return IsViewportTurnedAway(vp) || (IsViewportTurned(vp) && ThreeDGroupShown(ThreeDGroup::Rails));
+	return IsViewportTurnedAway(vp);
 }
 
 /** The tiles of buildings drawn as their sprites while their objects are made ready in the background (ThreeDObjectReadyToDraw()). */
