@@ -90,6 +90,7 @@
 #include <set>
 #include <tuple>
 #include <unordered_map>
+#include <cfloat>
 #include <unordered_set>
 #include <atomic>
 #include <condition_variable>
@@ -9346,21 +9347,66 @@ static std::shared_ptr<ThreeDVehicleShape> MeshoptSimplerShape(const ThreeDVehic
 	 * glass, side out) and each wheel by themselves, so that a triangle keeps its kind and a wheel turns whole. Taken
 	 * where it leaves well under what the seams left. */
 	if (error >= 0.02 - 1e-9 && count > 3 * 2000) {
-		std::map<uint64_t, std::vector<uint32_t>> groups;
+		/* Each welded corner's piece of the texture: the corners joined by triangles (a seam of the texture parts two).
+		 * The cells join corners within a piece only: joined across a seam, a triangle left had its corners in pieces of
+		 * the texture apart and took its texels from all the atlas between them (the player, 15. 11.: a trailer's tarp
+		 * from some way off stripes and noise in place of its blue). */
+		std::vector<uint32_t> island(wfirst.size());
+		for (uint32_t i = 0; i < island.size(); i++) island[i] = i;
+		auto root = [&island](uint32_t i) {
+			while (island[i] != i) i = island[i] = island[island[i]];
+			return i;
+		};
 		for (size_t t = 0; t < triangles; t++) {
-			const uint32_t i0 = shape.tri[t * 3];
-			const uint64_t group = static_cast<uint64_t>(wkind[windex[t * 3]]) | static_cast<uint64_t>(wheels ? shape.corner_wheel[i0] : 0) << 32;
-			std::vector<uint32_t> &g = groups[group];
+			const uint32_t r = root(windex[t * 3]);
+			for (int c = 1; c < 3; c++) {
+				const uint32_t o = root(windex[t * 3 + c]);
+				if (o != r) island[o] = r;
+			}
+		}
+		/* The triangles of each piece (a piece is of one kind and one wheel: its corners are welded by them too). */
+		std::map<uint32_t, std::vector<uint32_t>> groups;
+		for (size_t t = 0; t < triangles; t++) {
+			std::vector<uint32_t> &g = groups[root(windex[t * 3])];
 			g.insert(g.end(), {windex[t * 3], windex[t * 3 + 1], windex[t * 3 + 2]});
 		}
-		const float scale = meshopt_simplifyScale(wpos.data(), wfirst.size(), 3 * sizeof(float));
-		std::vector<uint32_t> sloppy, one;
+		std::vector<uint32_t> sloppy, one, local, local_of(wfirst.size(), UINT32_MAX), global_of;
+		std::vector<float> lpos;
 		for (const auto &[group, g] : groups) {
-			one.resize(g.size());
+			/* Its corners by themselves (the simplifier's tables are as big as the corners it is given). */
+			global_of.clear();
+			lpos.clear();
+			local.resize(g.size());
+			float lo[3] = {FLT_MAX, FLT_MAX, FLT_MAX}, hi[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+			for (size_t i = 0; i < g.size(); i++) {
+				uint32_t &l = local_of[g[i]];
+				if (l == UINT32_MAX) {
+					l = static_cast<uint32_t>(global_of.size());
+					global_of.push_back(g[i]);
+					for (int a = 0; a < 3; a++) {
+						const float v = wpos[g[i] * 3 + a];
+						lpos.push_back(v);
+						lo[a] = std::min(lo[a], v);
+						hi[a] = std::max(hi[a], v);
+					}
+				}
+				local[i] = l;
+			}
+			for (uint32_t w : global_of) local_of[w] = UINT32_MAX;
+			const float extent = std::max({hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]});
+			/* A piece smaller than the error: left out, as the simplifier leaves out what is smaller. */
+			if (extent < static_cast<float>(error)) continue;
+			/* A piece of a few triangles: as it is. */
+			if (g.size() <= 3 * 4) {
+				sloppy.insert(sloppy.end(), g.begin(), g.end());
+				continue;
+			}
+			one.resize(local.size());
 			float group_error = 0;
-			const size_t n = meshopt_simplifySloppy(one.data(), g.data(), g.size(), wpos.data(), wfirst.size(), 3 * sizeof(float), nullptr, 0,
+			const float scale = meshopt_simplifyScale(lpos.data(), global_of.size(), 3 * sizeof(float));
+			const size_t n = meshopt_simplifySloppy(one.data(), local.data(), local.size(), lpos.data(), global_of.size(), 3 * sizeof(float), nullptr, 0,
 					static_cast<float>(error / std::max(scale, 1e-6f)), &group_error);
-			sloppy.insert(sloppy.end(), one.begin(), one.begin() + n);
+			for (size_t i = 0; i < n; i++) sloppy.push_back(global_of[one[i]]);
 		}
 		if (sloppy.size() * 10 < count * 6) {
 			count = sloppy.size();
