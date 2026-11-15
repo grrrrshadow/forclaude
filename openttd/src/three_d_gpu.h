@@ -27,6 +27,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <vector>
@@ -590,6 +591,9 @@ struct ThreeDGpuStanding {
 };
 
 bool ThreeDGpuAvailable(bool wait = false);
+std::unique_lock<std::mutex> ThreeDGpuTexturesLock();
+bool ThreeDGpuHoldsTextureLocked(uint64_t uid);
+bool ThreeDGpuHoldsTexture(uint64_t uid);
 bool ThreeDGpuPosesBones();
 /** Whether the card smooths the roads of the ground of the view from the eyes (ThreeDGpuGroundTexture::smooth_roads): not when found it cannot. */
 bool ThreeDGpuSmoothsRoads();

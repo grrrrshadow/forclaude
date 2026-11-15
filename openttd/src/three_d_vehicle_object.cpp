@@ -2211,6 +2211,8 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		for (size_t i = 0; i < m.textures.size(); i++) {
 			if (!m.triangles->used[i]) continue;
 			if (i != 0) levels[i] = TextureLevelAt(obj, shape, static_cast<int>(i), p);
+			/* For the card alone (ThreeDTexturesForCard): a level whose pixels were let go of as the card holds it will do. */
+			const ThreeDTexturesForCard for_card;
 			m.textures[i] = obj.GetTexture(levels[i], static_cast<int>(i));
 		}
 		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0, st != nullptr ? st->rust_variant : 0);
@@ -2254,6 +2256,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		for (float d = TexelsPerMetre(*wf, *fs); d >= 2.0f * p * w.scale && crew_level < 12; d /= 2.0f) crew_level++;
 		m.textures.assign(m.triangles->used.size(), nullptr);
 		for (size_t i = 0; i < m.textures.size(); i++) {
+			const ThreeDTexturesForCard for_card;
 			if (m.triangles->used[i]) m.textures[i] = wf->GetTexture(crew_level, static_cast<int>(i));
 		}
 	}
@@ -2277,6 +2280,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			for (size_t i = 0; i < textures.size(); i++) {
 				if (!triangles->used[i]) continue;
 				if (i != 0) levels[i] = TextureLevelAt(*load.fig, *ls, static_cast<int>(i), p * biggest);
+				const ThreeDTexturesForCard for_card;
 				textures[i] = load.fig->GetTexture(levels[i], static_cast<int>(i));
 			}
 			std::vector<ThreeDGpuPaint> paints;
@@ -4677,6 +4681,8 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 	for (size_t i = 0; i < textures.size(); i++) {
 		if (used != nullptr && (i >= used->size() || !(*used)[i])) continue;
 		if (i != 0 && drawn != nullptr) levels[i] = EyeTextureLevel(obj, drawn, pixels_per_metre, static_cast<int>(i));
+		/* For the card alone (ThreeDTexturesForCard): a level whose pixels were let go of as the card holds it will do. */
+		const ThreeDTexturesForCard for_card;
 		textures[i] = obj->GetTexture(levels[i], static_cast<int>(i));
 		if (textures[i] == nullptr) return false;
 	}

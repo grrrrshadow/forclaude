@@ -16089,7 +16089,9 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 	 * (something the card could not hold): painted here. */
 	auto painted = [&model](const ThreeDVehicleObject *obj, int state, const std::vector<const ThreeDObjectTexture *> &texs, const std::vector<ThreeDGpuPaint> &paints) {
 		std::vector<const ThreeDObjectTexture *> out = texs;
-		for (size_t i = 0; i < out.size() && !paints.empty(); i++) {
+		for (size_t i = 0; i < out.size(); i++) {
+			/* One asked for the card alone, its pixels let go of as the card holds it (ThreeDTexturesForCard): made for the processor too. */
+			if (paints.empty() && (out[i] == nullptr || !out[i]->card_only)) continue;
 			if (const ThreeDObjectTexture *t = GetThreeDEyeVehicleTexture(obj, state, model.texture_ppm, static_cast<int>(i)); t != nullptr) out[i] = t;
 		}
 		return out;

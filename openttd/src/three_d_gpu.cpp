@@ -36,6 +36,7 @@
 #include <thread>
 #include <functional>
 #include <unordered_map>
+#include <unordered_set>
 
 #if defined(_WIN32) && defined(WITH_OPENGL)
 #	define THREE_D_GPU_WGL
@@ -46,6 +47,32 @@
 #endif
 
 #include "safeguards.h"
+
+/**
+ * The textures the card holds, by their numbers, for the game's threads to ask (ThreeDGpuHoldsTexture()): one it holds
+ * needs its pixels in the memory no more (TrimTextures() of three_d_objects.cpp lets them go; the player's logs of
+ * 15. 11.: the vehicles' textures 575 MB in the memory and 543 MB on the card, the same pictures twice). The mutex is
+ * held by the card's thread while it reads a texture's pixels to put it on, and by whoever lets pixels go.
+ */
+static std::mutex _card_texture_mutex;
+static std::unordered_set<uint64_t> _card_texture_uids;
+
+std::unique_lock<std::mutex> ThreeDGpuTexturesLock()
+{
+	return std::unique_lock<std::mutex>(_card_texture_mutex);
+}
+
+/** Whether the card holds a texture; under ThreeDGpuTexturesLock(). */
+bool ThreeDGpuHoldsTextureLocked(uint64_t uid)
+{
+	return _card_texture_uids.contains(uid);
+}
+
+bool ThreeDGpuHoldsTexture(uint64_t uid)
+{
+	std::lock_guard lock(_card_texture_mutex);
+	return _card_texture_uids.contains(uid);
+}
 
 std::atomic<bool> _three_d_gpu_off = true;
 std::atomic<bool> _three_d_gpu_show = true;
@@ -3079,6 +3106,10 @@ void ForgetCard()
 	_card_shapes.clear();
 	_card_indices.clear();
 	_card_textures.clear();
+	{
+		std::lock_guard lock(_card_texture_mutex);
+		_card_texture_uids.clear();
+	}
 	_card_buildings.clear();
 	_card_bytes = 0;
 	for (std::atomic<size_t> &b : _card_bytes_of) b = 0;
@@ -3216,6 +3247,8 @@ void TrimCard()
 			_card_bytes -= t.bytes;
 			_card_bytes_of[2] -= t.bytes;
 			_card_textures.erase(h.uid);
+			std::lock_guard lock(_card_texture_mutex);
+			_card_texture_uids.erase(h.uid);
 		} else {
 			GpuBuilding &b = _card_buildings[h.uid];
 			gl.glDeleteVertexArrays(1, &b.vao);
@@ -3315,6 +3348,9 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 		it->second.used = _card_clock;
 		return &it->second;
 	}
+	/* Its pixels read under the lock: none let go of meanwhile (ThreeDGpuTexturesLock()). One whose pixels were let go
+	 * of as the card held it, and the card let it go since: not drawn this picture, made again by who asks for it. */
+	std::lock_guard pixels_lock(_card_texture_mutex);
 	if (t.w <= 0 || t.h <= 0 || t.w > _max_texture || t.h > _max_texture || t.px.size() < static_cast<size_t>(t.w) * t.h) return nullptr;
 	Step(fmt::format("textura na kartu: {}x{}", t.w, t.h));
 	GpuTexture g;
@@ -3334,6 +3370,7 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
+	_card_texture_uids.insert(t.uid.value);
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
 
@@ -5647,12 +5684,26 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 		if (m.bones != nullptr && !d.shape->has_bones) return false;
 		/* As DrawOnCard(): a triangle naming a corner the shape has not, the processor draws. */
 		if (d.indices->largest >= d.shape->corners) return false;
+		bool gone = false;
 		for (size_t i = 0; i < m.textures.size(); i++) {
 			if (m.textures[i] == nullptr || i >= m.triangles->used.size() || !m.triangles->used[i]) continue;
 			const GpuTexture *t = TextureOnCard(*m.textures[i]);
-			if (t == nullptr) return false;
+			if (t == nullptr) {
+				/* Its pixels were let go of as the card held it, and the card let it go since: the figure not in this
+				 * picture, its texture made again by the game as it asks for it the next time. */
+				std::lock_guard lock(_card_texture_mutex);
+				if (m.textures[i]->px.empty()) {
+					gone = true;
+					break;
+				}
+				return false;
+			}
 			d.textures[i] = t->name;
 			if (i < m.paints.size() && m.paints[i].Any() && !PaintMasksOnCard(m.paints[i], d.paints[i])) return false;
+		}
+		if (gone) {
+			_gpu_eye_later++;
+			continue;
 		}
 		/* Among those alike, drawn at once (Batch); one with wheels that turn, or posed by its bones, on its own. */
 		if (_eye_instances_on && _instanced_arrays_ok && (m.wheels.empty() || !d.shape->has_wheel) && m.bones == nullptr) {

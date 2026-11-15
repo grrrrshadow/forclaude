@@ -11074,6 +11074,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (const auto &[tile, n] : depots) where += fmt::format(" {}x na {},{}", n, TileX(TileIndex(tile)), TileY(TileIndex(tile)));
 		IConsolePrint(CC_DEFAULT, "test3d: vyjed: {} vozidel:{}", started, where);
 		return true;
+	} else if (what == "texturykarty" && argv.size() > 2) {
+		/* 'texturykarty 0|1': the pixels of the vehicles' textures the card holds let go of (1), or kept in the memory too (0). */
+		extern bool _textures_card_only;
+		_textures_card_only = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: texturykarty {}", _textures_card_only ? 1 : 0);
+		return true;
 	} else if (what == "domykartou" && argv.size() > 2) {
 		/* 'domykartou 0|1': the buildings from the eyes painted by the card as it draws them (1), or of the copies of
 		 * their textures the processor paints (0). */

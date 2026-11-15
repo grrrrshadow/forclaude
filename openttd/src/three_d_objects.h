@@ -119,6 +119,23 @@ struct ThreeDObjectTexture {
 	 * 255: no such texture, every level is drawn.
 	 */
 	uint8_t coarsest = 255;
+	/**
+	 * Its pixels were let go of as the card held it (TrimTextures() of three_d_objects.cpp): it is whole for the card
+	 * while the card holds it (ThreeDGpuHoldsTexture()); for the processor it has nothing, and is made again.
+	 */
+	bool card_only = false;
+};
+
+/**
+ * While one of these lives on a thread, the textures it asks for there are for the card alone (ThreeDVehicleObject::
+ * GetTexture()): a level whose pixels were let go of as the card holds it counts as there. Nothing the processor
+ * reads pixels of may be asked for under it.
+ */
+struct ThreeDTexturesForCard {
+	ThreeDTexturesForCard();
+	~ThreeDTexturesForCard();
+	ThreeDTexturesForCard(const ThreeDTexturesForCard &) = delete;
+	ThreeDTexturesForCard &operator=(const ThreeDTexturesForCard &) = delete;
 };
 
 /**

@@ -951,10 +951,25 @@ GlbFilesScope::~GlbFilesScope()
  * eyes close to it), what is not asked for any more let go of every quarter of a minute (TrimThreeDTextures()).
  */
 /** The finest level of a texture that has its pixels. */
+/** How many ThreeDTexturesForCard live on this thread: the textures asked for are for the card alone. */
+static thread_local int _textures_for_card = 0;
+ThreeDTexturesForCard::ThreeDTexturesForCard() { _textures_for_card++; }
+ThreeDTexturesForCard::~ThreeDTexturesForCard() { _textures_for_card--; }
+
+/**
+ * Whether a level of a texture can be drawn from by who asks: with its pixels; or, asked for the card alone
+ * (ThreeDTexturesForCard), its pixels let go of as the card holds it and the card holding it still.
+ */
+static bool LevelUsable(const ThreeDObjectTexture &t)
+{
+	if (!t.px.empty()) return true;
+	return _textures_for_card > 0 && t.card_only && ThreeDGpuHoldsTexture(t.uid.value);
+}
+
 static int FinestLevel(const std::vector<ThreeDObjectTexture> &lv)
 {
 	for (size_t i = 0; i < lv.size(); i++) {
-		if (!lv[i].px.empty()) return static_cast<int>(i);
+		if (!lv[i].px.empty() || lv[i].card_only) return static_cast<int>(i);
 	}
 	return static_cast<int>(lv.size()) - 1;
 }
@@ -971,7 +986,13 @@ static int DrawnLevel(const std::vector<ThreeDObjectTexture> &lv, int level)
 /** Whether a texture has a level with its pixels (or a coarser one, the coarsest there is). */
 static bool HasLevel(const std::vector<ThreeDObjectTexture> &lv, int level)
 {
-	return FinestLevel(lv) <= std::min(DrawnLevel(lv, level), static_cast<int>(lv.size()) - 1);
+	if (lv.empty()) return false;
+	const int drawn = std::min(DrawnLevel(lv, level), static_cast<int>(lv.size()) - 1);
+	/* The level itself: a finer one with its pixels does not tell (one between may have let go of its as the card
+	 * holds it, TrimTextures()). */
+	if (FinestLevel(lv) > drawn) return false;
+	const ThreeDObjectTexture &t = lv[std::max(drawn, 0)];
+	return !t.card_only || LevelUsable(t);
 }
 
 /** Let go of the pixels of the levels finer than a level; their sizes stay. */
@@ -10965,6 +10986,12 @@ static bool ImageSizeOfHead(std::span<const uint8_t> head, int &w, int &h)
 static std::vector<ThreeDTextureLevels> _textures_replaced;
 /** The finest level of each texture drawn since the last trimming, by the texture. Under _lazy_mutex. */
 static std::unordered_map<const void *, int> _texture_levels_asked;
+/** The textures asked for since the last trimming by other than the card alone (ThreeDTexturesForCard): their pixels stay. Under _lazy_mutex. */
+static std::unordered_set<const void *> _textures_asked_by_processor;
+
+/** The textures' pixels let go of as the card holds them (TrimTextures()); the rig: 'test3d texturykarty 0' keeps them. */
+bool _textures_card_only = true;
+static size_t _texture_bytes_on_card_only = 0;
 
 /** Keep a texture made in the place of the one there (under _lazy_mutex): that one is kept a while yet. */
 static void KeepTexture(ThreeDTextureLevels &place, ThreeDTextureLevels made)
@@ -10981,7 +11008,11 @@ static const ThreeDObjectTexture *LevelOfKept(const ThreeDTextureLevels &place, 
 	level = DrawnLevel(lv, level);
 	auto [it, added] = _texture_levels_asked.try_emplace(&lv, level);
 	if (!added) it->second = std::min(it->second, level);
-	return &lv[std::clamp<int>(level, FinestLevel(lv), static_cast<int>(lv.size()) - 1)];
+	if (_textures_for_card == 0) _textures_asked_by_processor.insert(&lv);
+	/* That level, or the nearest coarser one that can be drawn from (LevelUsable(): the coarsest keeps its pixels). */
+	size_t at = std::clamp<int>(level, FinestLevel(lv), static_cast<int>(lv.size()) - 1);
+	while (at + 1 < lv.size() && !LevelUsable(lv[at])) at++;
+	return &lv[at];
 }
 
 /**
@@ -11288,6 +11319,21 @@ size_t ThreeDVehicleObject::TrimTextures(std::set<const void *> &seen) const
 		keep = DrawnLevel(lv, keep);
 		for (int i = 0; i < keep; i++) freed += lv[i].px.capacity() * sizeof(uint32_t);
 		DropFinerLevels(lv, keep);
+		/* The levels the card holds, asked for by none but the card since the last time: their pixels are on the card,
+		 * not twice (the player's log of 15. 11.: the vehicles' textures 575 MB here and 543 MB on the card). Not the
+		 * small ones, nor the coarsest: the processor has that one to draw from till the texture is made again for it. */
+		if (!_textures_card_only || _textures_asked_by_processor.contains(&lv)) return;
+		for (size_t i = std::max(keep, 0); i + 1 < lv.size(); i++) {
+			ThreeDObjectTexture &t = lv[i];
+			if (t.px.empty() || std::max(t.w, t.h) <= 256) continue;
+			std::unique_lock<std::mutex> card = ThreeDGpuTexturesLock();
+			if (!ThreeDGpuHoldsTextureLocked(t.uid.value)) continue;
+			freed += t.px.capacity() * sizeof(uint32_t);
+			_texture_bytes_on_card_only += t.px.capacity() * sizeof(uint32_t);
+			t.px.clear();
+			t.px.shrink_to_fit();
+			t.card_only = true;
+		}
 	};
 	for (const ThreeDTextureLevels &place : this->levels) trim(place);
 	trim(this->mask_levels);
@@ -11309,7 +11355,8 @@ static void TrimThreeDTextures()
 		for (const ThreeDVehicleObject &v : *list) freed += v.TrimTextures(seen);
 	}
 	_texture_levels_asked.clear();
-	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB of levels finer than drawn let go of", freed / (1024.0 * 1024.0));
+	_textures_asked_by_processor.clear();
+	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB of levels finer than drawn, or held by the card, let go of ({:.1f} MB as the card holds them so far)", freed / (1024.0 * 1024.0), _texture_bytes_on_card_only / (1024.0 * 1024.0));
 }
 
 /**
@@ -15772,13 +15819,16 @@ std::string DescribeThreeDObjectMemory()
 		const HeldTexture &t = *by_size[i];
 		textures_most += fmt::format("{}{:.1f} MB {}x{} (uroven {}, {} sdili od {})", i == 0 ? "" : ", ", t.bytes / (1024.0 * 1024.0), t.w, t.h, t.level, t.holders, t.first);
 	}
-	size_t textures = 0, texture_count = 0, pngs = 0, png_count = 0, masks = 0;
+	size_t textures = 0, texture_count = 0, pngs = 0, png_count = 0, masks = 0, on_card_only = 0;
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
 		std::set<const void *> seen;
 		auto levels_bytes = [&](const std::shared_ptr<const std::vector<ThreeDObjectTexture>> &lv) {
 			if (lv == nullptr || !seen.insert(lv.get()).second) return;
-			for (const ThreeDObjectTexture &t : *lv) textures += VectorBytes(t.px);
+			for (const ThreeDObjectTexture &t : *lv) {
+				textures += VectorBytes(t.px);
+				if (t.card_only && t.px.empty()) on_card_only += static_cast<size_t>(t.w) * t.h * sizeof(uint32_t);
+			}
 			texture_count++;
 		};
 		for (const auto &[key, made] : _texture_levels) levels_bytes(made.levels.lock());
@@ -15818,8 +15868,8 @@ std::string DescribeThreeDObjectMemory()
 	std::ranges::sort(biggest, std::greater{});
 	std::string most;
 	for (size_t i = 0; i < std::min<size_t>(biggest.size(), 3); i++) most += fmt::format("{}{} {:.1f} MB", i == 0 ? "" : ", ", biggest[i].second, mb(biggest[i].first));
-	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}",
-			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most);
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}; dalsich {:.1f} MB jen na karte), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}",
+			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(on_card_only), mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most);
 }
 
 /**
