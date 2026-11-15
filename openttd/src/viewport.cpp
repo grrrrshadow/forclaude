@@ -8219,7 +8219,8 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 	for (const ThreeDObject *w : to.with) parts.push_back({w, {}, false});
 	for (Part &p : parts) {
 		if (p.o == nullptr) continue;
-		p.shape = TurnedObjectShape(p.o, lay);
+		/* Not simplified here on the main thread: its own shape meanwhile, drawn again when the simpler one is made. */
+		p.shape = p.o->DrawnShape(ThreeDShapeLevel(ZOOM_BASE * OBJECT_HEIGHT_PER_METRE * lay.scale, 0.75));
 		if (!p.shape.tri.empty() && p.shape.uid == 0) return false;
 	}
 	const uint64_t stood_in = ThreeDStandInsGiven();

@@ -450,8 +450,9 @@ struct ThreeDObject {
 	TreeUse TreeUseAt(TileIndex origin) const;
 	/** How many textures its triangles have: its own, its add-ons' and its other materials'. */
 	size_t Textures() const { return 1 + this->addon_objects.size() + this->material_pngs.size(); }
-	const ThreeDObjectTexture *MaterialTexture(size_t material, int level, bool now) const;
+	const ThreeDObjectTexture *MaterialTexture(size_t material, int level, bool now, bool redraw = false) const;
 	ThreeDObjectShapeView GetShape(int level) const;
+	ThreeDObjectShapeView DrawnShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
 	bool TryGetCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<struct ThreeDGpuBuildingPaint> &paints) const;
 	bool CardPaints(uint32_t paint) const;

@@ -14539,6 +14539,11 @@ bool ThreeDObject::TryRead() const
 	return this->IsRead();
 }
 
+/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
+static std::atomic<uint64_t> _three_d_objects_readied = 0;
+/** How many times a building was drawn with a texture of another level standing in (ThreeDObject::DrawnTexture()). */
+static std::atomic<uint64_t> _three_d_textures_stood_in = 0;
+
 ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 {
 	MarkThreeDUsed(this->used);
@@ -14559,6 +14564,30 @@ ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
 	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
 	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
+	const ThreeDObjectShape &s = *this->shapes[level];
+	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex, s.uid.value};
+}
+
+/**
+ * The building's shape to draw it with on the map now, the drawing waiting for no simplifying (the player's log of
+ * 15. 11., build #369: "dum tvar zjednoduseny" 1568 times, 14 s of the main thread in two hours): simplified for a
+ * level if that is made; else its own shape stands in, the simpler one is made in the background and the building's
+ * place drawn again when it is there (ThreeDTexturesStoodIn(), ThreeDObjectsReadied()).
+ */
+ThreeDObjectShapeView ThreeDObject::DrawnShape(int level) const
+{
+	MarkThreeDUsed(this->used);
+	if (!this->Read()) return {};
+	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
+	const ThreeDObjectShapeView own{this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return own;
+	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] {
+		this->GetShape(level);
+		_three_d_objects_readied++;
+	})) {
+		_three_d_textures_stood_in++;
+		return own;
+	}
 	const ThreeDObjectShape &s = *this->shapes[level];
 	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex, s.uid.value};
 }
@@ -14817,10 +14846,6 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
  * @param may_drop whether the painted textures of every object may be dropped here when they take too much memory;
  *                 not while textures are made on several cores at once (PrepareThreeDObjectTextures())
  */
-/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
-static std::atomic<uint64_t> _three_d_objects_readied = 0;
-/** How many times a building was drawn with a texture of another level standing in (ThreeDObject::DrawnTexture()). */
-static std::atomic<uint64_t> _three_d_textures_stood_in = 0;
 
 /** The mask of a part of a building painted a colour, read the first time (on either thread). */
 static void MakeHouseMask(const ThreeDObjectColourPart &part, size_t k)
@@ -14973,8 +14998,10 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTextureOf(uint8_t texture, int le
  * a level with its pixels given, a finer one made again when it is wanted.
  * @param now made here if it is not yet (on whichever thread); else made in the background and meanwhile its finest
  *            level there is (a coarser one), nullptr none
+ * @param redraw not made yet (not now): the map draws the building's place again when it is (ThreeDTexturesStoodIn(),
+ *               ThreeDObjectsReadied())
  */
-const ThreeDObjectTexture *ThreeDObject::MaterialTexture(size_t material, int level, bool now) const
+const ThreeDObjectTexture *ThreeDObject::MaterialTexture(size_t material, int level, bool now, bool redraw) const
 {
 	MarkThreeDUsed(this->used);
 	level = std::max(level, 0);
@@ -14988,8 +15015,11 @@ const ThreeDObjectTexture *ThreeDObject::MaterialTexture(size_t material, int le
 	};
 	if (now) {
 		make();
-	} else {
-		MadeOrAsked(this, thing, made, make);
+	} else if (!MadeOrAsked(this, thing, made, [make, redraw] {
+		make();
+		if (redraw) _three_d_objects_readied++; // the map drawn with a coarser one meanwhile draws its place again
+	}) && redraw) {
+		_three_d_textures_stood_in++;
 	}
 	std::lock_guard lock(_lazy_mutex);
 	return material < this->material_levels.size() ? LevelOfKept(this->material_levels[material], level) : nullptr;
@@ -15417,7 +15447,17 @@ uint64_t ThreeDTexturesStoodIn()
 const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint) const
 {
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].DrawnTexture(level, paint);
-	if (paint == 0 || this->colours.empty() || this->levels.empty()) return this->GetTexture(level, paint);
+	if (paint == 0 || this->colours.empty() || this->levels.empty()) {
+		/* Unpainted: its level if it is held, else a coarser one meanwhile, the level read in the background and the
+		 * place drawn again -- not read here, on the main thread (the player's log of 15. 11., build #369: "dum textura"
+		 * 1539 times, 47 s of the main thread in two hours, the longest 1.2 s: a level let go of (TrimThreeDHouseLevels())
+		 * and wanted again as the view came nearer). Nothing of it read yet: read now. */
+		const ThreeDObjectTexture *held = this->TryGetTexture(level, 0);
+		if (held == nullptr) return this->GetTexture(level, paint);
+		std::lock_guard lock(_lazy_mutex);
+		if (!this->levels.empty() && held != &this->levels[std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1)]) _three_d_textures_stood_in++;
+		return held;
+	}
 	MarkThreeDUsed(this->used);
 	const std::pair<int, uint32_t> key(std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1), paint);
 	const ThreeDObjectTexture *nearest = nullptr;
@@ -15448,7 +15488,12 @@ const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint)
 /** A texture of the building's triangles to draw it with now (as GetTextureOf(), by DrawnTexture()). */
 const ThreeDObjectTexture *ThreeDObject::DrawnTextureOf(uint8_t texture, int level, uint32_t paint) const
 {
-	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, true);
+	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) {
+		/* Not waited for either: a coarser level meanwhile, its place drawn again; none of it yet, made now. */
+		const size_t material = texture - 1 - this->addon_objects.size();
+		const ThreeDObjectTexture *held = this->MaterialTexture(material, level, false, true);
+		return held != nullptr ? held : this->MaterialTexture(material, level, true);
+	}
 	if (texture == 0 || texture > this->addon_objects.size()) return this->DrawnTexture(level, paint);
 	return _three_d_objects[this->addon_objects[texture - 1]].DrawnTexture(level, paint);
 }
