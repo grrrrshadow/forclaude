@@ -2793,7 +2793,12 @@ double ThreeDTrackStandOver(TileIndex tile, double lx, double ly)
  */
 double ThreeDTrackRailTop(TileIndex tile)
 {
-	return ThreeDTrackShownOn(tile) ? THREE_D_RAIL_TOP_M : 0.0;
+	if (!ThreeDTrackShownOn(tile)) return 0.0;
+	/* The game's pipeline has no rails: its valve (the pump of the set Rozvody 3D) sits on the pipe as its model has it,
+	 * not a rail's height over it (the player, 15. 11.: "put the valve a little lower ... this is a big gap"). */
+	if (IsValidTile(tile) && (IsPlainRailTile(tile) || IsRailDepotTile(tile) || IsLevelCrossingTile(tile) || HasStationTileRail(tile)) &&
+			GetRailTypeInfo(GetRailType(tile))->label == RAILTYPE_LABEL_PIPE) return 0.0;
+	return THREE_D_RAIL_TOP_M;
 }
 
 /** Our catenary's wires over the ground, metres (objekty/nase/trakce.py CONTACT, CARRIER): the contact wire, the carrier wire. */
