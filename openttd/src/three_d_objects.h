@@ -787,6 +787,7 @@ struct ThreeDVehicleState {
 	uint8_t given = 0;          ///< the keys it gives (GIVEN_*): those of a later layer replace an earlier one's
 	std::vector<int16_t> addon_parts; ///< "doplnky": the part of each add-on it shows (its node), -1 where it names none of the add-on
 	int crew_part = -1;         ///< "posadka": the part of the group of the crew it shows, -1 none named
+	int crew_more_part = -1;    ///< "posadka" with "posadka_pridat": the part of a group of the crew shown beside that of the layers under it, -1 none
 	uint32_t open_doors = 0;    ///< "dvere_otevrene": bit n the wing ThreeDVehicleObject::doors[n] open, the others shut
 	std::string set_name;       ///< "sada": the GRF's set it is drawn for, by its name ("nastavba hasici"): a vehicle standing as a building's event (StateNamed())
 	bool empty = false;         ///< standing empty: none of its crew drawn, the record's nor its groups' (EmptyStateOf(): the fire Tatra on the pitch)

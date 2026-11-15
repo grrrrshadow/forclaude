@@ -7996,7 +7996,14 @@ static void ReadThreeDVehicleObjects()
 						if (st.contains("posadka") && st.at("posadka").is_string()) {
 							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
 							if (part > 0) state.parts.Set(part);
-							state.crew_part = part;
+							/* "posadka_pridat": its group beside the group of the layers under it, not in its place (the
+							 * students on the benches of a horse's wagon beside the driver on its box seat, a girl of the
+							 * configurator: Special 3D v11 of grrrrf; else a group for each driver with the students in it). */
+							if (st.value("posadka_pridat", false)) {
+								state.crew_more_part = part;
+							} else {
+								state.crew_part = part;
+							}
 						}
 						if (st.contains("doprovod")) {
 							if (auto c = companion_of(st.at("doprovod")); c.has_value()) {
@@ -12037,6 +12044,7 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
 		}
 		if (s.crew_part >= 0) made.crew_part = s.crew_part;
+		if (s.crew_more_part > 0) made.parts.Set(s.crew_more_part);
 		/* A wing open in any layer is open. */
 		made.open_doors |= s.open_doors;
 		/* The animal running behind it of any layer (the colleague's horse: its layer 1). */
