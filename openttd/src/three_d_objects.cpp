@@ -15750,11 +15750,24 @@ uint64_t ThreeDTexturesStoodIn()
 }
 
 /**
+ * What a building is drawn with while none of its texture is read yet (DrawnTexture()): a texel of plaster. The player's
+ * log of 16. 11., build #372: the main thread still read "dum textura" 312 times (10 s in an hour, the longest 1 s),
+ * "dum lak" 262 times, "dum material" 32 -- each the first time a building of a kind came into the view, the map
+ * standing still for it ("it jerks at a big zoom out"). Read in the background instead, the place drawn again when it
+ * is there (ThreeDTexturesStoodIn(), ThreeDObjectsReadied()).
+ */
+static const ThreeDObjectTexture *TextureNotReadYet()
+{
+	static const ThreeDObjectTexture PLAIN{1, 1, {Colour(200, 192, 176).data}, {}};
+	return &PLAIN;
+}
+
+/**
  * The building's texture to draw it with now, the drawing waiting for no painting (the player, 28. 10.: zooming in and
  * out showed the boxes of the houses and the industries first and their 3D after; a zoom asks for the texture at
  * another level, and painting it waited): at the level painted if it is already; else the nearest level painted
  * already stands in, the level is painted in the background and the building's place drawn again when it is there
- * (ThreeDObjectsReadied(), ThreeDTexturesStoodIn()). Nothing of it painted yet: painted now, as GetTexture().
+ * (ThreeDObjectsReadied(), ThreeDTexturesStoodIn()). Nothing of it painted yet: unpainted meanwhile.
  */
 const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint) const
 {
@@ -15763,9 +15776,13 @@ const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint)
 		/* Unpainted: its level if it is held, else a coarser one meanwhile, the level read in the background and the
 		 * place drawn again -- not read here, on the main thread (the player's log of 15. 11., build #369: "dum textura"
 		 * 1539 times, 47 s of the main thread in two hours, the longest 1.2 s: a level let go of (TrimThreeDHouseLevels())
-		 * and wanted again as the view came nearer). Nothing of it read yet: read now. */
+		 * and wanted again as the view came nearer). Nothing of it read yet: a texel of plaster meanwhile
+		 * (TextureNotReadYet()), TryGetTexture() has asked for it. */
 		const ThreeDObjectTexture *held = this->TryGetTexture(level, 0);
-		if (held == nullptr) return this->GetTexture(level, paint);
+		if (held == nullptr) {
+			_three_d_textures_stood_in++;
+			return TextureNotReadYet();
+		}
 		std::lock_guard lock(_lazy_mutex);
 		if (!this->levels.empty() && held != &this->levels[std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1)]) _three_d_textures_stood_in++;
 		return held;
@@ -15784,7 +15801,8 @@ const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint)
 			nearest = PaintedAsked(tex);
 		}
 	}
-	if (nearest == nullptr) return this->GetTexture(level, paint);
+	/* None of this paint yet: unpainted meanwhile (or nothing read yet: plaster), not painted here on the main thread. */
+	if (nearest == nullptr) nearest = this->DrawnTexture(level, 0);
 	if (!MadeOrAsked(this, LazyHousePaint(key.first, paint), [this, key] { return this->painted.contains(key); }, [this, key] {
 		this->GetTexture(key.first, key.second, false);
 		_three_d_objects_readied++;
@@ -15801,10 +15819,12 @@ const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint)
 const ThreeDObjectTexture *ThreeDObject::DrawnTextureOf(uint8_t texture, int level, uint32_t paint) const
 {
 	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) {
-		/* Not waited for either: a coarser level meanwhile, its place drawn again; none of it yet, made now. */
+		/* Not waited for either: a coarser level meanwhile, its place drawn again; none of it yet, plaster meanwhile. */
 		const size_t material = texture - 1 - this->addon_objects.size();
 		const ThreeDObjectTexture *held = this->MaterialTexture(material, level, false, true);
-		return held != nullptr ? held : this->MaterialTexture(material, level, true);
+		if (held != nullptr) return held;
+		_three_d_textures_stood_in++;
+		return TextureNotReadYet();
 	}
 	if (texture == 0 || texture > this->addon_objects.size()) return this->DrawnTexture(level, paint);
 	return _three_d_objects[this->addon_objects[texture - 1]].DrawnTexture(level, paint);
