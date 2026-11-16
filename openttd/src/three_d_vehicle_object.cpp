@@ -2893,7 +2893,9 @@ static std::mutex _pictures_mutex; ///< of _pictures_to_make, _loads_to_do, _pic
 static std::condition_variable _pictures_wake;
 static std::deque<PictureToMake> _pictures_to_make;
 /** What the view from the eyes asked to be made in the background (ThreeDLoadInBackground()): before the pictures, which may need it too. */
-static std::deque<std::function<void()>> _loads_to_do;
+static std::deque<std::pair<std::chrono::steady_clock::time_point, std::function<void()>>> _loads_to_do;
+/** A load asked for this long ago is made before the newest (MakePicturesInBackground()). */
+static constexpr std::chrono::milliseconds LOAD_LONGEST_WAIT{2000};
 static std::vector<PictureMade> _pictures_done;
 static bool _picture_in_hand = false; ///< the thread is making one now
 static bool _pictures_stop = false;
@@ -2926,9 +2928,17 @@ static void MakePicturesInBackground()
 		load_turn = !load_turn;
 		if (!_loads_to_do.empty() && (load_turn || _pictures_to_make.empty())) {
 			/* The newest asked for first, as the pictures: what is on the screen now (a horse coming into view waited
-			 * behind the loads of a whole town asked before it). */
-			std::function<void()> load = std::move(_loads_to_do.back());
-			_loads_to_do.pop_back();
+			 * behind the loads of a whole town asked before it) -- but the oldest first once it has waited too long:
+			 * with a load or so asked every frame and some sixty waiting, the oldest were never made (the player's
+			 * save by night: trees, a dragon, a piece of track "not read yet" for good, their places and the buildings
+			 * about them laid again by the card at every load that came). */
+			const bool oldest = std::chrono::steady_clock::now() - _loads_to_do.front().first > LOAD_LONGEST_WAIT;
+			std::function<void()> load = std::move(oldest ? _loads_to_do.front().second : _loads_to_do.back().second);
+			if (oldest) {
+				_loads_to_do.pop_front();
+			} else {
+				_loads_to_do.pop_back();
+			}
 			_picture_in_hand = true;
 			lock.unlock();
 			load();
@@ -2991,7 +3001,7 @@ void ThreeDLoadInBackground(std::function<void()> job)
 	}
 	{
 		std::lock_guard lock(_pictures_mutex);
-		_loads_to_do.push_back(std::move(job));
+		_loads_to_do.emplace_back(std::chrono::steady_clock::now(), std::move(job));
 	}
 	_pictures_wake.notify_one();
 }
@@ -3120,6 +3130,9 @@ void StopThreeDPictureThread()
 	_pictures_stop = false;
 	_pictures_to_make.clear();
 	_loads_to_do.clear();
+	/* What they were for asked again when wanted (ThreeDLazyForgetAsked()). */
+	extern void ThreeDLazyForgetAsked();
+	ThreeDLazyForgetAsked();
 	_pictures_done.clear();
 	_picture_in_hand = false;
 	_pictures_asked.clear();

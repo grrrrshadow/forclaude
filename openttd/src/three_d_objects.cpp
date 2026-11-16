@@ -9090,6 +9090,12 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
 	std::unique_lock lock(_lazy_mutex);
 	for (bool waited = false;; waited = true) {
 		if (made()) {
+			/* Asked of the thread and made meanwhile some other way: asked no more -- else, let go of later (the
+			 * objects not drawn for a while, ForgetUnusedThreeDObjects()), it was never asked again and gave nothing
+			 * for good: the trees and the dragon of the player's save "not read yet" frame after frame, each time their
+			 * places and all the buildings about them laid again by the card (the player's #373: 7 frames a second by
+			 * night over the town). */
+			_lazy_asked.erase(key);
 			if (waited) note_main(false);
 			return;
 		}
@@ -9121,6 +9127,19 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
  * @param made whether it is there: under the lock, as MakeOnce()'s
  * @param make the job that makes it (a getter that does)
  */
+/**
+ * The jobs asked of the thread in the background dropped (StopThreeDPictureThread(): the objects read anew, a game
+ * loaded): nothing is asked any more. The marks stayed before, and what had been asked was never asked again -- the
+ * objects read anew lie where the old ones lay, so the trees, a dragon and a piece of track of the player's save gave
+ * "not read yet" for good, their places and all the buildings about them laid again by the card at every load that came
+ * (the player's #373 by night: 7 frames a second over the town).
+ */
+void ThreeDLazyForgetAsked()
+{
+	std::lock_guard lock(_lazy_mutex);
+	_lazy_asked.clear();
+}
+
 template <typename Made>
 static bool MadeOrAsked(const void *of, int thing, Made &&made, std::function<void()> make)
 {
