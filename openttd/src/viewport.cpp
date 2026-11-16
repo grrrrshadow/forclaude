@@ -15401,7 +15401,10 @@ void AddCabWire(double x0, double y0, double ground0, double x1, double y1, doub
  */
 static void DrawEyeWires(const CabCanvas &cv, const CabEye &eye)
 {
-	const double half = std::max(0.6, cv.w / 1100.0);
+	/* A pixel and a little across however wide the picture is: a few centimetres of wire are less than a pixel from a
+	 * few metres on. It was a 1100th of the picture's width, on the player's phone four pixels -- thick black wires
+	 * beside thin masts (the player, 16. 11.: "in 3D the thick black wires and the pale thin masts stayed"). */
+	const double half = 0.55;
 	const double near = _cab_near * 1.01, far = CAB_RANGE_TILES * TILE_SIZE;
 	for (const CabWire &w : _cab_wires) {
 		CabPoint a = CabToEye(eye, w.x0, w.y0, w.z0, 0.5, 0.5), b = CabToEye(eye, w.x1, w.y1, w.z1, 0.5, 0.5);
