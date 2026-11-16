@@ -310,9 +310,10 @@ public:
 	/** No turn asked for from the cab (#cab_turn). */
 	static constexpr uint8_t CAB_TURN_NONE = 0xFF;
 	/**
-	 * The turn a road vehicle once took at the next junction as the player asked from its cab; asked no more (the
-	 * player, 27. 10.: "that was not used and should not be there"), minded by nothing. Only in the saved games
-	 * (SaveLoadVersion::CabDriving).
+	 * A train's way at its next switch as the player asked from its cab (the player, 16. 11.: "I press left and the
+	 * Sergej goes right at the switch ... so that I could steer at the switches with the arrows"): 0 left, 1 right,
+	 * CAB_TURN_NONE as its pathfinder chooses (DoTrainPathfind()). Of a road vehicle, once its turn at the next junction,
+	 * asked no more (27. 10.). In the saved games (SaveLoadVersion::CabDriving).
 	 */
 	uint8_t cab_turn = CAB_TURN_NONE;
 	/** Driven freely from the cab (cab_drive.h): a road vehicle off the road, a ship anywhere on the water. */

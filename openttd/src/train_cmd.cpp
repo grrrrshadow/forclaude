@@ -12180,6 +12180,37 @@ void FreeTrainTrackReservation(const Train *consist, TileIndex from_tile, Trackd
 }
 
 /**
+ * The tracks of a switch a train may take as the player asked from its cab (Vehicle::cab_turn): the one turning most to
+ * that side, or the straight one where none turns so; all of them where nothing is asked or there is no choice.
+ * @param v the train
+ * @param enterdir the way it goes onto the tile
+ * @param tracks the tracks it can take there
+ */
+static TrackBits CabWishedTracks(const Train *v, DiagDirection enterdir, TrackBits tracks)
+{
+	if (v->cab_turn == Vehicle::CAB_TURN_NONE || tracks.Count() < 2) return tracks;
+	const int heading = to_underlying(DiagDirToDir(enterdir));
+	Track side = Track::Invalid, straight = Track::Invalid;
+	int best = 0;
+	for (Track t : tracks) {
+		const int d = (to_underlying(TrackdirTravelDirection(TrackEnterdirToTrackdir(t, enterdir))) - heading) & 7;
+		if (d == 0) {
+			straight = t;
+			continue;
+		}
+		/* Clockwise seen from above is to the right: 1-3 right, 5-7 left; how much, the more the better. */
+		const int how = v->cab_turn == 1 ? (d <= 3 ? d : 0) : (d >= 5 ? 8 - d : 0);
+		if (how > best) {
+			best = how;
+			side = t;
+		}
+	}
+	if (side != Track::Invalid) return TrackBits{side};
+	if (straight != Track::Invalid) return TrackBits{straight};
+	return tracks;
+}
+
+/**
  * Perform pathfinding for a train.
  *
  * @param v The train
@@ -12195,6 +12226,9 @@ void FreeTrainTrackReservation(const Train *consist, TileIndex from_tile, Trackd
 static Track DoTrainPathfind(const Train *v, TileIndex tile, DiagDirection enterdir, TrackBits tracks, bool &path_found, bool do_track_reservation, PBSTileInfo *dest, TileIndex *final_dest)
 {
 	if (final_dest != nullptr) *final_dest = INVALID_TILE;
+	/* At a switch the way the player asked from the cab (Vehicle::cab_turn): only that track to choose from -- its
+	 * branch to that side, or straight on where it has none; the search from there as ever. */
+	tracks = CabWishedTracks(v, enterdir, tracks);
 	return YapfTrainChooseTrack(v, tile, enterdir, tracks, path_found, do_track_reservation, dest, final_dest);
 }
 
@@ -12580,6 +12614,10 @@ static Track ChooseTrainTrack(Train *consist, TileIndex tile, DiagDirection ente
 	 * only place that can refuse without sending the train somewhere else
 	 * instead. */
 	if (res_tracks.Any()) return FindFirstTrack(res_tracks);
+
+	/* At a switch the way the player asked from the cab (Vehicle::cab_turn, CabWishedTracks()): that track and no
+	 * other, whatever the search would say beyond it (a siding the player drives into on purpose). */
+	tracks = CabWishedTracks(consist, enterdir, tracks);
 
 	/* Quick return in case only one possible track is available */
 	if (tracks.Count() == 1) {
@@ -13951,6 +13989,11 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					int speed_before = first->cur_speed;
 					uint8_t subspeed_before = first->subspeed;
 					chosen_track = ChooseTrainTrack(first, gp.new_tile, enterdir, bits, false, nullptr, true);
+					/* The way asked from the cab taken at this switch (CabWishedTracks()): asked no more. */
+					if (bits.Count() > 1 && first->cab_turn != Vehicle::CAB_TURN_NONE) {
+						first->cab_turn = Vehicle::CAB_TURN_NONE;
+						SetWindowDirty(WindowClass::FirstPerson, 0);
+					}
 					assert(chosen_track.Any(bits | GetReservedTrackbits(gp.new_tile)));
 					/* A tile entered with nothing booked on it. Ordinary between
 					 * block signals, and a shed is booked by its own bit; in a

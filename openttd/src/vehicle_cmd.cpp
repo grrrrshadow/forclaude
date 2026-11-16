@@ -1506,6 +1506,17 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 		/* Anywhere on the water, not in its shed or a tunnel; with its first turn too. */
 		if (what == CabDriveOp::Free && !v->cab_free && (s->IsInDepot() || s->state == Track::Wormhole)) return CMD_ERROR;
 		if (what == CabDriveOp::Rejoin && !v->cab_free) return CMD_ERROR;
+	} else if (v->type == VehicleType::Train) {
+		/* A train: left or right is its way at its next switch (Vehicle::cab_turn, CabWishedTracks() of train_cmd.cpp);
+		 * the road it booked through it given back, to be booked again that way. */
+		if (what != CabDriveOp::Left && what != CabDriveOp::Right) return CMD_ERROR;
+		if (!Train::From(v)->IsFrontEngine()) return CMD_ERROR;
+		if (flags.Test(DoCommandFlag::Execute)) {
+			v->cab_turn = what == CabDriveOp::Left ? 0 : 1;
+			FreeTrainTrackReservation(Train::From(v));
+			SetWindowDirty(WindowClass::FirstPerson, 0);
+		}
+		return CommandCost();
 	} else if (v->type == VehicleType::Aircraft) {
 		/* In the air, on its way or circling its airport; not taking off or landing. */
 		if (what == CabDriveOp::Rejoin) {

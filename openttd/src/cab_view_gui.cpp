@@ -334,8 +334,12 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		switch (key) {
 			case DirectionKey::Left:
 			case DirectionKey::Right:
-				/* A train follows its rails. */
-				if (v->type == VehicleType::Train) return false;
+				/* A train follows its rails: its way at the next switch (Vehicle::cab_turn); once a press. */
+				if (v->type == VehicleType::Train) {
+					Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(key == DirectionKey::Left ? CabDriveOp::Left : CabDriveOp::Right));
+					this->done = key == DirectionKey::Left ? "vlevo: na vyhybce vlevo" : "vpravo: na vyhybce vpravo";
+					return false;
+				}
 				return CabTurn(v, key == DirectionKey::Left);
 			case DirectionKey::Up:
 			case DirectionKey::Down:
