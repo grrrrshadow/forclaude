@@ -18671,8 +18671,13 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double pa = own_model.pitch * M_PI / 180.0;
 		const double mx = cx * ahead / OBJECT_UNITS_PER_METRE, mz = (camera.msts ? m.cab[2] : CabEyeHeight(m)) * own_model.scale;
 		const double along = (mx * std::cos(pa) - mz * std::sin(pa)) * OBJECT_UNITS_PER_METRE;
-		eye.x = own_model.x + along * bfx - cy * across * bfy;
-		eye.y = own_model.y + along * bfy + cy * across * bfx;
+		/* In the model's own frame: its front, not the way the eye looks -- at the back stand that is turned round
+		 * already, and the eye mirrored to the back cab was turned back into the front one, looking into its back wall
+		 * (the player, 16. 11., the Sergej: "I change to the back and look backwards into the wall, not ahead through
+		 * the windscreen"). */
+		const double mfx = rear ? -bfx : bfx, mfy = rear ? -bfy : bfy;
+		eye.x = own_model.x + along * mfx - cy * across * mfy;
+		eye.y = own_model.y + along * mfy + cy * across * mfx;
 		eye.z = EyeStandZ(own_model.x, own_model.y, own_model.z) + (mx * std::sin(pa) + mz * std::cos(pa)) * OBJECT_HEIGHT_PER_METRE;
 		cab_pitch = rear ? -pa : pa;
 		own_model.facing = static_cast<float>((camera.heading - (rear ? M_PI : 0.0)) * 180.0 / M_PI);
