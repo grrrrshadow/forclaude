@@ -9485,7 +9485,6 @@ static std::shared_ptr<ThreeDVehicleShape> MeshoptSimplerShape(const ThreeDVehic
 		}
 	}
 	/* The triangles left, each corner the shape's of its place facing most as the triangle faces. */
-	std::vector<uint32_t> new_of(corners, UINT32_MAX);
 	auto corner = [&](uint32_t w, const double n[3]) {
 		uint32_t best = wcorner[wfirst[w]];
 		if (has_nrm) {
@@ -9499,15 +9498,10 @@ static std::shared_ptr<ThreeDVehicleShape> MeshoptSimplerShape(const ThreeDVehic
 				}
 			}
 		}
-		if (new_of[best] == UINT32_MAX) {
-			new_of[best] = static_cast<uint32_t>(out->pos.size() / 3);
-			out->pos.insert(out->pos.end(), {shape.pos[best * 3], shape.pos[best * 3 + 1], shape.pos[best * 3 + 2]});
-			if (has_nrm) out->nrm.insert(out->nrm.end(), {shape.nrm[best * 3], shape.nrm[best * 3 + 1], shape.nrm[best * 3 + 2]});
-			if (has_uv) out->uv.insert(out->uv.end(), {shape.uv[best * 2], shape.uv[best * 2 + 1]});
-			if (wheels) out->corner_wheel.push_back(shape.corner_wheel[best]);
-		}
-		return new_of[best];
+		return best;
 	};
+	std::vector<uint32_t> tri;
+	tri.reserve(count);
 	for (size_t t = 0; t + 2 < count; t += 3) {
 		const float *a = &wpos[kept[t] * 3], *b = &wpos[kept[t + 1] * 3], *c = &wpos[kept[t + 2] * 3];
 		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
@@ -9515,12 +9509,44 @@ static std::shared_ptr<ThreeDVehicleShape> MeshoptSimplerShape(const ThreeDVehic
 		const double l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
 		if (l > 0) for (double &v : n) v /= l;
 		const uint32_t k = wkind[kept[t]];
-		out->tri.insert(out->tri.end(), {corner(kept[t], n), corner(kept[t + 1], n), corner(kept[t + 2], n)});
+		tri.insert(tri.end(), {corner(kept[t], n), corner(kept[t + 1], n), corner(kept[t + 2], n)});
 		out->tri_tex.push_back(static_cast<uint8_t>(k & 0xFF));
 		if (!shape.tri_part.empty()) out->tri_part.push_back(static_cast<uint8_t>(k >> 8));
 		if (!shape.tri_glass.empty()) out->tri_glass.push_back(static_cast<uint8_t>(k >> 16));
 		if (!shape.facing.empty()) out->facing.push_back(static_cast<int8_t>(static_cast<uint8_t>(k >> 24)));
 	}
+	/* Its corners: the shape's own lists where it uses a good part of them (SIMPLER_SHARES_FROM), nothing copied; else
+	 * those it uses by themselves. */
+	std::vector<uint32_t> new_of(corners, UINT32_MAX);
+	size_t used = 0;
+	for (uint32_t i : tri) {
+		if (new_of[i] == UINT32_MAX) new_of[i] = static_cast<uint32_t>(used++);
+	}
+	if (_three_d_shapes_shared && used * ThreeDVehicleShape::SIMPLER_SHARES_FROM >= corners) {
+		out->pos = shape.pos;
+		if (has_nrm) out->nrm = shape.nrm;
+		if (has_uv) out->uv = shape.uv;
+		if (wheels) out->corner_wheel = shape.corner_wheel;
+		out->tri = std::move(tri);
+		return out;
+	}
+	out->pos.resize(used * 3);
+	if (has_nrm) out->nrm.resize(used * 3);
+	if (has_uv) out->uv.resize(used * 2);
+	if (wheels) out->corner_wheel.resize(used);
+	{
+		std::vector<float> &pos = out->pos.Written();
+		for (size_t i = 0; i < corners; i++) {
+			const uint32_t to = new_of[i];
+			if (to == UINT32_MAX) continue;
+			for (int a = 0; a < 3; a++) pos[to * 3 + a] = shape.pos[i * 3 + a];
+			if (has_nrm) for (int a = 0; a < 3; a++) out->nrm[to * 3 + a] = shape.nrm[i * 3 + a];
+			if (has_uv) for (int a = 0; a < 2; a++) out->uv[to * 2 + a] = shape.uv[i * 2 + a];
+			if (wheels) out->corner_wheel[to] = shape.corner_wheel[i];
+		}
+	}
+	for (uint32_t &i : tri) i = new_of[i];
+	out->tri = std::move(tri);
 	return out;
 }
 

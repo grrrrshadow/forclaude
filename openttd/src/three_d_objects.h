@@ -584,7 +584,7 @@ public:
 	template <typename... Args> void assign(Args &&...args) { this->Own().assign(std::forward<Args>(args)...); }
 	template <typename... Args> void resize(Args &&...args) { this->Own().resize(std::forward<Args>(args)...); }
 	void reserve(size_t n) { this->Own().reserve(n); }
-	void shrink_to_fit() { if (this->v != nullptr) this->Own().shrink_to_fit(); }
+	void shrink_to_fit() { if (this->v != nullptr && this->v.use_count() == 1) this->v->shrink_to_fit(); }
 	void clear() { this->v.reset(); }
 	void swap(std::vector<T> &o) { this->Own().swap(o); }
 	void swap(ThreeDSharedList &o) { this->v.swap(o.v); }
@@ -620,7 +620,8 @@ public:
 		std::erase_if(same_hash, [](const std::weak_ptr<Block> &w) { return w.expired(); });
 		for (const std::weak_ptr<Block> &w : same_hash) {
 			std::shared_ptr<Block> other = w.lock();
-			if (other == nullptr || other == this->v || other->size() != mine.size() || std::memcmp(other->data(), mine.data(), count) != 0) continue;
+			if (other == this->v) return; // (kept already: a simpler shape with its shape's own list)
+			if (other == nullptr || other->size() != mine.size() || std::memcmp(other->data(), mine.data(), count) != 0) continue;
 			this->v = std::move(other);
 			return;
 		}
@@ -767,6 +768,13 @@ struct ThreeDVehicleShape {
 	 * build #370: the vehicles' shapes 1.6 GB from the eyes, "LOW_MEMORY").
 	 */
 	static constexpr size_t SIMPLER_WORTH_PERCENT = 55;
+	/**
+	 * A simpler shape that uses at least one in so many of the shape's corners keeps the shape's own lists of them
+	 * (ThreeDSharedList), only its triangles its own: the simplifier leaves corners out, it makes none, and the levels
+	 * were each a copy of what they kept -- 92 MB beside the shapes' 134 on the player's save. One that uses fewer has
+	 * its corners by themselves, as before: what is drawn by the processor goes through all the corners of a shape.
+	 */
+	static constexpr size_t SIMPLER_SHARES_FROM = 4;
 	/** A shape of fewer triangles than this is drawn as it is (Simpler()): a simpler one saves little -- unless it is a plant, drawn by the hundred. */
 	static constexpr size_t SIMPLER_FEWEST = 512;
 	const ThreeDVehicleShape *Simpler(double cell_m, bool plant = false) const;
