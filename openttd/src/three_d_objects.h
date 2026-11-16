@@ -922,6 +922,7 @@ struct ThreeDVehicleState {
 	int crew_more_part = -1;    ///< "posadka" with "posadka_pridat": the part of a group of the crew shown beside that of the layers under it, -1 none
 	uint32_t open_doors = 0;    ///< "dvere_otevrene": bit n the wing ThreeDVehicleObject::doors[n] open, the others shut
 	std::string set_name;       ///< "sada": the GRF's set it is drawn for, by its name ("nastavba hasici"): a vehicle standing as a building's event (StateNamed())
+	bool loaded = false;        ///< carrying its load: of its add-ons' nodes "<dil>_plny" drawn, not "<dil>_prazdny" (LoadedStateOf(): a semi-trailer's lifted axle down)
 	bool empty = false;         ///< standing empty: none of its crew drawn, the record's nor its groups' (EmptyStateOf(): the fire Tatra on the pitch)
 	/* The pieces of the shared loads it carries (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): the GRF's set
 	 * names the piece, the game stacks it on the bed of the body, as many as are loaded, coloured by the cargo. */
@@ -1177,6 +1178,13 @@ struct ThreeDVehicleObject {
 	std::vector<ThreeDVehicleCompanion> companions; ///< the animals running behind it in its states ("doprovod")
 	ThreeDParts seat_groups;  ///< by part, the groups of the crew one of which sits at the driver's seat ("misto_ridicky"): the record's driver not drawn where they are shown
 	int crew_record_part = 0; ///< the part of the record's own crew ("posadka" of the record), shown but where the state stands empty; 0 none (always drawn)
+	mutable std::map<int, int> loaded_steps; ///< the step of each state carrying its load (LoadedStateOf()), made the first time
+	/**
+	 * Its add-ons' nodes drawn by its load (the player, 16. 11.: "the trailer has its wheels lifted as if empty, put them
+	 * down when it is loaded"): beside a node "<dil>" the nodes "<dil>_prazdny", drawn with it while the vehicle
+	 * carries nothing, and "<dil>_plny", while it is loaded. Each: the part of <dil>, of the one, of the other (0 none).
+	 */
+	std::vector<std::array<uint8_t, 3>> load_parts;
 	mutable std::map<int, int> empty_steps; ///< the step of each state standing empty (EmptyStateOf()), made the first time
 	mutable std::map<std::pair<int, uint32_t>, int> worn_steps; ///< the step of each state worn (WornStateOf()), by the state and its wear
 	mutable std::map<std::pair<int, uint32_t>, int> rust_steps; ///< the step of each state rusting in a vehicle's order of its pieces (RustStateOf()), by the state and the variant
@@ -1295,6 +1303,7 @@ struct ThreeDVehicleObject {
 	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0, uint64_t load = 0) const;
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
+	int LoadedStateOf(int step) const;
 	int WornStateOf(int step, uint32_t wear) const;
 	int RustStateOf(int step, uint32_t variant) const;
 	const ThreeDWear *Wear(const ThreeDParts &parts) const;

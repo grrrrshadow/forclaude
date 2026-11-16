@@ -357,7 +357,17 @@ static uint32_t WearCode(const ThreeDVehicleObject *obj, const Vehicle *v, Engin
  */
 static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
 {
-	const int step = GrfStateStep(obj, engine, v, image_type);
+	int step = GrfStateStep(obj, engine, v, image_type);
+	/* Loaded (the player, 16. 11.: "put its wheels down when it is loaded"): the whole vehicle carrying half of what it
+	 * can or more -- the nodes of its add-ons for that (ThreeDVehicleObject::load_parts). */
+	if (v != nullptr && !obj->load_parts.empty()) {
+		uint32_t carried = 0, room = 0;
+		for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
+			carried += u->cargo.StoredCount();
+			room += u->cargo_cap;
+		}
+		if (room > 0 && carried * 2 >= room) step = obj->LoadedStateOf(step);
+	}
 	const uint32_t wear = WearCode(obj, v, image_type);
 	const int worn = wear == 0 ? step : obj->WornStateOf(step, wear);
 	/* Its pieces of rust in its own order (the player, 9. 11.: "make the chance"; the colleague: "a new vehicle a new

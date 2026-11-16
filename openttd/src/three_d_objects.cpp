@@ -7800,6 +7800,19 @@ static void ReadThreeDVehicleObjects()
 						obj.addons.push_back(std::move(addon));
 					}
 				}
+				/* The nodes drawn by the load (load_parts): "<dil>_prazdny" and "<dil>_plny" beside "<dil>" of an add-on. */
+				for (const ThreeDVehicleAddon &addon : obj.addons) {
+					auto part_named = [&obj](const std::string &name) -> uint8_t {
+						auto at = std::ranges::find(obj.part_names, name);
+						const size_t i = at - obj.part_names.begin();
+						return at != obj.part_names.end() && i > 0 && i < static_cast<size_t>(ThreeDParts::COUNT) ? static_cast<uint8_t>(i) : 0;
+					};
+					for (const std::string &n : addon.nodes) {
+						const uint8_t base = part_named(addon.key + "/" + n);
+						const uint8_t empty = part_named(addon.key + "/" + n + "_prazdny"), full = part_named(addon.key + "/" + n + "_plny");
+						if (base != 0 && (empty != 0 || full != 0)) obj.load_parts.push_back({base, empty, full});
+					}
+				}
 				if (e.contains("posadky") && e.at("posadky").is_object()) {
 					for (const auto &[group, list] : e.at("posadky").items()) {
 						std::vector<ThreeDVehicleCrew> crew;
@@ -11566,6 +11579,12 @@ ThreeDParts ThreeDVehicleObject::PartsOf(int state) const
 	/* Each wing of its doors shut or, the state opening it, open (ThreeDVehicleDoor); without a state shut. */
 	const uint32_t open = s != nullptr ? s->open_doors : 0;
 	for (size_t d = 0; d < this->doors.size(); d++) parts.Set(((open >> d) & 1) != 0 ? this->doors[d].open_part : this->doors[d].shut_part);
+	/* Its add-ons' nodes by its load (load_parts): with each part shown the one for empty or the one for loaded. */
+	for (const std::array<uint8_t, 3> &l : this->load_parts) {
+		if (!parts.Has(l[0])) continue;
+		const uint8_t with = (s != nullptr && s->loaded) ? l[2] : l[1];
+		if (with != 0) parts.Set(with);
+	}
 	if (s != nullptr && s->empty) {
 		/* Standing empty: none of its crew, the record's driver neither (bit 0). */
 		if (s->crew_part > 0) parts.Clear(s->crew_part);
@@ -11584,6 +11603,31 @@ int ThreeDVehicleObject::StateNamed(std::string_view set) const
 		if (this->states[i].set_name == set) return static_cast<int>(i + 1);
 	}
 	return 0;
+}
+
+/**
+ * A state as another but carrying its load (ThreeDVehicleState::loaded): made the first time, a step after its states
+ * as EmptyStateOf() makes its own. An object with no nodes drawn by the load (load_parts), or no state: the step itself.
+ */
+int ThreeDVehicleObject::LoadedStateOf(int step) const
+{
+	if (this->load_parts.empty()) return step;
+	const ThreeDVehicleState *s = this->State(step);
+	if (s == nullptr || s->loaded) return step;
+	ThreeDVehicleState made;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->loaded_steps.find(step);
+		if (it != this->loaded_steps.end()) return it->second;
+		made = *s;
+	}
+	made.loaded = true;
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->loaded_steps.emplace(step, 0);
+	if (!added) return it->second;
+	this->composed.push_back(std::move(made));
+	it->second = static_cast<int>(this->states.size() + this->composed.size());
+	return it->second;
 }
 
 /**
