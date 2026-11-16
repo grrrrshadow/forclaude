@@ -15212,6 +15212,40 @@ bool _eye_buildings_card_paint = true;
 float _standing_paint_turn = 1.0f;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
 double _cab_detail_pixels = 2.0;
+/** A model drawn by its triangles has at most this many of them to a pixel of its box on the picture (CabShapeAsBig()). The rig: 'test3d trojpx <n>', 0 as many as it has. */
+double _cab_triangles_per_pixel = 2.0;
+
+/**
+ * The shape of a model from the eyes as simple as it is big on the picture: its corners joined about _cab_detail_pixels
+ * apart (ThreeDVehicleShape::TrySimpler()), and simpler still while it has more triangles than the pixels of its box
+ * can show (_cab_triangles_per_pixel). The colleague's lorries are half a million triangles each -- their frames,
+ * their engines, their cabs inside --, and one standing ten metres off was drawn with 314 thousand, as many as all
+ * the buildings in sight (the player's #371: a picture from the eyes 2.2 million triangles, the card 84 ms). Its
+ * corners' distance alone left it whole: they are near each other wherever it is.
+ * @param whole its shape
+ * @param pixels_per_metre how many pixels a metre of it is
+ * @param plant simpler however few its triangles (our grass)
+ */
+static const ThreeDVehicleShape *CabShapeAsBig(const ThreeDVehicleShape *whole, double pixels_per_metre, bool plant = false)
+{
+	double cell = _cab_detail_pixels / pixels_per_metre;
+	const ThreeDVehicleShape *shape = whole->TrySimpler(cell, plant);
+	/* Not a plant: a meadow's tufts are small each and many, simpler by their corners already (and sparser to see when
+	 * simpler still). */
+	if (_cab_triangles_per_pixel <= 0 || plant) return shape;
+	/* Its box seen from its side, the most of it there is to see. */
+	const double along = std::max(whole->x1 - whole->x0, whole->y1 - whole->y0), up = whole->z1 - whole->z0;
+	const double budget = std::max<double>(ThreeDVehicleShape::SIMPLER_FEWEST, _cab_triangles_per_pixel * along * up * pixels_per_metre * pixels_per_metre);
+	cell = std::max(cell, ThreeDVehicleShape::SIMPLER_CELL_M);
+	for (int k = 0; k < ThreeDVehicleShape::SIMPLER_LEVELS && shape->tri.size() / 3 > budget; k++) {
+		cell *= 2;
+		const ThreeDVehicleShape *simpler = whole->TrySimpler(cell, plant);
+		/* Not made yet (made in the background, asked for now), or no simpler than the finer one (drawn in its place,
+		 * SIMPLER_WORTH_PERCENT): the next. */
+		if (simpler->tri.size() < shape->tri.size()) shape = simpler;
+	}
+	return shape;
+}
 /** The rig: 'test3d detail <px> textura': its textures at their full size, whatever its distance. */
 bool _cab_full_textures = false;
 /**
@@ -16066,7 +16100,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 	/* A plant (our grass's tufts, 329 triangles, some 600 of them in a meadow's view, half its triangles) simpler however
 	 * few its triangles: the meadow 352 -> 291 thousand triangles, 0.9 % of its pixels other, far off. (Its corners
 	 * twice as far apart, 242 thousand, but the grass halfway off sparser to see.) */
-	model.shape = fg.own_cab || fg.missile ? whole : whole->TrySimpler(_cab_detail_pixels / pixels_per_metre, fg.plant);
+	model.shape = fg.own_cab || fg.missile ? whole : CabShapeAsBig(whole, pixels_per_metre, fg.plant);
 	/* The textures at the detail of its distance, a texel to a pixel (the player, 16. 10.: "save when they are far");
 	 * a vehicle's body painted as its state has it, its add-ons coloured -- by the graphics card as it draws them, the
 	 * textures as they are (the player, 29. 10.: "3 cars I see take the last 750 MB"); else painted by the processor. */
@@ -16115,7 +16149,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 		const ThreeDVehicleShape *frame_shape = by_card ? ThreeDCardFrame(*wf, frame, true, crew_bones, crew_posed) : wf->TryGetShape(frame);
 		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
 		const double crew_ppm = pixels_per_metre * w.scale;
-		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : frame_shape->TrySimpler(_cab_detail_pixels / crew_ppm), {}, {}, std::move(crew_bones)};
+		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : CabShapeAsBig(frame_shape, crew_ppm), {}, {}, std::move(crew_bones)};
 		float at[3];
 		w.At(*posed, w.behind ? fig->TryGetShape() : nullptr, at);
 		crew.at = {at[0], at[1], at[2]};
@@ -16148,7 +16182,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 				ready = texs[i] != nullptr;
 			}
 		}
-		if (ready) model.loads.push_back({load.fig, load.state, fg.own_cab ? ls : ls->TrySimpler(_cab_detail_pixels / pixels_per_metre), std::move(texs), std::move(paints), std::move(load.places), std::move(load_bones)});
+		if (ready) model.loads.push_back({load.fig, load.state, fg.own_cab ? ls : CabShapeAsBig(ls, pixels_per_metre), std::move(texs), std::move(paints), std::move(load.places), std::move(load_bones)});
 	}
 	return true;
 }
