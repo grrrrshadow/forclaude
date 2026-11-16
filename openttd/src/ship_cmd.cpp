@@ -992,6 +992,7 @@ static bool ShipRejoinCourse(Ship *v, TileIndex tile, DiagDirection enterdir, in
 	v->direction = DiagDirToDir(enterdir);
 	v->state = ShipTrackAlong(v->direction);
 	v->cab_free = false;
+	v->cab_reverse = false;
 	v->cab_rejoin = false;
 	v->cab_heading = Direction::Invalid;
 	v->path.clear();
@@ -1024,8 +1025,10 @@ static void ShipFreeController(Ship *v)
 	}
 	v->ShowVisualEffect();
 	const uint number_of_steps = ShipAccelerate(v);
+	/* Backwards (Vehicle::cab_reverse): a unit against its heading, still facing along it. */
+	const int way = v->cab_reverse ? -1 : 1;
 	for (uint i = 0; i < number_of_steps; ++i) {
-		int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);
+		int32_t px = v->cab_px + way * CabCos(v->cab_yaw), py = v->cab_py + way * CabSin(v->cab_yaw);
 		int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
 		bool blocked = px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
 				x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE);

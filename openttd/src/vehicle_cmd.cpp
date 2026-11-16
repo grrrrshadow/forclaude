@@ -1484,9 +1484,10 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 		return CoupleTrainByHand(flags, t, rear);
 	}
 	const bool height = what == CabDriveOp::Up || what == CabDriveOp::Down;
-	/* Backwards only a road vehicle driven freely already. */
+	/* Backwards only a road vehicle or a ship driven freely already (a ship: the player, 16. 11., in the submarine,
+	 * "I cannot stop it, let alone back up"). */
 	const bool backwards = what == CabDriveOp::Reverse || what == CabDriveOp::Forward;
-	if (backwards && (v->type != VehicleType::Road || !v->cab_free)) return CMD_ERROR;
+	if (backwards && ((v->type != VehicleType::Road && v->type != VehicleType::Ship) || !v->cab_free)) return CMD_ERROR;
 
 	if (v->type == VehicleType::Road) {
 		const RoadVehicle *rv = RoadVehicle::From(v);

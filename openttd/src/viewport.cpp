@@ -18756,6 +18756,13 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const std::optional<double> surface = EyeWaterSurfaceZ(eye.x, eye.y);
 		cab_under_water = surface.has_value() && eye.z < EyeLevelZ(*surface);
 		under_water = cab_under_water;
+	} else if (!walker->swimming && !walker->fly && !FirstPersonTunnelFloor(walker->x, walker->y, FirstPersonFeetZ(*walker)).has_value()) {
+		/* And of the walker dry under the surface -- walking about a boat that dived (the player, 16. 11., in the
+		 * submarine: "driving it is right, I see the fish; walking on its deck dived, the sky is below and the sea
+		 * above"): as from its cab. Not in a tunnel under the water. */
+		const std::optional<double> surface = EyeWaterSurfaceZ(eye.x, eye.y);
+		cab_under_water = surface.has_value() && eye.z < EyeLevelZ(*surface);
+		under_water = cab_under_water;
 	}
 	eye.focal = walker != nullptr ? (width / 2.0) / CAB_FOV_TAN : CabFocal(camera, width, height);
 	eye.cx = width / 2.0;
@@ -19884,7 +19891,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					const double mx = b.at[0] * ev.scale * ev.along * OBJECT_UNITS_PER_METRE, my = b.at[1] * ev.scale * OBJECT_UNITS_PER_METRE;
 					const ThreeDVehicleObject *fig = GetThreeDFigure(b.figure);
 					const float size = fig != nullptr && fig->thing ? ev.scale * b.scale : CAB_FIGURE_SCALE * b.scale;
+					const size_t before = _cab_figures.size();
 					AddCabFigure(b.figure, size, ev.x + mx * fx - my * fy, ev.y + mx * fy + my * fx, ev.z + b.at[2] * ev.scale * OBJECT_HEIGHT_PER_METRE, ev.facing + b.facing, -1);
+					/* Lifted from the eyes as its boat is (EyeStandZ()), its own height over the boat's kept: by itself, half
+					 * a metre over the waterline, it was lifted more than the hull -- and dived, under the surface, more
+					 * still (the player, 16. 11., swimming round the submarine: "the girls sit high over the benches"). */
+					for (size_t k = before; k < _cab_figures.size(); k++) _cab_figures[k].base = EyeBaseZ(ev.x, ev.y, ev.z);
 				});
 			}
 			continue;

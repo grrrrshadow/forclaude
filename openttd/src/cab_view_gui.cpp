@@ -325,7 +325,10 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 	 * brakes it to the slowest and then stops it; held on with it stopped (CAB_BACKWARDS_HOLD_MS), it goes backwards
 	 * while it is held, at most Vehicle::CAB_REVERSE_SPEED, and stops as it is let go; Up stops it and turns it
 	 * forwards again. */
-	const bool backwards_too = v != nullptr && v->type == VehicleType::Road && v->cab_free && !v->cab_rejoin;
+	/* A ship too (the player, 16. 11., in the submarine: "I cannot stop it, let alone back up"): Down stops it from
+	 * the slowest whether it is driven freely yet or not; held on, it is taken off its course first and then backs. */
+	const bool ship = v != nullptr && v->type == VehicleType::Ship && !v->cab_rejoin;
+	const bool backwards_too = v != nullptr && (v->type == VehicleType::Road || v->type == VehicleType::Ship) && v->cab_free && !v->cab_rejoin;
 	if (this->backwards_wait > 0) this->backwards_wait -= ms;
 	auto arrow = [&](DirectionKey key) {
 		switch (key) {
@@ -358,7 +361,7 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 					this->done = "nahoru: z couvani dopredu";
 					return true;
 				}
-				if (backwards_too && key == DirectionKey::Down) {
+				if ((backwards_too || ship) && key == DirectionKey::Down) {
 					/* Stopped already: held on, it goes backwards (below). At the slowest: it stops. */
 					if (v->vehstatus.Test(VehState::Stopped)) return true;
 					if (v->cab_speed_limit != 0 && v->cab_speed_limit <= CAB_SLOWEST) {
@@ -409,13 +412,20 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		}
 	}
 	/* Down held with it stopped: backwards after a while; backwards and Down let go: it stops. */
-	if (backwards_too && !v->cab_reverse && now.Test(DirectionKey::Down) && v->vehstatus.Test(VehState::Stopped)) {
+	if ((backwards_too || ship) && !v->cab_reverse && now.Test(DirectionKey::Down) && v->vehstatus.Test(VehState::Stopped)) {
 		if ((this->down_still_ms += ms) >= CAB_BACKWARDS_HOLD_MS && this->backwards_wait <= 0) {
-			Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Reverse));
-			CabStartStop(v);
-			this->backwards_wait = 500;
-			this->down_still_ms = 0;
-			this->done = "dolu drzeno: couvat";
+			if (!v->cab_free) {
+				/* A ship on its course yet: driven freely first, backwards the next time round. */
+				Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Free));
+				this->backwards_wait = 300;
+				this->done = "dolu drzeno: lod z kurzu";
+			} else {
+				Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Reverse));
+				CabStartStop(v);
+				this->backwards_wait = 500;
+				this->down_still_ms = 0;
+				this->done = "dolu drzeno: couvat";
+			}
 		}
 	} else {
 		this->down_still_ms = 0;
@@ -423,6 +433,11 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 	if (backwards_too && v->cab_reverse && this->held.Test(DirectionKey::Down) && !now.Test(DirectionKey::Down) && !v->vehstatus.Test(VehState::Stopped)) {
 		CabStartStop(v);
 		this->done = "dolu pusteno: stat";
+	}
+	/* What the arrows did, for the log (-d misc=3). */
+	if (static std::string told; told != this->done) {
+		told = this->done;
+		Debug(misc, 3, "cab arrows: {}", told);
 	}
 	/* Going its route, the arrows held so: let go and pressed again they take the wheel. */
 	this->held = this->route ? pressed : now;
