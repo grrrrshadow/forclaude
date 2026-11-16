@@ -706,7 +706,8 @@ static uint64_t WalkCode(const ThreeDVehicleObject *obj, int state, double walke
 /** How far a vehicle drawn from its object has gone as drawn (EyeTrail::walked), for its crew that walks; 0 none (the purchase list). */
 static double WalkedOf(const Vehicle *v, const ThreeDVehicleObject *obj)
 {
-	if (v == nullptr || (obj->WalkingCrew().empty() && obj->body.empty())) return 0;
+	/* (Its crew that sits still is drawn on its own too, WalkingCrew(): the way gone only for one that walks.) */
+	if (v == nullptr || (obj->body.empty() && std::ranges::none_of(obj->WalkingCrew(), [](const ThreeDWalkingCrew &w) { return w.behind || w.on_seat || (w.figure != nullptr && w.figure->Walks()); }))) return 0;
 	bool reversed = false;
 	if (v->type == VehicleType::Train) {
 		const Train *t = Train::From(v);

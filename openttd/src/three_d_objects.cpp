@@ -9169,6 +9169,15 @@ int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
 static std::vector<std::shared_ptr<const ThreeDVehicleShape>> _shapes_replaced;
 
 /**
+ * Whether the crew that does not walk is of its vehicle's shape (AddCrewFigure()), as it was; not: drawn with it on its
+ * own as the crew that walks (WalkingCrew()), one shape of a figure for every vehicle it sits in. A Tatra 148's shape
+ * was 388 thousand triangles with its three girls in the cab, the eight on its flatbed, the six on its other body and
+ * Mat of the fire engine baked into it, again for each of its variants (the player's save, 16. 11.: the vehicles' shapes
+ * 525 MB; the player: "they carry ten girls in the cab and a load of girls on the flatbed"). The rig: 'test3d posadkavtvaru 0|1'.
+ */
+bool _three_d_crew_in_shape = false;
+
+/**
  * A figure of the crew into a vehicle's shape: its shape sized, turned about z and stood at its place, its textures after
  * the others, its triangles of a part. The driver -- the one sitting at the eye of the cab -- is not drawn from that eye.
  * A figure bigger than it is ("meritko") stays that big everywhere, the view from the eyes too. A figure that walks is
@@ -9177,7 +9186,7 @@ static std::vector<std::shared_ptr<const ThreeDVehicleShape>> _shapes_replaced;
 void ThreeDVehicleObject::AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const
 {
 	const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
-	if (c.on_seat || (fig != nullptr && fig->Walks())) return; // drawn on its own, a frame by the way gone or on the body's seat (WalkingCrew())
+	if (!_three_d_crew_in_shape || c.on_seat || (fig != nullptr && fig->Walks())) return; // drawn on its own (WalkingCrew())
 	const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
 	if (fs == nullptr) {
 		Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
@@ -10411,10 +10420,11 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		key += fmt::format("|{}{}", w.file, w.both_sides ? "*2" : "");
 		for (const auto &at : w.at) key += fmt::format(",{},{},{}", at[0], at[1], at[2]);
 	}
-	for (const ThreeDVehicleCrew &c : this->crew) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
+	/* (The crew only while it is of the shape: drawn on its own, vehicles that differ by their crew alone share a shape.) */
+	if (_three_d_crew_in_shape) for (const ThreeDVehicleCrew &c : this->crew) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
 	for (const auto &[group, list] : this->crew_groups) {
-		key += "|=" + group;
-		for (const ThreeDVehicleCrew &c : list) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
+		key += "|=" + group;                                             // (the group is a part of the shape's numbering either way)
+		if (_three_d_crew_in_shape) for (const ThreeDVehicleCrew &c : list) key += fmt::format("|{}@{},{},{}/{}x{}", c.figure, c.at[0], c.at[1], c.at[2], c.turn, c.scale);
 	}
 	for (const ThreeDVehicleAddon &a : this->addons) {
 		key += fmt::format("|+{}@{},{},{}", a.file, a.at[0], a.at[1], a.at[2]);
@@ -12156,7 +12166,18 @@ const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 		std::vector<ThreeDWalkingCrew> found;
 		auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
 			const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
-			if (fig == nullptr || (!fig->Walks() && !c.on_seat)) return;
+			if (fig == nullptr) return;
+			const bool walks = fig->Walks() || c.on_seat;
+			if (!walks && _three_d_crew_in_shape) return;                     // of the vehicle's shape (AddCrewFigure())
+			/* One that sits still: the driver -- at the eye of the cab -- and one at the driver's seat are not drawn
+			 * from that eye, as when they were of the shape (ThreeDVehicleShape::AtDriverSeat()). */
+			if (!walks) {
+				if ((part == 0 || part == this->crew_record_part) && this->has_cab && std::hypot(c.at[0] - this->cab[0], c.at[1] - this->cab[1]) < 0.4f) {
+					part = ThreeDVehicleShape::PART_DRIVER;
+				} else if (c.driver_seat && part != 0 && part != this->crew_record_part) {
+					part = static_cast<uint8_t>(ThreeDVehicleShape::PART_SEAT + part);
+				}
+			}
 			ThreeDWalkingCrew w;
 			w.figure = fig;
 			std::copy(std::begin(c.at), std::end(c.at), w.at);

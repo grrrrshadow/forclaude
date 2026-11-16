@@ -15243,7 +15243,11 @@ static const ThreeDVehicleShape *CabShapeAsBig(const ThreeDVehicleShape *whole, 
 	const double along = std::max(whole->x1 - whole->x0, whole->y1 - whole->y0), up = whole->z1 - whole->z0;
 	const double budget = std::max<double>(ThreeDVehicleShape::SIMPLER_FEWEST, _cab_triangles_per_pixel * along * up * pixels_per_metre * pixels_per_metre);
 	cell = std::max(cell, ThreeDVehicleShape::SIMPLER_CELL_M);
-	for (int k = 0; k < ThreeDVehicleShape::SIMPLER_LEVELS && shape->tri.size() / 3 > budget; k++) {
+	/* One level past what its corners' distance gives, no more: a shape a little over its budget whose next levels are
+	 * no simpler than itself (drawn in their place, SIMPLER_WORTH_PERCENT) went on to the first one that is, cells of
+	 * 16 cm and more -- a lorry thirty metres off with lumps for its wheels (seen as its crew came out of its shape and
+	 * left it 83 thousand triangles against a budget of 68). */
+	for (int k = 0; k < 1 && shape->tri.size() / 3 > budget; k++) {
 		cell *= 2;
 		const ThreeDVehicleShape *simpler = whole->TrySimpler(cell, plant);
 		/* Not made yet (made in the background, asked for now), or no simpler than the finer one (drawn in its place,
@@ -16148,6 +16152,8 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, model.parts)) continue;
 		const size_t shown = slot++;
+		/* The driver, and one at the driver's seat, not from the own cab's eye (as when they were of the shape). */
+		if (fg.own_cab && ThreeDVehicleShape::AtDriverSeat(w.part)) continue;
 		std::shared_ptr<const ThreeDBonesFrame> crew_bones;
 		const ThreeDVehicleShape *crew_posed = nullptr;
 		int frame = fig->CrewFrame(fg.walk, shown);

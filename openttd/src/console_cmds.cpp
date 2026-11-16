@@ -13621,6 +13621,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto x = number(2), y = number(3);
 		_turned_debug_tile = (x.has_value() && y.has_value()) ? TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())) : INVALID_TILE;
 		return true;
+	} else if (what == "posadkavtvaru" && argv.size() > 2) {
+		/* 'posadkavtvaru 0|1': the crew that sits still of its vehicle's shape (1, as it was) or drawn on its own (0);
+		 * before the vehicles are first drawn (the shapes made stay as they are). */
+		extern bool _three_d_crew_in_shape;
+		_three_d_crew_in_shape = number(2).value_or(0) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: posadka v tvaru vozidla: {}", _three_d_crew_in_shape ? "ano" : "ne");
+		return true;
 	} else if (what == "trojpx" && argv.size() > 2) {
 		/* 'trojpx <n>': a model from the eyes at most n triangles to a pixel of its box (CabShapeAsBig()), tenths; 0 as many as it has. */
 		extern double _cab_triangles_per_pixel;
