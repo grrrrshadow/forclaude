@@ -2831,6 +2831,46 @@ static bool ThreeDCatenaryOn(TileIndex tile)
 }
 
 /**
+ * Whether a point of the world is on the bed of our track (koleje.py: the embankment 3.4 m across), a mast's foot
+ * with it: any piece of track of the tiles about the point, straight, across a corner or round, as near its middle line.
+ * The player, 16. 11. (from the cab of the Sergej in the yard): "make the masts never stand on the track bed" -- a mast
+ * at a corner of a tile was where another track of the junction beside ran.
+ * @param wx,wy the point, world units
+ */
+static bool ThreeDOnTrackBed(double wx, double wy)
+{
+	const double reach = (ThreeDTrackHalfM() + 0.3) * OBJECT_UNITS_PER_METRE;
+	auto near_segment = [&](double ax, double ay, double bx, double by) {
+		const double dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+		const double k = l2 > 0 ? std::clamp(((wx - ax) * dx + (wy - ay) * dy) / l2, 0.0, 1.0) : 0.0;
+		return std::hypot(wx - (ax + k * dx), wy - (ay + k * dy)) < reach;
+	};
+	const int x0 = static_cast<int>(std::floor((wx - reach) / TILE_SIZE)), x1 = static_cast<int>(std::floor((wx + reach) / TILE_SIZE));
+	const int y0 = static_cast<int>(std::floor((wy - reach) / TILE_SIZE)), y1 = static_cast<int>(std::floor((wy + reach) / TILE_SIZE));
+	for (int ty = y0; ty <= y1; ty++) {
+		for (int tx = x0; tx <= x1; tx++) {
+			if (tx < 0 || ty < 0 || tx >= static_cast<int>(Map::SizeX()) || ty >= static_cast<int>(Map::SizeY())) continue;
+			const TileIndex n = TileXY(tx, ty);
+			for (Track t : ThreeDTrackBitsOf(n)) {
+				if (RoundTrackDrawing() && IsRoundTrackTile(n)) {
+					const std::vector<RoundTrackPoint> line = RoundTrackCentreLine(n, t, TILE_SIZE / 4.0);
+					if (!line.empty()) {
+						for (size_t i = 0; i + 1 < line.size(); i++) {
+							if (near_segment(line[i].x, line[i].y, line[i + 1].x, line[i + 1].y)) return true;
+						}
+						continue;
+					}
+				}
+				const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
+				const double ox = tx * static_cast<double>(TILE_SIZE), oy = ty * static_cast<double>(TILE_SIZE);
+				if (near_segment(ox + p.x - p.ax, oy + p.y - p.ay, ox + p.x + p.ax, oy + p.y + p.ay)) return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
  * Our catenary over our track on a tile (the player, 8. 11.: "such masts for the electrified track, for the catenary,
  * but simple, the wires as the fishing rod's line"; "faithful to the view from above, so one on each tile"; "the spacing
  * between the masts in the settings, as the spacing of the signals"; "2 may be over both"):
@@ -2909,6 +2949,8 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
 	auto mast = [&](double lx, double ly, std::initializer_list<float> arms, std::string_view arm_name, double arm_len) {
 		if (!masts) return;
 		const double px = ox + lx, py = oy + ly;
+		/* Never on the bed of a track (ThreeDOnTrackBed()): the wires alone there. */
+		if (ThreeDOnTrackBed(px, py)) return;
 		const int z = ti->z + static_cast<int>(std::lround(ground(lx, ly)));
 		if (eye) {
 			AddCabFigure("trakce_stozar", 1.0f, px, py, z, 0.0f);
