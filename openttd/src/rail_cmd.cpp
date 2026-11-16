@@ -2671,6 +2671,13 @@ struct ThreeDTrackPiece {
 	float facing;   ///< its +x, degrees (0 along +x, 90 along +y)
 };
 
+/**
+ * How wide across a diagonal piece of our track is drawn in the view not turned, of its true width (DrawThreeDTrack()):
+ * measured on the game's sprites at 8x, the rails of a track up the screen 6.5 pixels apart and across it 3 against 5.2
+ * square to a track along a tile's edge -- 0.78 and 0.72 of what the same track turned that way shows.
+ */
+static constexpr float THREE_D_DIAGONAL_ACROSS = 0.75f;
+
 /** The pieces of the game's tracks: X and Y the tile long through its middle, the four others from the middle of an edge to the middle of the next. */
 static const TrackIndexArray<ThreeDTrackPiece> THREE_D_TRACK_PIECES = {{{
 	{8, 8, 8, 0, 0.0f},     // X
@@ -3147,7 +3154,14 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 		const int bx0 = static_cast<int>(std::lround(x - hx)), by0 = static_cast<int>(std::lround(y - hy));
 		const int bx1 = std::max(bx0, static_cast<int>(std::lround(x + hx)) - 1), by1 = std::max(by0, static_cast<int>(std::lround(y + hy)) - 1);
 		const std::array<int, 6> box{bx0, by0, foot, bx1, by1, foot + tall - 1};
-		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+		/* The view not turned (the building view; the player, 15. 11.: "as the original rails"): a diagonal piece as wide
+		 * as the game's own sprite of it, THREE_D_DIAGONAL_ACROSS of what its true shape shows there -- seen from the
+		 * north a track up or across the screen shows wider than one along a tile's edge, and the game's sprites do not
+		 * (the player's #371: "the rails north-south and west-east are wider ... the size of the original rails").
+		 * As long as it is: smaller by it, longer by it along. Turned, as it is: its ends meet the others' there. */
+		const bool narrow = !pipe && name == diagonal && !ViewportDrawingEye() && std::fabs(GetViewYaw()) < 0.5f;
+		AddThreeDFigureToViewportInBox(name, narrow ? THREE_D_DIAGONAL_ACROSS : 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box,
+				narrow ? 1.0f / THREE_D_DIAGONAL_ACROSS : 0.0f);
 	};
 
 	/* The game's own power line: no track, its pylons and cables (DrawThreeDPowerLine()). */

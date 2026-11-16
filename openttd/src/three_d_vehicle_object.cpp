@@ -5358,7 +5358,7 @@ void NoteThreeDBlinking(TileIndex tile, int ticks, double x0, double y0, double 
  * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)
  * @return nothing when the figure is not there (or its frame is not read yet)
  */
-static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false, bool *not_yet = nullptr, bool no_wait = false)
+static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false, bool *not_yet = nullptr, bool no_wait = false, float along = 0.0f)
 {
 	if (up != nullptr) *up = 0;
 	later = false;
@@ -5427,7 +5427,7 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 		NoteMovingFigure(tile, ticks, *shape, scale, tall, x, y, z);
 	}
 	/* Its state: a tree's colours of its use (ThreeDVehicleObject::TreeState()). */
-	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, state, frame, -1, 1.0f, spin_step, 0, 0, 0, 0.0f, 0);
+	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, state, frame, -1, 1.0f, spin_step, 0, 0, 0, along, 0);
 }
 
 /** A picture asked for (PictureRequest()) as it is made: now, or not waited for (later, FigureRequest()). */
@@ -5489,7 +5489,7 @@ std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, fl
  */
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state)
 {
-	return AddThreeDFigureToViewportInBox(name, scale, x, y, z, facing, zoom, tile, phase, frame, state, nullptr);
+	return AddThreeDFigureToViewportInBox(name, scale, x, y, z, facing, zoom, tile, phase, frame, state, nullptr, 0.0f);
 }
 
 /**
@@ -5499,7 +5499,7 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
  * drawn on top, the gates, the ship through the lock's concrete").
  * @param box its box, world units, inclusive: xmin, ymin, zmin, xmax, ymax, zmax; nullptr the small one about its feet
  */
-bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state, const std::array<int, 6> *box)
+bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state, const std::array<int, 6> *box, float along)
 {
 	int height = 0, up = 0;
 	bool later = false;
@@ -5507,7 +5507,7 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 	 * picture so that it is within what the card draws one in. */
 	if (ViewportVehiclesOnCard()) {
 		bool not_yet = false;
-		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state, true, &not_yet);
+		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state, true, &not_yet, false, along);
 		if (not_yet) {
 			/* Its shape or its bones not read yet (read in the background): nothing of it till they come, its place drawn again then. */
 			_stand_ins_given++;
@@ -5539,7 +5539,7 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 	 * shapes of the trees and the figures itself (the player's test10, snimky.log: "tvar 70x 13381 ms", a frame of
 	 * 14 s; the rig at night: FigureRequest() of DrawTile_Trees()). */
 	bool shape_not_yet = false;
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state, false, &shape_not_yet, _three_d_pictures_stand_in && !_three_d_load_at_once);
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state, false, &shape_not_yet, _three_d_pictures_stand_in && !_three_d_load_at_once, along);
 	if (shape_not_yet) {
 		_stand_ins_given++;
 		OweUnknownFigurePlace(x, y, z);
