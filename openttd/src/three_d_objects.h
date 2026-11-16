@@ -1186,6 +1186,24 @@ struct ThreeDVehicleObject {
 	std::vector<ThreeDVehicleCompanion> companions; ///< the animals running behind it in its states ("doprovod")
 	ThreeDParts seat_groups;  ///< by part, the groups of the crew one of which sits at the driver's seat ("misto_ridicky"): the record's driver not drawn where they are shown
 	int crew_record_part = 0; ///< the part of the record's own crew ("posadka" of the record), shown but where the state stands empty; 0 none (always drawn)
+	/**
+	 * The details of the configurator the record itself offers ("konfigurator"; the player, 16. 11.: "put the horn in
+	 * the configurator, none by default, then the colours silver, white, black, red, and the colour adds the horn"):
+	 * each with its options, an option showing nodes of the add-ons ("doplnky") beside what the state shows. Kept on
+	 * the vehicle with the set's own details, from the last of the sixteen down (ConfigSlot()).
+	 */
+	struct ConfigDetail {
+		struct Option {
+			std::string name;  ///< "jmeno"
+			ThreeDParts parts; ///< "doplnky": the parts it shows
+		};
+		std::string name;            ///< "jmeno"
+		std::vector<Option> options; ///< "volby", the first the one a new vehicle has
+	};
+	std::vector<ConfigDetail> config_details;
+	/** Which of the vehicle's sixteen choices (Vehicle::config_options) the record's detail k is. */
+	static constexpr size_t ConfigSlot(size_t k) { return 15 - k; }
+	mutable std::map<std::array<int, 3>, int> config_steps; ///< the step of a state with an option of a detail chosen (ConfiguredStateOf()): by the state, the detail, the option
 	mutable std::map<int, int> loaded_steps; ///< the step of each state carrying its load (LoadedStateOf()), made the first time
 	/**
 	 * Its add-ons' nodes drawn by its load (the player, 16. 11.: "the trailer has its wheels lifted as if empty, put them
@@ -1312,6 +1330,7 @@ struct ThreeDVehicleObject {
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
 	int LoadedStateOf(int step) const;
+	int ConfiguredStateOf(int step, const std::array<uint8_t, 16> &chosen) const;
 	int WornStateOf(int step, uint32_t wear) const;
 	int RustStateOf(int step, uint32_t variant) const;
 	const ThreeDWear *Wear(const ThreeDParts &parts) const;
@@ -1367,6 +1386,7 @@ struct ThreeDLikenessSolid {
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 std::vector<struct VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine);
+std::vector<struct VehicleConfigAspect> GetThreeDRecordConfigAspects(EngineID engine);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
 

@@ -13621,6 +13621,43 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto x = number(2), y = number(3);
 		_turned_debug_tile = (x.has_value() && y.has_value()) ? TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())) : INVALID_TILE;
 		return true;
+	} else if (what == "konfig" && argv.size() > 2) {
+		/* 'konfig <n> [<detail> <volba>]': the details of the configurator of the n-th vehicle (as 'vozidlo' counts
+		 * them), the set's and its record's; with a detail and an option, that option chosen on it as the
+		 * configurator's command does (in a depot or not: the rig). */
+		int want = number(2).value_or(0), seen = 0;
+		Vehicle *found = nullptr;
+		for (Vehicle *v : Vehicle::Iterate()) {
+			if (!v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Hidden)) continue;
+			if (seen++ == want) {
+				found = v;
+				break;
+			}
+		}
+		if (found == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: konfig: vozidlo {} neni.", want);
+			return true;
+		}
+		const std::vector<VehicleConfigAspect> aspects = GetVehicleConfigAspects(found->engine_type, found);
+		if (argv.size() > 4) {
+			const size_t aspect = number(3).value_or(0), option = number(4).value_or(0);
+			if (aspect >= aspects.size() || aspects[aspect].hidden || !aspects[aspect].Offers(static_cast<uint>(option))) {
+				IConsolePrint(CC_ERROR, "test3d: konfig: detail {} volbu {} nema.", aspect, option);
+				return true;
+			}
+			found->config_options[aspect] = static_cast<uint8_t>(option);
+			ApplyVehicleConfig(found);
+			found->InvalidateNewGRFCacheOfChain();
+			MarkWholeScreenDirty();
+		}
+		std::string out;
+		for (size_t i = 0; i < aspects.size(); i++) {
+			if (aspects[i].hidden) continue;
+			out += fmt::format(" [{}] {}:", i, aspects[i].name);
+			for (size_t o = 0; o < aspects[i].options.size(); o++) out += fmt::format(" {}{}{}", o == found->config_options[i] ? "*" : "", aspects[i].options[o].name, aspects[i].options[o].hidden ? "(skryta)" : "");
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: konfig vozidla {}:{}", found->unitnumber, out);
+		return true;
 	} else if (what == "sdilenetvary" && argv.size() > 2) {
 		/* 'sdilenetvary 0|1': equal lists of the shapes' corners held once (1) or by each shape (0, as it was); before
 		 * the vehicles are first drawn. */

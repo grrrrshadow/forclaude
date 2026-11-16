@@ -74,11 +74,9 @@ static std::optional<VehicleConfigTextResult> VehicleConfigText(EngineID engine,
  * @param v the vehicle the set is asked about: the part that carries the choices; nullptr in the purchase list
  * @return the details, in the set's order; empty when there are none
  */
-std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine, const Vehicle *v)
+/** The details a vehicle's set offers on it (GetVehicleConfigAspects()). */
+static std::vector<VehicleConfigAspect> SetConfigAspects(EngineID engine, const Vehicle *v)
 {
-	/* An engine the game makes itself (our 1203s of BeamNG, the paints of the player's old 2D 1203): its details the
-	 * game's own, not asked of a set. */
-	if (std::vector<VehicleConfigAspect> own = GetThreeDOwnConfigAspects(engine); !own.empty()) return own;
 	std::vector<VehicleConfigAspect> aspects;
 	const Engine *e = Engine::GetIfValid(engine);
 	if (e == nullptr || e->GetGRF() == nullptr) return aspects;
@@ -101,6 +99,27 @@ std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine, const 
 		 * would move up a place and no longer be the byte the set reads. */
 		if (aspect.options.empty()) break;
 		aspects.push_back(std::move(aspect));
+	}
+	return aspects;
+}
+
+std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine, const Vehicle *v)
+{
+	/* An engine the game makes itself (our 1203s of BeamNG, the paints of the player's old 2D 1203): its details the
+	 * game's own, not asked of a set. */
+	if (std::vector<VehicleConfigAspect> own = GetThreeDOwnConfigAspects(engine); !own.empty()) return own;
+	std::vector<VehicleConfigAspect> aspects = SetConfigAspects(engine, v);
+	/* The details the record of its 3D object offers (the horn of the Tatras: ThreeDVehicleObject::config_details): the
+	 * record's detail k the choice 15 - k, whatever the set offers -- the places between hidden, so that a detail's
+	 * place in the list is the choice it is kept in. One the set's own details reach is not offered. */
+	std::vector<VehicleConfigAspect> record = GetThreeDRecordConfigAspects(engine);
+	while (!record.empty() && aspects.size() + record.size() > VEHICLE_CONFIG_MAX_ASPECTS) record.pop_back();
+	if (!record.empty()) {
+		VehicleConfigAspect none;
+		none.hidden = true;
+		none.options.push_back({{}, true});
+		aspects.resize(VEHICLE_CONFIG_MAX_ASPECTS - record.size(), none);
+		for (size_t k = record.size(); k-- > 0;) aspects.push_back(std::move(record[k]));
 	}
 	return aspects;
 }

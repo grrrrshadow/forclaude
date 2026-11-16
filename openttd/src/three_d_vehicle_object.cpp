@@ -368,6 +368,8 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 		}
 		if (room > 0 && carried * 2 >= room) step = obj->LoadedStateOf(step);
 	}
+	/* What the player chose of the record's own details of the configurator (the horn). */
+	if (v != nullptr && !obj->config_details.empty()) step = obj->ConfiguredStateOf(step, VehicleConfigHead(v)->config_options);
 	const uint32_t wear = WearCode(obj, v, image_type);
 	const int worn = wear == 0 ? step : obj->WornStateOf(step, wear);
 	/* Its pieces of rust in its own order (the player, 9. 11.: "make the chance"; the colleague: "a new vehicle a new

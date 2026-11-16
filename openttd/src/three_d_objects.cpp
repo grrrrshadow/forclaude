@@ -7813,6 +7813,29 @@ static void ReadThreeDVehicleObjects()
 						if (base != 0 && (empty != 0 || full != 0)) obj.load_parts.push_back({base, empty, full});
 					}
 				}
+				/* The record's own details of the configurator (config_details). */
+				if (e.contains("konfigurator") && e.at("konfigurator").is_array()) {
+					for (const auto &d : e.at("konfigurator")) {
+						if (!d.is_object() || !d.contains("volby") || !d.at("volby").is_array() || obj.config_details.size() >= 8) continue;
+						ThreeDVehicleObject::ConfigDetail detail;
+						detail.name = d.value("jmeno", std::string());
+						for (const auto &o : d.at("volby")) {
+							if (!o.is_object() || detail.options.size() >= 32) continue;
+							ThreeDVehicleObject::ConfigDetail::Option option;
+							option.name = o.value("jmeno", std::string());
+							if (o.contains("doplnky") && o.at("doplnky").is_object()) {
+								for (const auto &[file, node] : o.at("doplnky").items()) {
+									if (!node.is_string()) continue;
+									auto at = std::ranges::find(obj.part_names, file + "/" + node.get<std::string>());
+									const size_t i = at - obj.part_names.begin();
+									if (at != obj.part_names.end() && i > 0 && i < static_cast<size_t>(ThreeDParts::COUNT)) option.parts.Set(static_cast<int>(i));
+								}
+							}
+							detail.options.push_back(std::move(option));
+						}
+						if (detail.options.size() >= 2) obj.config_details.push_back(std::move(detail));
+					}
+				}
 				if (e.contains("posadky") && e.at("posadky").is_object()) {
 					for (const auto &[group, list] : e.at("posadky").items()) {
 						std::vector<ThreeDVehicleCrew> crew;
@@ -8548,6 +8571,20 @@ std::vector<VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine)
 	};
 	add("Karoserie", obj->paint_names);
 	if (!obj->tarp_names.empty()) add("Plachta", obj->tarp_names);
+	return aspects;
+}
+
+/** The details of the configurator an engine's record offers (ThreeDVehicleObject::config_details), in the record's order; empty none. */
+std::vector<VehicleConfigAspect> GetThreeDRecordConfigAspects(EngineID engine)
+{
+	std::vector<VehicleConfigAspect> aspects;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, nullptr);
+	if (obj == nullptr) return aspects;
+	for (const ThreeDVehicleObject::ConfigDetail &d : obj->config_details) {
+		VehicleConfigAspect &a = aspects.emplace_back();
+		a.name = d.name;
+		for (const ThreeDVehicleObject::ConfigDetail::Option &o : d.options) a.options.push_back({o.name, false});
+	}
 	return aspects;
 }
 
@@ -11629,6 +11666,44 @@ int ThreeDVehicleObject::StateNamed(std::string_view set) const
 		if (this->states[i].set_name == set) return static_cast<int>(i + 1);
 	}
 	return 0;
+}
+
+/**
+ * A state as another with the options chosen for the record's details of the configurator (config_details): the parts
+ * of each option beside the state's own. Made the first time, a step after its states, as LoadedStateOf().
+ * @param chosen the vehicle's choices (Vehicle::config_options)
+ */
+int ThreeDVehicleObject::ConfiguredStateOf(int step, const std::array<uint8_t, 16> &chosen) const
+{
+	for (size_t k = 0; k < this->config_details.size(); k++) {
+		const int option = chosen[ConfigSlot(k)];
+		if (option <= 0 || static_cast<size_t>(option) >= this->config_details[k].options.size()) continue;
+		const ThreeDParts &more = this->config_details[k].options[option].parts;
+		const ThreeDVehicleState *s = this->State(step);
+		if (s == nullptr) return step;
+		const std::array<int, 3> key{step, static_cast<int>(k), option};
+		ThreeDVehicleState made;
+		{
+			std::lock_guard lock(_lazy_mutex);
+			auto it = this->config_steps.find(key);
+			if (it != this->config_steps.end()) {
+				step = it->second;
+				continue;
+			}
+			made = *s;
+		}
+		for (int p = 1; p < ThreeDParts::COUNT; p++) {
+			if (more.Has(p)) made.parts.Set(p);
+		}
+		std::lock_guard lock(_lazy_mutex);
+		auto [it, added] = this->config_steps.emplace(key, 0);
+		if (added) {
+			this->composed.push_back(std::move(made));
+			it->second = static_cast<int>(this->states.size() + this->composed.size());
+		}
+		step = it->second;
+	}
+	return step;
 }
 
 /**
