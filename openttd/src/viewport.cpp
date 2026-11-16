@@ -16878,6 +16878,42 @@ static double EyeSeaLandDistance(int tx, int ty)
 	return nearest;
 }
 
+/** How far from a lock, a ship depot or a dock the bed is dug deep, tiles: all the way within the first, the bed as it is from the second on (the distances are kept up to EYE_SEA_REACH + 1). */
+static constexpr double EYE_HARBOUR_DEEP_TILES = 5.0, EYE_HARBOUR_BED_TILES = 6.5; // (out to where the sea is deep by itself: at 2 and 5 a ridge of 6 m was left between the harbour and the deep)
+
+/**
+ * How far the nearest lock, ship depot or dock is from the middle of a tile, tiles (EyeWaterDepth()): to the nearest
+ * point of its tile, within EYE_SEA_REACH; EYE_SEA_REACH + 1 none. Kept by the tile till the ground changes, as
+ * EyeSeaLandDistance().
+ */
+static double EyeSeaHarbourDistance(int tx, int ty)
+{
+	static std::mutex lock;
+	static std::unordered_map<uint32_t, float> kept;
+	static uint64_t kept_version = UINT64_MAX;
+	std::lock_guard guard(lock);
+	/* (And anew every 256 ticks: a dock or a depot built or pulled down does not change the ground's version.) */
+	const uint64_t version = _turned_ground_version << 24 ^ (TimerGameTick::counter >> 8);
+	if (kept_version != version) {
+		kept.clear();
+		kept_version = version;
+	}
+	const uint32_t key = static_cast<uint32_t>(tx) | static_cast<uint32_t>(ty) << 16;
+	if (auto it = kept.find(key); it != kept.end()) return it->second;
+	double nearest = EYE_SEA_REACH + 1;
+	for (int dy = -EYE_SEA_REACH; dy <= EYE_SEA_REACH; dy++) {
+		for (int dx = -EYE_SEA_REACH; dx <= EYE_SEA_REACH; dx++) {
+			const int nx = tx + dx, ny = ty + dy;
+			if (nx < 1 || ny < 1 || nx >= static_cast<int>(Map::SizeX()) - 1 || ny >= static_cast<int>(Map::SizeY()) - 1) continue;
+			const TileIndex n = TileXY(nx, ny);
+			if (!((IsTileType(n, TileType::Water) && (IsLock(n) || IsShipDepot(n))) || (IsTileType(n, TileType::Station) && IsDock(n)))) continue;
+			nearest = std::min(nearest, std::hypot(std::max(0.0, std::abs(dx) - 0.5), std::max(0.0, std::abs(dy) - 0.5)));
+		}
+	}
+	kept.emplace(key, static_cast<float>(nearest));
+	return nearest;
+}
+
 /**
  * How deep under the surface of the water the bed lies at a world point, units of height. A river or a canal shallow
  * over its bank drawn by the land (EYE_RIVER_BANK), past it a level within a quarter of a tile. The sea (the player,
@@ -16932,6 +16968,23 @@ double EyeWaterDepth(double x, double y)
 	/* By a lock, a ship depot or a dock dug deep (the player, test4: "under the lock we need depth"): two levels within a
 	 * tile of it, the bed as it is two tiles off -- the shore there shallow as it gently goes down, the ships' keels in it. */
 	levels = std::max(levels, 2.0 * std::clamp(2.0 - harbour / TILE_SIZE, 0.0, 1.0));
+	/* And about it the sea as deep as it gets (the player, 16. 11.: "the trouble is coming into the harbour with the
+	 * submarine, the harbour is in the shallows, the sea's bed should be deeper about the harbour"): all its levels
+	 * within EYE_HARBOUR_DEEP_TILES of the lock, the depot or the dock, going up to the bed as it is at
+	 * EYE_HARBOUR_BED_TILES -- by the tiles' kept distances between their middles, the shore itself as shallow as it
+	 * gently goes down (the first tile from the land keeps the bed above). */
+	if (!narrow) {
+		const double fx = x / TILE_SIZE - 0.5, fy = y / TILE_SIZE - 0.5;
+		const int ix = static_cast<int>(std::floor(fx)), iy = static_cast<int>(std::floor(fy));
+		const double u = fx - ix, w = fy - iy;
+		auto at = [](int i, int j) {
+			return EyeSeaHarbourDistance(std::clamp(i, 0, static_cast<int>(Map::MaxX())), std::clamp(j, 0, static_cast<int>(Map::MaxY())));
+		};
+		const double away = (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - w) + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * w;
+		const double dug = EYE_SEA_LEVELS * std::clamp((EYE_HARBOUR_BED_TILES - away) / (EYE_HARBOUR_BED_TILES - EYE_HARBOUR_DEEP_TILES), 0.0, 1.0);
+		/* (No deeper than the land lets it by the shore: a level and a half a tile from it.) */
+		levels = std::max(levels, std::min(dug, 1.5 * nearest / TILE_SIZE + 0.5));
+	}
 	return std::clamp(levels, 0.0, EYE_SEA_LEVELS) * TILE_HEIGHT;
 }
 

@@ -1423,6 +1423,11 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				t.name = mat.value("name", std::string());
 				t.double_sided = mat.value("doubleSided", false);
 				ReadMaterialLight(mat, t);
+				/* A material that names no colour is white (glTF: baseColorFactor is 1, 1, 1, 1 where left out), not the
+				 * grey of a triangle with no material: the colleague's sailing yacht has its hull over the waterline and
+				 * its sails white, written so, and was grey all over (the player, 16. 11.: "the sailing yacht is not
+				 * coloured, it is grey outside"). */
+				t.flat = Colour(255, 255, 255).data;
 				{
 					if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
 						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f->at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
@@ -2081,6 +2086,7 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path, bool with_mes
 				const auto &mat = j.at("materials").at(material);
 				t.name = mat.value("name", std::string());
 				ReadMaterialLight(mat, t);
+				t.flat = Colour(255, 255, 255).data; // (a material that names no colour is white, as above)
 				{
 					if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
 						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f->at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
