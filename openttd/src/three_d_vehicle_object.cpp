@@ -1150,7 +1150,12 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 		const uint32_t a = shape.tri[i], b = shape.tri[i + 1], c = shape.tri[i + 2];
 		double ux = shape.uv[b * 2] - shape.uv[a * 2], uy = shape.uv[b * 2 + 1] - shape.uv[a * 2 + 1];
 		double vx = shape.uv[c * 2] - shape.uv[a * 2], vy = shape.uv[c * 2 + 1] - shape.uv[a * 2 + 1];
-		uv_area += std::abs(ux * vy - uy * vx) / 2 * tw * th;
+		/* A triangle that draws from one point of the picture (a cell of a palette: the colleague's atlases of flat
+		 * colours made small, grrrrf tools/atlas_paleta.py) needs no texels at all: not counted, or the few triangles
+		 * that do draw a piece of the picture -- a wheel's disc -- got a level as coarse as the mean of them all. */
+		const double triangle_uv = std::abs(ux * vy - uy * vx) / 2 * tw * th;
+		if (triangle_uv <= 0) continue;
+		uv_area += triangle_uv;
 		double px = shape.pos[b * 3] - shape.pos[a * 3], py = shape.pos[b * 3 + 1] - shape.pos[a * 3 + 1], pz = shape.pos[b * 3 + 2] - shape.pos[a * 3 + 2];
 		double qx = shape.pos[c * 3] - shape.pos[a * 3], qy = shape.pos[c * 3 + 1] - shape.pos[a * 3 + 1], qz = shape.pos[c * 3 + 2] - shape.pos[a * 3 + 2];
 		double cx = py * qz - pz * qy, cy = pz * qx - px * qz, cz = px * qy - py * qx;
