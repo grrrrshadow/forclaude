@@ -12241,8 +12241,11 @@ int ThreeDVehicleObject::PaletteState(uint32_t n) const
 
 /**
  * The state of the states the GRF picks for the layers of its sprites (the colleague's hra/3d/PROSBA-SPECIAL-3D.md):
- * the keys of a later layer replace those of an earlier one, the add-ons' nodes ("doplnky") and colours
- * ("barvy_doplnku") each add-on by itself. Made the first time, kept by the steps of the layers.
+ * the keys of a later layer replace those of an earlier one, the add-ons' colours ("barvy_doplnku") each add-on by
+ * itself; the add-ons' nodes ("doplnky") of the layers are all shown, as the layers' sprites lie over each other (the
+ * fire Tatra: its body the node "hasici" of a file in the layer 2, its lit beacon the node "majak" of the same file
+ * in the layer 3 -- the player, 16. 11.: "when the beacon lights up the fire body is gone"). Made the first time,
+ * kept by the steps of the layers.
  * The vehicle's colours of its set (callback 1C1, true_colour.h) go into the state made, for its masks of details
  * (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, point 2): a vehicle in other colours is another state, so
  * its pictures are made apart (ObjectPicture()) as its sprites are in 2D.
@@ -12276,7 +12279,10 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 		if (s.given & ThreeDVehicleState::GIVEN_TURN) made.turn = s.turn;
 		made.given |= s.given;
 		for (size_t a = 0; a < s.addon_parts.size() && a < made.addon_parts.size(); a++) {
-			if (s.addon_parts[a] >= 0) made.addon_parts[a] = s.addon_parts[a];
+			if (s.addon_parts[a] < 0) continue;
+			/* Another node of an add-on an earlier layer shows a node of: both. */
+			if (made.addon_parts[a] > 0) made.parts.Set(made.addon_parts[a]);
+			made.addon_parts[a] = s.addon_parts[a];
 		}
 		for (size_t a = 0; a < s.addon_colours.size() && a < made.addon_colours.size(); a++) {
 			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
