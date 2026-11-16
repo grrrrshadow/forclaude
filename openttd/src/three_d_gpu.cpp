@@ -1623,8 +1623,10 @@ std::string EyeMeshSource(const char *source, bool fragment)
 		s.insert(s.find('\n') + 1, "uniform float u_near;\n");
 		s.insert(s.rfind('}'), "\tgl_FragDepth = u_near * gl_FragCoord.w;\n");
 		/* Its own light alone in the second picture, as glow_after_night of viewport.cpp draws it over the dark: the
-		 * texel by its colour's strongest; see-through by the glass's alpha. */
-		replace("o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(1.0);", "o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(floor(own * max(u_glow.r, max(u_glow.g, u_glow.b)) / 256.0) / 255.0, 1.0);\n\tif (u_glass != 0) o_lit *= alpha;");
+		 * texel by its colour's strongest, or -- a material shining its colour alone (u_glow.a 2), as by day -- that
+		 * colour: the fire Tatra's blue beacon was the red of its body's paint by night (the player, 16. 11.: "the
+		 * fire 148 blinks red ... I switch the night off and it shines blue"). See-through by the glass's alpha. */
+		replace("o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(1.0);", "o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4((u_glow.a < 1.5 ? floor(own * max(u_glow.r, max(u_glow.g, u_glow.b)) / 256.0) : u_glow.rgb) / 255.0, 1.0);\n\tif (u_glass != 0) o_lit *= alpha;");
 	} else {
 		/* A wheel that turns (its corners' wheel in attribute 3): its corners and normals moved by its matrix first. */
 		s.insert(s.find('\n') + 1, "layout(location = 3) in float a_wheel;\nuniform mat4 u_wheels[32];\nuniform int u_wheel_count;\n");
