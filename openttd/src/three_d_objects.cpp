@@ -15965,7 +15965,17 @@ std::string RigDescribeBiggestShapes()
 	std::ranges::sort(rows, std::greater{}, &Row::all);
 	size_t all = 0, geo = 0, simpler = 0, night = 0, per_tri = 0;
 	for (const Row &r : rows) { all += r.all; geo += r.geo; simpler += r.simpler; night += r.night; per_tri += r.per_tri; }
-	std::string out = fmt::format("tvary {}: celkem {:.1f} MB, vlastni rohy a trojuhelniky {:.1f}, zjednodusene {:.1f}, nocni {:.1f}, po trojuhelnicich {:.1f}", rows.size(), mb(all), mb(geo), mb(simpler), mb(night), mb(per_tri));
+	/* The corners of the wheels that turn among them: what one wheel held once would spare at most. */
+	size_t wheel_corners = 0, all_corners = 0;
+	{
+		std::lock_guard lock(_vehicle_shapes_mutex);
+		for (const auto &[key, shape] : _vehicle_shapes) {
+			if (shape == nullptr) continue;
+			all_corners += shape->pos.size() / 3;
+			wheel_corners += std::ranges::count_if(shape->corner_wheel, [](uint8_t w) { return w != 0; });
+		}
+	}
+	std::string out = fmt::format("tvary {}: celkem {:.1f} MB, vlastni rohy a trojuhelniky {:.1f}, zjednodusene {:.1f}, nocni {:.1f}, po trojuhelnicich {:.1f}; rohu {} z toho kol {}", rows.size(), mb(all), mb(geo), mb(simpler), mb(night), mb(per_tri), all_corners, wheel_corners);
 	for (size_t i = 0; i < std::min<size_t>(rows.size(), 8); i++) {
 		const Row &r = rows[i];
 		Debug(misc, 1, "3D shape {} of {} corners, its whole key: {}", i, r.corners, r.key);
