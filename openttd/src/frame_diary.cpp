@@ -15,6 +15,9 @@
 #include "window_func.h"
 #include "window_type.h"
 #include "openttd.h"
+#include "settings_type.h"
+#include "window_gui.h"
+#include "viewport_type.h"
 #include "three_d_gpu.h"
 #include "3rdparty/fmt/format.h"
 
@@ -179,11 +182,17 @@ std::string TakeWindowPaints()
 	return out.empty() ? std::string("-") : out;
 }
 
-/** What the player looks at: the view from the eyes, from a cab, or the map. */
-const char *Looking()
+/**
+ * What the player looks at: the view from the eyes, from a cab, or the map; then whether it is night ("noc") and how
+ * far out the main view is zoomed ("z0" the closest) -- the player, 16. 11.: "it got worse when I set the night, from
+ * above and from the eyes too; it jerks at a big zoom out", and the diary could not tell either.
+ */
+std::string Looking()
 {
-	if (FindWindowById(WindowClass::FirstPerson, 0) != nullptr) return "oci";
-	return "mapa";
+	std::string out = FindWindowById(WindowClass::FirstPerson, 0) != nullptr ? "oci" : "mapa";
+	if (_settings_client.gui.night) out += " noc";
+	if (const Window *main = GetMainWindow(); main != nullptr && main->viewport != nullptr) out += fmt::format(" z{}", to_underlying(main->viewport->zoom));
+	return out;
 }
 
 void WriteLine(std::chrono::steady_clock::time_point now)
