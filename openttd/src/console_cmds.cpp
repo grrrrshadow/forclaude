@@ -13621,6 +13621,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto x = number(2), y = number(3);
 		_turned_debug_tile = (x.has_value() && y.has_value()) ? TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())) : INVALID_TILE;
 		return true;
+	} else if (what == "sdilenetvary" && argv.size() > 2) {
+		/* 'sdilenetvary 0|1': equal lists of the shapes' corners held once (1) or by each shape (0, as it was); before
+		 * the vehicles are first drawn. */
+		extern bool _three_d_shapes_shared;
+		_three_d_shapes_shared = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stejne seznamy rohu tvaru jednou: {}", _three_d_shapes_shared ? "ano" : "ne");
+		return true;
 	} else if (what == "posadkavtvaru" && argv.size() > 2) {
 		/* 'posadkavtvaru 0|1': the crew that sits still of its vehicle's shape (1, as it was) or drawn on its own (0);
 		 * before the vehicles are first drawn (the shapes made stay as they are). */

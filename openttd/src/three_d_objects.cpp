@@ -9141,9 +9141,13 @@ static void ExtentOfAll(ThreeDVehicleShape &s)
 	}
 }
 
+bool _three_d_shapes_shared = true;
+
 /** Keep a shape read for its key (MakeShape()). */
 static void KeepVehicleShape(const std::string &key, const std::shared_ptr<const ThreeDVehicleShape> &made)
 {
+	/* (Nobody else has it yet: its lists the same as another shape's held with it.) */
+	const_cast<ThreeDVehicleShape &>(*made).ShareLists();
 	std::lock_guard lock(_vehicle_shapes_mutex);
 	_vehicle_shapes.emplace(key, made);
 }
@@ -9714,7 +9718,12 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, bool plant)
 	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m, plant);
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / SIMPLER_CELL_M))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
-	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level, plant] { return MakeSimplerShape(*this, level, plant); }, [this, level, &made](std::shared_ptr<const ThreeDVehicleShape> out) {
+	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level, plant] {
+		auto simpler = MakeSimplerShape(*this, level, plant);
+		/* (The simpler shapes of equal shapes are equal too: held once.) */
+		if (simpler != nullptr) const_cast<ThreeDVehicleShape &>(*simpler).ShareLists();
+		return simpler;
+	}, [this, level, &made](std::shared_ptr<const ThreeDVehicleShape> out) {
 		/* One that saves little against the nearest finer one made is not kept, that one stands for it (the player's log
 		 * of 14. 11., the game killed for memory at 4.8 GB, the vehicles' shapes 1.6 GB of it: a model all seams is not
 		 * made simpler at all, each of its levels a whole copy -- the two-wheel cart 13.0 MB a level beside its own
@@ -9906,7 +9915,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 	const GlbSkeleton *sk = PoseOfFrame(*this, frame, pose);
 	if (sk == nullptr) return nullptr;
 	auto made = std::make_shared<ThreeDVehicleShape>();
-	sk->Skin(pose, made->pos, made->nrm);
+	sk->Skin(pose, made->pos.Written(), made->nrm.Written());
 	/* Its seat (the colleague's horses: the node "sedlo" under the bone Spine1) where it is in the pose, the game's axes. */
 	if (const int seat = sk->NodeNamed("sedlo"); seat >= 0) {
 		const BoneMatrix m = sk->Globals(pose)[seat];
@@ -15858,6 +15867,13 @@ template <typename T>
 static size_t VectorBytes(const std::vector<T> &v)
 {
 	return v.capacity() * sizeof(T);
+}
+
+/** The memory of a shared list's elements: this holder's share. */
+template <typename T>
+static size_t VectorBytes(const ThreeDSharedList<T> &v)
+{
+	return v.Bytes();
 }
 
 /** The memory of a vehicle's shape and of its simpler shapes made: its corners, triangles and lights (its textures apart). */

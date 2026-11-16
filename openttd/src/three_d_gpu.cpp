@@ -3273,10 +3273,28 @@ void TrimCard()
 	}
 }
 
+/**
+ * What the card keeps a shape's corners by: shapes that hold the very same lists of them (ThreeDSharedList: a tractor's
+ * records for each trailer it pulls) one set of buffers, by the lists' numbers; a figure on bones and a shape with no
+ * such lists by its own number.
+ */
+static uint64_t CardShapeKey(const ThreeDVehicleShape &s)
+{
+	if (!s.corner_joints.empty() || s.pos.Identity() == 0 || s.uv.Identity() == 0) return s.uid.value;
+	uint64_t h = 0x9e3779b97f4a7c15ull;
+	for (uint64_t id : {s.pos.Identity(), s.nrm.Identity(), s.uv.Identity(), s.corner_wheel.Identity()}) {
+		h ^= id + 0x9e3779b97f4a7c15ull + (h << 6) + (h >> 2);
+		h *= 0xff51afd7ed558ccdull;
+		h ^= h >> 33;
+	}
+	return h | 1ull << 63; // (apart from the shapes' own numbers, counted from one)
+}
+
 /** The corners of a shape on the card: put there the first time. */
 const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 {
-	auto it = _card_shapes.find(s.uid.value);
+	const uint64_t key = CardShapeKey(s);
+	auto it = _card_shapes.find(key);
 	if (it != _card_shapes.end()) {
 		it->second.used = _card_clock;
 		return &it->second;
@@ -3334,7 +3352,7 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 	_card_bytes_of[0] += g.bytes;
 	_card_sent_of[0] += g.bytes;
 	_card_sent += g.bytes;
-	return &_card_shapes.emplace(s.uid.value, g).first->second;
+	return &_card_shapes.emplace(key, g).first->second;
 }
 
 /** The triangles of a shape on the card. */
@@ -5704,7 +5722,7 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
 		if (full()) {
 			/* A figure whose shape or a texture is not on the card yet: the next picture. */
-			bool is_new = !_card_shapes.contains(m.shape->uid.value);
+			bool is_new = !_card_shapes.contains(CardShapeKey(*m.shape));
 			for (size_t i = 0; i < m.textures.size() && !is_new; i++) {
 				if (m.textures[i] == nullptr || i >= m.triangles->used.size() || !m.triangles->used[i]) continue;
 				is_new = !_card_textures.contains(m.textures[i]->uid.value);

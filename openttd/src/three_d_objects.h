@@ -43,7 +43,11 @@
 #include <deque>
 #include <functional>
 #include <map>
+#include <cstring>
+#include <initializer_list>
 #include <memory>
+#include <mutex>
+#include <unordered_map>
 #include <optional>
 #include <set>
 #include <span>
@@ -510,12 +514,127 @@ struct ThreeDParts {
  * the vehicle's frame -- x forward, y to its left, z up, the origin in the middle of the vehicle on the top of the
  * rail -- with the normals, so the game lights it itself.
  */
+extern bool _three_d_shapes_shared; ///< equal lists of the shapes' corners held once (the rig turns it off: 'test3d sdilenetvary')
+
+/**
+ * A list of a shape's corners or triangles that equal shapes hold once (the player, 16. 11.: "the same vehicle several
+ * times by its load, and one cab several times with another body"): a lorry's tractor has a record for each trailer it
+ * pulls, each with a shape of the same corners -- ten of them on the player's save, 67 MB. Used as the std::vector it
+ * holds; a copy shares it till one of them is written to, and Share() finds the list of the same content kept already.
+ * A shape kept (KeepVehicleShape()) is only read: writing to a shared list from two threads is not guarded.
+ */
+template <typename T>
+class ThreeDSharedList {
+	/** The list, and a number no other list ever has (the card keeps its buffer by it: an address comes again). */
+	struct Block : std::vector<T> {
+		uint64_t id = NextId();
+		using std::vector<T>::vector;
+		Block(const std::vector<T> &o) : std::vector<T>(o) {}
+		Block(std::vector<T> &&o) : std::vector<T>(std::move(o)) {}
+	};
+	static uint64_t NextId() { static std::atomic<uint64_t> next{1}; return next.fetch_add(1, std::memory_order_relaxed); }
+	std::shared_ptr<Block> v;
+	static const std::vector<T> &Empty() { static const std::vector<T> empty; return empty; }
+	const std::vector<T> &Get() const { return this->v != nullptr ? *this->v : Empty(); }
+	std::vector<T> &Own()
+	{
+		if (this->v == nullptr) {
+			this->v = std::make_shared<Block>();
+		} else if (this->v.use_count() > 1) {
+			this->v = std::make_shared<Block>(static_cast<const std::vector<T> &>(*this->v));
+		}
+		return *this->v;
+	}
+public:
+	using value_type = T;
+	using const_iterator = typename std::vector<T>::const_iterator;
+	using iterator = typename std::vector<T>::iterator;
+	ThreeDSharedList() = default;
+	ThreeDSharedList(const ThreeDSharedList &) = default;
+	ThreeDSharedList(ThreeDSharedList &&) = default;
+	ThreeDSharedList &operator=(const ThreeDSharedList &) = default;
+	ThreeDSharedList &operator=(ThreeDSharedList &&) = default;
+	ThreeDSharedList &operator=(const std::vector<T> &o) { this->v = std::make_shared<Block>(std::vector<T>(o)); return *this; }
+	ThreeDSharedList &operator=(std::vector<T> &&o) { this->v = std::make_shared<Block>(std::move(o)); return *this; }
+	ThreeDSharedList &operator=(std::initializer_list<T> o) { this->v = std::make_shared<Block>(std::vector<T>(o)); return *this; }
+	operator const std::vector<T> &() const { return this->Get(); }
+	const std::vector<T> &List() const { return this->Get(); }
+	std::vector<T> &Written() { return this->Own(); }
+	size_t size() const { return this->Get().size(); }
+	size_t capacity() const { return this->Get().capacity(); }
+	bool empty() const { return this->Get().empty(); }
+	const T *data() const { return this->Get().data(); }
+	T *data() { return this->Own().data(); }
+	const T &operator[](size_t i) const { return this->Get()[i]; }
+	T &operator[](size_t i) { return this->Own()[i]; }
+	const T &front() const { return this->Get().front(); }
+	const T &back() const { return this->Get().back(); }
+	T &back() { return this->Own().back(); }
+	const_iterator begin() const { return this->Get().begin(); }
+	const_iterator end() const { return this->Get().end(); }
+	const_iterator cbegin() const { return this->Get().begin(); }
+	const_iterator cend() const { return this->Get().end(); }
+	iterator begin() { return this->Own().begin(); }
+	iterator end() { return this->Own().end(); }
+	void push_back(const T &t) { this->Own().push_back(t); }
+	template <typename... Args> T &emplace_back(Args &&...args) { return this->Own().emplace_back(std::forward<Args>(args)...); }
+	template <typename... Args> auto insert(Args &&...args) { return this->Own().insert(std::forward<Args>(args)...); }
+	auto insert(const_iterator at, std::initializer_list<T> l) { return this->Own().insert(at, l); }
+	template <typename... Args> auto erase(Args &&...args) { return this->Own().erase(std::forward<Args>(args)...); }
+	template <typename... Args> void assign(Args &&...args) { this->Own().assign(std::forward<Args>(args)...); }
+	template <typename... Args> void resize(Args &&...args) { this->Own().resize(std::forward<Args>(args)...); }
+	void reserve(size_t n) { this->Own().reserve(n); }
+	void shrink_to_fit() { if (this->v != nullptr) this->Own().shrink_to_fit(); }
+	void clear() { this->v.reset(); }
+	void swap(std::vector<T> &o) { this->Own().swap(o); }
+	void swap(ThreeDSharedList &o) { this->v.swap(o.v); }
+	/** How many shapes hold this very list. */
+	size_t Holders() const { return this->v != nullptr ? static_cast<size_t>(this->v.use_count()) : 1; }
+	/** What tells the list from another (the card: one buffer for those who share it), 0 empty. */
+	uint64_t Identity() const { return this->v != nullptr ? this->v->id : 0; }
+	/** The memory of its elements, this holder's share of it. */
+	size_t Bytes() const { return this->v != nullptr ? this->v->capacity() * sizeof(T) / this->Holders() : 0; }
+	/**
+	 * Hold the list of the same content that another holds already, if there is one; else this one is the one the
+	 * next will find. Before the shape is given to anyone else.
+	 */
+	void Share()
+	{
+		if (this->v == nullptr || this->v->empty()) return;
+		static std::mutex mutex;
+		static std::unordered_map<uint64_t, std::vector<std::weak_ptr<Block>>> kept;
+		const std::vector<T> &mine = *this->v;
+		const uint8_t *bytes = reinterpret_cast<const uint8_t *>(mine.data());
+		const size_t count = mine.size() * sizeof(T);
+		uint64_t h = 1469598103934665603ull ^ count;
+		size_t i = 0;
+		for (; i + 8 <= count; i += 8) {
+			uint64_t w;
+			std::memcpy(&w, bytes + i, 8);
+			h = (h ^ w) * 1099511628211ull;
+			h ^= h >> 29;
+		}
+		for (; i < count; i++) h = (h ^ bytes[i]) * 1099511628211ull;
+		std::lock_guard lock(mutex);
+		auto &same_hash = kept[h];
+		std::erase_if(same_hash, [](const std::weak_ptr<Block> &w) { return w.expired(); });
+		for (const std::weak_ptr<Block> &w : same_hash) {
+			std::shared_ptr<Block> other = w.lock();
+			if (other == nullptr || other == this->v || other->size() != mine.size() || std::memcmp(other->data(), mine.data(), count) != 0) continue;
+			this->v = std::move(other);
+			return;
+		}
+		this->v->shrink_to_fit();
+		same_hash.push_back(this->v);
+	}
+};
+
 struct ThreeDVehicleShape {
 	ThreeDUniqueId uid;        ///< for the graphics card (three_d_gpu.cpp)
-	std::vector<float> pos;    ///< x, y, z of each corner, metres
-	std::vector<float> nrm;    ///< its normal; empty when the file has none (drawn unlit)
-	std::vector<float> uv;     ///< u, v of each corner in its texture
-	std::vector<uint32_t> tri; ///< three corners a triangle
+	ThreeDSharedList<float> pos;    ///< x, y, z of each corner, metres
+	ThreeDSharedList<float> nrm;    ///< its normal; empty when the file has none (drawn unlit)
+	ThreeDSharedList<float> uv;     ///< u, v of each corner in its texture
+	ThreeDSharedList<uint32_t> tri; ///< three corners a triangle
 	std::vector<uint8_t> tri_tex; ///< the texture of each triangle: 0 the body's (the one painted, "textura", and the one the paint mask is for), then the others of the file and of the wheels
 	std::vector<ThreeDTextureBytes> pngs; ///< the textures, as they are in the files (nullptr: none, the material's colour)
 	std::vector<uint32_t> flats; ///< for each texture, the colour where a material has no picture
@@ -556,7 +675,7 @@ struct ThreeDVehicleShape {
 	static constexpr uint8_t PART_GLASS = 255;  ///< tri_part: the glass, drawn see-through after the rest
 	std::vector<uint8_t> tri_part;      ///< each triangle's part: 0 always, n the part n of the object's states (ThreeDVehicleObject::part_names), or PART_*; empty all 0
 	std::vector<int8_t> tex_addon;      ///< each texture's add-on (ThreeDVehicleObject::addons), -1 none
-	std::vector<uint8_t> corner_wheel;  ///< each corner's wheel that turns, n the wheel n - 1 of ThreeDVehicleObject::model_wheels, 0 none; empty none
+	ThreeDSharedList<uint8_t> corner_wheel;  ///< each corner's wheel that turns, n the wheel n - 1 of ThreeDVehicleObject::model_wheels, 0 none; empty none
 	float glass_alpha = 0.15f;          ///< how much of the glass's colour a layer of it lays over
 	uint32_t own_triangles = 0;         ///< the triangles of its own file, first: then those of its wheels of their own files and of its crew ...
 	uint32_t addons_from = 0;           ///< ... then from this one on those of its add-ons; 0 not known (all of its own file)
@@ -574,6 +693,8 @@ struct ThreeDVehicleShape {
 	std::vector<float> corner_weights;  ///< four a corner: how much each of them moves it
 	/** How many joints at most a figure posed by the card has (ThreeDBonesFrame): its corners name them by a byte. */
 	static constexpr size_t MAX_JOINTS = 256;
+	/** Its corners and triangles held once with the shapes that have the same (ThreeDSharedList::Share()). */
+	void ShareLists() { if (!_three_d_shapes_shared) return; this->pos.Share(); this->nrm.Share(); this->uv.Share(); this->tri.Share(); this->corner_wheel.Share(); }
 	bool HasPart(uint8_t part) const { return std::ranges::find(this->tri_part, part) != this->tri_part.end(); }
 	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty() || this->HasLightsGoingBack(); }
 	/** Whether it has lights of its own for going back first (front_back_lights). */
