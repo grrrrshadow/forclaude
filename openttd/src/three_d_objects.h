@@ -407,6 +407,7 @@ struct ThreeDObject {
 	float stop_turn = 0;      ///< facing, degrees, 0 along +x
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
 	mutable int level_asked = INT_MAX; ///< the finest level of its texture asked for since its finer levels were last let go of (TrimThreeDHouseLevels())
+	mutable bool asked_by_processor = false; ///< its texture asked for by other than the card since then (ThreeDTexturesForCard): its pixels stay
 	mutable std::array<std::shared_ptr<const ThreeDObjectShape>, THREE_D_SHAPE_LEVELS> shapes; ///< its shape simplified, by level, made the first time it is asked for (GetShape())
 	ThreeDUniqueId shape_uid; ///< its own shape's number, for the graphics card (ThreeDObjectShapeView::uid)
 	IndustryType industry = 0xFF; ///< "prumysl" ("druh": "prumysl"): the game's own industry it is, 0xFF none or one the game has not yet
@@ -454,6 +455,7 @@ struct ThreeDObject {
 	ThreeDObjectShapeView GetShape(int level) const;
 	ThreeDObjectShapeView DrawnShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
+	int TryTextureWidth() const;
 	bool TryGetCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<struct ThreeDGpuBuildingPaint> &paints) const;
 	bool CardPaints(uint32_t paint) const;
 	bool DrawnCardPaint(int level, uint32_t paint, const ThreeDObjectTexture *&plain, std::vector<struct ThreeDGpuBuildingPaint> &paints) const;

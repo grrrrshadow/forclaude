@@ -8340,7 +8340,13 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 					b.to_metres = {static_cast<float>(1.0 / OBJECT_UNITS_PER_METRE), static_cast<float>(1.0 / OBJECT_UNITS_PER_METRE), static_cast<float>(1.0 / OBJECT_HEIGHT_PER_METRE)};
 				} else {
 					b.paints.clear();
-					b.textures.push_back(p.o->DrawnTexture(to_underlying(lay.zoom), paint));
+					if (paint == 0) {
+						/* Unpainted, for the card alone: a level it holds may be without its pixels here. */
+						ThreeDTexturesForCard for_card;
+						b.textures.push_back(p.o->DrawnTexture(to_underlying(lay.zoom), 0));
+					} else {
+						b.textures.push_back(p.o->DrawnTexture(to_underlying(lay.zoom), paint));
+					}
 				}
 				for (uint8_t t = 1; t < p.o->Textures(); t++) b.textures.push_back(p.o->DrawnTextureOf(t, to_underlying(lay.zoom), p.o->AddonPaintAt(to.origin, t)));
 				/* A corner to the block: affine, so where its origin and unit steps go. */
@@ -18955,7 +18961,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				/* The palm plantation's part is the tile's ground: the game's laid lower under it (at the same height it
 				 * showed through and flickered), once the part is drawn -- till its texture is read (the houses' wait,
 				 * below), the game's ground as it is. */
-				t.own_ground = forest->whole_ground && drawn->TryGetTexture(0) != nullptr;
+				t.own_ground = forest->whole_ground && drawn->TryTextureWidth() != 0;
 				if (near) {
 					objects.push_back({in, _cur_ti.tile, z});
 					for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, _cur_ti.tile, k), _cur_ti.tile, z});
@@ -19474,9 +19480,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* Near, the spalled places of its concrete (a bridge's piece), each tile its own. */
 		if (c.f < EYE_WALL_DETAIL_UNITS && !o.decal_faces.empty()) DrawEyeObjectDecals(cv, eye, o, co.origin, ox, oy, oz, static_cast<uint32_t>(co.ez));
 		/* Its texture if it is read; else read in the background, the house there the next frame (the player, 17. 10., 4). */
-		const ThreeDObjectTexture *full = o.TryGetTexture(0);
-		if (full == nullptr) continue;
-		double texels_per_unit = o.texels_per_unit > 0 ? o.texels_per_unit : full->w / static_cast<double>(TILE_SIZE);
+		const int full_w = o.TryTextureWidth();
+		if (full_w == 0) continue;
+		double texels_per_unit = o.texels_per_unit > 0 ? o.texels_per_unit : full_w / static_cast<double>(TILE_SIZE);
 		double pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
 		int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
 		/* Its shape as simple as its nearest part allows (ThreeDShapeLevel()). */
@@ -19493,7 +19499,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		extern bool _eye_buildings_card_paint;
 		if (!_eye_buildings_card_paint || !ThreeDGpuAvailable() || !j.o->TryGetCardPaint(j.level, j.paint, j.tex, j.paints)) {
 			j.paints.clear();
-			j.tex = j.o->TryGetTexture(j.level, j.paint);
+			if (j.paint == 0 && ThreeDGpuAvailable()) {
+				/* Unpainted, for the card alone: a level it holds may be without its pixels here (the processor, where
+				 * the card draws no frame, draws such a one in its flat colour that frame). */
+				ThreeDTexturesForCard for_card;
+				j.tex = j.o->TryGetTexture(j.level, 0);
+			} else {
+				j.tex = j.o->TryGetTexture(j.level, j.paint);
+			}
 		}
 		j.shape = j.o->TryGetShape(j.shape_level);
 		/* Its add-ons' textures too; one not made yet, its triangles not this frame. */
@@ -20383,9 +20396,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			/* Near and on the far land: the lights of the towns on the horizon. */
 			if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y) || c.f > CAB_FAR_OBJECT_TILES * TILE_SIZE) continue;
 			/* The texture at the level of detail of its distance, as the house (4b. above); one not read yet, not this frame. */
-			const ThreeDObjectTexture *full = o.TryGetTexture(0);
-			if (full == nullptr) continue;
-			const double texels_per_unit = full->w / static_cast<double>(TILE_SIZE), pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
+			const int full_w = o.TryTextureWidth();
+			if (full_w == 0) continue;
+			const double texels_per_unit = full_w / static_cast<double>(TILE_SIZE), pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
 			const int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
 			if (!o.night_tri.empty()) {
 				/* An add-on's lamp in the add-on's texture, in its colour at this place: those of its windows only. */
