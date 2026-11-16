@@ -12326,7 +12326,10 @@ const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 		std::vector<ThreeDWalkingCrew> found;
 		auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
 			const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
-			if (fig == nullptr) return;
+			if (fig == nullptr) {
+				Debug(misc, 0, "3D vehicle {}: the figure {} of its crew is not there", this->name, c.figure);
+				return;
+			}
 			const bool walks = fig->Walks() || c.on_seat;
 			if (!walks && _three_d_crew_in_shape) return;                     // of the vehicle's shape (AddCrewFigure())
 			/* One that sits still: the driver -- at the eye of the cab -- and one at the driver's seat are not drawn

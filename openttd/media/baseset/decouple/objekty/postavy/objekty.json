@@ -362,5 +362,25 @@
   "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_vzv (kostra modelu, IK obou rukou), bez renderu",
   "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
   "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole), čelem k +x, metry; při své velikosti (1,62 m) má chodidla 0,20 m pod sedem. Je udělaný pro vysokozdvižný vozík Specialu 3D (special_vzv) s meritko 1,25: sed na přední hraně polštáře sedačky, volant (věnec 0,195 m, sklon 29,8°) střed 0,489 m před sedem a 0,306 m nad ním. Kreslený Mat má na nízký volant vozíku krátké ruce, proto 1,25. Při jiném meritko ruce volant mine. Barvy bez textur, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "mat_jesterka.glb",
+  "jmeno": "mat_jesterka",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "Mat řídí ještěrku: sedí, stehna dopředu, lýtka dolů, trup mírně předkloněný (6°), hlava na cestu, obě dlaně na věnci velkého volantu 60° od jeho bližšího kraje na každou stranu (hráč: „udělej i special, ještěrku a unc“, řidiči „holky a Mat z konfigurátoru“); jedna póza",
+  "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_jesterka (kostra modelu, IK obou rukou), bez renderu",
+  "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole), čelem k +x, metry; při své velikosti (1,62 m) má chodidla 0,20 m pod sedem. Je udělaný pro ještěrku Specialu 3D (special_jesterka) s meritko 1,25: sed na přední hraně polštáře levé sedačky, volant (věnec 0,293 m, sklon 11,4°) střed 0,308 m před sedem a 0,676 m nad ním. Při jiném meritko ruce volant mine. Barvy bez textur, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "mat_unc.glb",
+  "jmeno": "mat_unc",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "Mat řídí nakladač UNC: sedí v kabině, stehna dopředu, lýtka dolů, trup předkloněný (14°), hlava na cestu, obě dlaně na hlavicích dvou pák (hráč: „udělej i special, ještěrku a unc“, řidiči „holky a Mat z konfigurátoru“); jedna póza",
+  "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_unc (kostra modelu, IK obou rukou), bez renderu",
+  "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole), čelem k +x, metry; chodidla 0,20 m pod sedem, temeno 1,27 m nad ním. Je udělaný pro nakladač UNC Specialu 3D (special_unc) s meritko 1: sed na přední hraně naší sedačky v kabině, hlavice pák 0,22 m před sedem, 0,30 m nad ním a 0,22 m na každou stranu (pod střechou kabiny je nad sedem 1,35 m, proto ne 1,25 jako u vozíku a ještěrky). Při jiném meritko ruce páky minou. Barvy bez textur, s normálami; nikdy nebledne"
  }
 ]
