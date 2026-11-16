@@ -142,7 +142,7 @@ void MakeThreeDPicturesAtOnce(const std::function<void()> &ask);
 extern bool _three_d_pictures_stand_in; ///< drawing the map: pictures not made yet stand in for by the nearest made, made on the thread
 uint64_t ThreeDStandInsGiven();
 bool ThreeDPictureStandsIn(const ThreeDModelPicture *pic);
-void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int z1);
+void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int z1, bool mover = false);
 void StopThreeDPictureThread();
 const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN, const float *rise = nullptr);
 std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, const float *rise = nullptr);

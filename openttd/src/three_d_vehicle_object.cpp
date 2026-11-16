@@ -3026,7 +3026,7 @@ static bool _picture_none_owed = false;
 /** The pictures given to stand in since the pictures last came, how many, and the places drawn with them, drawn again when they come. */
 static std::set<const ThreeDModelPicture *> _stand_in_pictures;
 static uint64_t _stand_ins_given = 0;
-static std::vector<std::array<double, 6>> _boxes_owed_pictures;
+static std::vector<std::array<double, 7>> _boxes_owed_pictures;
 
 /** How many pictures stood in so far: a building drawn with one has its box drawn again when the pictures come (OweThreeDPictureBox()). */
 uint64_t ThreeDStandInsGiven()
@@ -3041,9 +3041,12 @@ bool ThreeDPictureStandsIn(const ThreeDModelPicture *pic)
 }
 
 /** A box of the world drawn with a picture standing in: drawn again when the pictures come (TakePicturesMade()). */
-void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int z1)
+static bool _card_vehicles_as_kept = false;   ///< the moving layer's pass is on (owed places then the layer's alone: OweThreeDPictureBox())
+void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int z1, bool mover)
 {
-	if (_boxes_owed_pictures.size() < 4096) _boxes_owed_pictures.push_back({x0, y0, x1, y1, static_cast<double>(z0), static_cast<double>(z1)});
+	/* Owed in the moving layer's pass: all of it moves (OweCardPlace()). */
+	mover = mover || _card_vehicles_as_kept;
+	if (_boxes_owed_pictures.size() < 4096) _boxes_owed_pictures.push_back({x0, y0, x1, y1, static_cast<double>(z0), static_cast<double>(z1), mover ? 1.0 : 0.0});
 }
 
 /**
@@ -3070,10 +3073,10 @@ static bool TakePicturesMade()
 	const bool loads = _loads_came.exchange(false);
 	if (done.empty() && !loads) return false;
 	/* The places drawn with pictures standing in drawn again: with these, or with the nearest again till theirs come. */
-	std::vector<std::array<double, 6>> owed;
+	std::vector<std::array<double, 7>> owed;
 	owed.swap(_boxes_owed_pictures);
 	if (!done.empty()) _stand_in_pictures.clear();
-	for (const auto &b : owed) MarkWorldBoxDirty(b[0], b[1], b[2], b[3], static_cast<int>(b[4]), static_cast<int>(b[5]));
+	for (const auto &b : owed) MarkWorldBoxDirty(b[0], b[1], b[2], b[3], static_cast<int>(b[4]), static_cast<int>(b[5]), b[6] != 0);
 	return true;
 }
 
@@ -3368,7 +3371,6 @@ struct CardVehicleKept {
 	uint64_t used = 0; ///< the pass it was asked for last
 };
 static std::unordered_map<uint64_t, CardVehicleKept> _card_vehicles_kept; ///< by its key; the main thread's
-static bool _card_vehicles_as_kept = false;   ///< the moving layer's pass is on
 static uint64_t _card_vehicles_kept_pass = 0;
 static uint64_t _card_vehicles_kept_given = 0;
 
@@ -3535,6 +3537,10 @@ uint64_t TakeThreeDCardVehiclesAsKept()
  */
 static void OweCardPlace(int x, int y, int z, int reach, int height)
 {
+	/* Owed by the moving layer's pass (_card_vehicles_as_kept): that layer laid again, not what stands there -- every
+	 * shape, texture or picture that came had all the buildings about each such thing laid again by the card (the
+	 * player's log of 16. 11., build #373: by night 3 million triangles of buildings in the blocks of 5 s at zoom 3,
+	 * 7 frames a second; the rig on the save: 25 such places a frame by night, 8 by day). */
 	OweThreeDPictureBox(x - reach, y - reach, x + reach, y + reach, z - TILE_HEIGHT, z + height + reach);
 }
 
