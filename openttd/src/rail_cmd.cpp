@@ -3074,7 +3074,9 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 	static constexpr std::array<std::array<double, 2>, 3> CABLES{{{9.6, 25.95}, {9.6, 18.75}, {5.28, 18.68}}};
 	static constexpr double PYLON_TALL_M = 30.3, PYLON_HALF_M = 9.6;
 	static constexpr int PYLON_EVERY = 3;
-	static const uint32_t CABLE_COLOUR = Colour(40, 42, 46).data;
+	/* Light, as from above (GetThreeDWires(): 150, 154, 146), the pylons dark (the player, 16. 11.: "we darkened the
+	 * pylons from above and lightened the wires; in 3D thick black wires and pale thin pylons stayed"). */
+	static const uint32_t CABLE_COLOUR = Colour(150, 154, 146).data;
 	const TileIndex tile = ti->tile;
 	const int tx = TileX(tile), ty = TileY(tile);
 	const double ox = tx * TILE_SIZE, oy = ty * TILE_SIZE;

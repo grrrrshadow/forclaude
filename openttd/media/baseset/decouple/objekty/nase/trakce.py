@@ -50,10 +50,8 @@ def lattice_png():
     """The lattice of a mast's face: two chords at its sides, a zigzag of diagonals between them, a batten now and then;
     the rest transparent (0, 0, 0, 0: cut out)."""
     im = Image.new('RGBA', (TEX_W, TEX_H), (0, 0, 0, 0))
-    # darker than the first ones (88, 98, 92 / 60, 68, 64): from the eyes in the sun the lattice was pale beside the
-    # wires (the player, 16. 11.: "in 3D ... the pale thin masts stayed")
-    steel = (58, 64, 60, 255)
-    dark = (38, 43, 40, 255)
+    steel = (88, 98, 92, 255)
+    dark = (60, 68, 64, 255)
     px = im.load()
     for y in range(TEX_H):
         for x in (0, 1, TEX_W - 2, TEX_W - 1):
