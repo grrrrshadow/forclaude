@@ -365,7 +365,9 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 					this->done = "nahoru: z couvani dopredu";
 					return true;
 				}
-				if ((backwards_too || ship) && key == DirectionKey::Down) {
+				/* A train too stops from the slowest (the player, 16. 11., in the Sergej: "again as on the boat I cannot
+				 * stop, it goes 5 km/h and less it will not"); backwards it does not go from here. */
+				if ((backwards_too || ship || v->type == VehicleType::Train) && key == DirectionKey::Down) {
 					/* Stopped already: held on, it goes backwards (below). At the slowest: it stops. */
 					if (v->vehstatus.Test(VehState::Stopped)) return true;
 					if (v->cab_speed_limit != 0 && v->cab_speed_limit <= CAB_SLOWEST) {
