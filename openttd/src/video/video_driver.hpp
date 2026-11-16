@@ -148,6 +148,7 @@ public:
 		float strength;  ///< how much of it is added in its middle
 		float order = 0; ///< how near its lamp is, as the order of over's pixels (over_order of ShowThreeDPicture()): not over a pixel nearer; 0 over all
 		float order_down = 0; ///< how much less near a pixel lower of it is: the glow a disc standing upright at its lamp
+		bool unseen = false;  ///< shown whether the picture has a lit pixel near its middle or not (the pool of headlights on the ground)
 	};
 
 	/**

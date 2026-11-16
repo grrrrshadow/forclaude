@@ -238,6 +238,12 @@ bool DirtyPlaceIsMover()
 	return _dirty_place.mover;
 }
 
+/** Whether what the game marks dirty now is a mover whose lights at night the card has (DirtyPlace::lights_told). */
+bool DirtyPlaceLightsTold()
+{
+	return _dirty_place.lights_told;
+}
+
 /** Whether what the game marks dirty now is only what the processor draws over the card's picture (DirtyPlace::screen_only). */
 bool DirtyPlaceIsScreenOnly()
 {

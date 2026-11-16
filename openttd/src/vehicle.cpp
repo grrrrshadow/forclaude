@@ -2281,6 +2281,7 @@ static DirtyPlace VehicleDirtyPlace(const Vehicle *v)
 	place.ay = v->y_pos;
 	place.az = v->z_pos;
 	place.mover = true;
+	place.lights_told = true;
 	return place;
 }
 
@@ -2343,6 +2344,7 @@ void Vehicle::UpdateViewport(bool dirty)
 					std::abs(this->sprite_cache.old_coord.right - this->coord.right) <= jump && std::abs(this->sprite_cache.old_coord.bottom - this->coord.bottom) <= jump;
 			DirtyPlace jumped;
 			jumped.mover = true;
+			jumped.lights_told = true;
 			DirtyPlaceScope place(near ? VehicleDirtyPlace(this) : jumped);
 			this->sprite_cache.is_viewport_candidate = ::MarkAllViewportsDirty(
 				std::min(this->sprite_cache.old_coord.left, this->coord.left),

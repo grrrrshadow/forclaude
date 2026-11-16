@@ -1216,7 +1216,8 @@ void OpenGLBackend::Paint()
 					/* Its middle in the picture's lit pixels, and one of them, as the picture is laid over the window (part). */
 					const float u = pic.part[0] + (g.x - pic.r.left) / rw * pic.part[2], v = pic.part[1] + (g.y - pic.r.top) / rh * pic.part[3];
 					_glUniform4f(this->three_d_glow_lit_loc, u, v, pic.part[2] / rw, pic.part[3] / rh);
-					_glUniform4f(this->three_d_glow_colour_loc, g.r / 255.0f, g.g / 255.0f, g.b / 255.0f, g.strength);
+					/* (Its strength negative: shown without a lit pixel near, ThreeDGlow::unseen.) */
+					_glUniform4f(this->three_d_glow_colour_loc, g.r / 255.0f, g.g / 255.0f, g.b / 255.0f, g.unseen ? -g.strength : g.strength);
 					_glUniform4f(this->three_d_glow_order_loc, pic.over_order != 0 ? g.order : 0.0f, g.rx, g.ry, g.order_down);
 					/* Exactly its ellipse: the pixels whose middles are in it, as the processor's (AddNightLight()). */
 					_glUniform4f(this->three_d_glow_sprite_loc, g.x - g.rx, g.y - g.ry, 2.0f * g.rx, 2.0f * g.ry);

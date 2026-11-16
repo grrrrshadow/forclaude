@@ -295,8 +295,8 @@ static const char *_frag_shader_three_d_glow[] = {
 	"  }",
 	"  float lit = 0.0;",
 	"  for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) lit = max(lit, texture2D(over_lit_tex, lit_at.xy + vec2(float(x), float(y)) * lit_at.zw).r);",
-	"  if (lit < 0.002) discard;",
-	"  float f = glow.a * (1.0 - d2) * (1.0 - d2);",
+	"  if (glow.a > 0.0 && lit < 0.002) discard;",
+	"  float f = abs(glow.a) * (1.0 - d2) * (1.0 - d2);",
 	"  gl_FragData[0] = vec4(glow.rgb * f, 1.0);",
 	"}",
 };
@@ -327,8 +327,8 @@ static const char *_frag_shader_three_d_glow_150[] = {
 	"  }",
 	"  float lit = 0.0;",
 	"  for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) lit = max(lit, texture(over_lit_tex, lit_at.xy + vec2(float(x), float(y)) * lit_at.zw).r);",
-	"  if (lit < 0.002) discard;",
-	"  float f = glow.a * (1.0 - d2) * (1.0 - d2);",
+	"  if (glow.a > 0.0 && lit < 0.002) discard;",
+	"  float f = abs(glow.a) * (1.0 - d2) * (1.0 - d2);",
 	"  colour = vec4(glow.rgb * f, 1.0);",
 	"}",
 };

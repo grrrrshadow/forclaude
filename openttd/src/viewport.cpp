@@ -2173,6 +2173,7 @@ struct TurnedCardGlow {
 	bool house = false; ///< a light of a building or of a thing standing (its "svetlo_NN", _night_glows), told with what the card laid there; else a vehicle's, told by its block
 	float order = 0;    ///< how near its lamp is (TurnedOrder()): not over what stands nearer (VideoDriver::ThreeDGlow::order); 0 over all
 	float order_down = 0; ///< how much less near a pixel lower of it is (VideoDriver::ThreeDGlow::order_down, TurnedGlowOrderDown())
+	bool unseen = false;  ///< shown whether a lit pixel is near its middle or not: the pool of a vehicle's headlights on the ground (VideoDriver::ThreeDGlow::unseen)
 };
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
@@ -7166,6 +7167,7 @@ struct TurnedCardGround {
 	int view = 0;                  ///< its pictures on the card (ThreeDGpuGround::view): 0 the main view's, another a small view's
 	uint64_t ground_key = 1;       ///< its kept ground's texture on the card (ThreeDGpuGroundTexture::key)
 	std::vector<TurnedCardGlow> glows; ///< at night: of all the blocks the card laid, each where its block put it
+	std::vector<TurnedCardGlow> mover_glows; ///< at night, the moving layer on: the lights of what moves, of all the view, told each time they are laid (TurnedMoverGlows())
 	ZoomLevel glows_zoom = ZoomLevel::Normal; ///< the zoom they are of
 	bool glows_told = false;       ///< the video driver has some of them (VideoDriver::SetThreeDGlows())
 	uint64_t laid_pass = UINT64_MAX; ///< the pass of DrawDirtyBlocks() whose dirty part of the view the card laid at once (TurnedCardLayDirty()); else none
@@ -9520,17 +9522,66 @@ static void TurnedCardGlowsShow(const Viewport &vp)
 {
 	TurnedCardGround &card = *_tcg;
 	if (card.vp != &vp || !card.shown || !_night_windows_now || card.glows_zoom != vp.zoom) card.glows.clear();
-	if (card.glows.empty() && !card.glows_told) return;
+	if (card.vp != &vp || !card.shown || !_night_windows_now || !_turned_moving_layer) card.mover_glows.clear();
+	if (card.glows.empty() && card.mover_glows.empty() && !card.glows_told) return;
 	std::vector<VideoDriver::ThreeDGlow> glows;
-	glows.reserve(card.glows.size());
+	glows.reserve(card.glows.size() + card.mover_glows.size());
 	const int ox = vp.left - UnScaleByZoomLower(vp.virtual_left, vp.zoom), oy = vp.top - UnScaleByZoomLower(vp.virtual_top, vp.zoom);
-	for (const TurnedCardGlow &g : card.glows) {
-		const float x = g.x + ox, y = g.y + oy;
-		if (x + g.rx < vp.left || y + g.ry < vp.top || x - g.rx > vp.left + vp.width || y - g.ry > vp.top + vp.height) continue;
-		glows.push_back({x, y, g.rx, g.ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength, g.order, g.order_down});
+	/* The pools on the ground first, the lamps over them. */
+	for (const std::vector<TurnedCardGlow> *list : {&card.mover_glows, &card.glows}) {
+		for (const TurnedCardGlow &g : *list) {
+			const float x = g.x + ox, y = g.y + oy;
+			if (x + g.rx < vp.left || y + g.ry < vp.top || x - g.rx > vp.left + vp.width || y - g.ry > vp.top + vp.height) continue;
+			glows.push_back({x, y, g.rx, g.ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength, g.order, g.order_down, g.unseen});
+		}
 	}
 	card.glows_told = !glows.empty();
 	VideoDriver::GetInstance()->SetThreeDGlows(&card, std::move(glows));
+}
+
+static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double unit, const std::function<void(double, double, double, double &, double &)> &project,
+		const std::function<void(double, double, double, double, Colour, double)> &shine, const std::function<void(double, double, double, double, Colour, double)> &spill);
+
+/**
+ * Whether the lights of what moves on the turned main view are the card's, told once a frame with its moving layer
+ * (TurnedMoverGlows()), not painted by the processor into each block (DrawNight()): at night, the block being drawn
+ * one of the turned main view.
+ */
+static bool TurnedMoverGlowsOn()
+{
+	return _turned_moving_layer && _tcg == &_turned_card_ground && _night_windows_now;
+}
+
+/**
+ * The lights of what moves on the turned main view (NightMoverLights()) as glows of the card over its picture
+ * (TurnedCardGround::mover_glows), all of the view at once: after its moving layer is laid (TurnedCardLayMovers()),
+ * the block being drawn all the view.
+ * @param vp the turned main view
+ */
+static void TurnedMoverGlows(const Viewport &vp)
+{
+	TurnedCardGround &card = *_tcg;
+	card.mover_glows.clear();
+	if (TurnedMoverGlowsOn()) {
+		const DrawPixelInfo &dpi = _vd.dpi;
+		const int w = UnScaleByZoom(dpi.width, dpi.zoom), h = UnScaleByZoom(dpi.height, dpi.zoom);
+		const double scale = 1.0 / (1 << to_underlying(dpi.zoom));
+		const int vs = ScaleByZoom(1, dpi.zoom), bl = dpi.left / vs, bt = dpi.top / vs;
+		auto project = [&](double x, double y, double z, double &px, double &py) {
+			double vx, vy;
+			ProjectTurnedF(x, y, z, vx, vy);
+			px = (vx - dpi.left) * scale;
+			py = (vy - dpi.top) * scale;
+		};
+		auto glow = [&](double px, double py, double rx, double ry, Colour colour, double strength, bool unseen) {
+			if (px + rx < 0 || py + ry < 0 || px - rx >= w || py - ry >= h) return;
+			card.mover_glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength), false, 0, 0, unseen});
+		};
+		NightMoverLights(dpi.zoom, true, w, h, 2 * ZOOM_BASE * scale, project,
+				[&](double px, double py, double rx, double ry, Colour colour, double strength) { glow(px, py, rx, ry, colour, strength, false); },
+				[&](double px, double py, double rx, double ry, Colour colour, double strength) { glow(px, py, rx, ry, colour, strength, true); });
+	}
+	TurnedCardGlowsShow(vp);
 }
 
 /** The glow of a light of a building at night (its "svetlo_NN"): its colour, its half width in units of the world along the ground, how strong. */
@@ -9575,122 +9626,52 @@ static TurnedCardGlow TurnedHouseGlow(const std::array<double, 4> &g, ZoomLevel 
 }
 
 /**
- * The night (gui.night, the player: "a dark mode, and it will make night, as if it were night, and the cars will
- * shine"): the block just drawn darkened as under the moon, and the lights of the vehicles in it -- two headlights at
- * the front of a road vehicle, a train or a ship, with the pool of their light on the way ahead; the red lights at
- * the back of its last part; an aircraft's landing light and its red beacon blinking. Only the picture, at 32bpp;
- * the vehicles' boxes have room for the lights (Vehicle::UpdateBoundingBoxCoordinates()).
- * @param turned whether the block was drawn turned (three_d.h)
+ * The lights of the things that move at night -- the vehicles and the cars of the game's own --, as DrawNight() shows
+ * them: the lamps of a vehicle's model where they are in it (or two at the front and two red at the back of one
+ * without), the pools of its headlights on the way ahead, an aircraft's landing light and beacon.
+ * For a block of a view (DrawNight()), or for all the turned main view at once, given to the card as glows
+ * (TurnedMoverGlows()): the player, 16. 11., "it got worse when I set the night" -- every lit vehicle had the screen
+ * about it and the ground under its pool drawn again at each step, for the processor to paint its lights there.
+ * @param zoom the zoom of the view
+ * @param turned whether it is turned
+ * @param w,h the size of what is drawn, its pixels
+ * @param unit a unit of the world along the ground, in those pixels
+ * @param project a point of the world to a pixel of it
+ * @param shine a lamp's glow, shown where its lit glass is seen: its middle, half its width and height, colour, strength
+ * @param spill a light shown whatever is there (a pool on the ground)
  */
-static void DrawNight(bool turned)
+static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double unit, const std::function<void(double, double, double, double &, double &)> &project,
+		const std::function<void(double, double, double, double, Colour, double)> &shine, const std::function<void(double, double, double, double, Colour, double)> &spill)
 {
-	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return;
-	const DrawPixelInfo &dpi = _vd.dpi;
-	const int w = UnScaleByZoom(dpi.width, dpi.zoom), h = UnScaleByZoom(dpi.height, dpi.zoom);
-	if (w <= 0 || h <= 0) return;
-	/* The lit windows that are still as they were drawn: nothing came over them since. */
-	std::erase_if(_night_lit, [](const auto &p) { return *p.first != p.second; });
-	std::erase_if(_night_lit_through, [](const NightLitThrough &p) { return *p.at != p.drawn; });
-	const NightLight moon = GetNightLight();
-	BlitterFactory::GetCurrentBlitter()->DarkenRect(dpi.dst_ptr, w, h, moon.r, moon.g, moon.b);
-	for (const auto &[at, colour] : _night_lit) *at = colour;
-	/* The see-through lit ones: their own light given back as the darkening took it (DarkenRect()). */
-	for (const NightLitThrough &p : _night_lit_through) {
-		const Colour d(*p.at);
-		auto back = [](uint8_t now, uint8_t own, uint m) { return static_cast<uint8_t>(std::min<uint>(255, now + own - (own * m >> 8))); };
-		*p.at = Colour(back(d.r, p.own.r, moon.r), back(d.g, p.own.g, moon.g), back(d.b, p.own.b, moon.b), d.a).data;
-	}
-
-	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
-	const double scale = 1.0 / (1 << to_underlying(dpi.zoom));
-	auto project = [&](double x, double y, double z, double &px, double &py) {
-		double vx, vy;
-		if (turned) {
-			ProjectTurnedF(x, y, z, vx, vy);
-		} else {
-			RemapCoordsF(x, y, z, vx, vy);
-		}
-		px = (vx - dpi.left) * scale;
-		py = (vy - dpi.top) * scale;
-	};
-	/* A unit of the world along the ground, in pixels of the block (as wide as the map draws it). */
-	const double unit = 2 * ZOOM_BASE * scale;
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
-	/* The pixels of the lit glass left lit (the windows of the houses, the lights of the vehicles' models): the glow of
-	 * a light only where they are seen -- one on the far side of a house, or hidden behind another, has none left. */
-	std::vector<uint8_t> seen;
-	auto lit_near = [&](int cx, int cy) {
-		if (seen.empty()) {
-			seen.assign(static_cast<size_t>(w) * h, 0);
-			for (const auto &[at, colour] : _night_lit) {
-				const ptrdiff_t i = at - dst;
-				if (i < 0) continue;
-				const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
-				if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
-			}
-		}
-		for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {
-			for (int x = std::max(0, cx - 2); x <= std::min(w - 1, cx + 2); x++) {
-				if (seen[static_cast<size_t>(y) * w + x]) return true;
-			}
-		}
-		return false;
-	};
-	/* The block's glows of the card before (TurnedCardGlow) go: those of now are told below. */
-	const int vs = ScaleByZoom(1, dpi.zoom), bl = dpi.left / vs, bt = dpi.top / vs;
-	if (turned) {
-		if (_tcg->glows_zoom != dpi.zoom) {
-			_tcg->glows.clear();
-			_tcg->glows_zoom = dpi.zoom;
-		}
-		/* A block only a hole for what the card laid at once keeps its buildings' glows: they came with that. */
-		std::erase_if(_tcg->glows, [&](const TurnedCardGlow &g) { return (!_night_block_hole || !g.house) && g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
-	}
-	/* A glow seen only by a lit pixel near it: by the card's where it laid the block (_night_card_lit), else here. */
-	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength, bool house = false, float order = 0) {
-		if (turned && _night_card_lit) {
-			if (px >= 0 && py >= 0 && px < w && py < h) _tcg->glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength), house, order, order != 0 ? TurnedGlowOrderDown(dpi.zoom) : 0.0f});
-			return;
-		}
-		if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, rx, ry, colour, strength);
-	};
-	/* The glows of the houses' lights (their "svetlo_NN"): small and warm (TurnedHouseGlow()); a hole has them already. */
-	if (turned && _night_block_hole) _night_glows.clear();
-	const Colour window = TURNED_HOUSE_GLOW_COLOUR;
-	for (const auto &g : _night_glows) {
-		double px, py;
-		project(g[0], g[1], g[2], px, py);
-		if (px < 0 || py < 0 || px >= w || py >= h) continue;
-		lit_glow(px, py, TURNED_HOUSE_GLOW_SIZE * unit * g[3], TURNED_HOUSE_GLOW_SIZE * unit * g[3], window, TURNED_HOUSE_GLOW_STRENGTH, true, turned ? TurnedGlowOrder(g) : 0.0f);
-	}
 	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block; braking,
 	 * its red lights glow more (VehicleBrakeLightsOn()). */
 	auto model_light = [&](double hx, double hy, const ThreeDPictureLight &l, bool braking = false) {
 		const double px = hx + l.x, py = hy + l.y;
 		switch (l.kind) {
 			case ThreeDPictureLight::Kind::Front:
-				lit_glow(px, py, 1.2 * unit, 1.2 * unit, lamp, 0.55);
+				shine(px, py, 1.2 * unit, 1.2 * unit, lamp, 0.55);
 				break;
 			case ThreeDPictureLight::Kind::Back:
 				if (braking) {
-					lit_glow(px, py, 1.3 * unit, 1.3 * unit, tail, 0.9);
+					shine(px, py, 1.3 * unit, 1.3 * unit, tail, 0.9);
 				} else {
-					lit_glow(px, py, 0.7 * unit, 0.7 * unit, tail, 0.6);
+					shine(px, py, 0.7 * unit, 0.7 * unit, tail, 0.6);
 				}
 				break;
 			case ThreeDPictureLight::Kind::PoolNear:
-				AddNightLight(dst, dpi.pitch, w, h, px, py, 4 * unit, 2 * unit, pool, 0.4);
+				spill(px, py, 4 * unit, 2 * unit, pool, 0.4);
 				break;
 			case ThreeDPictureLight::Kind::Pool:
-				AddNightLight(dst, dpi.pitch, w, h, px, py, 8 * unit, 4 * unit, pool, 0.4);
+				spill(px, py, 8 * unit, 4 * unit, pool, 0.4);
 				break;
 		}
 	};
 	/* The cars of the game's own driving about (three_d_walkers.h), only on the turned view. */
 	if (turned) {
-		ForEachThreeDDriverLight(dpi.zoom, [&](int x, int y, int z, const ThreeDPictureLight &l) {
+		ForEachThreeDDriverLight(zoom, [&](int x, int y, int z, const ThreeDPictureLight &l) {
 			double hx, hy;
 			project(x, y, z, hx, hy);
 			model_light(hx, hy, l);
@@ -9740,11 +9721,11 @@ static void DrawNight(bool turned)
 			const bool round = turned && GetRoundTrackPose(v, pose);
 			/* Its model's lights as placed, found once a frame for the zoom and the way it is drawn: a vehicle near the
 			 * edges of several blocks was placed again for each. */
-			const auto key = std::make_tuple(v->index.base(), to_underlying(dpi.zoom), turned, ViewportVehiclesOnCard());
+			const auto key = std::make_tuple(v->index.base(), to_underlying(zoom), turned, ViewportVehiclesOnCard());
 			auto found = lit_models.find(key);
 			if (found == lit_models.end()) {
 				LitModel m;
-				m.ok = GetThreeDVehicleObjectLights(v, dpi.zoom, round ? &pose : nullptr, m.lights, m.ax, m.ay, m.az);
+				m.ok = GetThreeDVehicleObjectLights(v, zoom, round ? &pose : nullptr, m.lights, m.ax, m.ay, m.az);
 				found = lit_models.emplace(key, std::move(m)).first;
 			}
 			if (found->second.ok) {
@@ -9767,10 +9748,10 @@ static void DrawNight(bool turned)
 			/* Its landing light ahead, and the red beacon on its back, blinking. */
 			double px, py;
 			project(v->x_pos + fx * 6, v->y_pos + fy * 6, z + 2, px, py);
-			AddNightLight(dst, dpi.pitch, w, h, px, py, 3 * unit, 3 * unit, lamp, 0.9);
+			spill(px, py, 3 * unit, 3 * unit, lamp, 0.9);
 			if ((TimerGameTick::counter + v->index.base() * 7) % 32 < 6) {
 				project(v->x_pos, v->y_pos, z + 6, px, py);
-				AddNightLight(dst, dpi.pitch, w, h, px, py, 2 * unit, 2 * unit, beacon, 1.0);
+				spill(px, py, 2 * unit, 2 * unit, beacon, 1.0);
 			}
 			continue;
 		}
@@ -9779,12 +9760,12 @@ static void DrawNight(bool turned)
 			/* The pool of the light on the way ahead, then the two lamps. */
 			double px, py;
 			project(v->x_pos + fx * (half + 9), v->y_pos + fy * (half + 9), z, px, py);
-			AddNightLight(dst, dpi.pitch, w, h, px, py, 9 * unit, 4.5 * unit, pool, 0.45);
+			spill(px, py, 9 * unit, 4.5 * unit, pool, 0.45);
 			project(v->x_pos + fx * (half + 4), v->y_pos + fy * (half + 4), z, px, py);
-			AddNightLight(dst, dpi.pitch, w, h, px, py, 5 * unit, 2.5 * unit, pool, 0.5);
+			spill(px, py, 5 * unit, 2.5 * unit, pool, 0.5);
 			for (int side = -1; side <= 1; side += 2) {
 				project(v->x_pos + fx * half + sx * side * 1.5, v->y_pos + fy * half + sy * side * 1.5, z + 2, px, py);
-				AddNightLight(dst, dpi.pitch, w, h, px, py, 1.6 * unit, 1.6 * unit, lamp, 1.2);
+				spill(px, py, 1.6 * unit, 1.6 * unit, lamp, 1.2);
 			}
 		}
 		if (last && v->type != VehicleType::Ship) {
@@ -9793,9 +9774,107 @@ static void DrawNight(bool turned)
 			for (int side = -1; side <= 1; side += 2) {
 				double px, py;
 				project(v->x_pos - fx * half + sx * side * 1.5, v->y_pos - fy * half + sy * side * 1.5, z + 2, px, py);
-				AddNightLight(dst, dpi.pitch, w, h, px, py, r * unit, r * unit, tail, 0.9);
+				spill(px, py, r * unit, r * unit, tail, 0.9);
 			}
 		}
+	}
+}
+
+/**
+ * The night (gui.night, the player: "a dark mode, and it will make night, as if it were night, and the cars will
+ * shine"): the block just drawn darkened as under the moon, and the lights of the vehicles in it -- two headlights at
+ * the front of a road vehicle, a train or a ship, with the pool of their light on the way ahead; the red lights at
+ * the back of its last part; an aircraft's landing light and its red beacon blinking. Only the picture, at 32bpp;
+ * the vehicles' boxes have room for the lights (Vehicle::UpdateBoundingBoxCoordinates()).
+ * @param turned whether the block was drawn turned (three_d.h)
+ */
+static void DrawNight(bool turned)
+{
+	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return;
+	const DrawPixelInfo &dpi = _vd.dpi;
+	const int w = UnScaleByZoom(dpi.width, dpi.zoom), h = UnScaleByZoom(dpi.height, dpi.zoom);
+	if (w <= 0 || h <= 0) return;
+	/* The lit windows that are still as they were drawn: nothing came over them since. */
+	std::erase_if(_night_lit, [](const auto &p) { return *p.first != p.second; });
+	std::erase_if(_night_lit_through, [](const NightLitThrough &p) { return *p.at != p.drawn; });
+	const NightLight moon = GetNightLight();
+	BlitterFactory::GetCurrentBlitter()->DarkenRect(dpi.dst_ptr, w, h, moon.r, moon.g, moon.b);
+	for (const auto &[at, colour] : _night_lit) *at = colour;
+	/* The see-through lit ones: their own light given back as the darkening took it (DarkenRect()). */
+	for (const NightLitThrough &p : _night_lit_through) {
+		const Colour d(*p.at);
+		auto back = [](uint8_t now, uint8_t own, uint m) { return static_cast<uint8_t>(std::min<uint>(255, now + own - (own * m >> 8))); };
+		*p.at = Colour(back(d.r, p.own.r, moon.r), back(d.g, p.own.g, moon.g), back(d.b, p.own.b, moon.b), d.a).data;
+	}
+
+	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
+	const double scale = 1.0 / (1 << to_underlying(dpi.zoom));
+	auto project = [&](double x, double y, double z, double &px, double &py) {
+		double vx, vy;
+		if (turned) {
+			ProjectTurnedF(x, y, z, vx, vy);
+		} else {
+			RemapCoordsF(x, y, z, vx, vy);
+		}
+		px = (vx - dpi.left) * scale;
+		py = (vy - dpi.top) * scale;
+	};
+	/* A unit of the world along the ground, in pixels of the block (as wide as the map draws it). */
+	const double unit = 2 * ZOOM_BASE * scale;
+	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
+	/* The pixels of the lit glass left lit (the windows of the houses, the lights of the vehicles' models): the glow of
+	 * a light only where they are seen -- one on the far side of a house, or hidden behind another, has none left. */
+	std::vector<uint8_t> seen;
+	auto lit_near = [&](int cx, int cy) {
+		if (seen.empty()) {
+			seen.assign(static_cast<size_t>(w) * h, 0);
+			for (const auto &[at, colour] : _night_lit) {
+				const ptrdiff_t i = at - dst;
+				if (i < 0) continue;
+				const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
+				if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
+			}
+		}
+		for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {
+			for (int x = std::max(0, cx - 2); x <= std::min(w - 1, cx + 2); x++) {
+				if (seen[static_cast<size_t>(y) * w + x]) return true;
+			}
+		}
+		return false;
+	};
+	/* The block's glows of the card before (TurnedCardGlow) go: those of now are told below. */
+	const int vs = ScaleByZoom(1, dpi.zoom), bl = dpi.left / vs, bt = dpi.top / vs;
+	if (turned) {
+		if (_tcg->glows_zoom != dpi.zoom) {
+			_tcg->glows.clear();
+			_tcg->glows_zoom = dpi.zoom;
+		}
+		/* A block only a hole for what the card laid at once keeps its buildings' glows: they came with that. */
+		std::erase_if(_tcg->glows, [&](const TurnedCardGlow &g) { return (!_night_block_hole || !g.house) && g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
+	}
+	/* A glow seen only by a lit pixel near it: by the card's where it laid the block (_night_card_lit), else here. */
+	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength, bool house = false, float order = 0) {
+		if (turned && _night_card_lit) {
+			if (px >= 0 && py >= 0 && px < w && py < h) _tcg->glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength), house, order, order != 0 ? TurnedGlowOrderDown(dpi.zoom) : 0.0f});
+			return;
+		}
+		if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, rx, ry, colour, strength);
+	};
+	/* The glows of the houses' lights (their "svetlo_NN"): small and warm (TurnedHouseGlow()); a hole has them already. */
+	if (turned && _night_block_hole) _night_glows.clear();
+	const Colour window = TURNED_HOUSE_GLOW_COLOUR;
+	for (const auto &g : _night_glows) {
+		double px, py;
+		project(g[0], g[1], g[2], px, py);
+		if (px < 0 || py < 0 || px >= w || py >= h) continue;
+		lit_glow(px, py, TURNED_HOUSE_GLOW_SIZE * unit * g[3], TURNED_HOUSE_GLOW_SIZE * unit * g[3], window, TURNED_HOUSE_GLOW_STRENGTH, true, turned ? TurnedGlowOrder(g) : 0.0f);
+	}
+	/* The lights of what moves: here, or -- on the turned main view with its moving layer, where the card laid the
+	 * block -- told to the card once a frame for all the view (TurnedMoverGlows()). */
+	if (!(turned && _night_card_lit && TurnedMoverGlowsOn())) {
+		NightMoverLights(dpi.zoom, turned, w, h, unit, project,
+				[&](double px, double py, double rx, double ry, Colour colour, double strength) { lit_glow(px, py, rx, ry, colour, strength); },
+				[&](double px, double py, double rx, double ry, Colour colour, double strength) { AddNightLight(dst, dpi.pitch, w, h, px, py, rx, ry, colour, strength); });
 	}
 	/* The witches flying (three_d_witches.h; the player: "light all round the lantern, and from the hand torch a
 	 * beam"), where they are drawn: the flame and the light all round it -- over her and what is near --, the beam of
@@ -10215,6 +10294,8 @@ static uint32_t TurnedCardLayMoversOnce(bool whole)
 	const double t_card = TurnedNow();
 	const bool laid = ThreeDGpuDrawStanding(movers);
 	_turned_moving_card_ms += TurnedNow() - t_card;
+	/* Their lights at night, the card's too. */
+	TurnedMoverGlows(vp);
 	_night_lit.clear();
 	_night_lit_through.clear();
 	_night_glows.clear();
@@ -10858,7 +10939,9 @@ static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, 
 
 	if (mover) {
 		_turned_movers_moved = true;
-		if (!IsNightNow() && TurnedCardStoodAll(vp, left + vp.virtual_left, top + vp.virtual_top, right + vp.virtual_left, bottom + vp.virtual_top)) return true;
+		/* At night the screen there was drawn again for its lights (DrawNight()): not for one whose lights the card has
+		 * with the moving layer (TurnedMoverGlows(), DirtyPlace::lights_told). */
+		if ((!IsNightNow() || DirtyPlaceLightsTold()) && TurnedCardStoodAll(vp, left + vp.virtual_left, top + vp.virtual_top, right + vp.virtual_left, bottom + vp.virtual_top)) return true;
 	}
 
 	AddDirtyBlock(
@@ -10964,6 +11047,8 @@ void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
 	place.mover = mover;
+	/* A walker, a car of the game's own, the pool of a vehicle's headlights. */
+	place.lights_told = mover;
 	place.x0 = x0;
 	place.x1 = x1;
 	place.y0 = y0;
