@@ -10466,6 +10466,170 @@ static void BendThreeDThingPoint(const ThreeDVehicleObject &o, float *point, flo
  * @param parts the parts of its states (PartsOf()), bit n the part n
  */
 /**
+ * A mesh's triangles that lie twice in one place, the second the other way round (a model made "double sided" by
+ * copying every face turned over: the colleague's people_girl, 20000 triangles in 10107 places): of each such pair
+ * only the outer one stays. The game draws a figure from both sides anyway, and the two of a pair fought for the same
+ * depth, each lit its own way -- the player, 16. 11., from the eyes up close: "the girl fell apart into triangles".
+ * A plain copy (the same way round) goes too.
+ * The outer one: the faces joined across their edges are a shell, the copies another; of the two shells the one whose
+ * faces look away from its middle. A sheet (hair, a skirt) has no such side: its first.
+ */
+static void DropReverseTwins(GlbMesh &m)
+{
+	const size_t n = m.tri.size() / 3;
+	if (n < 2 || m.pos.empty()) return;
+	using Corner = std::array<uint32_t, 3>;
+	auto corner = [&m](uint32_t i) { return Corner{std::bit_cast<uint32_t>(m.pos[i * 3]), std::bit_cast<uint32_t>(m.pos[i * 3 + 1]), std::bit_cast<uint32_t>(m.pos[i * 3 + 2])}; };
+	struct Hash {
+		size_t operator()(const std::array<uint32_t, 9> &k) const
+		{
+			uint64_t h = 0;
+			for (uint32_t v : k) h = (h ^ v) * 0x9E3779B97F4A7C15ull;
+			return static_cast<size_t>(h ^ (h >> 29));
+		}
+		size_t operator()(const std::array<uint32_t, 6> &k) const
+		{
+			uint64_t h = 0;
+			for (uint32_t v : k) h = (h ^ v) * 0x9E3779B97F4A7C15ull;
+			return static_cast<size_t>(h ^ (h >> 29));
+		}
+	};
+	/* Each triangle's place: its corners in order of their numbers; and whether it goes round them that way. */
+	std::unordered_map<std::array<uint32_t, 9>, uint32_t, Hash> first;
+	first.reserve(n);
+	std::vector<uint32_t> twin(n, UINT32_MAX);
+	std::vector<uint8_t> drop(n, 0);
+	size_t pairs = 0, copies = 0;
+	auto place_of = [&](size_t t, bool &even) {
+		std::array<Corner, 3> c{corner(m.tri[t * 3]), corner(m.tri[t * 3 + 1]), corner(m.tri[t * 3 + 2])};
+		int swaps = 0;
+		for (int a = 0; a < 2; a++) {
+			for (int b = 0; b < 2 - a; b++) {
+				if (c[b + 1] < c[b]) {
+					std::swap(c[b], c[b + 1]);
+					swaps++;
+				}
+			}
+		}
+		even = swaps % 2 == 0;
+		return std::array<uint32_t, 9>{c[0][0], c[0][1], c[0][2], c[1][0], c[1][1], c[1][2], c[2][0], c[2][1], c[2][2]};
+	};
+	std::vector<uint8_t> evens(n, 0);
+	for (size_t t = 0; t < n; t++) {
+		bool even;
+		const auto key = place_of(t, even);
+		evens[t] = even;
+		/* Two corners in one place: no face. */
+		if (std::equal(key.begin(), key.begin() + 3, key.begin() + 3) || std::equal(key.begin() + 3, key.begin() + 6, key.begin() + 6)) continue;
+		auto [it, added] = first.try_emplace(key, static_cast<uint32_t>(t));
+		if (added) continue;
+		const uint32_t a = it->second;
+		if (evens[a] == evens[t]) {
+			drop[t] = 1;
+			copies++;
+		} else if (twin[a] == UINT32_MAX) {
+			twin[a] = static_cast<uint32_t>(t);
+			twin[t] = a;
+			pairs++;
+		} else {
+			drop[t] = 1;
+			copies++;
+		}
+	}
+	if (pairs == 0 && copies == 0) return;
+	if (pairs > 0) {
+		/* The shells: faces joined across an edge one goes along and the other back along, not a face with its twin. */
+		std::vector<uint32_t> shell(n);
+		std::iota(shell.begin(), shell.end(), 0u);
+		auto root = [&shell](uint32_t i) {
+			while (shell[i] != i) {
+				shell[i] = shell[shell[i]];
+				i = shell[i];
+			}
+			return i;
+		};
+		std::unordered_map<std::array<uint32_t, 6>, std::vector<uint32_t>, Hash> along;
+		along.reserve(n * 3);
+		auto edge = [&](size_t t, int k, bool back) {
+			const Corner a = corner(m.tri[t * 3 + k]), b = corner(m.tri[t * 3 + (k + 1) % 3]);
+			return back ? std::array<uint32_t, 6>{b[0], b[1], b[2], a[0], a[1], a[2]} : std::array<uint32_t, 6>{a[0], a[1], a[2], b[0], b[1], b[2]};
+		};
+		for (size_t t = 0; t < n; t++) {
+			if (drop[t]) continue;
+			for (int k = 0; k < 3; k++) along[edge(t, k, false)].push_back(static_cast<uint32_t>(t));
+		}
+		for (size_t t = 0; t < n; t++) {
+			if (drop[t]) continue;
+			for (int k = 0; k < 3; k++) {
+				auto it = along.find(edge(t, k, true));
+				if (it == along.end()) continue;
+				for (uint32_t o : it->second) {
+					if (o == twin[t]) continue;
+					const uint32_t a = root(static_cast<uint32_t>(t)), b = root(o);
+					if (a != b) shell[b] = a;
+				}
+			}
+		}
+		/* Each shell's middle, and how much its faces look away from it: by their normals as the file has them, or as
+		 * they go round. */
+		const bool has_nrm = m.nrm.size() == m.pos.size();
+		std::vector<std::array<double, 4>> middle(n, {0, 0, 0, 0});
+		std::vector<double> away(n, 0);
+		auto centre = [&](size_t t, double c[3]) {
+			for (int a = 0; a < 3; a++) c[a] = (m.pos[m.tri[t * 3] * 3 + a] + m.pos[m.tri[t * 3 + 1] * 3 + a] + m.pos[m.tri[t * 3 + 2] * 3 + a]) / 3.0;
+		};
+		for (size_t t = 0; t < n; t++) {
+			if (drop[t]) continue;
+			double c[3];
+			centre(t, c);
+			std::array<double, 4> &mid = middle[root(static_cast<uint32_t>(t))];
+			for (int a = 0; a < 3; a++) mid[a] += c[a];
+			mid[3] += 1;
+		}
+		for (size_t t = 0; t < n; t++) {
+			if (drop[t]) continue;
+			const uint32_t r = root(static_cast<uint32_t>(t));
+			double c[3], nr[3] = {0, 0, 0};
+			centre(t, c);
+			const float *p0 = &m.pos[m.tri[t * 3] * 3], *p1 = &m.pos[m.tri[t * 3 + 1] * 3], *p2 = &m.pos[m.tri[t * 3 + 2] * 3];
+			const double ux = p1[0] - p0[0], uy = p1[1] - p0[1], uz = p1[2] - p0[2], vx = p2[0] - p0[0], vy = p2[1] - p0[1], vz = p2[2] - p0[2];
+			const double g[3] = {uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx}; // as it goes round, as long as twice its area
+			if (has_nrm) {
+				for (int k = 0; k < 3; k++) for (int a = 0; a < 3; a++) nr[a] += m.nrm[m.tri[t * 3 + k] * 3 + a];
+				const double l = std::sqrt(nr[0] * nr[0] + nr[1] * nr[1] + nr[2] * nr[2]), area = std::sqrt(g[0] * g[0] + g[1] * g[1] + g[2] * g[2]);
+				if (l > 0) for (double &v : nr) v *= area / l;
+			} else {
+				for (int a = 0; a < 3; a++) nr[a] = g[a];
+			}
+			for (int a = 0; a < 3; a++) away[r] += nr[a] * (c[a] - middle[r][a] / std::max(1.0, middle[r][3]));
+		}
+		for (size_t t = 0; t < n; t++) {
+			if (drop[t] || twin[t] == UINT32_MAX || twin[t] < t) continue;
+			const size_t o = twin[t];
+			drop[away[root(static_cast<uint32_t>(o))] > away[root(static_cast<uint32_t>(t))] ? t : o] = 1;
+		}
+	}
+	size_t kept = 0;
+	for (size_t t = 0; t < n; t++) {
+		if (drop[t]) continue;
+		if (kept != t) {
+			for (int k = 0; k < 3; k++) m.tri[kept * 3 + k] = m.tri[t * 3 + k];
+			if (m.tri_tex.size() == n) m.tri_tex[kept] = m.tri_tex[t];
+			if (m.tri_group.size() == n) m.tri_group[kept] = m.tri_group[t];
+			if (m.tri_mark.size() == n) m.tri_mark[kept] = m.tri_mark[t];
+			if (m.tri_glass.size() == n) m.tri_glass[kept] = m.tri_glass[t];
+		}
+		kept++;
+	}
+	if (m.tri_tex.size() == n) m.tri_tex.resize(kept);
+	if (m.tri_group.size() == n) m.tri_group.resize(kept);
+	if (m.tri_mark.size() == n) m.tri_mark.resize(kept);
+	if (m.tri_glass.size() == n) m.tri_glass.resize(kept);
+	m.tri.resize(kept * 3);
+	Debug(misc, 2, "3D mesh: {} of {} triangles lay twice in one place ({} pairs turned over, {} plain copies): left out", n - kept, n, pairs, copies);
+}
+
+/**
  * A file's part of a shape's key (ThreeDVehicleObject::MakeShape()): its path; of a small file what is in it -- the
  * trailers of the colleague's lorries have each a file of its own for its length (nt_delka_naves_0125.glb, _0132,
  * _0135 ...), the same 2.4 kB byte for byte, and all the rest of them the same add-ons: by the path each record kept
@@ -10755,6 +10919,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, this->only_node, {}, nullptr, "noc", &marked)) {
 			return nullptr;
 		}
+		/* Faces copied turned over (a "double sided" model): one of each pair. */
+		DropReverseTwins(mesh);
 	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	if (!this->file.ends_with(".s") && !this->file.ends_with(".S")) {
