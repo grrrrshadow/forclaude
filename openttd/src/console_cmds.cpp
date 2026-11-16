@@ -10776,6 +10776,38 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			for (const ThreeDPictureLight &l : lights) list += fmt::format(" {}@{:.0f},{:.0f}", to_underlying(l.kind), l.x, l.y);
 			IConsolePrint(CC_DEFAULT, "test3d: svetla vozidla {} dil {}: {}{}{}", v->unitnumber, v->index.base(), model ? "z modelu" : "z obdelniku", lights.empty() ? "" : fmt::format(" od {},{},{}:", ax, ay, az), list);
 		}
+	} else if (what == "stavynakup" && argv.size() > 2) {
+		/* 'stavynakup <text>': the engines whose name has the text, each with its articles as the purchase list has
+		 * them (no vehicle): its default cargo, the object it is a piece of, the sets its GRF picks for its layers there. */
+		const std::string wanted(argv[2]);
+		for (const Engine *e : Engine::Iterate()) {
+			if (e->type != VehicleType::Road && e->type != VehicleType::Train) continue;
+			const std::string name = GetString(STR_ENGINE_NAME, e->index);
+			if (name.find(wanted) == std::string::npos) continue;
+			IConsolePrint(CC_DEFAULT, "test3d: stavynakup motor {} '{}'", e->index.base(), name);
+			std::vector<EngineID> parts = GetArticulatedPartEngines(e->index);
+			if (std::ranges::find(parts, e->index) == parts.end()) parts.insert(parts.begin(), e->index);
+			for (EngineID id : parts) {
+				const Engine *a = Engine::Get(id);
+				const CargoType cargo = a->GetDefaultCargoType();
+				int piece = 0;
+				const ThreeDVehicleObject *obj = GetThreeDVehicleObject(id, &piece);
+				std::vector<uint32_t> ids;
+				GetVehicleSetSpriteLocalIDs(id, nullptr, EngineImageType::Purchase, ids);
+				std::string list;
+				for (size_t l = 0; l < ids.size(); l++) list += fmt::format(" {}:{}", l, ids[l] == UINT32_MAX ? -1 : static_cast<int64_t>(ids[l]));
+				if (obj != nullptr) {
+					for (size_t l = 0; l < ids.size(); l++) {
+						for (size_t i = 0; i < obj->states.size(); i++) {
+							if (static_cast<size_t>(obj->states[i].layer) == l && ids[l] >= obj->states[i].first && ids[l] <= obj->states[i].last) list += fmt::format(" [vrstva {} stav {}]", l, i + 1);
+						}
+					}
+				}
+				IConsolePrint(CC_DEFAULT, "test3d:   clanek {} (v sade {:#06x}) naklad {} objekt {} kus {}; sady vrstev{}", id.base(), a->grf_prop.local_id,
+						IsValidCargoType(cargo) ? fmt::format("{:08X}", std::byteswap(CargoSpec::Get(cargo)->label.base())) : std::string("zadny"), obj != nullptr ? obj->name : std::string("zadny"), piece, list);
+			}
+		}
+		return true;
 	} else if (what == "stavy") {
 		/* 'stavy': each vehicle drawn as a 3D object, the sprite number its GRF picks for each layer and the state of the
 		 * layer it means ("stavy", "vrstva"). */

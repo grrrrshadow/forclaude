@@ -1306,11 +1306,17 @@ void GUIEngineListAddChildren(GUIEngineList &dst, const GUIEngineList &src, Engi
 
 		const Engine *e = Engine::Get(item.engine_id);
 		EngineDisplayFlags flags = item.flags;
+		/* A parent that is in the list only for its variants (shaded: the filter of the cargo or of the name lets it
+		 * not through itself) shows them at once, unfolded: the variants were what was asked for, and each group had to
+		 * be clicked open to see them (the player, 16. 11., the lorries' semi-trailers with coal picked: "I have to click
+		 * it open, it is not on top"). */
+		const bool only_heading = item.flags.Test(EngineDisplayFlag::Shaded);
+		if (only_heading) flags.Reset(EngineDisplayFlag::IsFolded);
 		if (e->display_last_variant != EngineID::Invalid()) flags.Reset(EngineDisplayFlag::Shaded);
 		dst.emplace_back(e->display_last_variant == EngineID::Invalid() ? item.engine_id : e->display_last_variant, item.engine_id, flags, indent);
 
 		/* Add variants if not folded */
-		if (item.flags.Test(EngineDisplayFlag::HasVariants) && !item.flags.Test(EngineDisplayFlag::IsFolded)) {
+		if (item.flags.Test(EngineDisplayFlag::HasVariants) && (only_heading || !item.flags.Test(EngineDisplayFlag::IsFolded))) {
 			/* Add this engine again as a child */
 			if (!item.flags.Test(EngineDisplayFlag::Shaded)) {
 				dst.emplace_back(item.engine_id, item.engine_id, EngineDisplayFlags{}, indent + 1);
