@@ -11,6 +11,7 @@
 #include "stdafx.h"
 #include "vehicle_config.h"
 
+#include <atomic>
 #include <chrono>
 #include "train.h"
 #include "ship.h"
@@ -13587,6 +13588,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern TileIndex _turned_debug_tile;
 		auto x = number(2), y = number(3);
 		_turned_debug_tile = (x.has_value() && y.has_value()) ? TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())) : INVALID_TILE;
+		return true;
+	} else if (what == "jakodrzene" && argv.size() > 2) {
+		extern std::atomic<bool> _card_vehicles_as_kept_on;
+		_card_vehicles_as_kept_on = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: vrstva aut dava drzene bez tvaru: {}", _card_vehicles_as_kept_on.load() ? "ano" : "ne");
+		return true;
+	} else if (what == "sberaut" && argv.size() > 2) {
+		/* 'sberaut <n>': the moving layer's gathering n times a frame (TurnedCardLayMovers()), for a debugger's samples. */
+		extern int _rig_movers_repeat;
+		_rig_movers_repeat = std::max(1, number(2).value_or(1));
+		IConsolePrint(CC_DEFAULT, "test3d: sber vrstvy aut {}x na snimek", _rig_movers_repeat);
 		return true;
 	} else if (what == "posun" && argv.size() > 4) {
 		/* 'posun mys|klavesy <dx> <dy>': the main view moved as a drag of the right button moves it (OnScroll(), at

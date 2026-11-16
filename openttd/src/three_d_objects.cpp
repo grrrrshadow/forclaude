@@ -382,6 +382,7 @@ static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
 /** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
 static std::vector<ThreeDVehicleObject> _figure_objects;
+static std::atomic<uint64_t> _figure_objects_reading{0}; ///< how many times the list was emptied to be read anew (GetThreeDFigure() keeps what it found by it)
 /** The ivies among the add-ons ("popinavka" of a record), where they grow (GetThreeDIvies()). */
 static std::vector<ThreeDIvy> _three_d_ivies;
 /** The graffiti of the walls ("druh": "zed_grafiti"), the names of their figures (GetThreeDGraffiti()). */
@@ -8596,6 +8597,7 @@ void ResetThreeDVehicleObjects()
 {
 	_vehicle_objects.clear();
 	_figure_objects.clear();
+	_figure_objects_reading++;
 	_motion_sets.clear();
 	_humanoids.clear();
 	_load_pieces.clear();
@@ -8804,21 +8806,57 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 		passage->walk_step = to->walk_step;
 		return _passages.emplace(std::string(name), std::move(passage)).first->second.get();
 	}
+	/* Found before: every creature of the map and every vehicle that is an animal asks by name each frame, and the list
+	 * was gone through comparing names each time (the player's #371: a third of the gathering of the moving layer).
+	 * Kept while the list is as it was. */
+	static std::mutex found_mutex;
+	static std::unordered_map<std::string, const ThreeDVehicleObject *> found;
+	static const ThreeDVehicleObject *found_of = nullptr;
+	static size_t found_count = 0;
+	static uint64_t found_reading = 0;
+	const uint64_t reading = _figure_objects_reading;
+	std::string asked;
+	asked.reserve(package.size() + 1 + name.size());
+	asked.append(package).push_back('\n');
+	asked.append(name);
+	{
+		std::lock_guard lock(found_mutex);
+		if (found_of != _figure_objects.data() || found_count != _figure_objects.size() || found_reading != reading) {
+			found.clear();
+			found_of = _figure_objects.data();
+			found_count = _figure_objects.size();
+			found_reading = reading;
+		}
+		if (auto it = found.find(asked); it != found.end()) return it->second;
+	}
+	const ThreeDVehicleObject *figure = nullptr;
 	/* A vehicle's crew from its own package first (the package of a GRF carries its driver). */
 	if (!package.empty()) {
 		for (const ThreeDVehicleObject &f : _figure_objects) {
-			if (f.name == name && f.package == package) return &f;
+			if (f.name == name && f.package == package) {
+				figure = &f;
+				break;
+			}
 		}
 	}
-	for (const ThreeDVehicleObject &f : _figure_objects) {
-		if (f.name == name) return &f;
+	if (figure == nullptr) {
+		for (const ThreeDVehicleObject &f : _figure_objects) {
+			if (f.name == name) {
+				figure = &f;
+				break;
+			}
+		}
 	}
 	/* A figure on no skeleton has its poses as figures of their own, "<jmeno>_<poza>" (the colleague's postavy: mat_ridi,
 	 * college_girl_sedi): "<jmeno>/<poza>" is that one (the fire Tatra's driver, "postava" mat, "poza" ridi). */
-	if (const size_t slash = name.find('/'); slash != std::string_view::npos) {
-		return GetThreeDFigure(fmt::format("{}_{}", name.substr(0, slash), name.substr(slash + 1)), package);
+	if (figure == nullptr) {
+		if (const size_t slash = name.find('/'); slash != std::string_view::npos) {
+			figure = GetThreeDFigure(fmt::format("{}_{}", name.substr(0, slash), name.substr(slash + 1)), package);
+		}
 	}
-	return nullptr;
+	std::lock_guard lock(found_mutex);
+	if (found_of == _figure_objects.data() && found_count == _figure_objects.size() && found_reading == reading) found.emplace(std::move(asked), figure);
+	return figure;
 }
 
 /*

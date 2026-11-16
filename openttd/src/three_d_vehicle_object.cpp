@@ -57,6 +57,7 @@
 #include <map>
 #include <mutex>
 #include <unordered_map>
+#include <utility>
 #include <optional>
 #include <set>
 #include <thread>
@@ -3342,6 +3343,17 @@ struct VehicleObjectPlace {
 	std::vector<ThreeDPictureLight> card_lights; ///< and its lights on at night, as its picture's
 };
 
+/** A thing of the moving layer as it was given to the card the last time, without its shapes (CardVehicle()). */
+struct CardVehicleKept {
+	std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+	std::vector<ThreeDPictureLight> lights;
+	uint64_t used = 0; ///< the pass it was asked for last
+};
+static std::unordered_map<uint64_t, CardVehicleKept> _card_vehicles_kept; ///< by its key; the main thread's
+static bool _card_vehicles_as_kept = false;   ///< the moving layer's pass is on
+static uint64_t _card_vehicles_kept_pass = 0;
+static uint64_t _card_vehicles_kept_given = 0;
+
 /** What the card makes of a thing of the map it draws (CardVehicle()). */
 enum class CardMade : uint8_t {
 	Drawn,  ///< its shapes for the card (nullptr: not a pixel of it seen)
@@ -3381,6 +3393,20 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	}, p.key);
 	card = nullptr;
 	lights.clear();
+	/* The moving layer (ThreeDCardVehiclesAsKept): what the card keeps the picture of by this key is given as it was
+	 * the last time, without its shapes -- the card lays the kept picture and needs none of them (the player's #371:
+	 * the gathering of the layer 30 ms a frame on the phone, the shapes of every vehicle in sight prepared again each
+	 * frame for a picture drawn long ago). */
+	if (_card_vehicles_as_kept) {
+		auto it = _card_vehicles_kept.find(key);
+		if (it != _card_vehicles_kept.end() && ThreeDGpuStandingKeeps(key)) {
+			it->second.used = _card_vehicles_kept_pass;
+			card = it->second.card;
+			lights = it->second.lights;
+			_card_vehicles_kept_given++;
+			return CardMade::Drawn;
+		}
+	}
 	GpuObjectPicture gp;
 	bool drawn = false;
 	{
@@ -3438,8 +3464,49 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	v->pic = std::move(gp.pic);
 	v->held = std::move(gp.held);
 	lights = std::move(gp.lights);
+	if (_card_vehicles_as_kept) {
+		/* The same without its shapes, for the next time (above): where it is and how near, nothing of the object's. */
+		auto light = std::make_shared<ThreeDGpuStandingVehicle>();
+		light->key = v->key;
+		light->supersample = v->supersample;
+		light->left = v->left; light->top = v->top; light->width = v->width; light->height = v->height;
+		light->near_osy = v->near_osy; light->near_od = v->near_od; light->near_top = v->near_top; light->near_min = v->near_min; light->near_span = v->near_span;
+		light->pic.width = v->pic.width; light->pic.height = v->pic.height;
+		light->pic.depth_near = v->pic.depth_near; light->pic.depth_far = v->pic.depth_far;
+		light->pic.glass_alpha = v->pic.glass_alpha;
+		light->pic.read_lit = v->pic.read_lit;
+		light->kept_only = true;
+		_card_vehicles_kept[key] = {std::move(light), lights, _card_vehicles_kept_pass};
+	}
 	card = std::move(v);
 	return CardMade::Drawn;
+}
+
+/**
+ * The moving layer's pass begins (TurnedCardLayMovers() of viewport.cpp): its things the card keeps the pictures of
+ * given without their shapes from now till ThreeDCardVehiclesAsKeptEnd().
+ * @param whole all of them with their shapes this time (the card kept one of them no more, ThreeDGpuStanding::missing)
+ */
+void ThreeDCardVehiclesAsKeptBegin(bool whole)
+{
+	_card_vehicles_kept_pass++;
+	if (whole) _card_vehicles_kept.clear();
+	_card_vehicles_as_kept = true;
+}
+
+/** The pass ends: those not asked for a while forgotten. */
+void ThreeDCardVehiclesAsKeptEnd()
+{
+	_card_vehicles_as_kept = false;
+	if (_card_vehicles_kept.size() > 4096) {
+		std::erase_if(_card_vehicles_kept, [](const auto &e) { return e.second.used + 120 < _card_vehicles_kept_pass; });
+	}
+}
+
+/** How many things of the moving layer were given as the card keeps them since asked the last time (the diary). */
+uint64_t TakeThreeDCardVehiclesAsKept()
+{
+	return std::exchange(_card_vehicles_kept_given, 0);
 }
 
 /**
@@ -3732,7 +3799,8 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	};
 	static Stamp kept_for;
 	static std::map<std::tuple<uint32_t, uint8_t, bool>, std::pair<const ThreeDVehicleObject *, VehicleObjectPlace>> kept;
-	if (!on_card) return PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
+	extern int _rig_movers_repeat; // the rig's samples of the gathering: placed every time
+	if (!on_card || _rig_movers_repeat > 1) return PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
 	const Stamp now{_dirty_blocks_pass, TimerGameTick::counter, GetViewYaw(), ViewportDrawingTurned(), ViewportDrawingNorthObjects(), ViewportDrawingEye()};
 	if (!(now == kept_for)) {
 		kept_for = now;

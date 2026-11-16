@@ -488,6 +488,9 @@ struct ThreeDGpuStandingVehicle {
 	int left = 0, top = 0;     ///< its top left from the world point it hangs from, pixels of the block
 	int width = 0, height = 0; ///< pixels of the block
 	std::vector<std::shared_ptr<const ThreeDObjectTexture>> held; ///< what its paints need, kept till it is drawn
+	/** Given without its shapes, the card keeping its picture by its key (ThreeDGpuStandingKeeps()); let go of since: not
+	 * laid, counted in ThreeDGpuStanding::missing. */
+	bool kept_only = false;
 	/**
 	 * How near each of its pixels is, from its own depth (the player's test6: the gates and the iron of a depot drawn
 	 * over the engine, its nearness of its box only): a subpixel of its picture at row osy (subpixels down from the world
@@ -563,6 +566,7 @@ struct ThreeDGpuStanding {
 	 * viewport.cpp); empty all of the block. */
 	std::vector<std::array<int, 4>> parts;
 	std::vector<ThreeDGpuStandingItem> items;
+	mutable uint32_t missing = 0; ///< what comes: the vehicles given as kept only (ThreeDGpuStandingVehicle::kept_only) the card kept no more
 	std::vector<ThreeDGpuStandingBuilding> buildings;
 	std::vector<ThreeDGpuStandingFaces> faces;
 	/** The view's turn (TurnWorldPoint() of three_d.h): its cosine and sine, the world point it turns about. */
@@ -605,6 +609,8 @@ uint32_t ThreeDGpuViewGround(int view, uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing);
+/** Whether the card keeps the picture of a vehicle of the turned map by its key (ThreeDGpuStandingVehicle::key) now; any thread. */
+bool ThreeDGpuStandingKeeps(uint64_t key);
 uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit = nullptr, uint32_t *order = nullptr);
 void ThreeDGpuMovingLayer(int view, bool on);
 std::string ThreeDGpuMovingTimes();

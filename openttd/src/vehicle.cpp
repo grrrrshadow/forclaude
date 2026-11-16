@@ -1418,6 +1418,8 @@ static void DoDrawVehicle(const Vehicle *v)
 		bool on_round = GetRoundTrackPose(v, round_pose);
 		if (AddThreeDVehicleToViewport(v, pal, _cur_dpi->zoom, on_round ? &round_pose : nullptr)) return;
 	}
+	/* Drawn from its sprite after all (ViewportAddVehicles() left it as it was). */
+	if (ViewportDrawingTurned()) RevalidateVehicleSprite(v);
 	if (step != 0 && turnable) {
 		if (v->type == VehicleType::Ship) {
 			/* A ship shows the way it is turned (its rotation), its GetImage() on the map nothing else. */
@@ -1509,7 +1511,11 @@ void ViewportAddVehicles(DrawPixelInfo *dpi)
 					 * This vehicle can potentially be drawn as part of this viewport and
 					 * needs to be revalidated, as the sprite may not be correct.
 					 */
-					RevalidateVehicleSprite(v);
+					/* Turned, a vehicle drawn from its 3D object or its likeness shows no sprite: its sprite is brought up
+					 * to date only when it is drawn from it (DoDrawVehicle()) -- every vehicle in sight that moved had
+					 * its sprite asked of its set each frame for nothing (the player's #371: the gathering of the moving
+					 * layer 30 ms a frame on the phone). */
+					if (!ViewportDrawingTurned()) RevalidateVehicleSprite(v);
 
 					if (l <= v->coord.right &&
 						t <= v->coord.bottom &&

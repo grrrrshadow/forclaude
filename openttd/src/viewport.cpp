@@ -2629,13 +2629,18 @@ std::string TakeTurnedTimesForDiary(int frames)
 	extern double _turned_moving_ms;
 	if (s != "-" || _turned_moving_passes > 0) {
 		extern double _turned_moving_collect_ms, _turned_moving_card_ms;
-		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms a cekani na kartu {:.0f} ms (karta {})", _turned_moving_passes, _turned_moving_ms / n,
-				_turned_moving_collect_ms / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes());
+		extern uint64_t TakeThreeDCardVehiclesAsKept();
+		extern double _turned_moving_kinds_ms[7];
+		const double *k = _turned_moving_kinds_ms;
+		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), {} veci dano jako drzene bez tvaru", _turned_moving_passes, _turned_moving_ms / n,
+				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), TakeThreeDCardVehiclesAsKept());
 	}
 	_turned_moving_passes = 0;
 	_turned_moving_ms = 0;
 	extern double _turned_moving_collect_ms, _turned_moving_card_ms;
 	_turned_moving_collect_ms = _turned_moving_card_ms = 0;
+	extern double _turned_moving_kinds_ms[7];
+	std::fill(std::begin(_turned_moving_kinds_ms), std::end(_turned_moving_kinds_ms), 0.0);
 	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
 	extern std::string TakeCardReachForRig();
 	if (s != "-") s += "; " + TakeCardReachForRig();
@@ -7275,6 +7280,9 @@ static bool _turned_moving_due = false;   ///< what stands, or the view, changed
 uint64_t _turned_moving_passes = 0;       ///< the diary: times they were laid
 double _turned_moving_ms = 0;             ///< and how long that took on the main thread, the card's part waited for
 double _turned_moving_collect_ms = 0;     ///< of it: gathering the vehicles and figures (AddTurnedMovers())
+std::atomic<bool> _card_vehicles_as_kept_on = true; ///< Rig (test3d jakodrzene 0|1): the moving layer gives what the card keeps without its shapes
+int _rig_movers_repeat = 1;               ///< the rig: the gathering of the moving layer so many times a frame
+double _turned_moving_kinds_ms[7] = {};   ///< of the gathering: vehicles, walkers, dragons, animals, witches, ufos, drivers
 double _turned_moving_card_ms = 0;        ///< of it: handing them to the card and waiting for it (ThreeDGpuDrawStanding())
 
 /** The picture of the view's ground shown no more: the blocks of holes are drawn again with their ground. */
@@ -8711,14 +8719,24 @@ static void TurnedStandingNear(ThreeDGpuStanding &s, const DrawPixelInfo &frame,
 /** The things that move on the turned view collected for a block (the moving layer, ThreeDGpuStanding::moving): the vehicles, the walkers and the cars of the towns, the creatures. */
 static void AddTurnedMovers(ZoomLevel zoom, DrawPixelInfo *cdpi)
 {
+	/* Each kind timed for the diary (the player's #371: the gathering 30 ms of the layer's 37 ms a frame). */
+	double t = TurnedNow();
+	auto timed = [&](int kind) { const double now = TurnedNow(); _turned_moving_kinds_ms[kind] += now - t; t = now; };
 	ViewportAddVehicles(cdpi);
+	timed(0);
 	/* The people walking about the towns (three_d_walkers.h). */
 	AddThreeDWalkersToViewport(zoom);
+	timed(1);
 	AddThreeDDragonsToViewport(zoom);
+	timed(2);
 	AddThreeDAnimalsToViewport(zoom);
+	timed(3);
 	AddThreeDWitchesToViewport(zoom);
+	timed(4);
 	AddThreeDUfosToViewport(zoom);
+	timed(5);
 	AddThreeDDriversToViewport(zoom);
+	timed(6);
 }
 
 static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = false)
@@ -10104,19 +10122,32 @@ void TurnedMovingLayerUpdate()
  * view as a block is (ViewportDoDrawTurned()), only they. A move of the view after them left the picture of them shown
  * a frame behind the ground and what stands, which the move takes along (MoveViewGround() of three_d_gpu.cpp).
  */
+static uint32_t TurnedCardLayMoversOnce(bool whole);
+
 void TurnedCardLayMovers()
 {
-	if (!_turned_moving_layer || (!_turned_movers_moved && !_turned_moving_due)) return;
+	/* The card kept no more a picture given as kept (let go of between the asking and the laying): once more, all of
+	 * them with their shapes. */
+	if (TurnedCardLayMoversOnce(false) > 0) TurnedCardLayMoversOnce(true);
+}
+
+/**
+ * @param whole every thing with its shapes, none as the card keeps it (ThreeDCardVehiclesAsKeptBegin())
+ * @return how many things given as kept the card kept no more: not laid
+ */
+static uint32_t TurnedCardLayMoversOnce(bool whole)
+{
+	if (!_turned_moving_layer || (!whole && !_turned_movers_moved && !_turned_moving_due)) return 0;
 	extern bool FirstPersonCoversMap();
-	if (FirstPersonCoversMap()) return;
+	if (FirstPersonCoversMap()) return 0;
 	const Window *main = GetMainWindow();
-	if (main == nullptr || main->viewport == nullptr) return;
+	if (main == nullptr || main->viewport == nullptr) return 0;
 	const Viewport &vp = *main->viewport;
 	TurnedCardGround &g = _turned_card_ground;
 	AutoRestoreBackup card(_tcg, &g);
 	AutoRestoreBackup kept_ground(_tg, &_turned_ground);
 	AutoRestoreBackup kept_version(_tg_version, &_turned_ground_version);
-	if (g.vp != &vp || !g.shown || !TurnedCardGroundFollow(vp, vp.zoom)) return;
+	if (g.vp != &vp || !g.shown || !TurnedCardGroundFollow(vp, vp.zoom)) return 0;
 	const double t0 = TurnedNow();
 	const int vs = ScaleByZoom(1, vp.zoom), mask = ScaleByZoom(-1, vp.zoom);
 	DrawPixelInfo frame{};
@@ -10126,7 +10157,7 @@ void TurnedCardLayMovers()
 	frame.height = ScaleByZoom(vp.height, vp.zoom) & mask;
 	frame.zoom = vp.zoom;
 	const int fw = UnScaleByZoom(frame.width, vp.zoom), fh = UnScaleByZoom(frame.height, vp.zoom);
-	if (fw <= 0 || fh <= 0) return;
+	if (fw <= 0 || fh <= 0) return 0;
 	/* Nothing is drawn into it; what makes a picture of a thing draws into its own (TurnedPassOnCard()). */
 	static std::vector<uint32_t> scratch;
 	const int pitch = std::max(fw, _screen.pitch);
@@ -10153,8 +10184,14 @@ void TurnedCardLayMovers()
 	TurnedWorldBox(frame, tx0, tx1, ty0, ty1, cdpi);
 	_vd.dpi = cdpi;
 	const double t_collect = TurnedNow();
+	extern void ThreeDCardVehiclesAsKeptBegin(bool whole);
+	extern void ThreeDCardVehiclesAsKeptEnd();
+	if (_card_vehicles_as_kept_on) ThreeDCardVehiclesAsKeptBegin(whole);
 	AddTurnedMovers(vp.zoom, &cdpi);
 	_turned_moving_collect_ms += TurnedNow() - t_collect;
+	/* The rig ('test3d sberaut <n>'): the gathering so many times more, to be looked at with a debugger's samples. */
+	for (int k = 1; k < _rig_movers_repeat; k++) AddTurnedMovers(vp.zoom, &cdpi);
+	ThreeDCardVehiclesAsKeptEnd();
 	_vd.dpi = frame;
 	TurnParentSprites(0);
 	const std::vector<TurnedSprite> standing = SortedTurnedSprites();
@@ -10191,6 +10228,7 @@ void TurnedCardLayMovers()
 	}
 	_turned_moving_ms += TurnedNow() - t0;
 	_turned_times.moving_ms += TurnedNow() - t0;
+	return laid ? movers.missing : 0;
 }
 
 /**

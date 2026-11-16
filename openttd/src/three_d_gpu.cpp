@@ -805,6 +805,16 @@ struct StandingShelf {
 };
 StandingShelf _standing_atlas_shelf, _standing_stream_shelf;
 std::unordered_map<uint64_t, std::array<int, 2>> _standing_places;
+/** The vehicles' pictures among them (their keys, ThreeDGpuStandingVehicle::key), for the main thread to ask (ThreeDGpuStandingKeeps()). */
+std::mutex _standing_kept_mutex;
+std::unordered_set<uint64_t> _standing_kept_keys;
+
+void ClearStandingPlaces()
+{
+	_standing_places.clear();
+	std::lock_guard lock(_standing_kept_mutex);
+	_standing_kept_keys.clear();
+}
 GLuint _standing_vao = 0, _standing_vbo = 0;
 GLuint _standing_tri_vao = 0, _standing_tri_vbo = 0; ///< the lit glass of the buildings at night, placed already
 bool _standing_program_ok = false;
@@ -3130,7 +3140,7 @@ void ForgetCard()
 	if (_standing_near != 0) gl.glDeleteTextures(1, &_standing_near);
 	_standing_atlas = _standing_stream = _standing_near = 0;
 	_standing_atlas_size = 0;
-	_standing_places.clear();
+	ClearStandingPlaces();
 	if (_sv_colour != 0) {
 		gl.glDeleteTextures(1, &_sv_colour);
 		gl.glDeleteTextures(1, &_sv_lit);
@@ -4573,7 +4583,7 @@ std::array<int, 2> StandingReserve(bool kept, int w, int h, const std::function<
 	if (shelf.y + h > _standing_atlas_size) {
 		flush();
 		shelf = {};
-		if (kept) _standing_places.clear();
+		if (kept) ClearStandingPlaces();
 	}
 	const std::array<int, 2> place = {shelf.x, shelf.y};
 	shelf.x += w;
@@ -4773,7 +4783,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		_standing_near_checked = false;
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		_standing_atlas_shelf = {};
-		_standing_places.clear();
+		ClearStandingPlaces();
 	}
 	_standing_stream_shelf = {};
 	/* Where it is laid, pixels of the view's picture: the parts asked (ThreeDGpuStanding::parts), else all the block. */
@@ -5191,7 +5201,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (_standing_places.contains(key) || !keys.insert(key).second) continue;
 			const ThreeDGpuPicture &pic = s.items[k].vehicle->pic;
 			std::vector<MeshOnCard> draws;
-			if (pic.width <= 0 || pic.height <= 0 || pic.width > frame_w || pic.height > _max_target || !PictureOnCard(pic, draws)) {
+			if (s.items[k].vehicle->kept_only || pic.width <= 0 || pic.height <= 0 || pic.width > frame_w || pic.height > _max_target || !PictureOnCard(pic, draws)) {
 				vehicle_at[k] = {-2, -2};
 				continue;
 			}
@@ -5303,6 +5313,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glEnable(GL_BLEND);
 		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		_standing_places[key] = place;
+		{
+			std::lock_guard lock(_standing_kept_mutex);
+			_standing_kept_keys.insert(v.key);
+		}
 		_gpu_standing_vehicles++;
 		return true;
 	};
@@ -5382,6 +5396,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				if (kept != _standing_places.end()) {
 					place = kept->second;
 					_gpu_standing_vehicles_kept++;
+				} else if (v.kept_only) {
+					/* Given without its shapes, as kept, and let go of since: told, the asker gives it whole. */
+					s.missing++;
+					continue;
 				} else {
 					flush();
 					const auto draw_started = std::chrono::steady_clock::now();
@@ -7013,6 +7031,12 @@ void ThreeDGpuViewPicturesWait(void (*wait)(void *fence))
  * Lay what stands on a block of the turned map on the card, into the picture of the view's standing things (it waits).
  * @return false: not laid (no card, a picture bigger than it holds): the processor draws it
  */
+bool ThreeDGpuStandingKeeps(uint64_t key)
+{
+	std::lock_guard lock(_standing_kept_mutex);
+	return _standing_kept_keys.contains(key);
+}
+
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing)
 {
 	if (!ThreeDGpuAvailable()) return false;
@@ -7368,6 +7392,7 @@ void ThreeDGpuMovingLayer(int, bool) {}
 std::string ThreeDGpuMovingTimes() { return "-"; }
 void ThreeDGpuForgetView(int, uint64_t) {}
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
+bool ThreeDGpuStandingKeeps(uint64_t) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
 std::atomic<bool> _three_d_gpu_driver_waits = false;
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
