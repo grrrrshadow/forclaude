@@ -11705,6 +11705,53 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int l
 	return addon < this->addon_mask_levels.size() ? LevelOfKept(this->addon_mask_levels[addon], level) : nullptr;
 }
 
+/** Trim one texture's levels (ThreeDVehicleObject::TrimTextures()); the bytes let go of. Under _lazy_mutex. */
+static size_t TrimTextureLevels(const ThreeDTextureLevels &place, std::set<const void *> &seen)
+{
+	size_t freed = 0;
+	if (place == nullptr || place->empty() || !seen.insert(place.get()).second) return 0;
+	/* Nothing draws from it now (between the frames): its pixels may go. */
+	std::vector<ThreeDObjectTexture> &lv = const_cast<std::vector<ThreeDObjectTexture> &>(*place);
+	int keep = static_cast<int>(lv.size()) - 1;
+	auto it = _texture_levels_asked.find(&lv);
+	if (it != _texture_levels_asked.end()) {
+		keep = std::min(keep, it->second);
+	} else {
+		while (keep > 0 && std::max(lv[keep - 1].w, lv[keep - 1].h) <= 256) keep--;
+	}
+	keep = DrawnLevel(lv, keep);
+	for (int i = 0; i < keep; i++) freed += lv[i].px.capacity() * sizeof(uint32_t);
+	DropFinerLevels(lv, keep);
+	/* The levels the card holds, asked for by none but the card since the last time: their pixels are on the card,
+	 * not twice (the player's log of 15. 11.: the vehicles' textures 575 MB here and 543 MB on the card). Not the
+	 * small ones, nor the coarsest: the processor has that one to draw from till the texture is made again for it. */
+	size_t *why = _texture_bytes_kept_why_now;
+	if (!_textures_card_only || _textures_asked_by_processor.contains(&lv)) {
+		for (const ThreeDObjectTexture &t : lv) why[0] += t.px.size() * sizeof(uint32_t);
+		return freed;
+	}
+	why[2] += lv.back().px.size() * sizeof(uint32_t);
+	for (size_t i = std::max(keep, 0); i + 1 < lv.size(); i++) {
+		ThreeDObjectTexture &t = lv[i];
+		if (t.px.empty()) continue;
+		if (std::max(t.w, t.h) <= 256) {
+			why[2] += t.px.size() * sizeof(uint32_t);
+			continue;
+		}
+		std::unique_lock<std::mutex> card = ThreeDGpuTexturesLock();
+		if (!ThreeDGpuHoldsTextureLocked(t.uid.value)) {
+			why[1] += t.px.size() * sizeof(uint32_t);
+			continue;
+		}
+		freed += t.px.capacity() * sizeof(uint32_t);
+		_texture_bytes_on_card_only += t.px.capacity() * sizeof(uint32_t);
+		t.px.clear();
+		t.px.shrink_to_fit();
+		t.card_only = true;
+	}
+	return freed;
+}
+
 /**
  * Between the frames (ForgetUnusedThreeDObjects()): of each of the object's textures and masks not trimmed yet the
  * levels finer than any drawn since the last time let go of -- of one not drawn at all, all but those of 256 texels
@@ -11715,48 +11762,7 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int l
 size_t ThreeDVehicleObject::TrimTextures(std::set<const void *> &seen) const
 {
 	size_t freed = 0;
-	auto trim = [&](const ThreeDTextureLevels &place) {
-		if (place == nullptr || place->empty() || !seen.insert(place.get()).second) return;
-		/* Nothing draws from it now (between the frames): its pixels may go. */
-		std::vector<ThreeDObjectTexture> &lv = const_cast<std::vector<ThreeDObjectTexture> &>(*place);
-		int keep = static_cast<int>(lv.size()) - 1;
-		auto it = _texture_levels_asked.find(&lv);
-		if (it != _texture_levels_asked.end()) {
-			keep = std::min(keep, it->second);
-		} else {
-			while (keep > 0 && std::max(lv[keep - 1].w, lv[keep - 1].h) <= 256) keep--;
-		}
-		keep = DrawnLevel(lv, keep);
-		for (int i = 0; i < keep; i++) freed += lv[i].px.capacity() * sizeof(uint32_t);
-		DropFinerLevels(lv, keep);
-		/* The levels the card holds, asked for by none but the card since the last time: their pixels are on the card,
-		 * not twice (the player's log of 15. 11.: the vehicles' textures 575 MB here and 543 MB on the card). Not the
-		 * small ones, nor the coarsest: the processor has that one to draw from till the texture is made again for it. */
-		size_t *why = _texture_bytes_kept_why_now;
-		if (!_textures_card_only || _textures_asked_by_processor.contains(&lv)) {
-			for (const ThreeDObjectTexture &t : lv) why[0] += t.px.size() * sizeof(uint32_t);
-			return;
-		}
-		why[2] += lv.back().px.size() * sizeof(uint32_t);
-		for (size_t i = std::max(keep, 0); i + 1 < lv.size(); i++) {
-			ThreeDObjectTexture &t = lv[i];
-			if (t.px.empty()) continue;
-			if (std::max(t.w, t.h) <= 256) {
-				why[2] += t.px.size() * sizeof(uint32_t);
-				continue;
-			}
-			std::unique_lock<std::mutex> card = ThreeDGpuTexturesLock();
-			if (!ThreeDGpuHoldsTextureLocked(t.uid.value)) {
-				why[1] += t.px.size() * sizeof(uint32_t);
-				continue;
-			}
-			freed += t.px.capacity() * sizeof(uint32_t);
-			_texture_bytes_on_card_only += t.px.capacity() * sizeof(uint32_t);
-			t.px.clear();
-			t.px.shrink_to_fit();
-			t.card_only = true;
-		}
-	};
+	auto trim = [&](const ThreeDTextureLevels &place) { freed += TrimTextureLevels(place, seen); };
 	for (const ThreeDTextureLevels &place : this->levels) trim(place);
 	trim(this->mask_levels);
 	trim(this->rust_levels);
@@ -11776,6 +11782,14 @@ static void TrimThreeDTextures()
 	std::fill(std::begin(_texture_bytes_kept_why_now), std::end(_texture_bytes_kept_why_now), 0);
 	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
 		for (const ThreeDVehicleObject &v : *list) freed += v.TrimTextures(seen);
+	}
+	/* The materials of the buildings' add-ons too (ThreeDObject::MaterialTexture()): they were never trimmed, every
+	 * level made of them stayed while the game ran. Asked for each time a building is laid, as its own texture. */
+	auto materials = [&](const ThreeDObject &o) {
+		for (const ThreeDTextureLevels &place : o.material_levels) freed += TrimTextureLevels(place, seen);
+	};
+	if (_three_d_objects_read) {
+		for (const ThreeDObject &o : _three_d_objects) materials(o);
 	}
 	std::copy(std::begin(_texture_bytes_kept_why_now), std::end(_texture_bytes_kept_why_now), std::begin(_texture_bytes_kept_why));
 	_texture_levels_asked.clear();

@@ -8356,7 +8356,13 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 						b.textures.push_back(p.o->DrawnTexture(to_underlying(lay.zoom), paint));
 					}
 				}
-				for (uint8_t t = 1; t < p.o->Textures(); t++) b.textures.push_back(p.o->DrawnTextureOf(t, to_underlying(lay.zoom), p.o->AddonPaintAt(to.origin, t)));
+				for (uint8_t t = 1; t < p.o->Textures(); t++) {
+					/* Its add-ons' and materials' unpainted for the card alone, as its own. */
+					const uint32_t addon_paint = p.o->AddonPaintAt(to.origin, t);
+					std::optional<ThreeDTexturesForCard> for_card;
+					if (addon_paint == 0) for_card.emplace();
+					b.textures.push_back(p.o->DrawnTextureOf(t, to_underlying(lay.zoom), addon_paint));
+				}
 				/* A corner to the block: affine, so where its origin and unit steps go. */
 				double o0[3], e[3][3];
 				place(0, 0, 0, o0[0], o0[1], o0[2]);
