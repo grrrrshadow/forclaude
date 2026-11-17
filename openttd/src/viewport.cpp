@@ -17503,6 +17503,77 @@ static void AddFieldWheatTufts(TileIndex tile, uint type, int x0, int y0, int ba
  * game, nothing to license. Only where the sky is, nothing drawn there.
  */
 /**
+ * What falls across the night sky (the player, 17. 11.: "I would like comets on the night sky, nice ones, falling"):
+ * shooting stars, quick and thin, every few seconds, and now and then a comet, slow, with a long tail that glows and
+ * sparkles. Each has its turn of the clock: by the number of its turn where it starts, which way and how far it
+ * falls, how long it takes and its colour -- the same for every eye, nothing kept. They fall low over the horizon,
+ * where the eye looking level sees them.
+ */
+struct SkyStreak {
+	double az, el;     ///< where it starts: round from the world's x, up from the horizon, radians
+	double daz, del;   ///< how far it goes in its life
+	double begins, life; ///< seconds: when, how long
+	double tail;       ///< its tail, a part of its way
+	Colour colour;
+	bool comet;        ///< a comet: wide, with a head that glows and sparks along its tail
+};
+
+/** Rig ('test3d kometa'): the sky's clock stands at this second; negative: it runs. */
+double _rig_sky_second = -1.0;
+
+/** The streak of a turn of the shooting stars' clock (stream 0, 1) or the comets' (2); nullopt: none falls in it. */
+static std::optional<SkyStreak> SkyStreakOf(int stream, uint32_t turn)
+{
+	static constexpr double PERIOD[] = {7.0, 11.0, 47.0};
+	static constexpr double OFTEN[] = {0.65, 0.55, 0.8};
+	uint32_t seed = turn * 2654435761u + static_cast<uint32_t>(stream) * 0x9E3779B9u + 0x5EEDu;
+	auto next = [&seed]() {
+		seed ^= seed << 13;
+		seed ^= seed >> 17;
+		seed ^= seed << 5;
+		return (seed >> 8) / static_cast<double>(1 << 24);
+	};
+	for (int k = 0; k < 4; k++) next();
+	if (next() > OFTEN[stream]) return std::nullopt;
+	SkyStreak st;
+	st.comet = stream == 2;
+	st.az = next() * 2.0 * M_PI;
+	const double side = next() < 0.5 ? -1.0 : 1.0;
+	if (st.comet) {
+		st.el = (21.0 + 9.0 * next()) * M_PI / 180.0;
+		st.del = -(st.el - (5.0 + 4.0 * next()) * M_PI / 180.0);
+		st.daz = side * (22.0 + 20.0 * next()) * M_PI / 180.0;
+		st.life = 5.0 + 3.0 * next();
+		st.tail = 0.34;
+		st.colour = next() < 0.5 ? Colour(205, 235, 255) : Colour(210, 255, 235);
+	} else {
+		st.el = (9.0 + 15.0 * next()) * M_PI / 180.0;
+		st.del = -std::min(st.el - 3.0 * M_PI / 180.0, (6.0 + 9.0 * next()) * M_PI / 180.0);
+		st.daz = side * (5.0 + 12.0 * next()) * M_PI / 180.0;
+		st.life = 0.6 + 0.7 * next();
+		st.tail = 0.45;
+		const double c = next();
+		st.colour = c < 0.6 ? Colour(255, 250, 235) : c < 0.85 ? Colour(200, 225, 255) : Colour(255, 215, 160);
+	}
+	st.begins = turn * PERIOD[stream] + next() * (PERIOD[stream] - st.life);
+	return st;
+}
+
+/** Rig ('test3d kometa <part of its life> [0|1|2]'): the sky's clock set into the first streak of a stream; says where it is. */
+std::string RigSkyStreak(double part, int stream)
+{
+	stream = Clamp(stream, 0, 2);
+	for (uint32_t turn = 0; turn < 64; turn++) {
+		const auto st = SkyStreakOf(stream, turn);
+		if (!st.has_value()) continue;
+		_rig_sky_second = st->begins + st->life * Clamp(part, 0.0, 1.0);
+		return fmt::format("proud {} kolo {}: zacina az {:.0f} el {:.0f} stupnu, konci az {:.0f} el {:.0f}, trva {:.1f} s; hodiny oblohy stoji na {:.2f} s",
+				stream, turn, st->az * 180.0 / M_PI, st->el * 180.0 / M_PI, (st->az + st->daz) * 180.0 / M_PI, (st->el + st->del) * 180.0 / M_PI, st->life, _rig_sky_second);
+	}
+	return "zadna";
+}
+
+/**
  * The night sky seen from an eye (DrawEyeSky()): the stars where they are on the picture, twinkling (t), the fewer the
  * lighter the night (seen); the moon's middle and size, its radius 0 when it is not ahead.
  */
@@ -17551,6 +17622,75 @@ static void EyeSkySeen(const CabEye &eye, double t, double seen, std::vector<Thr
 		const Colour c = st.warm > 200 ? Colour(255, 235, 200) : (st.warm < 60 ? Colour(200, 215, 255) : Colour(240, 240, 255));
 		/* A bright one: a little cross. */
 		out.push_back({static_cast<int>(sx), static_cast<int>(sy), static_cast<float>(c.r), static_cast<float>(c.g), static_cast<float>(c.b), static_cast<int>(a), st.bright > 200});
+	}
+	/* What falls across it (SkyStreakOf()): the turns of its clocks that are on now. The clock by the game's ticks, as
+	 * the twinkling: about five of t a second. */
+	const double second = _rig_sky_second >= 0 ? _rig_sky_second : t / 4.95;
+	for (int stream = 0; stream < 3; stream++) {
+		static constexpr double PERIOD[] = {7.0, 11.0, 47.0};
+		const uint32_t turn = static_cast<uint32_t>(second / PERIOD[stream]);
+		const auto streak = SkyStreakOf(stream, turn);
+		if (!streak.has_value()) continue;
+		const double part = (second - streak->begins) / streak->life;
+		if (part < 0 || part > 1) continue;
+		/* It lights up as it comes and burns out at its end. */
+		const double shine = std::min({1.0, part * 6.0, (1.0 - part) * 4.0}) * seen;
+		const Colour c = streak->colour;
+		auto point = [&](double sx, double sy, double a, bool cross = false) {
+			const int alpha = static_cast<int>(std::min(255.0, a));
+			if (alpha <= 2) return;
+			out.push_back({static_cast<int>(sx), static_cast<int>(sy), static_cast<float>(c.r), static_cast<float>(c.g), static_cast<float>(c.b), alpha, cross});
+		};
+		/* Its head, then its tail back along its way, a pixel apart on the picture. */
+		double hx, hy, ex, ey;
+		const double tail_from = std::max(0.0, part - streak->tail);
+		const bool head_seen = place(streak->az + streak->daz * part, streak->el + streak->del * part, hx, hy);
+		const bool end_seen = place(streak->az + streak->daz * tail_from, streak->el + streak->del * tail_from, ex, ey);
+		const int steps = head_seen && end_seen ? Clamp(static_cast<int>(std::hypot(hx - ex, hy - ey) * 1.3), 8, 600) : 160;
+		double px = 0, py = 0;
+		bool before = false;
+		for (int k = 0; k <= steps; k++) {
+			const double back = static_cast<double>(k) / steps; // 0 at its head, 1 at its tail's end
+			const double at = part - (part - tail_from) * back;
+			double sx, sy;
+			if (!place(streak->az + streak->daz * at, streak->el + streak->del * at, sx, sy)) {
+				before = false;
+				continue;
+			}
+			const double fade = (1.0 - back) * (1.0 - back);
+			point(sx, sy, 255.0 * shine * fade, k == 0);
+			if (streak->comet) {
+				/* Wide near its head: a pixel to each side across its way, thinner along the tail. */
+				if (before) {
+					const double dx = sx - px, dy = sy - py, len = std::max(1e-6, std::hypot(dx, dy));
+					const double nx = -dy / len, ny = dx / len;
+					for (int side = 1; side <= 2; side++) {
+						const double wide = fade * (side == 1 ? 0.55 : 0.22) * (back < 0.5 ? 1.0 : 2.0 * (1.0 - back));
+						point(sx + nx * side, sy + ny * side, 255.0 * shine * wide);
+						point(sx - nx * side, sy - ny * side, 255.0 * shine * wide);
+					}
+					/* Sparks left behind beside its tail, each twinkling out. */
+					if (k % 7 == 3) {
+						const uint32_t spark = (static_cast<uint32_t>(turn) * 131u + static_cast<uint32_t>(at * 400.0)) * 2654435761u;
+						const double off = (static_cast<double>(spark >> 8 & 0xFF) / 255.0 - 0.5) * 9.0;
+						point(sx + nx * off, sy + ny * off, 200.0 * shine * fade * (0.5 + 0.5 * std::sin(t * 3.0 + spark)));
+					}
+				}
+				px = sx;
+				py = sy;
+				before = true;
+			}
+		}
+		/* A comet's head: a glow round it. */
+		if (streak->comet && head_seen) {
+			for (int dy = -3; dy <= 3; dy++) {
+				for (int dx = -3; dx <= 3; dx++) {
+					const double d = std::hypot(dx, dy);
+					if (d > 3.3 || (dx == 0 && dy == 0)) continue;
+					point(hx + dx, hy + dy, 230.0 * shine * (1.0 - d / 3.6));
+				}
+			}
+		}
 	}
 	/* The moon, low in the south-east of the map. */
 	double mx, my;

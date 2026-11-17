@@ -13718,6 +13718,20 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_card_vehicles_as_kept_on = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: vrstva aut dava drzene bez tvaru: {}", _card_vehicles_as_kept_on.load() ? "ano" : "ne");
 		return true;
+	} else if (what == "kometa") {
+		/* 'kometa [part of its life 0..1] [0|1 a shooting star, 2 a comet]': the night sky's clock stands in the first
+		 * streak of that stream, so far through its life (what falls across the sky, SkyStreakOf() of viewport.cpp);
+		 * 'kometa bezi': the clock runs again. */
+		extern std::string RigSkyStreak(double part, int stream);
+		extern double _rig_sky_second;
+		if (argv.size() > 2 && argv[2] == "bezi") {
+			_rig_sky_second = -1.0;
+			IConsolePrint(CC_DEFAULT, "test3d: kometa: hodiny oblohy bezi");
+			return true;
+		}
+		const double part = argv.size() > 2 ? std::strtod(std::string(argv[2]).c_str(), nullptr) : 0.5;
+		IConsolePrint(CC_DEFAULT, "test3d: kometa {}", RigSkyStreak(part, number(3).value_or(2)));
+		return true;
 	} else if (what == "atlas" && argv.size() > 2) {
 		/* 'atlas <px>': the card's kept pictures of what stands on the turned map so big (0 as they are), to fill them. */
 		extern void RigThreeDGpuAtlas(int px);
