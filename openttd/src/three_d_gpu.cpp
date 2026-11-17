@@ -487,7 +487,7 @@ GlFunctions gl;
  * (GlCounted), the real one behind it.
  */
 static std::atomic<uint64_t> _gl_calls = 0;
-static std::atomic<uint64_t> _gl_calls_standing = 0, _gl_calls_ground = 0, _gl_jobs_standing = 0, _gl_jobs_ground = 0, _gl_buildings = 0;
+static std::atomic<uint64_t> _gl_calls_standing = 0, _gl_calls_ground = 0, _gl_jobs_standing = 0, _gl_jobs_ground = 0, _gl_buildings = 0, _gl_calls_buildings = 0, _gl_vehicles = 0, _gl_calls_vehicles = 0;
 template <int I, typename F> struct GlCounted;
 template <int I, typename R, typename... A> struct GlCounted<I, R (THREE_D_GL_API *)(A...)> {
 	static inline R (THREE_D_GL_API *real)(A...) = nullptr;
@@ -5151,6 +5151,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	GLuint lean_vao = 0;                ///< the corners bound
 	bool lean_program = false;          ///< the buildings' program in use
 	std::array<GLuint, 2 * THREE_D_GPU_BUILDING_PAINTS> lean_parts{}; ///< the masks and patterns on the units 1 to 8
+	/* The buildings' uniforms as last set (a uniform keeps its value with its program whatever is used meanwhile): set
+	 * again only when another. -1 / NaN not known. */
+	int lean_u_parts = -1;
+	std::array<float, 3> lean_u_metres{NAN, NAN, NAN};
 	auto lean_forget = [&]() {
 		lean_cull = -1;
 		lean_depth = -1;
@@ -5166,7 +5170,15 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			/* As a building before it left the state when it was drawn alone: no depth test, no side left out. */
 			if (lean_depth != 0) gl.glDisable(GL_DEPTH_TEST);
 			if (lean_cull != 0) gl.glDisable(GL_CULL_FACE);
-			lean_forget();
+			/* What is left as known: the units 3 to 8 of the buildings' masks and patterns are not touched by the pictures
+			 * (only 0, 1 and 2 are): a building after them binds only what it changed, not all eight again. */
+			lean_depth = 0;
+			lean_cull = 0;
+			lean_tex0 = 0;
+			lean_vao = _standing_order_vao;
+			lean_program = false;
+			lean_parts[0] = 0; // unit 1
+			lean_parts[2] = 0; // unit 2
 			gl.glActiveTexture(GL_TEXTURE1);
 			gl.glBindTexture(GL_TEXTURE_2D, s.moving ? pics.standing_order : 0);
 			gl.glActiveTexture(GL_TEXTURE2);
@@ -5208,13 +5220,18 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	 * things by the order kept under them. */
 	auto flush = [&]() {
 		if (corners.empty()) return;
-		lean_forget();
+		/* Lean: only what it changes forgotten (the depth test, unit 0); the masks and patterns of the buildings stay. */
+		if (!_gpu_standing_lean) lean_forget();
+		/* Set whatever was before: a picture put into its atlas meanwhile (StandingPlace()) binds unit 0 too. */
 		if (!s.moving) {
 			gl.glEnable(GL_DEPTH_TEST);
+			lean_depth = 1;
 		} else {
 			gl.glDisable(GL_DEPTH_TEST);
+			lean_depth = 0;
 		}
 		gl.glBindTexture(GL_TEXTURE_2D, drawing);
+		lean_tex0 = drawing;
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
 		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / STANDING_BOXED_FLOATS));
 		corners.clear();
@@ -5363,7 +5380,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			gl.glUniform1i(night_at, 0);
 			night_was_set = false;
 		}
-		gl.glUniform1f(u_order, static_cast<float>(order));
+		/* u_order: not read by STANDING_BUILDING_FRAGMENT (its pixels' order is by how near they are), set only when not lean. */
+		if (!_gpu_standing_lean) gl.glUniform1f(u_order, static_cast<float>(order));
 		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
 		const bool lean = _gpu_standing_lean;
 		if (!lean) lean_forget();
@@ -5403,9 +5421,16 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 		}
 		if (!lean || units_changed) gl.glActiveTexture(GL_TEXTURE0);
-		gl.glUniform3f(u_metres, b.building.to_metres[0], b.building.to_metres[1], b.building.to_metres[2]);
-		gl.glUniform1i(u_parts, 0);
-		int parts_set = 0;
+		if (!lean || lean_u_metres[0] != b.building.to_metres[0] || lean_u_metres[1] != b.building.to_metres[1] || lean_u_metres[2] != b.building.to_metres[2]) {
+			gl.glUniform3f(u_metres, b.building.to_metres[0], b.building.to_metres[1], b.building.to_metres[2]);
+			lean_u_metres = {b.building.to_metres[0], b.building.to_metres[1], b.building.to_metres[2]};
+		}
+		/* Its runs set u_parts as they need it: lean, the value left by the building before kept till a run wants another. */
+		if (!lean) {
+			gl.glUniform1i(u_parts, 0);
+			lean_u_parts = 0;
+		}
+		int parts_set = lean ? lean_u_parts : 0;
 		if (!lean || lean_depth != 1) {
 			gl.glEnable(GL_DEPTH_TEST);
 			lean_depth = 1;
@@ -5420,6 +5445,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (run_parts != parts_set) {
 				gl.glUniform1i(u_parts, run_parts);
 				parts_set = run_parts;
+				lean_u_parts = run_parts;
 			}
 			/* Its ranges in the cells that reach into the block, one after the other joined. */
 			firsts.clear();
@@ -5475,6 +5501,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			gl.glUniform1i(night_at, 1);
 			night_was_set = true;
 			gl.glUniform1i(u_parts, 0);
+			lean_u_parts = 0;
 			gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, to_view.data());
 			gl.glBindVertexArray(_standing_tri_vao);
 			gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_tri_vbo);
@@ -5501,6 +5528,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	 * drawn yet, -2 not drawn at all (one the card cannot hold). */
 	std::vector<std::array<int, 2>> vehicle_at(s.items.size(), {-1, -1});
 	auto draw_vehicles = [&](size_t from) {
+		/* Its pictures use the units 1 to 6 (their paint and bones): the buildings' masks and patterns there not known after. */
+		lean_forget();
 		/* The picture is drawn anew: those drawn into it before and not shrunk yet (after this one, which comes
 		 * again: its kept picture went as the kept pictures filled up) are not there any more -- drawn again too, or
 		 * they were shrunk from nothing (Mat and the trees of a town went missing with the figures on the card). */
@@ -5737,8 +5766,11 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				} else {
 					flush();
 					const auto draw_started = std::chrono::steady_clock::now();
+					const uint64_t vehicle_calls = _gl_calls;
 					if (vehicle_at[k][0] == -1) draw_vehicles(k);
 					const bool shrunk = vehicle_at[k][0] >= 0 && shrink_vehicle(v, vehicle_at[k], key, place);
+					if (const uint64_t after = _gl_calls; after >= vehicle_calls) _gl_calls_vehicles += after - vehicle_calls;
+					_gl_vehicles++;
 					if (!shrunk) {
 						if (_standing_failed_keys.size() > 4096) _standing_failed_keys.clear();
 						_standing_failed_keys.insert(v.key);
@@ -5766,7 +5798,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 			if (item.building >= 0) {
 				flush();
-				if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building], item.order)) {
+				const uint64_t calls_before = _gl_calls;
+				const bool building_drawn = static_cast<size_t>(item.building) < s.buildings.size() && draw_building(s.buildings[item.building], item.order);
+				if (const uint64_t calls_after = _gl_calls; calls_after >= calls_before) _gl_calls_buildings += calls_after - calls_before;
+				if (!building_drawn) {
 					_gpu_standing_failed[building_failed == 2 ? 2 : 1]++;
 					all = false;
 					break;
@@ -7752,8 +7787,10 @@ std::string ThreeDGpuTimes()
 	{
 		const uint64_t jg = _gl_jobs_ground.exchange(0), js = _gl_jobs_standing.exchange(0);
 		const uint64_t cg = _gl_calls_ground.exchange(0), cs = _gl_calls_standing.exchange(0);
-		s += fmt::format("; OpenGL calls {} (ground {} in {} jobs, {} a job; what stands {} in {} jobs, {} a job, buildings {})", _gl_calls.exchange(0),
-				cg, jg, jg > 0 ? cg / jg : 0, cs, js, js > 0 ? cs / js : 0, _gl_buildings.exchange(0));
+		const uint64_t nb = _gl_buildings.exchange(0), cb = _gl_calls_buildings.exchange(0);
+		const uint64_t nv = _gl_vehicles.exchange(0), cv = _gl_calls_vehicles.exchange(0);
+		s += fmt::format("; OpenGL calls {} (ground {} in {} jobs, {} a job; what stands {} in {} jobs, {} a job, buildings {} with {} calls, {} a building; vehicles drawn and shrunk {} with {} calls, {} a vehicle)", _gl_calls.exchange(0),
+				cg, jg, jg > 0 ? cg / jg : 0, cs, js, js > 0 ? cs / js : 0, nb, cb, nb > 0 ? cb / nb : 0, nv, cv, nv > 0 ? cv / nv : 0);
 	}
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
