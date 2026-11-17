@@ -19,6 +19,7 @@
 
 #if defined(_WIN32)
 #include "os/windows/win32.h"
+#include <windows.h> // TerminateProcess() of the watch of the game's end (ExitDiary())
 #endif
 
 #include "3rdparty/fmt/chrono.h"
