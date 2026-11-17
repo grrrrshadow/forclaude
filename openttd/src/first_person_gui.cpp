@@ -58,6 +58,7 @@
 #include "three_d_witches.h"
 #include "vehicle_base.h"
 #include "train.h"
+#include "train_cmd.h"
 #include "aircraft.h"
 #include "cab_drive.h"
 #include "vehicle_cmd.h"
@@ -2978,7 +2979,19 @@ struct FirstPersonWindow : Window {
 			case WID_FP_CENTRE:
 				/* Riding (the player, test4: "instead of the button 'On the map' the driver's stand changes by clicking one
 				 * button"): to the other end of the vehicle, the eye turned at once. */
-				if (this->Riding() != nullptr) {
+				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
+					/* A train standing: turned round, the stand at the other end now its front -- ahead is where the eye
+					 * looks, as at a real engine's other stand (the player, 17. 11.: "I change the stand and the arrow up
+					 * stays as at the old stand: I back up"). Going, the eye only looks back. */
+					const Vehicle *front = rv->First();
+					if (front->type == VehicleType::Train && front->owner == _local_company && front->cur_speed == 0 && Train::From(front)->IsFrontEngine() &&
+							!front->vehstatus.Test(VehState::Crashed)) {
+						Command<Commands::ReverseTrainDirection>::Post(STR_ERROR_CAN_T_REVERSE_DIRECTION_TRAIN, front->tile, front->index, false);
+						this->camera.valid = false;
+						this->camera.head = 0;
+						this->SetDirty();
+						break;
+					}
 					this->camera.rear = !this->camera.rear;
 					this->camera.valid = false;
 					this->camera.head = 0;
