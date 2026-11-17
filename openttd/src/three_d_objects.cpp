@@ -15367,11 +15367,15 @@ static void MakeHouseLevels(const ThreeDObject &o, int level)
  * TrimTextures()). A building kept every level from the first sight of it, its finest too: seen on the map from afar
  * a pub held 86 MB, the buildings together up to 894 MB (the player's log of 14. 11., build #367).
  */
+/** For the diary: why the pixels of the buildings' textures stayed here at the last trimming, bytes: asked for by the processor, the card not holding them, small or the coarsest. Under _lazy_mutex. */
+static size_t _house_bytes_kept_why[3] = {};
+
 static void TrimThreeDHouseLevels()
 {
 	if (!_three_d_objects_read) return;
 	std::lock_guard lock(_lazy_mutex);
 	size_t freed = 0;
+	size_t why[3] = {};
 	for (const ThreeDObject &o : _three_d_objects) {
 		if (o.levels.empty()) continue;
 		int keep = static_cast<int>(o.levels.size()) - 1;
@@ -15388,12 +15392,23 @@ static void TrimThreeDHouseLevels()
 		 * were 413 MB here and as much on the card (the player's save, 16. 11.: "the card should put the wallpapers on
 		 * the houses itself"). Not the small ones, nor the coarsest: the processor has that one to draw from meanwhile. */
 		const bool by_processor = std::exchange(o.asked_by_processor, false);
-		if (!_textures_card_only || by_processor) continue;
+		if (!_textures_card_only || by_processor) {
+			for (const ThreeDObjectTexture &t : o.levels) why[0] += t.px.size() * sizeof(uint32_t);
+			continue;
+		}
+		if (!o.levels.empty()) why[2] += o.levels.back().px.size() * sizeof(uint32_t);
 		for (size_t i = std::max(keep, 0); i + 1 < o.levels.size(); i++) {
 			ThreeDObjectTexture &t = o.levels[i];
-			if (t.px.empty() || std::max(t.w, t.h) <= 256) continue;
+			if (t.px.empty()) continue;
+			if (std::max(t.w, t.h) <= 256) {
+				why[2] += t.px.size() * sizeof(uint32_t);
+				continue;
+			}
 			std::unique_lock<std::mutex> card = ThreeDGpuTexturesLock();
-			if (!ThreeDGpuHoldsTextureLocked(t.uid.value)) continue;
+			if (!ThreeDGpuHoldsTextureLocked(t.uid.value)) {
+				why[1] += t.px.size() * sizeof(uint32_t);
+				continue;
+			}
 			freed += t.px.capacity() * sizeof(uint32_t);
 			_house_bytes_on_card_only += t.px.size() * sizeof(uint32_t);
 			t.px.clear();
@@ -15401,6 +15416,7 @@ static void TrimThreeDHouseLevels()
 			t.card_only = true;
 		}
 	}
+	std::copy(std::begin(why), std::end(why), std::begin(_house_bytes_kept_why));
 	if (freed > 0) Debug(misc, 1, "3D objects: {:.1f} MB of the buildings' texture levels finer than drawn let go of", freed / (1024.0 * 1024.0));
 }
 
@@ -15615,6 +15631,17 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint
 	MarkThreeDUsed(this->used);
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].TryGetTexture(level, paint);
 	if (!this->TryRead()) return nullptr;
+	/* Painted by the processor and the copy made already: that one, its own pixels -- the unpainted level it was made
+	 * of is not asked for. Asked every frame it was read again when let go of and stayed here for good, marked as the
+	 * processor's (the rig on the player's save, the turned map: of the buildings' 50 MB of textures here 20 to 26 MB
+	 * asked for by the processor, none let go of as the card held it; the player's diary of 17. 11.: 505 MB). */
+	if (paint != 0 && !this->colours.empty()) {
+		std::lock_guard lock(_lazy_mutex);
+		if (!this->levels.empty()) {
+			auto it = this->painted.find({std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1), paint});
+			if (it != this->painted.end()) return PaintedAsked(it->second);
+		}
+	}
 	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this, level] { return HouseLevelHeld(*this, level); }, [this, level, paint] {
 		this->GetTexture(level, paint, false);
 		_three_d_objects_readied++; // the map drawn with a coarser one meanwhile draws its place again (DrawnCardPaint())
@@ -16512,8 +16539,8 @@ std::string DescribeThreeDObjectMemory()
 	std::ranges::sort(biggest, std::greater{});
 	std::string most;
 	for (size_t i = 0; i < std::min<size_t>(biggest.size(), 3); i++) most += fmt::format("{}{} {:.1f} MB", i == 0 ? "" : ", ", biggest[i].second, mb(biggest[i].first));
-	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}; dalsich {:.1f} MB jen na karte), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}; textury {:.1f} a dalsich {:.1f} jen na karte, lakovane procesorem {:.1f} v {} kopiich, tvary {:.1f}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}",
-			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(on_card_only), mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_levels), mb(_house_bytes_on_card_only), mb(house_painted), house_painted_count, mb(house_shapes), mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most);
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}; dalsich {:.1f} MB jen na karte), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}; textury {:.1f} a dalsich {:.1f} jen na karte, lakovane procesorem {:.1f} v {} kopiich, tvary {:.1f}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}; textury domu tady proto: ptal se procesor {:.1f} MB, karta je nedrzi {:.1f} MB, male a nejhrubsi {:.1f} MB",
+			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(on_card_only), mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_levels), mb(_house_bytes_on_card_only), mb(house_painted), house_painted_count, mb(house_shapes), mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most, mb(_house_bytes_kept_why[0]), mb(_house_bytes_kept_why[1]), mb(_house_bytes_kept_why[2]));
 }
 
 /**
