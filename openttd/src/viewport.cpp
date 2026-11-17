@@ -8731,8 +8731,37 @@ static void TurnedStandingNear(ThreeDGpuStanding &s, const DrawPixelInfo &frame,
 }
 
 /** The things that move on the turned view collected for a block (the moving layer, ThreeDGpuStanding::moving): the vehicles, the walkers and the cars of the towns, the creatures. */
-static void AddTurnedMovers(ZoomLevel zoom, DrawPixelInfo *cdpi)
+/** The piece of the turned view the moving things are gathered for (AddTurnedMovers()); nullptr outside of it. */
+static const DrawPixelInfo *_turned_movers_frame = nullptr;
+
+/**
+ * A vehicle gathered for the turned view that stands beside the piece drawn (ViewportAddVehicles() of vehicle.cpp).
+ * The vehicles are gathered against the north-up box of the world under the piece from the ground to the tallest thing
+ * there can be (TurnedWorldBox()): many times the piece. One far beside it was placed and its shapes prepared for the
+ * card all the same, which then laid nothing of it (the player's diary of 17. 11.: at the nearest zoom 68 things placed
+ * a frame and one laid, the gathering 17 ms of the frame; on the whole map a third of the time in the layer).
+ */
+bool TurnedVehicleBesideFrame(const Vehicle *v)
 {
+	extern bool TurnedMoverBesideFrame(int x, int y, int z);
+	return TurnedMoverBesideFrame(v->x_pos, v->y_pos, v->z_pos);
+}
+
+/** The same of a moving thing at a place of the world (a figure, an animal: AddThreeDFigureToViewportInBox()). */
+bool TurnedMoverBesideFrame(int x, int y, int z)
+{
+	if (_turned_movers_frame == nullptr) return false;
+	const DrawPixelInfo &f = *_turned_movers_frame;
+	double vx, vy;
+	ProjectTurnedF(x, y, z, vx, vy);
+	/* As far about it as the biggest vehicle reaches, and half as much again: a ship's model, a pose on a round track. */
+	const int mx = MAX_VEHICLE_PIXEL_X * ZOOM_BASE * 3 / 2, my = MAX_VEHICLE_PIXEL_X * ZOOM_BASE * 3 / 2;
+	return vx < f.left - mx || vy < f.top - my || vx > f.left + f.width + mx || vy > f.top + f.height + my;
+}
+
+static void AddTurnedMovers(ZoomLevel zoom, DrawPixelInfo *cdpi, const DrawPixelInfo &frame)
+{
+	AutoRestoreBackup movers_frame(_turned_movers_frame, &frame);
 	/* Each kind timed for the diary (the player's #371: the gathering 30 ms of the layer's 37 ms a frame). */
 	double t = TurnedNow();
 	auto timed = [&](int kind) { const double now = TurnedNow(); _turned_moving_kinds_ms[kind] += now - t; t = now; };
@@ -9249,7 +9278,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	/* The things that move: laid over what stands each frame when the card lays it for the main view with the moving
 	 * layer on (TurnedCardLayMovers()), else here with it. */
 	const bool movers_apart = _turned_moving_layer && _tcg == &_turned_card_ground && card_usable && ground_laying.kept != nullptr;
-	if (!movers_apart) AddTurnedMovers(zoom, &cdpi);
+	if (!movers_apart) AddTurnedMovers(zoom, &cdpi, frame);
 	/* The marijuana the walkers planted (walker_inventory.h). */
 	ForWalkerPlantParts([zoom](std::string_view name, float scale, float stretch, double x, double y, double z, float facing) {
 		int height = 0;
@@ -9334,7 +9363,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 			const size_t from = _vd.parent_sprites_to_draw.size();
 			{
 				AutoRestoreBackup collecting(_vd.dpi, cdpi);
-				AddTurnedMovers(zoom, &cdpi);
+				AddTurnedMovers(zoom, &cdpi, frame);
 			}
 			TurnParentSprites(from);
 			standing = SortedTurnedSprites();
@@ -10281,10 +10310,10 @@ static uint32_t TurnedCardLayMoversOnce(bool whole)
 	extern void ThreeDCardVehiclesAsKeptBegin(bool whole);
 	extern void ThreeDCardVehiclesAsKeptEnd();
 	if (_card_vehicles_as_kept_on) ThreeDCardVehiclesAsKeptBegin(whole);
-	AddTurnedMovers(vp.zoom, &cdpi);
+	AddTurnedMovers(vp.zoom, &cdpi, frame);
 	_turned_moving_collect_ms += TurnedNow() - t_collect;
 	/* The rig ('test3d sberaut <n>'): the gathering so many times more, to be looked at with a debugger's samples. */
-	for (int k = 1; k < _rig_movers_repeat; k++) AddTurnedMovers(vp.zoom, &cdpi);
+	for (int k = 1; k < _rig_movers_repeat; k++) AddTurnedMovers(vp.zoom, &cdpi, frame);
 	ThreeDCardVehiclesAsKeptEnd();
 	_vd.dpi = frame;
 	TurnParentSprites(0);

@@ -47,6 +47,7 @@
 #include "table/strings.h"
 
 #include <span>
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <bit>
@@ -55,6 +56,7 @@
 #include <condition_variable>
 #include <deque>
 #include <functional>
+#include <iterator>
 #include <map>
 #include <mutex>
 #include <unordered_map>
@@ -3384,6 +3386,7 @@ struct CardVehicleKept {
 	std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 	std::vector<ThreeDPictureLight> lights;
 	uint64_t used = 0; ///< the pass it was asked for last
+	bool too_big = false; ///< bigger than the card draws one (CardMade::TooBig); card is nullptr then, as of one not seen at all
 };
 static std::unordered_map<uint64_t, CardVehicleKept> _card_vehicles_kept; ///< by its key; the main thread's
 static uint64_t _card_vehicles_kept_pass = 0;
@@ -3391,6 +3394,12 @@ static uint64_t _card_vehicles_kept_given = 0;
 /** For the diary, of the moving layer's pass: things placed, of them prepared anew with their shapes, and how long that took, ms. */
 static uint64_t _card_things_placed = 0, _card_things_prepared = 0;
 static double _card_things_prepared_ms = 0;
+/** Of those prepared anew, how they came out: nothing of it seen, bigger than the card draws one, not made yet, drawn; and the time of each, ms. */
+/** The things the card had no picture of when given as kept (ThreeDCardVehiclesGiveWhole()), and those of them it lacked more than once since the diary asked. */
+static uint64_t _card_things_missing = 0, _card_things_missing_again = 0;
+static std::unordered_map<uint64_t, int> _card_things_missing_keys;
+static uint64_t _card_things_prepared_how[4] = {};
+static double _card_things_prepared_how_ms[4] = {};
 
 /** What the card makes of a thing of the map it draws (CardVehicle()). */
 enum class CardMade : uint8_t {
@@ -3446,7 +3455,7 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 			card = it->second.card;
 			lights = it->second.lights;
 			_card_vehicles_kept_given++;
-			return CardMade::Drawn;
+			return it->second.too_big ? CardMade::TooBig : CardMade::Drawn;
 		}
 	}
 	GpuObjectPicture gp;
@@ -3454,11 +3463,15 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	const auto prepare_from = std::chrono::steady_clock::now();
 	struct PrepareTimed {
 		std::chrono::steady_clock::time_point from;
+		int how = 0; ///< how it came out: 0 nothing seen, 1 too big, 2 not made yet, 3 drawn
 		~PrepareTimed()
 		{
 			if (!_card_vehicles_as_kept) return;
+			const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
 			_card_things_prepared++;
-			_card_things_prepared_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
+			_card_things_prepared_ms += ms;
+			_card_things_prepared_how[this->how]++;
+			_card_things_prepared_how_ms[this->how] += ms;
 		}
 	} prepare_timed{prepare_from};
 	{
@@ -3478,12 +3491,24 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 		if (!no_wait.Missed()) drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp, bones, by_bones);
 		if (no_wait.Missed()) {
 			_stand_ins_given++;
+			prepare_timed.how = 2;
 			return CardMade::NotYet;
 		}
 	}
-	if (!drawn) return CardMade::Drawn;
+	/* Not a pixel of it seen, or bigger than the card draws one: remembered by its key as the drawn ones are, or it was
+	 * prepared with all its shapes again every frame only to learn the same (the player's diary of 17. 11.: at the
+	 * nearest zoom more things prepared anew in a pass than were placed, 80 a frame, the card drawing three of them). */
+	if (!drawn) {
+		if (_card_vehicles_as_kept) _card_vehicles_kept[key] = {nullptr, {}, _card_vehicles_kept_pass, false};
+		return CardMade::Drawn;
+	}
 	/* Bigger than the card draws one (a dragon zoomed in): its picture instead. */
-	if (gp.pic.width > THREE_D_GPU_VEHICLE_FRAME || gp.pic.height > THREE_D_GPU_VEHICLE_FRAME) return CardMade::TooBig;
+	if (gp.pic.width > THREE_D_GPU_VEHICLE_FRAME || gp.pic.height > THREE_D_GPU_VEHICLE_FRAME) {
+		prepare_timed.how = 1;
+		if (_card_vehicles_as_kept) _card_vehicles_kept[key] = {nullptr, {}, _card_vehicles_kept_pass, true};
+		return CardMade::TooBig;
+	}
+	prepare_timed.how = 3;
 	auto v = std::make_shared<ThreeDGpuStandingVehicle>();
 	v->key = key;
 	v->supersample = SUPERSAMPLE;
@@ -3528,7 +3553,7 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 		light->pic.glass_alpha = v->pic.glass_alpha;
 		light->pic.read_lit = v->pic.read_lit;
 		light->kept_only = true;
-		_card_vehicles_kept[key] = {std::move(light), lights, _card_vehicles_kept_pass};
+		_card_vehicles_kept[key] = {std::move(light), lights, _card_vehicles_kept_pass, false};
 	}
 	card = std::move(v);
 	return CardMade::Drawn;
@@ -3561,16 +3586,27 @@ void ThreeDCardVehiclesAsKeptEnd()
 /** For the diary: the things the moving layer's passes placed since it was last asked, those prepared anew and the time of that. */
 std::string TakeThreeDCardThingsPrepared()
 {
-	const std::string s = fmt::format("{} veci umisteno, {} pripraveno znovu za {:.0f} ms", _card_things_placed, _card_things_prepared, _card_things_prepared_ms);
+	const uint64_t *h = _card_things_prepared_how;
+	const double *hm = _card_things_prepared_how_ms;
+	const std::string s = fmt::format("{} veci umisteno, {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); karta nemela {}, z toho opakovane {} ruznych",
+			_card_things_placed, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_things_missing, _card_things_missing_again);
+	_card_things_missing = _card_things_missing_again = 0;
+	_card_things_missing_keys.clear();
 	_card_things_placed = _card_things_prepared = 0;
 	_card_things_prepared_ms = 0;
+	std::fill(std::begin(_card_things_prepared_how), std::end(_card_things_prepared_how), 0);
+	std::fill(std::begin(_card_things_prepared_how_ms), std::end(_card_things_prepared_how_ms), 0.0);
 	return s;
 }
 
 /** The card had no pictures of these things given as kept (ThreeDGpuStanding::missing_keys): with their shapes the next time. */
 void ThreeDCardVehiclesGiveWhole(std::span<const uint64_t> keys)
 {
-	for (uint64_t key : keys) _card_vehicles_kept.erase(key);
+	for (uint64_t key : keys) {
+		_card_vehicles_kept.erase(key);
+		_card_things_missing++;
+		if (++_card_things_missing_keys[key] == 2) _card_things_missing_again++;
+	}
 }
 
 uint64_t TakeThreeDCardVehiclesAsKept()
@@ -5579,6 +5615,10 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 {
 	int height = 0, up = 0;
 	bool later = false;
+	/* Among the moving things of the turned view and far beside the piece drawn: nothing of it (TurnedMoverBesideFrame()
+	 * of viewport.cpp), or its shapes were prepared for the card each frame it walked, the card laying nothing of it. */
+	extern bool TurnedMoverBesideFrame(int x, int y, int z);
+	if (box == nullptr && TurnedMoverBesideFrame(x, y, z)) return true;
 	/* Drawn by the card with the block's vehicles, no picture of it (CardVehicle()), coarser a little sooner than a
 	 * picture so that it is within what the card draws one in. */
 	if (ViewportVehiclesOnCard()) {

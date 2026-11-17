@@ -1517,10 +1517,13 @@ void ViewportAddVehicles(DrawPixelInfo *dpi)
 					 * layer 30 ms a frame on the phone). */
 					if (!ViewportDrawingTurned()) RevalidateVehicleSprite(v);
 
+					/* Turned, the box gathered against is many times the piece drawn: one far beside it is not placed. */
+					extern bool TurnedVehicleBesideFrame(const Vehicle *v);
 					if (l <= v->coord.right &&
 						t <= v->coord.bottom &&
 						r >= v->coord.left &&
-						b >= v->coord.top) DoDrawVehicle(v);
+						b >= v->coord.top &&
+						!(ViewportDrawingTurned() && TurnedVehicleBesideFrame(v))) DoDrawVehicle(v);
 				}
 
 				v = v->hash_viewport_next;
