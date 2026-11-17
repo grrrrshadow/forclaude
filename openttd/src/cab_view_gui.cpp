@@ -225,6 +225,12 @@ void CabCargo(const Vehicle *v, bool unload)
 void CabLetGo(const Vehicle *v)
 {
 	if (_game_mode != GameMode::Normal || _exit_game || _switch_mode != SwitchMode::None || v == nullptr || v->owner != _local_company) return;
+	/* Held to no speed any more, whatever it is: the arrows' slowest step stayed on a train its driver got out of (the
+	 * player, 17. 11.: "I stopped the Sergej and got out, sent it to the depot from its window: it goes 5 km/h"). */
+	if (v->cab_speed_limit != 0) {
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
+	}
 	/* A train driven from its desk: the game drives it again (simtrains_cab.h). */
 	if (v->type == VehicleType::Train) {
 		SimtrainsCabLetGo(v);

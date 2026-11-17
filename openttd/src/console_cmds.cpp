@@ -12284,7 +12284,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
 					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "",
 					v->cab_free ? fmt::format(" volne yaw {} rychlost {}{}{}{}", v->cab_yaw, v->cur_speed, v->cab_rejoin ? " zpet" : "", v->cab_reverse ? " couva" : "", VehicleBrakeLightsOn(v) ? " brzdi" : "") : "");
-			if (v->type == VehicleType::Train) IConsolePrint(CC_DEFAULT, "test3d:   rychlost {} rozkaz {} druh {} naklad {}", v->cur_speed, static_cast<int>(v->cur_real_order_index), to_underlying(v->current_order.GetType()), v->cargo.StoredCount());
+			if (v->type == VehicleType::Train) IConsolePrint(CC_DEFAULT, "test3d:   rychlost {} rozkaz {} druh {} naklad {} omezeni z kabiny {}", v->cur_speed, static_cast<int>(v->cur_real_order_index), to_underlying(v->current_order.GetType()), v->cargo.StoredCount(), v->cab_speed_limit);
 			if (v->type == VehicleType::Road) IConsolePrint(CC_DEFAULT, "test3d:   rychlost {} rozkaz {} stav {:#x} snimek {}", v->cur_speed, static_cast<int>(v->cur_real_order_index), RoadVehicle::From(v)->state, RoadVehicle::From(v)->frame);
 			if (!hidden) seen++;
 		}
