@@ -401,6 +401,10 @@ void MarkDirty(const Beast &b, const ThreeDAnimal &a)
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
 	place.mover = true;
+	/* Without lights of its own: nothing of it at night but its look, laid with the moving layer as by day. Not set, at
+	 * night every step of every creature in sight drew the blocks about it again (the rig, 17. 11.: the cows of a
+	 * farm by night, 385 of 400 blocks drawn again; the player's diary: the map's blocks six times as often as by day). */
+	place.lights_told = true;
 	const double reach = len_m * OBJECT_UNITS_PER_METRE + TILE_SIZE / 2.0;
 	place.x0 = b.x - reach;
 	place.x1 = b.x + reach;

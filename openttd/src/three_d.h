@@ -259,15 +259,20 @@ struct DirtyPlace {
 	 * over what stands each frame anyway (the moving layer, ThreeDGpuStanding::moving), what stands there stays. */
 	bool mover = false;
 	/** A mover whose lights at night are told to the card with the moving layer (TurnedMoverGlows() of viewport.cpp): a
-	 * vehicle, a car of the game's own. The screen about it is not drawn again for them (a witch's lantern and beam are
-	 * still the processor's: not set). */
+	 * vehicle, a car of the game's own -- or one without lights at all (an animal, a dragon, smoke). The screen about it is
+	 * not drawn again for them (a witch's lantern and beam, a lighthouse's beam are still the processor's: not set). */
 	bool lights_told = false;
+	/** Only the light of a thing on the ground before it (the pool of a vehicle's headlights), nothing standing nor moving:
+	 * where the card lays the glows of the moving things over its picture of the view (TurnedMoverGlows() of
+	 * viewport.cpp), nothing of the screen is drawn again for it. */
+	bool light_only = false;
 	/** Only what the processor draws over the card's picture of the turned view: a sign, a floating text -- nothing
 	 * that stands is laid again for it, only the screen there drawn again. */
 	bool screen_only = false;
 };
 bool DirtyPlaceIsMover();
 bool DirtyPlaceLightsTold();
+bool DirtyPlaceLightOnly();
 bool DirtyPlaceIsScreenOnly();
 
 /** While it lives, what the game marks dirty is at this place (DirtyPlace). */

@@ -10968,6 +10968,11 @@ static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, 
 	 * (TurnedCardLayMovers()), nothing of what stands laid again; the screen there drawn again only at night, for its
 	 * lights (DrawNight()). */
 	const bool mover = _turned_moving_layer && &vp == _turned_card_ground.vp && DirtyPlaceIsMover();
+	/* Only the pool of a vehicle's headlights on the turned main view whose moving things' glows the card lays over its
+	 * picture each frame (TurnedMoverGlows()): nothing there to draw again. Marked at every step of every lit vehicle,
+	 * it drew the blocks under it again where the card did not lay what stands (the player's diary of 17. 11.: at night
+	 * 7 000 to 11 000 marks in five seconds, the map's blocks drawn six times as often as by day). */
+	if (mover && DirtyPlaceLightOnly() && _turned_card_ground.shown && IsNightNow()) return true;
 
 	/* Past the turned main view, on the card about it: laid again when the view comes to it; a sign, the selection of
 	 * tiles facing north (SelectionOverTurned()) only drawn again. */
@@ -11049,7 +11054,7 @@ void ConstrainAllViewportsZoom()
  */
 static thread_local DirtyWhy _dirty_why = DirtyWhy::Other;
 /** The places marked since the diary last asked: by what told why (DirtyWhy), then moving things, boxes, tiles by their kind. */
-static constexpr size_t DIRTY_MARKS_MOVERS = to_underlying(DirtyWhy::End), DIRTY_MARKS_BOXES = DIRTY_MARKS_MOVERS + 1, DIRTY_MARKS_TILES = DIRTY_MARKS_BOXES + 1;
+static constexpr size_t DIRTY_MARKS_MOVERS = to_underlying(DirtyWhy::End), DIRTY_MARKS_BOXES = DIRTY_MARKS_MOVERS + 1, DIRTY_MARKS_LIGHTS = DIRTY_MARKS_BOXES + 1, DIRTY_MARKS_TILES = DIRTY_MARKS_LIGHTS + 1;
 static std::atomic<uint32_t> _dirty_marks[DIRTY_MARKS_TILES + to_underlying(TileType::End)] = {};
 
 DirtyWhyScope::DirtyWhyScope(DirtyWhy why) : before(_dirty_why)
@@ -11065,7 +11070,7 @@ DirtyWhyScope::~DirtyWhyScope()
 /** For the diary of the frames: what marked places of the map to be drawn again since it was last asked. */
 std::string TakeDirtyMarksForDiary()
 {
-	static const std::string_view names[] = {"", "objekty budov", "obrazky a tvary", "animace dlazdic", "postavy", "pohyblive veci", "krabice",
+	static const std::string_view names[] = {"", "objekty budov", "obrazky a tvary", "animace dlazdic", "postavy", "pohyblive veci", "krabice", "svetla aut",
 			"trava", "koleje", "silnice", "domy", "stromy", "stanice", "voda", "okraj", "prumysl", "mosty a tunely", "objekty"};
 	std::string s;
 	for (size_t k = 1; k < std::size(_dirty_marks) && k < std::size(names); k++) {
@@ -11119,14 +11124,16 @@ void MarkTileDirtyBetween(TileIndex tile, int z0, int z1, int reach)
  * @param x0,y0,x1,y1 the ground it is over, world units
  * @param z0,z1 the heights it is between, units
  * @param mover what moved is a thing that moves, a walker or the light of a vehicle (DirtyPlace::mover)
+ * @param light_only only the light of a vehicle on the ground before it (DirtyPlace::light_only)
  * @ingroup dirty
  */
-void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1, bool mover)
+void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1, bool mover, bool light_only)
 {
-	_dirty_marks[_dirty_why != DirtyWhy::Other ? to_underlying(_dirty_why) : mover ? DIRTY_MARKS_MOVERS : DIRTY_MARKS_BOXES]++;
+	_dirty_marks[_dirty_why != DirtyWhy::Other ? to_underlying(_dirty_why) : light_only ? DIRTY_MARKS_LIGHTS : mover ? DIRTY_MARKS_MOVERS : DIRTY_MARKS_BOXES]++;
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
 	place.mover = mover;
+	place.light_only = light_only;
 	/* A walker, a car of the game's own, the pool of a vehicle's headlights. */
 	place.lights_told = mover;
 	place.x0 = x0;

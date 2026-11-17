@@ -2302,7 +2302,7 @@ static void MarkVehicleLightPoolDirty(const Vehicle *v)
 	auto it = _light_pools.find(v->index.base());
 	if (!lit) {
 		if (it != _light_pools.end()) {
-			MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true);
+			MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true, true);
 			_light_pools.erase(it);
 		}
 		return;
@@ -2314,8 +2314,8 @@ static void MarkVehicleLightPoolDirty(const Vehicle *v)
 	const int ahead = v->type == VehicleType::Ship ? 20 : 15, half = 12;
 	const int cx = v->x_pos + dir_dx[d] * ahead, cy = v->y_pos + dir_dy[d] * ahead;
 	const std::array<int, 4> box{cx - half, cy - half, cx + half, cy + half};
-	if (it != _light_pools.end() && it->second != box) MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true);
-	MarkWorldBoxDirty(box[0], box[1], box[2], box[3], v->z_pos - 8, v->z_pos + 8, true);
+	if (it != _light_pools.end() && it->second != box) MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true, true);
+	MarkWorldBoxDirty(box[0], box[1], box[2], box[3], v->z_pos - 8, v->z_pos + 8, true, true);
 	_light_pools[v->index.base()] = box;
 }
 
@@ -2368,6 +2368,7 @@ void Vehicle::UpdateViewport(bool dirty)
 				const int m = 8 * ZOOM_BASE;
 				DirtyPlace smoke;
 				smoke.mover = true;
+				smoke.lights_told = true; // smoke has no light of its own
 				DirtyPlaceScope smoke_place(smoke);
 				::MarkAllViewportsDirty(pt.x + b.left - m, pt.y + b.top - m, pt.x + b.right + m, pt.y + b.bottom + m);
 			}

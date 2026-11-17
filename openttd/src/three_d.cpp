@@ -244,6 +244,12 @@ bool DirtyPlaceLightsTold()
 	return _dirty_place.lights_told;
 }
 
+/** Whether what the game marks dirty now is only a light on the ground (DirtyPlace::light_only). */
+bool DirtyPlaceLightOnly()
+{
+	return _dirty_place.light_only;
+}
+
 /** Whether what the game marks dirty now is only what the processor draws over the card's picture (DirtyPlace::screen_only). */
 bool DirtyPlaceIsScreenOnly()
 {
