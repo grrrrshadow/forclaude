@@ -463,7 +463,8 @@ constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 	X(void, glUniform1i, (GLint location, GLint v)) \
 	X(void, glUniform2i, (GLint location, GLint x, GLint y)) \
 	X(void, glUniform1f, (GLint location, GLfloat v)) \
-	X(void, glUniform1fv, (GLint location, GLsizei count, const GLfloat *value))
+	X(void, glUniform1fv, (GLint location, GLsizei count, const GLfloat *value)) \
+	X(void, glUniform4fv, (GLint location, GLsizei count, const GLfloat *value))
 
 /** The functions of OpenGL, of the card's context (only its thread calls them). */
 struct GlFunctions {
@@ -5122,12 +5123,14 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	int lean_depth = -1;                ///< the depth test on (1) or off (0)
 	GLuint lean_tex0 = 0;               ///< the texture on unit 0, 0 not known
 	GLuint lean_vao = 0;                ///< the corners bound
+	bool lean_program = false;          ///< the buildings' program in use
 	std::array<GLuint, 2 * THREE_D_GPU_BUILDING_PAINTS> lean_parts{}; ///< the masks and patterns on the units 1 to 8
 	auto lean_forget = [&]() {
 		lean_cull = -1;
 		lean_depth = -1;
 		lean_tex0 = 0;
 		lean_vao = 0;
+		lean_program = false;
 		lean_parts.fill(0);
 	};
 	bool pictures_uniforms_set = false;
@@ -5301,7 +5304,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		/* None of it in the part: nothing drawn. */
 		if (b.night.empty() && std::ranges::none_of(cell_in, [](uint8_t in) { return in != 0; })) return true;
 		const GpuProgram &bp = _standing_building_program;
-		gl.glUseProgram(bp.program);
+		if (!_gpu_standing_lean || !lean_program) gl.glUseProgram(bp.program);
+		lean_program = true;
 		/* Its paint (STANDING_BUILDING_FRAGMENT): the masks on the units 1 to 4, the patterns on 5 to 8, for its runs
 		 * of its first texture. The uniforms' places looked up once a program, not for every building. */
 		static GLuint paint_program = 0;
@@ -5338,10 +5342,27 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		const bool lean = _gpu_standing_lean;
 		if (!lean) lean_forget();
 		bool units_changed = false;
+		/* Its parts' colours and patterns: lean, each array at once. */
+		if (lean && part_count > 0) {
+			std::array<float, 4 * THREE_D_GPU_BUILDING_PAINTS> colours{}, abouts{};
+			for (int k = 0; k < part_count; k++) {
+				const ThreeDGpuBuildingPaint &p = b.building.paints[k];
+				colours[4 * k] = p.colour[0];
+				colours[4 * k + 1] = p.colour[1];
+				colours[4 * k + 2] = p.colour[2];
+				colours[4 * k + 3] = std::max(1.0f, p.start);
+				abouts[4 * k] = p.pattern != nullptr ? p.pattern_m : 0.0f;
+				abouts[4 * k + 1] = p.only_sloped ? 1.0f : 0.0f;
+			}
+			gl.glUniform4fv(u_colour[0], part_count, colours.data());
+			gl.glUniform4fv(u_about[0], part_count, abouts.data());
+		}
 		for (int k = 0; k < part_count; k++) {
 			const ThreeDGpuBuildingPaint &p = b.building.paints[k];
-			gl.glUniform4f(u_colour[k], p.colour[0], p.colour[1], p.colour[2], std::max(1.0f, p.start));
-			gl.glUniform4f(u_about[k], p.pattern != nullptr ? p.pattern_m : 0.0f, p.only_sloped ? 1.0f : 0.0f, 0.0f, 0.0f);
+			if (!lean) {
+				gl.glUniform4f(u_colour[k], p.colour[0], p.colour[1], p.colour[2], std::max(1.0f, p.start));
+				gl.glUniform4f(u_about[k], p.pattern != nullptr ? p.pattern_m : 0.0f, p.only_sloped ? 1.0f : 0.0f, 0.0f, 0.0f);
+			}
 			if (!lean || lean_parts[2 * k] != parts[k][0]) {
 				gl.glActiveTexture(GL_TEXTURE1 + k);
 				gl.glBindTexture(GL_TEXTURE_2D, parts[k][0]);
