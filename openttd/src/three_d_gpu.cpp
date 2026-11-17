@@ -631,6 +631,10 @@ std::atomic<size_t> _card_bytes = 0; ///< (read by the diary of the frames too, 
 std::array<std::atomic<size_t>, 4> _card_bytes_of{};
 std::array<std::atomic<size_t>, 4> _card_sent_of{};
 std::atomic<size_t> _card_sent = 0; ///< the rig: bytes put on the card since the last ThreeDGpuTimes()
+/** Of _card_sent, what is not a shape, triangles, a texture or a building (none of _card_sent_of): the ground's rects
+ * (SendGroundRect()) and the pictures of what stands (StandingPlace()) -- the player's diary of 17. 11.: at zoom 0 by
+ * night 190 MB in five seconds put on the card that the diary did not tell what it was. */
+static std::atomic<size_t> _card_sent_ground = 0, _card_sent_standing = 0;
 std::atomic<int> _card_trims = 0;   ///< and how many times it let go of what it held the longest not drawn
 std::atomic<int64_t> _card_biggest = 0; ///< and the most pixels of a frame of pictures read back at once (its width << 32 | its height)
 uint64_t _card_clock = 0;
@@ -4116,6 +4120,7 @@ void SendGroundRect(const ThreeDGpuGroundTexture &t, int x, int y, int w, int h,
 	gl.glTexSubImage2D(GL_TEXTURE_2D, 0, to_x + x, to_y + y, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, t.pixels + static_cast<size_t>(y) * t.width + x);
 	gl.glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	_card_sent += static_cast<size_t>(w) * h * 4;
+	_card_sent_ground += static_cast<size_t>(w) * h * 4;
 }
 
 /** A texture of nearest texels, of a size, none of its pixels sent. */
@@ -4735,6 +4740,7 @@ bool StandingPlace(const ThreeDGpuStandingItem &item, GLuint &texture, std::arra
 	gl.glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	gl.glTexSubImage2D(GL_TEXTURE_2D, 0, place[0], place[1], p.width, p.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, p.pixels.data());
 	_card_sent += static_cast<size_t>(p.width) * p.height * 4;
+	_card_sent_standing += static_cast<size_t>(p.width) * p.height * 4;
 	if (kept) {
 		_standing_places[item.key] = place;
 		StandingPlaceKept(item.key, false, 0);
@@ -7481,6 +7487,7 @@ std::string ThreeDGpuTimes()
 			_card_bytes_of[0].load() >> 20, _card_bytes_of[1].load() >> 20, _card_bytes_of[2].load() >> 20, _card_bytes_of[3].load() >> 20, _card_sent.load() >> 20,
 			_card_sent_of[0].load() >> 20, _card_sent_of[1].load() >> 20, _card_sent_of[2].load() >> 20, _card_sent_of[3].load() >> 20, _card_trims.load(), biggest >> 32, biggest & 0xFFFFFFFF);
 	for (std::atomic<size_t> &b : _card_sent_of) b = 0;
+	s += fmt::format(", of it the ground {} MB and pictures of what stands {} MB", _card_sent_ground.exchange(0) >> 20, _card_sent_standing.exchange(0) >> 20);
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
 	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single);
