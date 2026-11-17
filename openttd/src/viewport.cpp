@@ -9736,6 +9736,9 @@ static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double u
 				continue;
 			}
 		}
+		/* A boat shines only as its model's lights are marked: not the two lamps and the pool of a car, nor at all
+		 * without them (the player, 17. 11.: "the boats are not to shine as the cars without lights marked"). */
+		if (v->type == VehicleType::Ship) continue;
 		if (!front && !last) continue;
 		const int d = to_underlying(v->direction) & 7;
 		double fx = dir_dx[d], fy = dir_dy[d];
@@ -17683,6 +17686,8 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 			shine(model_lights, VehicleBrakeLightsOn(u), true);
 			continue;
 		}
+		/* A boat only by its model's marked lights (as on the map, NightMoverLights()). */
+		if (u->type == VehicleType::Ship) continue;
 		if (!front && !last) continue;
 		const int d = to_underlying(u->direction) & 7;
 		double fx = dir_dx[d], fy = dir_dy[d];
