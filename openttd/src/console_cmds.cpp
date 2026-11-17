@@ -11564,6 +11564,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::atomic<bool> _gpu_fence_last_only;
 		_gpu_fence_last_only = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: stojici plot {}", _gpu_fence_last_only ? "po posledni" : "po kazde");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "pripravit") {
+		/* 'stojici pripravit 0|1': the painted textures of the buildings the card paints made on the main thread before
+		 * they are drawn as before (1), or not at all (0; the card paints them). */
+		extern bool _turned_prepare_card_painted;
+		_turned_prepare_card_painted = number(3).value_or(0) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici pripravit {}", _turned_prepare_card_painted ? "ano" : "ne");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "stav") {
 		/* 'stojici stav 0|1': what the card lays on the turned map with each program's uniforms set once a job and the
 		 * pictures' program used again only when a picture comes after buildings (1), or all of it for every building

@@ -6437,12 +6437,27 @@ bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, fl
 /** Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot (box_kind 7). */
 static void AddTurnedObjectsToDraw()
 {
-	/* Their textures made on every core first, before they are drawn. */
+	/* Their textures made on every core first, before they are drawn -- not those the card paints as it draws them
+	 * (AddTurnedStandingObject()): no painted copy of theirs is drawn, and making them held the main thread (the
+	 * player's diary of 17. 11.: "dum lak" 165 and "dum textura" 59 times, 7 s of the drag of the zoomed out map;
+	 * the rig caught every one of them here). What the card paints from is read in the background, the place drawn
+	 * again when it is there (ObjectReadyOrOwed()). The rig: 'test3d stojici pripravit 1' makes them all as before. */
+	extern bool _eye_buildings_card_paint;
+	extern bool _turned_prepare_card_painted;
+	const bool card_paints = _eye_buildings_card_paint && ViewportVehiclesOnCard() && !ViewportDrawingNorthObjects() && !_turned_prepare_card_painted;
 	std::vector<ThreeDTextureWanted> wanted;
+	auto want = [&](const ThreeDObject *o, TileIndex origin) {
+		const uint32_t paint = o->PaintAt(origin);
+		/* Drawn by the card: what it paints, from its texture and masks read in the background (TryGetCardPaint());
+		 * the rest (unpainted, a tree in the colours of its use) from what is made already, another level or
+		 * plaster standing in till the background has it (DrawnTexture()) -- nothing waited for. */
+		if (card_paints) return;
+		wanted.push_back({o, to_underlying(_vd.dpi.zoom), paint});
+	};
 	for (const TurnedObject &to : _turned_objects) {
-		if (to.obj != nullptr) wanted.push_back({to.obj, to_underlying(_vd.dpi.zoom), to.obj->PaintAt(to.origin)});
-		if (to.ground != nullptr) wanted.push_back({to.ground, to_underlying(_vd.dpi.zoom), to.ground->PaintAt(to.origin)});
-		for (const ThreeDObject *w : to.with) wanted.push_back({w, to_underlying(_vd.dpi.zoom), w->PaintAt(to.origin)});
+		if (to.obj != nullptr) want(to.obj, to.origin);
+		if (to.ground != nullptr) want(to.ground, to.origin);
+		for (const ThreeDObject *w : to.with) want(w, to.origin);
 	}
 	PrepareThreeDObjectTextures(wanted);
 	/* The pictures of the figures and plants standing on them made before they are drawn, all at once: by the card in
@@ -7276,6 +7291,7 @@ bool _turned_card_ground_on = true; ///< Rig: the ground of the turned main view
  * ground is not there (a screenshot, no shared context, another blitter). Rig: test3d stojici ukaz.
  */
 bool _turned_card_standing_on = true;
+bool _turned_prepare_card_painted = false; ///< Rig: the painted textures of the buildings the card paints made before drawing anyway (test3d stojici pripravit)
 /** The rig: the vehicles among it drawn by the card, no pictures of them (ThreeDGpuStandingVehicle; test3d stojici auta); else laid as their pictures. */
 bool _standing_vehicles_on_card = true;
 /**
