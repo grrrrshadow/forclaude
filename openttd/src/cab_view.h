@@ -68,7 +68,15 @@ struct CabViewCamera {
 	 * eye of its cab mirrored through its middle.
 	 */
 	bool rear = false;
+	/**
+	 * Over the roof (CabCamera::Roof): how much farther behind the vehicle the eye is than it starts, metres -- the
+	 * wheel of the mouse (the player, 17. 11.: "the camera over the roof, scroll up and down to bring it nearer or
+	 * farther"); so much higher with it.
+	 */
+	double roof_far = 0.0;
 };
+
+static constexpr double CAB_ROOF_FAR_MOST = 60.0; ///< the eye over the roof at its farthest (CabViewCamera::roof_far), metres
 
 /** The tangent of half the field of view up and down of a cab of MSTS: 45 degrees, as MSTS and Open Rails see (its desk of 640 by 480 fills it). */
 static constexpr double MSTS_CAB_TAN = 0.41421356;

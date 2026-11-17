@@ -18740,6 +18740,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				behind = ((box.front - box.rear) / 2 + CAB_ROOF_BEHIND_M) * ahead;
 				want = own_model.z - v->z_pos + (box.roof + CAB_ROOF_ABOVE_M) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
 			}
+			/* Farther by the wheel (CabViewCamera::roof_far), and higher with it -- not in a tunnel. */
+			if (!tunnel_in.has_value() && camera.roof_far > 0) {
+				behind += camera.roof_far * (over_model ? own_model.scale * OBJECT_UNITS_PER_METRE * own_model.along : OBJECT_UNITS_PER_METRE);
+				want += camera.roof_far * 0.45 * (over_model ? own_model.scale : 1.0) * OBJECT_HEIGHT_PER_METRE;
+			}
 			const double round = tunnel_in.has_value() ? camera.heading : look;
 			eye.x = mid_x - behind * std::cos(round);
 			eye.y = mid_y - behind * std::sin(round);

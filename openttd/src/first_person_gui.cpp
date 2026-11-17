@@ -2741,6 +2741,16 @@ struct FirstPersonWindow : Window {
 		return true;
 	}
 
+	/** The wheel over the roof of the vehicle ridden (CabCamera::Roof): the eye nearer (up) or farther (down). */
+	void OnMouseWheel(int wheel, [[maybe_unused]] WidgetID widget) override
+	{
+		if (this->Riding() == nullptr || CabCameraChosen() != CabCamera::Roof) return;
+		/* A step a fifth of where it is, two metres at the least: fine near the vehicle, quick far from it. */
+		const double step = std::max(2.0, this->camera.roof_far * 0.2);
+		this->camera.roof_far = std::clamp(this->camera.roof_far + wheel * step, 0.0, CAB_ROOF_FAR_MOST);
+		this->SetDirty();
+	}
+
 	void OnScroll(Point delta) override
 	{
 		/* As the right button moves the view of the map (the player, #287: "turn left, right, up and down in keeping with
@@ -4245,6 +4255,11 @@ std::string RigRideClick(std::string_view name)
 	};
 	FirstPersonWindow *w = RigFirstPerson();
 	const Vehicle *v = w != nullptr ? w->Riding() : nullptr;
+	/* 'kolecko+' and 'kolecko-': the wheel of the mouse a notch down (farther) or up. */
+	if (w != nullptr && name.starts_with("kolecko")) {
+		w->OnMouseWheel(name.ends_with("-") ? -1 : 1, 0);
+		return fmt::format("kolecko: kamera {} dal o {:.1f} m", to_underlying(CabCameraChosen()), w->camera.roof_far);
+	}
 	WidgetID id = -1;
 	for (const auto &[n, wid] : buttons) if (name == n) id = wid;
 	if (id < 0 || v == nullptr) return "takove tlacitko neni, nebo nikdo nejede";
