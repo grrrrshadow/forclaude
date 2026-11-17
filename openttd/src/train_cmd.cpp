@@ -2933,6 +2933,10 @@ void ReverseTrainSwapVehicles(Train *v);
 static void ConcludeCoupleOrderInPlace(Train *new_head);
 static bool CheckReverseTrain(const Train *consist);
 static void ReverseTrainDirection(Train *consist, const char *why);
+static bool IsConduitTrain(const Train *v);
+static void ConduitReverse(Train *consist);
+static bool ConduitLocoHandler(Train *consist, bool mode);
+static bool HandleCrashedTrain(Train *v);
 static void TurnTrainInsideDepot(Train *consist);
 static void UpdateStatusAfterSwap(Train *v, bool reverse = true);
 static uint FaceTrainOutOfDepot(Train *head);
@@ -11382,6 +11386,11 @@ static void TurnTrainInsideDepot(Train *consist)
  */
 static void ReverseTrainDirection(Train *consist, const char *why)
 {
+	if (IsConduitTrain(consist)) {
+		ConduitReverse(consist);
+		return;
+	}
+
 	/* The trace prints at the points of no return below, not here -- a call
 	 * that bounces off the depot guard has not turned anything. */
 	Train *moving_front = consist->GetMovingFront();
@@ -13894,8 +13903,306 @@ static bool CheckTrainCollision(Train *moving_front)
  * @param reverse Set to false to not execute the vehicle reversing. This does not change any other logic.
  * @return True if the vehicle could be moved forward, false otherwise.
  */
+/*
+ * The pump in the pipe and the spark on the cables (the game's own conduits, IsOwnConduitRailType()): trains with
+ * none of the railway's rules, driven by their own code below and by none of the rest of this file. They book no
+ * track, read no signal, wait for nobody and meet nobody -- a pump runs through a pump and a spark through a spark,
+ * so one pipe carries the full ones out and the empty ones back, and any number of them stand on one platform. The
+ * way at a fork is the pathfinder's, asked as any train asks it; orders, loading and the depot are the game's.
+ */
+
+/**
+ * Whether a train is one of the game's own conduits' -- the pump or the spark.
+ * @param v any part of it
+ */
+static bool IsConduitTrain(const Train *v)
+{
+	const auto rt = v->First()->railtypes.GetNthSetBit(0);
+	return rt.has_value() && IsOwnConduitRailType(*rt);
+}
+
+/** A conduit's train turned to run the other way, where it stands. */
+static void ConduitReverse(Train *consist)
+{
+	consist->flags.Reset(VehicleRailFlag::Reversing);
+	consist->flags.Reset(VehicleRailFlag::Stuck);
+	if (IsWholeTrainInsideDepot(consist)) return; // it leaves by the door whichever way it was told to face
+
+	Train *moving_front = consist->GetMovingFront();
+	AdvanceWagonsBeforeSwap(moving_front);
+	ReverseTrainSwapVehicles(consist);
+	AdvanceWagonsAfterSwap(moving_front);
+
+	consist->flags.Flip(VehicleRailFlag::Reversed);
+	consist->ConsistChanged(CCF_TRACK);
+	for (Train *u = consist; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
+	if (IsRailDepotTile(consist->tile)) InvalidateWindowData(WindowClass::VehicleDepot, consist->tile);
+}
+
+/**
+ * A conduit's train moved a step: every vehicle from the given one on.
+ * @param v the first of them to move
+ * @param nomove the one to stop before
+ * @param reverse whether it may turn around where the conduit ends
+ * @return whether it moved
+ */
+static bool ConduitController(Train *v, Vehicle *nomove, bool reverse)
+{
+	Train *first = v->First();
+	bool direction_changed = false;
+
+	for (Train *prev = v->GetMovingPrev(); v != nomove; prev = v, v = v->GetMovingNext()) {
+		GetNewVehiclePosResult gp = GetNewVehiclePos(v);
+		bool blocked = false;
+
+		if (v->track == Track::Wormhole) {
+			/* Inside a bridge or a tunnel: on, until its far end takes it out. */
+			if (!IsTileType(gp.new_tile, TileType::TunnelBridge) || !VehicleEnterTile(v, gp.new_tile, gp.x, gp.y).Test(VehicleEnterTileState::EnteredWormhole)) {
+				v->x_pos = gp.x;
+				v->y_pos = gp.y;
+				v->UpdatePosition();
+				if (!v->vehstatus.Test(VehState::Hidden)) v->Vehicle::UpdateViewport(true);
+				continue;
+			}
+		} else if (gp.old_tile == gp.new_tile) {
+			if (v->track == Track::Depot) {
+				gp.x = v->x_pos;
+				gp.y = v->y_pos;
+			} else {
+				const auto vets = VehicleEnterTile(v, gp.new_tile, gp.x, gp.y);
+				if (vets.Test(VehicleEnterTileState::CannotEnter)) {
+					blocked = true;
+				} else if (vets.Test(VehicleEnterTileState::EnteredStation)) {
+					TrainEnterStation(first, GetStationIndex(gp.new_tile));
+				}
+			}
+		} else {
+			/* A new tile: what of it leads on from here. */
+			const DiagDirection enterdir = DiagdirBetweenTiles(gp.old_tile, gp.new_tile);
+			const TrackStatus ts = GetTileTrackStatus(gp.new_tile, TransportType::Rail, RoadTramType::Invalid, ReverseDiagDir(enterdir));
+			TrackBits bits = TrackdirBitsToTrackBits(ts.trackdirs & DiagdirReachesTrackdirs(enterdir));
+			if (prev == nullptr && Rail90DegTurnDisallowed(GetTileRailType(gp.old_tile), GetTileRailType(gp.new_tile), Forbid90DegFor(first))) {
+				bits.Reset(TrackCrossesTracks(FindFirstTrack(v->track)));
+			}
+
+			TrackBits chosen_track{};
+			if (bits.None() || !CheckCompatibleRail(first, gp.new_tile, v->IsMovingFront())) {
+				blocked = true;
+			} else if (prev == nullptr) {
+				/* The way at a fork: the pathfinder's, with nothing booked. */
+				if (bits.Count() == 1) {
+					chosen_track = bits;
+				} else {
+					bool path_found = true;
+					chosen_track = TrackBits{YapfTrainChooseTrack(first, gp.new_tile, enterdir, bits, path_found, false, nullptr, nullptr)};
+					first->HandlePathfindingResult(path_found);
+					if (!chosen_track.Any(bits)) chosen_track = TrackBits{FindFirstTrack(bits)};
+				}
+			} else if (prev->tile == gp.new_tile) {
+				chosen_track = prev->track.Any({Track::Wormhole, Track::Depot}) ? bits : prev->track & bits;
+			} else {
+				static const DiagDirectionIndexArray<DiagDirectionIndexArray<TrackBits>> _connecting_track{{{
+					{{{Track::X,     Track::Lower, {},           Track::Left }}},
+					{{{Track::Upper, Track::Y,     Track::Left,  {}          }}},
+					{{{{},           Track::Right, Track::X,     Track::Upper}}},
+					{{{Track::Right, {},           Track::Lower, Track::Y    }}}
+				}}};
+				const DiagDirection exitdir = DiagdirBetweenTiles(gp.new_tile, prev->tile);
+				chosen_track = IsValidDiagDirection(exitdir) ? _connecting_track[enterdir][exitdir] & bits : TrackBits{};
+			}
+			if (!blocked && chosen_track.Count() != 1) {
+				/* A vehicle behind that lost the one before it: any way on rather than none. */
+				chosen_track = bits.Any() ? TrackBits{FindFirstTrack(bits)} : TrackBits{};
+				if (chosen_track.None()) blocked = true;
+			}
+
+			if (!blocked) {
+				const Direction chosen_dir = VehicleEnterTileCoordinates(gp, enterdir, TrackBitsToTrack(chosen_track));
+				const auto vets = VehicleEnterTile(v, gp.new_tile, gp.x, gp.y);
+				if (vets.Test(VehicleEnterTileState::CannotEnter)) {
+					blocked = true;
+				} else {
+					if (!vets.Test(VehicleEnterTileState::EnteredWormhole)) {
+						v->tile = gp.new_tile;
+						if (GetTileRailType(gp.new_tile) != GetTileRailType(gp.old_tile)) first->ConsistChanged(CCF_TRACK);
+						v->track = chosen_track;
+					}
+					if (chosen_dir != v->GetMovingDirection()) {
+						direction_changed = true;
+						v->SetMovingDirection(chosen_dir);
+					}
+					if (vets.Test(VehicleEnterTileState::EnteredStation)) TrainEnterStation(first, GetStationIndex(gp.new_tile));
+				}
+			}
+		}
+
+		if (blocked) {
+			/* The conduit ends here: back the way it came. Only its front can find that out. */
+			if (prev == nullptr && reverse) {
+				first->cur_speed = 0;
+				first->subspeed = 0;
+				ConduitReverse(first);
+			}
+			return false;
+		}
+
+		v->UpdateDeltaXY();
+		v->x_pos = gp.x;
+		v->y_pos = gp.y;
+		v->UpdatePosition();
+		const int old_z = v->UpdateInclination(gp.new_tile != gp.old_tile, false);
+		if (prev == nullptr) AffectSpeedByZChange(first, v->z_pos - old_z);
+	}
+
+	if (direction_changed) first->tcache.cached_max_curve_speed = first->GetCurveSpeedLimit();
+	return true;
+}
+
+/**
+ * A conduit's train in its depot: out at once, or in for good when the depot is where it was sent.
+ * @return whether it stays in
+ */
+static bool ConduitStayInDepot(Train *v)
+{
+	for (const Train *u = v; u != nullptr; u = u->Next()) {
+		if (u->track != Track::Depot || u->tile != v->tile) return false;
+	}
+	if (FaceTrainOutOfDepot(v) != 0) {
+		for (Train *u = v; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
+	}
+
+	if (v->gcache.cached_power == 0) {
+		v->vehstatus.Set(VehState::Stopped);
+		SetWindowDirty(WindowClass::VehicleDepot, v->tile);
+		return true;
+	}
+	if (v->IsWaitingForUnbunching()) return true;
+
+	if (v->current_order.IsType(OT_GOTO_DEPOT) && v->tile == v->dest_tile) {
+		VehicleEnterDepot(v);
+		return true;
+	}
+
+	VehicleServiceInDepot(v);
+	v->LeaveUnbunchingDepot();
+	v->PlayLeaveStationSound();
+	SetWindowClassesDirty(WindowClass::TrainList);
+
+	Train *moving_front = v->GetMovingFront();
+	moving_front->track = AxisToTrack(DiagDirToAxis(DirToDiagDir(moving_front->direction)));
+	moving_front->vehstatus.Reset(VehState::Hidden);
+	v->cur_speed = 0;
+	moving_front->UpdateViewport(true, true);
+	moving_front->UpdatePosition();
+	v->UpdateAcceleration();
+	InvalidateWindowData(WindowClass::VehicleDepot, v->tile);
+	return false;
+}
+
+int Train::ConduitUpdateSpeed()
+{
+	const bool realistic = _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic;
+	int max_speed = realistic ? this->tcache.cached_max_curve_speed : this->gcache.cached_max_track_speed;
+	if (realistic) {
+		for (const Train *u = this; u != nullptr; u = u->Next()) {
+			if (u->track == Track::Depot) {
+				max_speed = std::min(max_speed, 61);
+				break;
+			}
+		}
+	}
+	max_speed = std::min<int>(max_speed, this->current_order.GetMaxSpeed());
+	max_speed = std::min<int>(max_speed, this->gcache.cached_max_track_speed);
+
+	const bool braking = this->GetAccelerationStatus() == AS_BRAKE;
+	if (!realistic) return this->DoUpdateSpeed(this->acceleration * (braking ? -4 : 2), 0, max_speed);
+	return this->DoUpdateSpeed(this->GetAcceleration(), braking ? 0 : 2, max_speed);
+}
+
+/**
+ * A tick of a conduit's train (see above): the whole of what drives it.
+ * @param consist its head
+ * @param mode the second half of a tick of a fast one
+ * @return whether it is still there
+ */
+static bool ConduitLocoHandler(Train *consist, bool mode)
+{
+	if (consist->vehstatus.Test(VehState::Crashed)) return mode ? true : HandleCrashedTrain(consist);
+
+	consist->flags.Reset(VehicleRailFlag::Stuck);
+	consist->force_proceed = TFP_NONE;
+
+	if (consist->HandleBreakdown()) return true;
+
+	if (consist->flags.Test(VehicleRailFlag::Reversing) && consist->cur_speed == 0) ConduitReverse(consist);
+
+	if (consist->vehstatus.Test(VehState::Stopped) && consist->cur_speed == 0) return true;
+
+	/* A new order, and the shorter way to it lies behind: around on the spot, whatever the setting of the railway's
+	 * trains says of turning -- it is how the empty one goes home down the pipe it came by. */
+	if (ProcessOrders(consist)) {
+		const Train *front = consist->GetMovingFront();
+		if (!front->track.Any({Track::Depot, Track::Wormhole}) && IsDiagonalDirection(front->GetMovingDirection()) &&
+				!IsAnyPartInsideDepot(consist) && YapfTrainCheckReverse(consist)) {
+			consist->cur_speed = 0;
+			consist->subspeed = 0;
+			ConduitReverse(consist);
+			return true;
+		}
+	}
+
+	consist->HandleLoading(mode);
+	if (consist->current_order.IsType(OT_LOADING)) return true;
+
+	if (ConduitStayInDepot(consist)) return true;
+
+	if (!mode) consist->ShowVisualEffect();
+
+	if (consist->current_order.IsType(OT_LEAVESTATION)) {
+		consist->current_order.Free();
+		SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
+		return true;
+	}
+
+	int j = consist->ConduitUpdateSpeed();
+
+	if (consist->cur_speed == 0 && consist->vehstatus.Test(VehState::Stopped)) SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
+
+	Train *moving_front = consist->GetMovingFront();
+	int adv_spd = moving_front->GetAdvanceDistance();
+	if (j < adv_spd) {
+		if (consist->cur_speed == 0) consist->SetLastSpeed();
+	} else {
+		for (;;) {
+			j -= adv_spd;
+			ConduitController(moving_front, nullptr, true);
+			moving_front = consist->GetMovingFront();
+			adv_spd = moving_front->GetAdvanceDistance();
+			if (j < adv_spd || consist->cur_speed == 0) break;
+
+			const OrderType order_type = consist->current_order.GetType();
+			if ((order_type == OT_GOTO_WAYPOINT || order_type == OT_GOTO_STATION) &&
+					consist->current_order.GetNonStopType().Test(OrderNonStopFlag::GoVia) &&
+					IsTileType(moving_front->tile, TileType::Station) &&
+					consist->current_order.GetDestination() == GetStationIndex(moving_front->tile)) {
+				ProcessOrders(consist);
+			}
+		}
+		consist->SetLastSpeed();
+	}
+
+	for (Train *u = consist; u != nullptr; u = u->Next()) {
+		if (!u->vehstatus.Test(VehState::Hidden)) u->UpdateViewport(false, false);
+	}
+
+	if (consist->progress == 0) consist->progress = j;
+	return true;
+}
+
 bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 {
+	if (IsConduitTrain(v)) return ConduitController(v, nomove, reverse);
+
 	Train *first = v->First();
 	Train *prev;
 	bool direction_changed = false; // has direction of any part changed?
@@ -14970,6 +15277,9 @@ static bool TrainCheckIfLineEnds(Train *moving_front, bool reverse)
  */
 static bool TrainLocoHandler(Train *consist, bool mode)
 {
+	/* The pump and the spark: their own code, none of the railway's rules. */
+	if (IsConduitTrain(consist)) return ConduitLocoHandler(consist, mode);
+
 	/* train has crashed? */
 	if (consist->vehstatus.Test(VehState::Crashed)) {
 		return mode ? true : HandleCrashedTrain(consist); // 'this' can be deleted here
@@ -15951,6 +16261,8 @@ Money Train::GetRunningCost() const
  */
 static void CheckStandingTrainHoldsGround(const Train *v)
 {
+	if (IsConduitTrain(v)) return; // books nothing, ever
+
 	const Train *loose = nullptr;
 	uint held_count = 0;
 	uint loose_count = 0;

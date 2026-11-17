@@ -410,6 +410,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	void ConsistChanged(ConsistChangeFlags allowed_changes);
 
 	int UpdateSpeed();
+	int ConduitUpdateSpeed(); ///< The speed of a pump or a spark, a train with none of the railway's rules.
 	int CabAcceleration() const;
 
 	void UpdateAcceleration();

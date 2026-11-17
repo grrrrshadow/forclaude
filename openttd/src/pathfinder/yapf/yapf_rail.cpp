@@ -856,7 +856,10 @@ bool YapfTrainCheckReverse(const Train *v)
 	 * engine is held to the rule even so: for it "the shortest way" is
 	 * always engine first, and engine first was seen to on departure. */
 	bool may_choose = v->flags.Test(VehicleRailFlag::AutomaticDeparture) && v->Last()->CanLeadTrain();
-	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None && !may_choose) {
+	/* The pump and the spark (the game's own conduits) turn wherever the way behind is the shorter one: trains with none
+	 * of the railway's rules. */
+	const bool conduit = IsOwnConduitRailType(v->railtypes.GetNthSetBit(0).value_or(RAILTYPE_RAIL));
+	if (_settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None && !may_choose && !conduit) {
 		reverse_penalty += 1000 * YAPF_INFINITE_PENALTY;
 	}
 

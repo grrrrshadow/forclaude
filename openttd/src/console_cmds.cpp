@@ -12233,6 +12233,30 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: smycka druhy oken: {}", FrameDiaryTakeWindowPaints());
 		if (!slow_frames.empty()) IConsolePrint(CC_DEFAULT, "test3d: smycka pomale snimky{}", slow_frames.substr(0, 400));
 		return true;
+	} else if (what == "rozkazy" && argv.size() > 5) {
+		/* 'rozkazy <x1> <y1> <x2> <y2>': every train of the player sent between the stations on those two tiles. */
+		auto x1 = number(2), y1 = number(3), x2 = number(4), y2 = number(5);
+		if (!x1.has_value() || !y1.has_value() || !x2.has_value() || !y2.has_value()) return true;
+		const Station *a = Station::GetByTile(TileXY(*x1, *y1)), *b = Station::GetByTile(TileXY(*x2, *y2));
+		if (a == nullptr || b == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: rozkazy: stanice tam neni");
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		int given = 0;
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (v->type != VehicleType::Train || !v->IsPrimaryVehicle() || v->owner != _local_company || v->GetNumOrders() != 0) continue;
+			Order there{}, back{};
+			there.MakeGoToStation(a->index);
+			there.SetStopLocation(OrderStopLocation::FarEnd);
+			back.MakeGoToStation(b->index);
+			back.SetStopLocation(OrderStopLocation::FarEnd);
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, v->index, 0, there);
+			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, v->index, 1, back);
+			given++;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: rozkazy: {} vlakum", given);
+		return true;
 	} else if (what == "vozidla") {
 		/* Every front, with the tile under it (its type: 1 is plain rail, 5 a station) and the number of parts: the rig picks one on plain track from this. */
 		int seen = 0;
@@ -12250,6 +12274,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
 					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "",
 					v->cab_free ? fmt::format(" volne yaw {} rychlost {}{}{}{}", v->cab_yaw, v->cur_speed, v->cab_rejoin ? " zpet" : "", v->cab_reverse ? " couva" : "", VehicleBrakeLightsOn(v) ? " brzdi" : "") : "");
+			if (v->type == VehicleType::Train) IConsolePrint(CC_DEFAULT, "test3d:   rychlost {} rozkaz {} druh {} naklad {}", v->cur_speed, static_cast<int>(v->cur_real_order_index), to_underlying(v->current_order.GetType()), v->cargo.StoredCount());
 			if (v->type == VehicleType::Road) IConsolePrint(CC_DEFAULT, "test3d:   rychlost {} rozkaz {} stav {:#x} snimek {}", v->cur_speed, static_cast<int>(v->cur_real_order_index), RoadVehicle::From(v)->state, RoadVehicle::From(v)->frame);
 			if (!hidden) seen++;
 		}
