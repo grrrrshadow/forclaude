@@ -189,7 +189,7 @@ void ExitDiary(std::string_view step, int seconds_at_most)
 		/* The diary of the end before this one kept: a frozen end is the one the player sends after starting the game again. */
 		std::error_code ec;
 		const std::string path = FioDiaryPath("konec.log");
-		std::filesystem::rename(std::filesystem::u8path(path), std::filesystem::u8path(FioDiaryPath("konec_minule.log")), ec);
+		std::filesystem::rename(OTTD2FS(path), OTTD2FS(FioDiaryPath("konec_minule.log")), ec);
 		_exit_diary = FileHandle::Open(path, "w");
 		if (_exit_diary.has_value()) {
 			fmt::print(*_exit_diary, "OpenTTD Decouple: denik konce hry. Kazdy krok ukoncovani, jak zacal; krok, ktery trva dele, nez smi, je misto, kde konec zamrzl.\n");

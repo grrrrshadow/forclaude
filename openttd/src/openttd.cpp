@@ -111,6 +111,9 @@
 
 #include "safeguards.h"
 
+/** The port the interface for an agent (agent_api.h) listens on from the start (-A, OTTD_AGENT_API); 0 not asked. */
+static uint16_t _agent_api_at_start = 0;
+
 void CallLandscapeTick();
 void DoPaletteAnimations();
 void MusicLoop();
@@ -193,6 +196,7 @@ static void ShowHelp()
 		"  -b drv              = Set the blitter to use (see below)\n"
 		"  -r res              = Set resolution (for instance 800x600)\n"
 		"  -h                  = Display this help text\n"
+		"  -A [port]           = Turn on the interface for an agent (HTTP on 127.0.0.1)\n"
 		"  -t year             = Set starting year\n"
 		"  -d [[fac=]lvl[,...]]= Debug mode\n"
 		"  -e                  = Start Editor\n"
@@ -486,6 +490,16 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 		IConsoleInit();
 		InitializeGUI();
 		IConsoleCmdExec("exec scripts/autoexec.scr 0");
+		/* The interface for an agent asked for at the start: by -A, or by the environment (OTTD_AGENT_API a port, or 1). */
+		if (_agent_api_at_start == 0) {
+			if (const char *env = std::getenv("OTTD_AGENT_API"); env != nullptr && *env != '\0') {
+				const auto port = ParseInteger<uint16_t>(env);
+				_agent_api_at_start = port.has_value() && *port >= 1024 ? *port : AGENT_API_DEFAULT_PORT;
+			}
+		}
+		if (_agent_api_at_start != 0) {
+			if (const std::string why = AgentApiStart(_agent_api_at_start); !why.empty()) Debug(misc, 0, "Agent interface: cannot start: {}", why);
+		}
 
 		/* The Mars towns want the Mars houses; a first start of this build
 		 * fetches them (and any start after one that could not). After the
@@ -548,7 +562,7 @@ static std::vector<OptionData> CreateOptions()
 	for (char c : "GIMSbcmnpqrstv") options.push_back({ .type = ODF_HAS_VALUE, .id = c, .shortname = c });
 
 	/* Options with an optional parameter. */
-	for (char c : "Ddg") options.push_back({ .type = ODF_OPTIONAL_VALUE, .id = c, .shortname = c });
+	for (char c : "ADdg") options.push_back({ .type = ODF_OPTIONAL_VALUE, .id = c, .shortname = c });
 
 	/* Options without a parameter. */
 	for (char c : "QXehx") options.push_back({ .type = ODF_NO_VALUE, .id = c, .shortname = c });
@@ -600,6 +614,14 @@ int openttd_main(std::span<std::string_view> arguments)
 		case 's': sounddriver = mgo.opt; break;
 		case 'v': videodriver = mgo.opt; break;
 		case 'b': blitter = mgo.opt; break;
+		case 'A': {
+			/* The interface for an agent (agent_api.h) on from the start: at its port, or the one given. */
+			_agent_api_at_start = AGENT_API_DEFAULT_PORT;
+			if (!mgo.opt.empty()) {
+				if (const auto port = ParseInteger<uint16_t>(mgo.opt); port.has_value() && *port >= 1024) _agent_api_at_start = *port;
+			}
+			break;
+		}
 		case 'D':
 			musicdriver = "null";
 			sounddriver = "null";
