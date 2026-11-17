@@ -21,6 +21,7 @@ enum AirportToolbarWidgets : WidgetID {
 	WID_AT_HANGAR,   ///< Build a hangar of a modular airport.
 	WID_AT_BUILDING, ///< Build a building of a modular airport.
 	WID_AT_REMOVE_PIECES, ///< Remove tiles of a modular airport.
+	WID_AT_SURFACE,  ///< Toggle the surface of new modular airport tiles: asphalt or gravel.
 	WID_AT_DEMOLISH, ///< Demolish button.
 };
 

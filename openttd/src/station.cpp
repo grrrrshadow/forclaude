@@ -736,6 +736,15 @@ Money AirportMaintenanceCost(Owner owner)
 		if (st->owner == owner && st->facilities.Test(StationFacility::Airport)) {
 			total_cost += _price[Price::InfrastructureAirport] * st->airport.GetSpec()->maintenance_cost;
 		}
+		/* A modular airport (air_map.h): by its tiles, about as much a tile as the old airports cost (the city
+		 * airport 24/8 for its 36 tiles). */
+		if (st->owner == owner && st->facilities.Test(StationFacility::ModularAirport) && st->modular_airport.tile != INVALID_TILE) {
+			uint tiles = 0;
+			for (TileIndex t : st->modular_airport) {
+				if (IsModularAirportTile(t) && GetStationIndex(t) == st->index) tiles++;
+			}
+			total_cost += _price[Price::InfrastructureAirport] * tiles * 2 / 3;
+		}
 	}
 	/* 3 bits fraction for the maintenance cost factor. */
 	return total_cost >> 3;

@@ -3591,6 +3591,9 @@ STR_TOOLBAR_AIRCRAFT_BUILDING                                   :{BLACK}Budova
 STR_TOOLBAR_AIRCRAFT_BUILDING_TOOLTIP                           :{BLACK}Postavit budovu letiště: terminál, věž… Klikem na budovu změníš její vzhled
 STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES                              :{BLACK}Bourat
 STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES_TOOLTIP                      :{BLACK}Zbourat dlaždice letiště stavěného po dlaždicích v označené oblasti
+STR_TOOLBAR_AIRCRAFT_SURFACE_ASPHALT                            :{BLACK}Asfalt
+STR_TOOLBAR_AIRCRAFT_SURFACE_GRAVEL                             :{BLACK}Štěrk
+STR_TOOLBAR_AIRCRAFT_SURFACE_TOOLTIP                            :{BLACK}Povrch nových dlaždic letiště stavěného po dlaždicích: asfalt, nebo štěrk. Klikem přepneš
 
 # Airport construction window
 STR_STATION_BUILD_AIRPORT_CAPTION                               :{WHITE}Výběr letiště

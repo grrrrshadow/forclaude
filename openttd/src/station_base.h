@@ -546,6 +546,16 @@ public:
 	TileArea docking_station{}; ///< Tile area the docking tiles cover
 	TileArea modular_airport{}; ///< Tile area of the airport built tile by tile (air_map.h); not saved, RecomputeModularAirportAreas()
 
+	/**
+	 * The tile aircraft distances to the station are measured from (ranges): its old airport's, else its modular
+	 * airport's corner; INVALID_TILE without either.
+	 */
+	inline TileIndex AircraftTile() const
+	{
+		if (this->airport.tile != INVALID_TILE) return this->airport.tile;
+		return this->facilities.Test(StationFacility::ModularAirport) ? this->modular_airport.tile : INVALID_TILE;
+	}
+
 	IndustryType indtype = IT_INVALID; ///< Industry type to get the name from
 
 	BitmapTileArea catchment_tiles{}; ///< NOSAVE: Set of individual tiles covered by catchment area

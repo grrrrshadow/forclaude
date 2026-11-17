@@ -87,6 +87,9 @@ static void PlaceAirport(TileIndex tile)
 	ShowSelectStationIfNeeded(TileArea(tile, _thd.size.x / TILE_SIZE, _thd.size.y / TILE_SIZE), proc);
 }
 
+/** The surface new tiles of a modular airport are built with (the toolbar's toggle). */
+static AirportSurface _modular_airport_surface = AirportSurface::Asphalt;
+
 /** The look of the next building of a modular airport (air_map.h): each one built takes the next. */
 static uint8_t _modular_airport_building = 0;
 
@@ -120,9 +123,9 @@ static void PlaceModularAirportPiece(TileIndex tile, ModularAirportKind kind)
 	bool adjacent = _ctrl_pressed;
 	auto proc = [=](bool test, StationID to_join) -> bool {
 		if (test) {
-			return Command<Commands::BuildAirportPiece>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportPiece>()), tile, kind, dir, building, AirportSurface::Asphalt, StationID::Invalid(), adjacent).Succeeded();
+			return Command<Commands::BuildAirportPiece>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportPiece>()), tile, kind, dir, building, _modular_airport_surface, StationID::Invalid(), adjacent).Succeeded();
 		}
-		return Command<Commands::BuildAirportPiece>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, tile, kind, dir, building, AirportSurface::Asphalt, to_join, adjacent);
+		return Command<Commands::BuildAirportPiece>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, tile, kind, dir, building, _modular_airport_surface, to_join, adjacent);
 	};
 	ShowSelectStationIfNeeded(TileArea(tile, 1, 1), proc);
 }
@@ -138,9 +141,9 @@ static void PlaceModularAirportTaxiway(TileIndex start, TileIndex end, Track tra
 	bool adjacent = _ctrl_pressed;
 	auto proc = [=](bool test, StationID to_join) -> bool {
 		if (test) {
-			return Command<Commands::BuildAirportTaxiway>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportTaxiway>()), start, end, track, AirportSurface::Asphalt, StationID::Invalid(), adjacent).Succeeded();
+			return Command<Commands::BuildAirportTaxiway>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportTaxiway>()), start, end, track, _modular_airport_surface, StationID::Invalid(), adjacent).Succeeded();
 		}
-		return Command<Commands::BuildAirportTaxiway>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, start, end, track, AirportSurface::Asphalt, to_join, adjacent);
+		return Command<Commands::BuildAirportTaxiway>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, start, end, track, _modular_airport_surface, to_join, adjacent);
 	};
 	ShowSelectStationIfNeeded(TileArea(start, end), proc);
 }
@@ -155,9 +158,9 @@ static void PlaceModularAirportRunway(TileIndex start, TileIndex end)
 	bool adjacent = _ctrl_pressed;
 	auto proc = [=](bool test, StationID to_join) -> bool {
 		if (test) {
-			return Command<Commands::BuildAirportRunway>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportRunway>()), start, end, AirportSurface::Asphalt, StationID::Invalid(), adjacent).Succeeded();
+			return Command<Commands::BuildAirportRunway>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportRunway>()), start, end, _modular_airport_surface, StationID::Invalid(), adjacent).Succeeded();
 		}
-		return Command<Commands::BuildAirportRunway>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, start, end, AirportSurface::Asphalt, to_join, adjacent);
+		return Command<Commands::BuildAirportRunway>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, start, end, _modular_airport_surface, to_join, adjacent);
 	};
 	ShowSelectStationIfNeeded(TileArea(start, end), proc);
 }
@@ -235,6 +238,14 @@ struct BuildAirToolbarWindow : Window {
 			case WID_AT_REMOVE_PIECES:
 				HandlePlacePushButton(this, widget, ANIMCURSOR_DEMOLISH, HT_RECT);
 				this->last_user_action = widget;
+				break;
+
+			case WID_AT_SURFACE:
+				_modular_airport_surface = _modular_airport_surface == AirportSurface::Asphalt ? AirportSurface::Gravel : AirportSurface::Asphalt;
+				this->SetWidgetLoweredState(WID_AT_SURFACE, _modular_airport_surface == AirportSurface::Gravel);
+				this->GetWidget<NWidgetCore>(WID_AT_SURFACE)->SetString(_modular_airport_surface == AirportSurface::Gravel ? STR_TOOLBAR_AIRCRAFT_SURFACE_GRAVEL : STR_TOOLBAR_AIRCRAFT_SURFACE_ASPHALT);
+				this->SetWidgetDirty(WID_AT_SURFACE);
+				SndClickBeep();
 				break;
 
 			default: break;
@@ -353,6 +364,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_air_toolbar_widgets 
 		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_HANGAR), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_HANGAR, STR_TOOLBAR_AIRCRAFT_HANGAR_TOOLTIP),
 		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_BUILDING), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_BUILDING, STR_TOOLBAR_AIRCRAFT_BUILDING_TOOLTIP),
 		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_REMOVE_PIECES), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES, STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_SURFACE), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_SURFACE_ASPHALT, STR_TOOLBAR_AIRCRAFT_SURFACE_TOOLTIP),
 		NWidget(WWT_PANEL, Colours::DarkGreen), SetToolbarSpacerMinimalSize(), SetFill(1, 1), EndContainer(),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_AT_DEMOLISH), SetFill(0, 1), SetToolbarMinimalSize(1), SetSpriteTip(SPR_IMG_DYNAMITE, STR_TOOLTIP_DEMOLISH_BUILDINGS_ETC),
 	EndContainer(),

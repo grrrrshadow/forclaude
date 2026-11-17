@@ -150,8 +150,8 @@ static StationID FindNearestHangar(const Aircraft *v)
 			if (!ModularAirportHasHangar(st) || !CanAircraftUseModularAirport(v->engine_type, st)) continue;
 			const TileIndex at = GetModularAirportHangar(st);
 			if (max_range != 0) {
-				uint last_dist = (last_dest != nullptr && last_dest->airport.tile != INVALID_TILE) ? DistanceSquare(at, last_dest->airport.tile) : 0;
-				uint next_dist = (next_dest != nullptr && next_dest->airport.tile != INVALID_TILE) ? DistanceSquare(at, next_dest->airport.tile) : 0;
+				uint last_dist = (last_dest != nullptr && last_dest->AircraftTile() != INVALID_TILE) ? DistanceSquare(at, last_dest->AircraftTile()) : 0;
+				uint next_dist = (next_dest != nullptr && next_dest->AircraftTile() != INVALID_TILE) ? DistanceSquare(at, next_dest->AircraftTile()) : 0;
 				if (last_dist > max_range || next_dist > max_range) continue;
 			}
 			uint distance = DistanceSquare(vtile, at);
@@ -173,8 +173,8 @@ static StationID FindNearestHangar(const Aircraft *v)
 
 		/* Check if our last and next destinations can be reached from the depot airport. */
 		if (max_range != 0) {
-			uint last_dist = (last_dest != nullptr && last_dest->airport.tile != INVALID_TILE) ? DistanceSquare(st->airport.tile, last_dest->airport.tile) : 0;
-			uint next_dist = (next_dest != nullptr && next_dest->airport.tile != INVALID_TILE) ? DistanceSquare(st->airport.tile, next_dest->airport.tile) : 0;
+			uint last_dist = (last_dest != nullptr && last_dest->AircraftTile() != INVALID_TILE) ? DistanceSquare(st->airport.tile, last_dest->AircraftTile()) : 0;
+			uint next_dist = (next_dest != nullptr && next_dest->AircraftTile() != INVALID_TILE) ? DistanceSquare(st->airport.tile, next_dest->AircraftTile()) : 0;
 			if (last_dist > max_range || next_dist > max_range) continue;
 		}
 
@@ -2319,8 +2319,8 @@ static bool AircraftEventHandler(Aircraft *v, int loop)
 		Station *cur_st = Station::GetIfValid(v->targetairport);
 		Station *next_st = v->current_order.IsType(OT_GOTO_STATION) || v->current_order.IsType(OT_GOTO_DEPOT) ? Station::GetIfValid(v->current_order.GetDestination().ToStationID()) : nullptr;
 
-		if (cur_st != nullptr && cur_st->airport.tile != INVALID_TILE && next_st != nullptr && next_st->airport.tile != INVALID_TILE) {
-			uint dist = DistanceSquare(cur_st->airport.tile, next_st->airport.tile);
+		if (cur_st != nullptr && cur_st->AircraftTile() != INVALID_TILE && next_st != nullptr && next_st->AircraftTile() != INVALID_TILE) {
+			uint dist = DistanceSquare(cur_st->AircraftTile(), next_st->AircraftTile());
 			AircraftHandleDestTooFar(v, dist > v->acache.cached_max_range_sqr);
 		}
 	}

@@ -3483,6 +3483,9 @@ STR_TOOLBAR_AIRCRAFT_BUILDING                                   :{BLACK}Building
 STR_TOOLBAR_AIRCRAFT_BUILDING_TOOLTIP                           :{BLACK}Build an airport building: terminal, tower... Click an existing building to change its look
 STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES                              :{BLACK}Remove
 STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES_TOOLTIP                      :{BLACK}Remove the tiles of an airport built tile by tile in a dragged area
+STR_TOOLBAR_AIRCRAFT_SURFACE_ASPHALT                            :{BLACK}Asphalt
+STR_TOOLBAR_AIRCRAFT_SURFACE_GRAVEL                             :{BLACK}Gravel
+STR_TOOLBAR_AIRCRAFT_SURFACE_TOOLTIP                            :{BLACK}The surface of new tiles of an airport built tile by tile: asphalt or gravel. Click to switch
 
 # Airport construction window
 STR_STATION_BUILD_AIRPORT_CAPTION                               :{WHITE}Airport Selection

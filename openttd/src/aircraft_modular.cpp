@@ -272,7 +272,7 @@ static bool IsGoal(TileIndex t, ModularAircraftGoal goal, uint runway_needed)
  * @param own the tiles reserved for it already (its runway)
  * @return the way, the start first; empty when there is none
  */
-static std::vector<ModularAircraftStep> SearchWay(StationID sid, const std::vector<ModularAircraftStep> &start, ModularAircraftGoal goal, uint runway_needed, const std::vector<TileIndex> &own)
+static std::vector<ModularAircraftStep> SearchWayIn(StationID sid, const std::vector<ModularAircraftStep> &start, ModularAircraftGoal goal, uint runway_needed, const std::vector<TileIndex> &own, bool through_stands)
 {
 	auto key = [](TileIndex t, Trackdir td) { return (static_cast<uint64_t>(t.base()) << 4) | to_underlying(td); };
 	struct Seen {
@@ -330,10 +330,24 @@ static std::vector<ModularAircraftStep> SearchWay(StationID sid, const std::vect
 		if (GetModularAirportKind(next) == ModularAirportKind::Hangar && exit != ReverseDiagDir(GetModularAirportDirection(next))) continue;
 		/* A goal of another kind is passed over only where it has taxiing tracks of its own (a hangar never). */
 		if (GetModularAirportKind(next) == ModularAirportKind::Hangar && goal != ModularAircraftGoal::Hangar) continue;
+		/* A stand is where a way ends, not a junction: an aircraft loading on it would hold up every way through it
+		 * (TEMATA 365). Through one only when there is no other way (the second search, through_stands). */
+		if (GetModularAirportKind(next) == ModularAirportKind::Stand && goal != ModularAircraftGoal::Stand && !through_stands) continue;
 		const uint step = IsModularAirportRunway(next) ? 3 : 1;
 		for (Trackdir in : DiagdirReachesTrackdirs(exit) & TrackBitsToTrackdirBits(PathTracks(next))) add(next, in, cost + step, k);
 	}
 	return {};
+}
+
+/**
+ * Search the way of an aircraft (SearchWayIn()): first one that ends on a stand but passes through none, then, when
+ * there is none, one through free stands.
+ */
+static std::vector<ModularAircraftStep> SearchWay(StationID sid, const std::vector<ModularAircraftStep> &start, ModularAircraftGoal goal, uint runway_needed, const std::vector<TileIndex> &own)
+{
+	std::vector<ModularAircraftStep> way = SearchWayIn(sid, start, goal, runway_needed, own, false);
+	if (way.empty()) way = SearchWayIn(sid, start, goal, runway_needed, own, true);
+	return way;
 }
 
 /** Every way off a tile an aircraft stands on (its trackdir now first). */
@@ -429,10 +443,16 @@ static Direction DirectionOf(int dx, int dy)
  * Turn an aircraft on the ground towards a direction, an eighth a tick, standing.
  * @return whether it faces that way (else it turned)
  */
-static bool TurnTowards(Aircraft *v, Direction want)
+static bool TurnTowards(Aircraft *v, Direction want, bool moving = false)
 {
 	const DirDiff diff = DirDifference(want, v->direction);
 	if (diff == DirDiff::Same) return true;
+	/* Rolling into a curve (an eighth): turned on the go, not stopped (TEMATA 365: stop-and-turn at every edge). */
+	if (moving && (diff == DirDiff::Left45 || diff == DirDiff::Right45)) {
+		v->direction = want;
+		v->UpdateDeltaXY();
+		return true;
+	}
 	v->direction = ChangeDir(v->direction, LimitDirDiff(diff));
 	v->cur_speed = 0;
 	SetAircraftPosition(v, v->x_pos, v->y_pos, v->z_pos);
@@ -795,7 +815,7 @@ static void HandleTaxi(Aircraft *v)
 			continue;
 		}
 		const int dx = to.x - v->x_pos, dy = to.y - v->y_pos;
-		if (!TurnTowards(v, DirectionOf(dx, dy))) return;
+		if (!TurnTowards(v, DirectionOf(dx, dy), true)) return;
 		const int x = v->x_pos + (dx > 0 ? 1 : dx < 0 ? -1 : 0);
 		const int y = v->y_pos + (dy > 0 ? 1 : dy < 0 ? -1 : 0);
 		v->tile = TileVirtXY(x, y);
@@ -1035,6 +1055,8 @@ bool ModularAircraftController(Aircraft *v)
 		if ((o.IsType(OT_GOTO_STATION) || o.IsType(OT_GOTO_DEPOT)) && o.GetDestination() != v->targetairport) return false;
 		if (st->owner != OWNER_NONE && st->owner != v->owner) return false;
 		if (!CanVehicleUseStation(v, st)) return false;
+		/* Closed for aircraft from the station's window: it circles (as at an old airport). */
+		if (st->airport.blocks.Test(AirportBlock::AirportClosed)) return false;
 		if ((v->tick_counter & 3) != 0) return false;
 		const TileIndex here = TileVirtXYClampedToMap(v->x_pos, v->y_pos);
 		const TileIndex middle = TileXY(TileX(st->modular_airport.tile) + st->modular_airport.w / 2, TileY(st->modular_airport.tile) + st->modular_airport.h / 2);
