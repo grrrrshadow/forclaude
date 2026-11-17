@@ -3573,6 +3573,27 @@ const Vehicle *FirstPersonRiding()
 	return w != nullptr ? w->Riding() : nullptr;
 }
 
+/**
+ * The middle button held and dragged, or clicked twice, while a vehicle is ridden with the camera over its roof: the eye
+ * goes round the vehicle, sideways and up or down (CabViewCamera::orbit, orbit_up); twice, back behind it.
+ * @return whether it was for that camera (else the map view turns, as ever)
+ */
+bool FirstPersonRoofOrbit(int dx, int dy, bool back)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || w->Riding() == nullptr || CabCameraChosen() != CabCamera::Roof) return false;
+	static constexpr double ORBIT_MOUSE = 0.005; // radians a pixel, as the head turns
+	if (back) {
+		w->camera.orbit = 0;
+		w->camera.orbit_up = 0;
+	} else {
+		w->camera.orbit = std::remainder(w->camera.orbit - dx * ORBIT_MOUSE, 2 * M_PI);
+		w->camera.orbit_up = std::clamp(w->camera.orbit_up - dy * ORBIT_MOUSE, -0.6, 1.2);
+	}
+	w->SetWidgetDirty(WID_FP_CANVAS);
+	return true;
+}
+
 /** The boat the walker of the view from the first person stands on (its rooms drawn from the eyes, ThreeDBoatRooms()), Invalid elsewhere. */
 VehicleID FirstPersonBoatAboard()
 {
@@ -4254,6 +4275,15 @@ std::string RigRideOut()
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 	w->GetOut();
 	return "vystoupeno";
+}
+
+/** The rig ('kabina hlava <dx> <dy>'): the right button dragged so many pixels in the vehicle ridden (CabLook::Move()). */
+std::string RigRideHead(int dx, int dy)
+{
+	FirstPersonWindow *w = RigFirstPerson();
+	if (w == nullptr || w->Riding() == nullptr) return "nikdo nejede";
+	w->OnScroll({dx, dy});
+	return fmt::format("hlava {:.0f} stupnu, sklon {:.0f}, obeh {:.0f}, nahoru {:.0f}", w->camera.head * 180.0 / M_PI, w->camera.pitch * 180.0 / M_PI, w->camera.orbit * 180.0 / M_PI, w->camera.orbit_up * 180.0 / M_PI);
 }
 
 /**

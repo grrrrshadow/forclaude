@@ -18831,7 +18831,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	CabEye eye;
 	/* The eye sits by the way the vehicle faces; it looks the way the head is turned (CabViewCamera::head). */
 	const double bfx = std::cos(camera.heading), bfy = std::sin(camera.heading);
-	const double look = walker != nullptr ? camera.heading : camera.heading + camera.head;
+	/* Over the roof the eye goes round the vehicle (CabViewCamera::orbit) and looks from there; its head turned looks aside from where it is. */
+	const double roof_round = walker == nullptr && roof ? camera.heading + camera.orbit : camera.heading;
+	double roof_tilt = 0.0; ///< how much up it looks for being lower round the vehicle (CabViewCamera::orbit_up below 0): the picture sheared
+	double roof_tip = 0.0;  ///< how much down it looks for being higher round it: tipped for real (CabEye::sp), as the camera round a place
+	const double look = walker != nullptr ? camera.heading : roof_round + camera.head;
 	eye.fx = std::cos(look);
 	eye.fy = std::sin(look);
 	eye.rx = eye.fy;
@@ -18927,7 +18931,19 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				behind += camera.roof_far * (over_model ? own_model.scale * OBJECT_UNITS_PER_METRE * own_model.along : OBJECT_UNITS_PER_METRE);
 				want += camera.roof_far * 0.45 * (over_model ? own_model.scale : 1.0) * OBJECT_HEIGHT_PER_METRE;
 			}
-			const double round = tunnel_in.has_value() ? camera.heading : look;
+			/* Up or down round it (CabViewCamera::orbit_up): as far from the vehicle, higher and nearer over it, looking down
+			 * so much more. */
+			if (!tunnel_in.has_value() && camera.orbit_up != 0) {
+				const double up = want * CAB_Z_SCALE, far = std::hypot(behind, up);
+				const double as_it_is = std::atan2(up, behind), tipped = std::clamp(as_it_is + camera.orbit_up, 0.06, 1.35);
+				behind = far * std::cos(tipped);
+				want = far * std::sin(tipped) / CAB_Z_SCALE;
+				/* Higher, tipped down for real by as much: the vehicle stays where it was on the picture (a picture sheared so
+				 * far is stretched, the vehicle under the eye as if a step from it). Lower, sheared up a little. */
+				roof_tip = std::min(1.3, std::max(0.0, tipped - as_it_is) * 1.2); // a little more: nearer over it the vehicle is bigger, it stays whole on the picture
+				roof_tilt = std::max(0.0, as_it_is - tipped);
+			}
+			const double round = tunnel_in.has_value() ? camera.heading : roof_round;
 			eye.x = mid_x - behind * std::cos(round);
 			eye.y = mid_y - behind * std::sin(round);
 			/* In a tunnel under its vault. */
@@ -18984,11 +19000,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
 	/* In a cab tipped up a slope, up with it as far as the head looks ahead (turned aside, the slope is across the view). */
-	eye.cy += std::tan(walker != nullptr ? walker->pitch : camera.pitch + (roof ? CAB_ROOF_LOOK : 0.0) + cab_pitch * std::cos(camera.head)) * eye.focal;
+	eye.cy += std::tan(walker != nullptr ? walker->pitch : std::clamp(camera.pitch + (roof ? CAB_ROOF_LOOK + roof_tilt : 0.0), -1.25, 1.1) + cab_pitch * std::cos(camera.head)) * eye.focal;
 	/* The camera round a place tipped down for real (CabEye::sp): from over the roofs straight down. */
 	if (walker != nullptr && walker->tip != 0) {
 		eye.sp = std::sin(walker->tip);
 		eye.cp = std::cos(walker->tip);
+	} else if (walker == nullptr && roof_tip != 0) {
+		/* Over the roof, gone up round the vehicle (CabViewCamera::orbit_up). */
+		eye.sp = std::sin(roof_tip);
+		eye.cp = std::cos(roof_tip);
 	}
 	out.eye = eye;
 	out.near_plane = _cab_near;

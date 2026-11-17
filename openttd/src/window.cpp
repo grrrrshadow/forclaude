@@ -3159,10 +3159,16 @@ void HandleMouseEvents()
 		if (!middle_was) {
 			middle_dragged = false;
 			_cursor.fix_at = true;
-		} else if (_cursor.delta.x != 0) {
-			/* Sideways only: up or down turns nothing (the player, 11. 11.: away with tipping the map up and down). */
-			middle_dragged = true;
-			RotateViewByDrag(-_cursor.delta.x);
+		} else if (_cursor.delta.x != 0 || _cursor.delta.y != 0) {
+			/* Riding with the camera over the roof: round the vehicle, sideways and up or down (FirstPersonRoofOrbit()). */
+			extern bool FirstPersonRoofOrbit(int dx, int dy, bool back);
+			if (FirstPersonRoofOrbit(_cursor.delta.x, _cursor.delta.y, false)) {
+				middle_dragged = true;
+			} else if (_cursor.delta.x != 0) {
+				/* Sideways only: up or down turns nothing (the player, 11. 11.: away with tipping the map up and down). */
+				middle_dragged = true;
+				RotateViewByDrag(-_cursor.delta.x);
+			}
 		}
 	} else if (middle_was) {
 		if (!_scrolling_viewport) _cursor.fix_at = false;
@@ -3171,8 +3177,10 @@ void HandleMouseEvents()
 		} else {
 			auto now = std::chrono::steady_clock::now();
 			if (now - middle_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
-				/* On the camera going round a place: the map again, as turned; on the map: facing north. */
-				if (!OrbitDoubleClick()) ResetViewYaw();
+				/* Over the roof of the vehicle ridden: behind it again. On the camera going round a place: the map again, as
+				 * turned; on the map: facing north. */
+				extern bool FirstPersonRoofOrbit(int dx, int dy, bool back);
+				if (!FirstPersonRoofOrbit(0, 0, true) && !OrbitDoubleClick()) ResetViewYaw();
 				middle_clicked = {};
 			} else {
 				middle_clicked = now;

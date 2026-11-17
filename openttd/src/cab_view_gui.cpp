@@ -541,6 +541,8 @@ void CabNextCamera(CabViewCamera &camera)
 	_settings_client.gui.cab_camera = (to_underlying(CabCameraChosen()) + 1) % (to_underlying(CabCamera::Roof) + 1);
 	camera.head = 0;
 	camera.pitch = 0;
+	camera.orbit = 0;
+	camera.orbit_up = 0;
 	camera.eye_dz = -1;
 	SetWindowClassesDirty(WindowClass::FirstPerson);
 	SetWindowClassesDirty(WindowClass::GameOptions);

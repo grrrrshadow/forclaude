@@ -74,6 +74,13 @@ struct CabViewCamera {
 	 * farther"); so much higher with it.
 	 */
 	double roof_far = 0.0;
+	/**
+	 * Over the roof: how far round the vehicle the eye has gone from behind it, and how far up over it, radians -- the
+	 * middle button held and dragged (the player, 17. 11.: "holding the middle one always round the thing with the
+	 * camera, sideways and up and down; holding the right one always looking about, turning the head, the camera where
+	 * it is").
+	 */
+	double orbit = 0.0, orbit_up = 0.0;
 };
 
 static constexpr double CAB_ROOF_FAR_MOST = 60.0; ///< the eye over the roof at its farthest (CabViewCamera::roof_far), metres

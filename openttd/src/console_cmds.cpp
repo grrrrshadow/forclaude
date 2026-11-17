@@ -12528,6 +12528,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeRiding());
 			return true;
 		}
+		if (argv.size() > 4 && (argv[2] == "obeh" || argv[2] == "hlava")) {
+			/* 'kabina obeh <dx> <dy>': the middle button dragged so many pixels (over the roof: round the vehicle,
+			 * FirstPersonRoofOrbit()); 'kabina hlava <dx> <dy>': the right one (the head turned, the eye where it is). */
+			extern bool FirstPersonRoofOrbit(int dx, int dy, bool back);
+			extern std::string RigRideHead(int dx, int dy);
+			const int dx = static_cast<int>(number(3).value_or(0)), dy = static_cast<int>(number(4).value_or(0));
+			if (argv[2] == "obeh") {
+				IConsolePrint(CC_DEFAULT, "test3d: kabina obeh {} {}: {}", dx, dy, FirstPersonRoofOrbit(dx, dy, false) ? "kolem vozidla" : "neni kamera nad strechou");
+			} else {
+				IConsolePrint(CC_DEFAULT, "test3d: kabina hlava {} {}: {}", dx, dy, RigRideHead(dx, dy));
+			}
+			return true;
+		}
 		if (argv.size() > 3 && argv[2] == "klik") {
 			/* 'kabina klik <trasa|nalozit|vylozit|kamera|cely|zadni>': a button of the view in the vehicle (RigRideClick()). */
 			extern std::string RigRideClick(std::string_view name);
