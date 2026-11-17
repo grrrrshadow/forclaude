@@ -2794,6 +2794,36 @@ static void MakeRoomForPicture()
 	}
 }
 
+/**
+ * Between the frames (ForgetUnusedThreeDObjects(), every fifteen seconds): the pictures of the turned view not asked
+ * for since the last time let go of, the longest not asked for first, till half of PICTURE_BYTES_KEPT is left. Room
+ * was made only when a picture was added (MakeRoomForPicture()), and never of those the block being drawn uses: at the
+ * nearest zoom the things bigger than the card draws one made 58 pictures of 594 MB, all in use; the view zoomed out
+ * no picture was added any more and they stayed for good (the player's diary of 17. 11.: the game from 3.0 to 4.1 GB,
+ * then a frame or four a second).
+ */
+void TrimThreeDPictures()
+{
+	static uint64_t last = 0;
+	const uint64_t not_since = std::exchange(last, _object_pictures_clock);
+	const size_t keep = PICTURE_BYTES_KEPT / 2;
+	size_t bytes = 0;
+	for (const auto &e : _object_pictures) bytes += PictureBytes(e.second.picture);
+	if (bytes <= keep) return;
+	std::vector<std::pair<uint64_t, std::map<ObjectPictureKey, ObjectPictureEntry>::iterator>> ages;
+	for (auto i = _object_pictures.begin(); i != _object_pictures.end(); ++i) {
+		if (i->second.used <= not_since) ages.emplace_back(i->second.used, i);
+	}
+	std::ranges::sort(ages, {}, &std::pair<uint64_t, std::map<ObjectPictureKey, ObjectPictureEntry>::iterator>::first);
+	const size_t before = bytes;
+	for (const auto &[used, it] : ages) {
+		if (bytes <= keep) break;
+		bytes -= PictureBytes(it->second.picture);
+		_object_pictures.erase(it);
+	}
+	if (bytes < before) Debug(misc, 1, "3D objects: {:.1f} MB of the turned view's pictures not asked for let go of", (before - bytes) / (1024.0 * 1024.0));
+}
+
 /** A picture of the turned view from an object drawn into pixels (RasterObject()). */
 static void PictureOfRaster(ThreeDModelPicture &picture, ObjectRaster &r)
 {

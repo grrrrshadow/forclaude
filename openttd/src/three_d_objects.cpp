@@ -16155,6 +16155,7 @@ static void ForgetUnusedThreeDObjectsNow()
 	_three_d_forgets_done++;
 	TrimThreeDTextures();
 	TrimThreeDEyePainted();
+	TrimThreeDPictures();
 	/* Of the shapes kept, the simpler shapes that save little joined (ThreeDVehicleShape::JoinSimpler()). */
 	{
 		std::vector<std::shared_ptr<const ThreeDVehicleShape>> kept;
