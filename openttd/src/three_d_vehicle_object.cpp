@@ -3087,6 +3087,7 @@ static bool TakePicturesMade()
 	std::vector<std::array<double, 7>> owed;
 	owed.swap(_boxes_owed_pictures);
 	if (!done.empty()) _stand_in_pictures.clear();
+	const DirtyWhyScope why(DirtyWhy::Pictures);
 	for (const auto &b : owed) MarkWorldBoxDirty(b[0], b[1], b[2], b[3], static_cast<int>(b[4]), static_cast<int>(b[5]), b[6] != 0);
 	return true;
 }
@@ -5146,6 +5147,7 @@ static std::vector<MovingFigure> _moving_figures;
 /** Draw the tiles of the figures that move again when their frames change, every tick of the game (only the
  * screen, nothing of the game); a figure no longer drawn drops out. */
 static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	const DirtyWhyScope why(DirtyWhy::Figures);
 	for (auto it = _moving_figures.begin(); it != _moving_figures.end();) {
 		if (TimerGameTick::counter / it->ticks == it->step) {
 			++it;

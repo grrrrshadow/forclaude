@@ -136,6 +136,25 @@ inline void MarkTileDirtyByTile(TileIndex tile, int bridge_level_offset = 0)
 void MarkTileDirtyBetween(TileIndex tile, int z0, int z1, int reach = 0);
 void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1, bool mover = false);
 
+/**
+ * Why places of the map are marked to be drawn again just now, for the diary of the frames (snimky.log, "oznaceno k
+ * prekresleni"): the player's #374, the map standing still had a hundred and more pieces of it laid again by the card
+ * every five seconds, and nothing said what marked them.
+ */
+enum class DirtyWhy : uint8_t {
+	Other,    ///< nothing told: counted by the kind of the tile, a box as a box
+	Objects,  ///< an object of a building made ready in the background
+	Pictures, ///< a picture, a shape or a texture of a thing made in the background
+	Animated, ///< the game's animated tiles
+	Figures,  ///< a figure whose frame changed
+	End,
+};
+struct DirtyWhyScope {
+	DirtyWhy before;
+	explicit DirtyWhyScope(DirtyWhy why);
+	~DirtyWhyScope();
+};
+
 Point GetViewportStationMiddle(const Viewport &vp, const Station *st);
 
 struct Station;

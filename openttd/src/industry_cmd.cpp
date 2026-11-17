@@ -9,6 +9,7 @@
 /** @file industry_cmd.cpp Handling of industry tiles. */
 
 #include "stdafx.h"
+#include <unordered_map>
 #include "misc/history_type.hpp"
 #include "misc/history_func.hpp"
 #include "clear_map.h"
@@ -1011,6 +1012,7 @@ static const int32_t DRAGON_HAY_DAYS = 4;
 static const uint DRAGON_BREAKDOWN_ONE_IN = 6;
 
 static bool DeliveredLately(const Industry *ind, CargoLabel label);
+static void RefreshGameOwnIndustryLook(const Industry *ind);
 
 /**
  * Are there girls about a school, a vending machine, a statue or a
@@ -1168,8 +1170,8 @@ static void TendMarijuanaPlantations()
 		} else if (i->plantation_days_left > 0 && --i->plantation_days_left == 0) {
 			i->plantation_care = 0;
 		}
-		/* The plants and the girls change with the day; drawn afresh, cheaply. */
-		MarkGameOwnIndustryDirty(i);
+		/* The plants and the girls change with the day: drawn afresh when they did (RefreshGameOwnIndustryLook()). */
+		RefreshGameOwnIndustryLook(i);
 	}
 }
 
@@ -1212,7 +1214,7 @@ static void DragonFarmsDay()
 {
 	for (IndustryID id : Industry::industries[IT_DRAGON_FARM]) {
 		Industry *i = Industry::Get(id);
-		MarkGameOwnIndustryDirty(i);
+		RefreshGameOwnIndustryLook(i);
 		if (!_settings_game.difficulty.dragon_breakdowns) continue;
 		if (HasGirls(i) || !Chance16(1, DRAGON_BREAKDOWN_ONE_IN)) continue;
 		const TileIndex middle = TileAddXY(i->location.tile, 1, 1);
@@ -1460,6 +1462,37 @@ void MarkGameOwnIndustryDirty(const Industry *ind)
 	for (TileIndex tile : ind->location) {
 		if (IsTileType(tile, TileType::Industry) && GetIndustryIndex(tile) == ind->index) MarkTileDirtyByTile(tile);
 	}
+}
+
+/**
+ * What one of the game's own industries looks like now, as far as the days change it without anything telling its
+ * tiles: its girls, its plants, its hut's girls and fireworks, the pub's goulash, the dragon farm's hay.
+ */
+static uint32_t GameOwnIndustryLook(const Industry *ind)
+{
+	uint32_t look = HasGirls(ind) ? 1 : 0;
+	look |= static_cast<uint32_t>(MarijuanaPlantationStage(ind)) << 1;
+	look |= static_cast<uint32_t>(HutGirlsAt(ind)) << 4;
+	look |= (HutHasFireworks(ind) ? 1u : 0u) << 7;
+	look |= (PubCooksGoulash(ind) ? 1u : 0u) << 8;
+	if (ind->type == IT_DRAGON_FARM) look |= DragonFarmHay(ind) << 9;
+	return look;
+}
+
+/**
+ * The tiles of one of the game's own industries drawn anew when it looks other than the last time asked
+ * (GameOwnIndustryLook()) -- not every round of the tiles and every day whether anything changed or not: on the turned
+ * map each such tile has the buildings about it laid again by the card (the diary of the frames, "oznaceno k
+ * prekresleni: prumysl": thousands a run in the rig on the player's save).
+ */
+static void RefreshGameOwnIndustryLook(const Industry *ind)
+{
+	static std::unordered_map<uint32_t, uint32_t> looks; // by the industry's index; not saved: the first asking draws it anew
+	const uint32_t look = GameOwnIndustryLook(ind);
+	auto [it, added] = looks.try_emplace(ind->index.base(), look);
+	if (!added && it->second == look) return;
+	it->second = look;
+	MarkGameOwnIndustryDirty(ind);
 }
 
 /**
@@ -2896,9 +2929,9 @@ static void TileLoop_Industry(TileIndex tile)
 		return;
 	}
 
-	/* The girls leave and the plants grow without anything telling the tile:
-	 * it is drawn anew every round (GameOwnIndustrySprite()). */
-	if (GameOwnIndustryDrawTile(GetIndustryGfx(tile), INDUSTRY_COMPLETED) != nullptr) MarkTileDirtyByTile(tile);
+	/* The girls leave and the plants grow without anything telling the tile: asked every round whether its industry
+	 * looks other than before, and drawn anew then (RefreshGameOwnIndustryLook(), GameOwnIndustrySprite()). */
+	if (GameOwnIndustryDrawTile(GetIndustryGfx(tile), INDUSTRY_COMPLETED) != nullptr) RefreshGameOwnIndustryLook(Industry::GetByTile(tile));
 	/* The fireworks over the coffeeshop's hut start here, at most a tile
 	 * loop after the delivery that lights them; AnimateTile_Industry() stops
 	 * them when they are over. */

@@ -1410,6 +1410,7 @@ static const IntervalTimer<TimerWindow> _objects_readied_timer(std::chrono::mill
 	owed.swap(_tiles_owed_objects);
 	std::sort(owed.begin(), owed.end());
 	owed.erase(std::unique(owed.begin(), owed.end()), owed.end());
+	const DirtyWhyScope why(DirtyWhy::Objects);
 	for (TileIndex t : owed) {
 		if (!IsValidTile(t)) continue;
 		/* Its building's whole height, and over its neighbours: an object reaches past its tile. */
@@ -2620,6 +2621,9 @@ std::string TakeTurnedTimesForDiary(int frames)
 		const int *w = t.small_old_why;
 		s += fmt::format("; male okna postaru {} bloku (vypnuto {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {})", t.small_old, w[0], w[2], w[3], w[4], w[5], w[6]);
 	}
+	/* What marked places to be drawn again (TakeDirtyMarksForDiary()). */
+	extern std::string TakeDirtyMarksForDiary();
+	if (const std::string marks = TakeDirtyMarksForDiary(); marks != "-") s = (s == "-" ? std::string() : s + "; ") + "oznaceno k prekresleni: " + marks;
 	/* The small views with their pictures on the card, and how many gave theirs up to another (SmallViewOnCardOf()). */
 	extern size_t SmallViewsOnCardCount();
 	extern uint64_t _small_views_given_up;
@@ -11006,8 +11010,37 @@ void ConstrainAllViewportsZoom()
  * @param tile_height_override Height of the tile (#TileHeight).
  * @ingroup dirty
  */
+static thread_local DirtyWhy _dirty_why = DirtyWhy::Other;
+/** The places marked since the diary last asked: by what told why (DirtyWhy), then moving things, boxes, tiles by their kind. */
+static constexpr size_t DIRTY_MARKS_MOVERS = to_underlying(DirtyWhy::End), DIRTY_MARKS_BOXES = DIRTY_MARKS_MOVERS + 1, DIRTY_MARKS_TILES = DIRTY_MARKS_BOXES + 1;
+static std::atomic<uint32_t> _dirty_marks[DIRTY_MARKS_TILES + to_underlying(TileType::End)] = {};
+
+DirtyWhyScope::DirtyWhyScope(DirtyWhy why) : before(_dirty_why)
+{
+	_dirty_why = why;
+}
+
+DirtyWhyScope::~DirtyWhyScope()
+{
+	_dirty_why = this->before;
+}
+
+/** For the diary of the frames: what marked places of the map to be drawn again since it was last asked. */
+std::string TakeDirtyMarksForDiary()
+{
+	static const std::string_view names[] = {"", "objekty budov", "obrazky a tvary", "animace dlazdic", "postavy", "pohyblive veci", "krabice",
+			"trava", "koleje", "silnice", "domy", "stromy", "stanice", "voda", "okraj", "prumysl", "mosty a tunely", "objekty"};
+	std::string s;
+	for (size_t k = 1; k < std::size(_dirty_marks) && k < std::size(names); k++) {
+		const uint32_t n = _dirty_marks[k].exchange(0);
+		if (n != 0) s += fmt::format("{}{} {}", s.empty() ? "" : ", ", names[k], n);
+	}
+	return s.empty() ? "-" : s;
+}
+
 void MarkTileDirtyByTile(TileIndex tile, int bridge_level_offset, int tile_height_override)
 {
+	_dirty_marks[_dirty_why != DirtyWhy::Other ? to_underlying(_dirty_why) : DIRTY_MARKS_TILES + std::min<size_t>(to_underlying(GetTileType(tile)), to_underlying(TileType::End) - 1)]++;
 	/* Turned (three_d.h): the tile and what stands on it, up to the highest building and its bridge, and what
 	 * reaches a little over the next tiles. */
 	DirtyPlace place;
@@ -11053,6 +11086,7 @@ void MarkTileDirtyBetween(TileIndex tile, int z0, int z1, int reach)
  */
 void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1, bool mover)
 {
+	_dirty_marks[_dirty_why != DirtyWhy::Other ? to_underlying(_dirty_why) : mover ? DIRTY_MARKS_MOVERS : DIRTY_MARKS_BOXES]++;
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
 	place.mover = mover;

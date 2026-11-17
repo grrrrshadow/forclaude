@@ -75,6 +75,7 @@ void AddAnimatedTile(TileIndex tile, bool mark_dirty)
 void AnimateAnimatedTiles()
 {
 	PerformanceAccumulator landscape_framerate(PerformanceElement::GameLoopLandscape);
+	const DirtyWhyScope why(DirtyWhy::Animated); // for the diary of the frames
 
 	for (auto it = std::begin(_animated_tiles); it != std::end(_animated_tiles); /* nothing */) {
 		TileIndex &tile = *it;
