@@ -316,7 +316,10 @@ protected:
 		this->stations_per_cargo_type_no_rating = 0;
 
 		for (const Station *st : Station::Iterate()) {
-			if (this->filter.facilities.Any(st->facilities)) { // only stations with selected facilities
+			/* A modular airport is an airport for the filter (air_map.h). */
+			StationFacilities facilities = st->facilities;
+			if (facilities.Test(StationFacility::ModularAirport)) facilities.Set(StationFacility::Airport);
+			if (this->filter.facilities.Any(facilities)) { // only stations with selected facilities
 				if (st->owner == owner || (st->owner == OWNER_NONE && HasStationInUse(st->index, true, owner))) {
 					this->string_filter.ResetState();
 					this->string_filter.AddLine(st->GetCachedName());

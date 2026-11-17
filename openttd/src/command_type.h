@@ -415,6 +415,11 @@ enum class Commands : uint8_t {
 
 	PasteBlueprint, ///< paste a blueprint onto the map
 
+	BuildAirportTaxiway, ///< lay taxiing tracks of a modular airport (air_map.h)
+	BuildAirportRunway, ///< build a runway of a modular airport
+	BuildAirportPiece, ///< build a stand, a helipad, a heliport, a hangar or a building of a modular airport
+	RemoveAirportPiece, ///< remove tiles of a modular airport
+
 	End, ///< @important Must ALWAYS be on the end of this list!! (period)
 };
 

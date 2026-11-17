@@ -768,6 +768,34 @@ static const DrawTileSpriteSpan _station_display_datas_airport[] = {
 	TILE_SPRITE_NULL() // APT_GRASS_FENCE_NE_FLAG_2
 };
 
+/**
+ * The modular airports' tiles in the view (DrawTile_Station(), ModularAirportGfx): the old airports' sprites -- the
+ * look of step 1 of hra/3d/PLAN-MODULARNI-LETISTE.md, the 3D look comes after.
+ */
+static const DrawTileSpriteSpan _station_display_datas_modular_airport[] = {
+	TILE_SPRITE_LINE_NOTHING(SPR_AIRPORT_APRON)                               // taxiway, asphalt
+	TILE_SPRITE_LINE_NOTHING(SPR_AIRPORT_TAXIWAY_EW_CTR)                      // taxiway along x
+	TILE_SPRITE_LINE_NOTHING(SPR_AIRPORT_TAXIWAY_NS_CTR)                      // taxiway along y
+	TILE_SPRITE_LINE_NOTHING(SPR_AIRFIELD_APRON_C)                            // taxiway, gravel
+	TILE_SPRITE_LINE_NOTHING(SPR_AIRPORT_RUNWAY_EXIT_B)                       // runway along x, middle
+	TILE_SPRITE_LINE_NOTHING(SPR_AIRPORT_RUNWAY_END)                          // runway along x, end
+	TILE_SPRITE_LINE_NOTHING(SPR_NSRUNWAY1)                                   // runway along y, middle
+	TILE_SPRITE_LINE_NOTHING(SPR_NSRUNWAY_END)                                // runway along y, end
+	TILE_SPRITE_LINE_NOTHING(SPR_AIRPORT_AIRCRAFT_STAND)                      // stand
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_helipad)  // helipad
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_heliport) // heliport
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_hangar_ne) // hangar, entrance north-east
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_hangar_se) // hangar, entrance south-east
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_hangar_sw) // hangar, entrance south-west
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_hangar_nw) // hangar, entrance north-west
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_terminal_a) // building 0: terminal
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_tower)      // building 1: control tower
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_concourse)  // building 2: round terminal
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_datas_terminal_b) // building 3: terminal
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_datas_terminal_c) // building 4: terminal
+	TILE_SPRITE_LINE(SPR_AIRPORT_APRON,              _station_display_low_building) // building 5: low building
+};
+
 static const DrawTileSpriteSpan _station_display_datas_airport_radar_grass_fence_sw[] = {
 	TILE_SPRITE_LINE(SPR_FLAT_GRASS_TILE,            _station_display_radar_1_fence_sw) // APT_RADAR_GRASS_FENCE_SW
 	TILE_SPRITE_LINE(SPR_FLAT_GRASS_TILE,            _station_display_radar_2_fence_sw)
@@ -901,6 +929,7 @@ static constexpr EnumIndexArray<std::span<const DrawTileSpriteSpan>, StationType
 	_station_display_datas_buoy,
 	_station_display_datas_waypoint,
 	_station_display_datas_road_waypoint,
+	_station_display_datas_modular_airport,
 };
 
 static const BridgeableTileInfo _station_bridgeable_info_rail[] = {
@@ -960,4 +989,5 @@ static constexpr EnumIndexArray<std::span<const BridgeableTileInfo>, StationType
 	_station_bridgeable_info_buoy, // Buoy
 	_station_bridgeable_info_waypoint, // RailWaypoint
 	_station_bridgeable_info_road_waypoint, // RoadWaypoint
+	{}, // ModularAirport
 };

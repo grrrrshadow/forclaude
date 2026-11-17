@@ -56,6 +56,8 @@ add_files(
     aircraft_cmd.h
     aircraft_gui.cpp
     airport.cpp
+    air_map.h
+    air_type.h
     airport.h
     airport_cmd.h
     airport_gui.cpp

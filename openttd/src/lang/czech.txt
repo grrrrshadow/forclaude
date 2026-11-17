@@ -3575,6 +3575,22 @@ STR_STATION_BUILD_DOCK_CAPTION                                  :{WHITE}Přísta
 # Airport toolbar
 STR_TOOLBAR_AIRCRAFT_CAPTION                                    :{WHITE}Letiště
 STR_TOOLBAR_AIRCRAFT_BUILD_AIRPORT_TOOLTIP                      :{BLACK}Postavit letiště. Pomocí Ctrl ho připojíš k existující stanici. Podrž Shift pro zobrazení odhadu ceny
+STR_TOOLBAR_AIRCRAFT_TAXIWAY                                    :{BLACK}Pojezd
+STR_TOOLBAR_AIRCRAFT_TAXIWAY_TOOLTIP                            :{BLACK}Položit asfaltový pojezd letiště stavěného po dlaždicích, tažením jako kolej. Pomocí Ctrl ho připojíš k jiné stanici
+STR_TOOLBAR_AIRCRAFT_RUNWAY                                     :{BLACK}Dráha
+STR_TOOLBAR_AIRCRAFT_RUNWAY_TOOLTIP                             :{BLACK}Postavit vzletovou dráhu: táhni rovnou čáru v libovolné ose, aspoň 3 dlaždice. Pomocí Ctrl ji připojíš k jiné stanici
+STR_TOOLBAR_AIRCRAFT_STAND                                      :{BLACK}Stání
+STR_TOOLBAR_AIRCRAFT_STAND_TOOLTIP                              :{BLACK}Postavit stání, kde letadla nakládají, na volné zemi nebo na pojezdu
+STR_TOOLBAR_AIRCRAFT_HELIPAD                                    :{BLACK}Helipad
+STR_TOOLBAR_AIRCRAFT_HELIPAD_TOOLTIP                            :{BLACK}Postavit helipad na zemi
+STR_TOOLBAR_AIRCRAFT_HELIPORT                                   :{BLACK}Heliport
+STR_TOOLBAR_AIRCRAFT_HELIPORT_TOOLTIP                           :{BLACK}Postavit heliport na budově
+STR_TOOLBAR_AIRCRAFT_HANGAR                                     :{BLACK}Hangár
+STR_TOOLBAR_AIRCRAFT_HANGAR_TOOLTIP                             :{BLACK}Postavit hangár, vraty k pojezdu vedle něj. Klikem na hangár otočíš vrata
+STR_TOOLBAR_AIRCRAFT_BUILDING                                   :{BLACK}Budova
+STR_TOOLBAR_AIRCRAFT_BUILDING_TOOLTIP                           :{BLACK}Postavit budovu letiště: terminál, věž… Klikem na budovu změníš její vzhled
+STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES                              :{BLACK}Bourat
+STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES_TOOLTIP                      :{BLACK}Zbourat dlaždice letiště stavěného po dlaždicích v označené oblasti
 
 # Airport construction window
 STR_STATION_BUILD_AIRPORT_CAPTION                               :{WHITE}Výběr letiště
@@ -6113,6 +6129,8 @@ STR_ERROR_MUST_DEMOLISH_PASSENGER_TRAM_STATION_FIRST            :{WHITE}Je nutn�
 STR_ERROR_MUST_DEMOLISH_CARGO_TRAM_STATION_FIRST                :je nutné nejprve odstranit nákladní tramvajovou stanici
 STR_ERROR_MUST_DEMOLISH_DOCK_FIRST                              :{WHITE}Je nutné nejprve zničit dok
 STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :je nutné nejprve zničit letiště
+STR_ERROR_MODULAR_AIRPORT_RUNWAY_STRAIGHT                       :dráha musí vést rovně v jedné ose
+STR_ERROR_MODULAR_AIRPORT_RUNWAY_TOO_SHORT                      :dráha musí mít aspoň 3 dlaždice
 
 # Waypoint related errors
 STR_ERROR_WAYPOINT_ADJOINS_MORE_THAN_ONE_EXISTING               :{WHITE}Sousedí s více než jedním existujícím bodem na trase

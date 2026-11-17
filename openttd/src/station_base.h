@@ -544,6 +544,7 @@ public:
 	Airport airport{}; ///< Tile area the airport covers
 	TileArea ship_station{}; ///< Tile area the ship 'station' part covers
 	TileArea docking_station{}; ///< Tile area the docking tiles cover
+	TileArea modular_airport{}; ///< Tile area of the airport built tile by tile (air_map.h); not saved, RecomputeModularAirportAreas()
 
 	IndustryType indtype = IT_INVALID; ///< Industry type to get the name from
 

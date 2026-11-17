@@ -50,6 +50,8 @@
 
 #include <map>
 #include <mutex>
+#include <utility>
+#include <vector>
 
 #include "safeguards.h"
 
@@ -909,6 +911,39 @@ static CommandCost ValidateAutoDrag(Trackdir *trackdir, TileIndex start, TileInd
 		if (abs(dx) != abs(dy) && abs(dx) + abs(trdy) != abs(dy) + abs(trdx)) return CMD_ERROR;
 	}
 
+	return CommandCost();
+}
+
+/**
+ * The pieces of track a drag lays from one tile to another, as the railway's drag lays them (CmdRailTrackHelper()):
+ * for the taxiways of a modular airport (CmdBuildAirportTaxiway(), air_map.h), laid as tracks are.
+ * @param start the tile the drag starts on
+ * @param end the tile it ends on
+ * @param track the piece of track it starts with
+ * @param[out] out each tile on the way and its piece of track, in order
+ * @param max_tiles at most so many tiles (the station's spread)
+ * @return an error if the drag cannot be laid
+ */
+CommandCost GetRailDragTiles(TileIndex start, TileIndex end, Track track, std::vector<std::pair<TileIndex, Track>> &out, uint max_tiles)
+{
+	out.clear();
+	if (!ValParamTrackOrientation(track)) return CMD_ERROR;
+	if (end >= Map::Size() || start >= Map::Size()) return CMD_ERROR;
+
+	Trackdir trackdir = TrackToTrackdir(track);
+	CommandCost ret = ValidateAutoDrag(&trackdir, start, end);
+	if (ret.Failed()) return ret;
+
+	TileIndex tile = start;
+	for (;;) {
+		if (out.size() >= max_tiles) return CommandCost(STR_ERROR_STATION_TOO_SPREAD_OUT);
+		out.emplace_back(tile, TrackdirToTrack(trackdir));
+		if (tile == end) break;
+		tile += ToTileIndexDiff(_trackdelta[trackdir]);
+		if (tile >= Map::Size()) return CMD_ERROR;
+		/* toggle railbit for the non-diagonal tracks */
+		if (!IsDiagonalTrackdir(trackdir)) trackdir = GetOtherTrackdir(trackdir);
+	}
 	return CommandCost();
 }
 

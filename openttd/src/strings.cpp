@@ -1960,7 +1960,7 @@ static void StationGetSpecialString(StringBuilder &builder, StationFacilities x)
 	if (x.Test(StationFacility::TruckStop)) builder.PutUtf8(SCC_LORRY);
 	if (x.Test(StationFacility::BusStop)) builder.PutUtf8(SCC_BUS);
 	if (x.Test(StationFacility::Dock)) builder.PutUtf8(SCC_SHIP);
-	if (x.Test(StationFacility::Airport)) builder.PutUtf8(SCC_PLANE);
+	if (x.Any({StationFacility::Airport, StationFacility::ModularAirport})) builder.PutUtf8(SCC_PLANE);
 }
 
 static const std::string_view _silly_company_names[] = {

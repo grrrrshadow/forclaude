@@ -1713,6 +1713,8 @@ static void ViewportAddKdtreeSigns(DrawPixelInfo *dpi)
 				/* If no facilities are present the station is a ghost station. */
 				StationFacilities facilities = st->facilities;
 				if (facilities.None()) facilities = STATION_FACILITY_GHOST;
+				/* A modular airport's sign shows as an airport's (air_map.h). */
+				if (facilities.Test(StationFacility::ModularAirport)) facilities.Set(StationFacility::Airport);
 
 				if (!facilities.Any(_facility_display_opt)) break;
 
@@ -11333,6 +11335,7 @@ static bool CheckClickOnViewportSign(const Viewport &vp, int x, int y)
 
 				StationFacilities facilities = st->facilities;
 				if (facilities.None()) facilities = STATION_FACILITY_GHOST;
+				if (facilities.Test(StationFacility::ModularAirport)) facilities.Set(StationFacility::Airport);
 				if (!facilities.Any(_facility_display_opt)) break;
 
 				if (CheckClickOnViewportSign(vp, x, y, &st->sign)) last_st = st;

@@ -73,6 +73,7 @@
 #include "cheat_type.h"
 #include "road_func.h"
 #include "station_layout_type.h"
+#include "air_map.h"
 
 #include "widgets/station_widget.h"
 #include "widgets/misc_widget.h"
@@ -80,7 +81,12 @@
 #include "table/strings.h"
 #include "table/station_land.h"
 
+#include <algorithm>
 #include <bitset>
+#include <iterator>
+#include <set>
+#include <utility>
+#include <vector>
 
 #include "three_d_vehicle_object.h"
 
@@ -445,6 +451,7 @@ TileArea Station::GetTileArea(StationType type) const
 		case StationType::Bus: return this->bus_station;
 		case StationType::Dock:
 		case StationType::Oilrig: return this->docking_station;
+		case StationType::ModularAirport: return this->modular_airport;
 		default: NOT_REACHED();
 	}
 }
@@ -777,6 +784,7 @@ void Station::AfterStationTileSetChange(bool adding, StationType type)
 			SetWindowWidgetDirty(WindowClass::StationView, this->index, WID_SV_TRAINS);
 			break;
 		case StationType::Airport:
+		case StationType::ModularAirport:
 			break;
 		case StationType::Truck:
 		case StationType::Bus:
@@ -893,6 +901,7 @@ static StringID GetBridgeTooLowMessageForStationType(StationType type)
 		STR_ERROR_BRIDGE_TOO_LOW_FOR_BUOY, // Buoy
 		STR_ERROR_BRIDGE_TOO_LOW_FOR_RAIL_WAYPOINT, // RailWaypoint
 		STR_ERROR_BRIDGE_TOO_LOW_FOR_ROAD_WAYPOINT, // RoadWaypoint
+		INVALID_STRING_ID, // ModularAirport
 	};
 	return too_low_msgs[type];
 };
@@ -2835,6 +2844,408 @@ static CommandCost RemoveAirport(TileIndex tile, DoCommandFlags flags)
 	return cost;
 }
 
+/* ---------------------------------------------------------------- the modular airports (air_map.h) */
+
+
+/** A tile of a modular airport to make or to change (BuildModularAirportTiles()). */
+struct ModularAirportPlan {
+	TileIndex tile; ///< The tile.
+	ModularAirportKind kind = ModularAirportKind::Taxiway; ///< Its kind.
+	TrackBits tracks{}; ///< Its taxiing tracks.
+	uint8_t bits = 0; ///< Bits 4..5 of m5: a runway's axis and end, a hangar's entrance, a building's front.
+	uint8_t building = 0; ///< A building's look.
+};
+
+/**
+ * Whether a modular airport's tile of this kind takes taxiing tracks laid over it.
+ * @param kind the kind
+ */
+static bool ModularAirportKindTakesTracks(ModularAirportKind kind)
+{
+	return kind == ModularAirportKind::Taxiway || kind == ModularAirportKind::Stand || kind == ModularAirportKind::Helipad;
+}
+
+/**
+ * Make or change the tiles of a modular airport: the common part of its commands. New tiles are built on clear land,
+ * tiles of it already there are changed; all of them join one station, as the tiles of a railway station do (Ctrl,
+ * distant join, the station's spread).
+ * @param flags the command's flags
+ * @param plan the tiles; those already of a modular airport must be of the company's one station
+ * @param surface the surface of the new tiles
+ * @param station_to_join the station to join (NEW_STATION: a new one, or the deleted one near)
+ * @param adjacent whether a new station may be built next to another one
+ * @return the cost or an error
+ */
+static CommandCost BuildModularAirportTiles(DoCommandFlags flags, const std::vector<ModularAirportPlan> &plan, AirportSurface surface, StationID station_to_join, bool adjacent)
+{
+	if (plan.empty()) return CMD_ERROR;
+	if (surface >= AirportSurface::End) return CMD_ERROR;
+
+	bool reuse = (station_to_join != NEW_STATION);
+	if (!reuse) station_to_join = StationID::Invalid();
+	bool distant_join = (station_to_join != StationID::Invalid());
+	if (distant_join && (!_settings_game.station.distant_join_stations || !Station::IsValidID(station_to_join))) return CMD_ERROR;
+
+	/* The area the tiles cover, and the station of those already of a modular airport. */
+	StationID existing = StationID::Invalid();
+	TileArea area(plan.front().tile, 1, 1);
+	for (const ModularAirportPlan &p : plan) {
+		if (!IsValidTile(p.tile)) return CMD_ERROR;
+		area.Add(p.tile);
+		if (!IsModularAirportTile(p.tile)) continue;
+		CommandCost ret = CheckOwnership(GetTileOwner(p.tile));
+		if (ret.Failed()) return ret;
+		StationID sid = GetStationIndex(p.tile);
+		if (existing != StationID::Invalid() && existing != sid) return CommandCost(STR_ERROR_ADJOINS_MORE_THAN_ONE_EXISTING);
+		existing = sid;
+	}
+	if (area.w > _settings_game.station.station_spread || area.h > _settings_game.station.station_spread) {
+		return CommandCost(STR_ERROR_STATION_TOO_SPREAD_OUT);
+	}
+
+	if (existing == StationID::Invalid()) {
+		CommandCost ret = CheckIfAuthorityAllowsNewStation(plan.front().tile, flags);
+		if (ret.Failed()) return ret;
+	}
+
+	Station *st = nullptr;
+	CommandCost ret = FindJoiningStation(existing, station_to_join, adjacent, area, &st);
+	if (ret.Failed()) return ret;
+	if (st == nullptr && distant_join) st = Station::GetIfValid(station_to_join);
+
+	ret = BuildStationPart(&st, flags, reuse, area, StationNaming::Airport);
+	if (ret.Failed()) return ret;
+
+	/* The land of the new tiles: buildable, all on one level, cleared. */
+	CommandCost cost(ExpensesType::Construction);
+	int allowed_z = -1;
+	for (const ModularAirportPlan &p : plan) {
+		if (IsModularAirportTile(p.tile)) {
+			cost.AddCost(_price[Price::BuildStationAirport] / 2);
+			continue;
+		}
+		ret = CheckBuildableTile(p.tile, {}, allowed_z, false);
+		if (ret.Failed()) return ret;
+		cost.AddCost(ret.GetCost());
+		ret = Command<Commands::LandscapeClear>::Do(flags, p.tile);
+		if (ret.Failed()) return ret;
+		cost.AddCost(ret.GetCost());
+		cost.AddCost(_price[Price::BuildStationAirport]);
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		assert(st != nullptr);
+		if (!st->facilities.Test(StationFacility::ModularAirport)) st->AddFacility(StationFacility::ModularAirport, plan.front().tile);
+		st->rect.BeforeAddRect(area.tile, area.w, area.h, StationRect::ADD_TRY);
+
+		for (const ModularAirportPlan &p : plan) {
+			Tile t(p.tile);
+			if (!IsModularAirportTile(t)) {
+				MakeModularAirport(t, st->owner, st->index, p.kind, surface);
+				SetStationTileRandomBits(t, GB(Random(), 0, 4));
+				Company::Get(st->owner)->infrastructure.station++;
+			} else {
+				SetModularAirportKind(t, p.kind);
+			}
+			SB(t.m5(), 4, 2, p.bits);
+			t.m4() = p.kind == ModularAirportKind::Building ? p.building : 0;
+			SetModularAirportTracks(t, p.tracks);
+			SetModularAirportReservedTracks(t, {});
+			if (IsModularAirportRunway(t)) SetModularAirportRunwayReservation(t, false);
+			if (st->modular_airport.tile == INVALID_TILE) {
+				st->modular_airport = TileArea(p.tile, 1, 1);
+			} else {
+				st->modular_airport.Add(p.tile);
+			}
+			MarkTileDirtyByTile(p.tile);
+		}
+
+		st->AfterStationTileSetChange(true, StationType::ModularAirport);
+		InvalidateWindowData(WindowClass::StationView, st->index, -1);
+	}
+
+	return cost;
+}
+
+/**
+ * Lay taxiing tracks of a modular airport, dragged as a railway's track is: on clear land a taxiway's tile with the
+ * track, on the airport's taxiways, stands and helipads the track added.
+ * @param flags operation to perform
+ * @param start the tile the drag starts on
+ * @param end the tile it ends on
+ * @param track the piece of track it starts with
+ * @param surface the surface of the new tiles
+ * @param station_to_join the station to join (NEW_STATION: a new one)
+ * @param adjacent whether a new station may be built next to another one
+ * @return the cost or an error
+ */
+CommandCost CmdBuildAirportTaxiway(DoCommandFlags flags, TileIndex start, TileIndex end, Track track, AirportSurface surface, StationID station_to_join, bool adjacent)
+{
+	extern CommandCost GetRailDragTiles(TileIndex start, TileIndex end, Track track, std::vector<std::pair<TileIndex, Track>> &out, uint max_tiles);
+	std::vector<std::pair<TileIndex, Track>> way;
+	CommandCost ret = GetRailDragTiles(start, end, track, way, 2u * _settings_game.station.station_spread + 2);
+	if (ret.Failed()) return ret;
+
+	std::vector<ModularAirportPlan> plan;
+	for (const auto &[tile, piece] : way) {
+		auto it = std::ranges::find(plan, tile, &ModularAirportPlan::tile);
+		if (it == plan.end()) {
+			ModularAirportPlan p{tile};
+			if (IsModularAirportTile(tile)) {
+				p.kind = GetModularAirportKind(tile);
+				p.tracks = GetModularAirportTracks(tile);
+				p.bits = GB(Tile(tile).m5(), 4, 2);
+				if (p.kind == ModularAirportKind::Building) p.building = GetModularAirportBuilding(tile);
+			}
+			plan.push_back(p);
+			it = std::prev(plan.end());
+		}
+		it->tracks.Set(piece);
+	}
+
+	/* Tiles of the airport that do not take tracks, or that have the track already, stay as they are. */
+	std::vector<ModularAirportPlan> changed;
+	for (const ModularAirportPlan &p : plan) {
+		if (!IsModularAirportTile(p.tile)) {
+			changed.push_back(p);
+			continue;
+		}
+		if (p.tracks == GetModularAirportTracks(p.tile)) continue;
+		if (!ModularAirportKindTakesTracks(p.kind)) return CommandCost(STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST);
+		changed.push_back(p);
+	}
+	if (changed.empty()) return CommandCost(STR_ERROR_ALREADY_BUILT);
+
+	return BuildModularAirportTiles(flags, changed, surface, station_to_join, adjacent);
+}
+
+/**
+ * Build a runway of a modular airport: a straight line along x or y, its two ends and the middle between them. On
+ * the airport's own taxiways it is built over them.
+ * @param flags operation to perform
+ * @param start one end
+ * @param end the other end
+ * @param surface the surface of the new tiles
+ * @param station_to_join the station to join (NEW_STATION: a new one)
+ * @param adjacent whether a new station may be built next to another one
+ * @return the cost or an error
+ */
+CommandCost CmdBuildAirportRunway(DoCommandFlags flags, TileIndex start, TileIndex end, AirportSurface surface, StationID station_to_join, bool adjacent)
+{
+	if (start >= Map::Size() || end >= Map::Size()) return CMD_ERROR;
+	if (TileX(start) != TileX(end) && TileY(start) != TileY(end)) return CommandCost(STR_ERROR_MODULAR_AIRPORT_RUNWAY_STRAIGHT);
+	const Axis axis = TileY(start) == TileY(end) ? Axis::X : Axis::Y;
+	TileArea line(start, end);
+	const uint length = axis == Axis::X ? line.w : line.h;
+	if (length < 3) return CommandCost(STR_ERROR_MODULAR_AIRPORT_RUNWAY_TOO_SHORT);
+
+	std::vector<ModularAirportPlan> plan;
+	uint i = 0;
+	for (TileIndex tile : line) {
+		if (IsModularAirportTile(tile)) {
+			ModularAirportKind kind = GetModularAirportKind(tile);
+			if (kind != ModularAirportKind::Taxiway) return CommandCost(STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST);
+		}
+		ModularAirportPlan p{tile};
+		const bool low = i == 0, high = i == length - 1;
+		p.kind = (low || high) ? ModularAirportKind::RunwayEnd : ModularAirportKind::RunwayMiddle;
+		p.bits = static_cast<uint8_t>(to_underlying(axis) | (high ? 2 : 0));
+		p.tracks = TrackBits{AxisToTrack(axis)};
+		plan.push_back(p);
+		i++;
+	}
+	return BuildModularAirportTiles(flags, plan, surface, station_to_join, adjacent);
+}
+
+/**
+ * Build one piece of a modular airport: a stand, a helipad, a heliport, a hangar or a building. On the airport's own
+ * taxiway it is built over it (a stand and a helipad keep its tracks); on a hangar or a building of the same kind it
+ * changes its entrance or its look.
+ * @param flags operation to perform
+ * @param tile the tile
+ * @param kind what to build
+ * @param dir a hangar's entrance, a building's front
+ * @param building a building's look (MODULAR_AIRPORT_BUILDINGS of them)
+ * @param surface the surface of a new tile
+ * @param station_to_join the station to join (NEW_STATION: a new one)
+ * @param adjacent whether a new station may be built next to another one
+ * @return the cost or an error
+ */
+CommandCost CmdBuildAirportPiece(DoCommandFlags flags, TileIndex tile, ModularAirportKind kind, DiagDirection dir, uint8_t building, AirportSurface surface, StationID station_to_join, bool adjacent)
+{
+	if (tile >= Map::Size()) return CMD_ERROR;
+	switch (kind) {
+		case ModularAirportKind::Stand:
+		case ModularAirportKind::Helipad:
+		case ModularAirportKind::Heliport:
+		case ModularAirportKind::Hangar:
+		case ModularAirportKind::Building:
+			break;
+		default: return CMD_ERROR;
+	}
+	if (!IsValidDiagDirection(dir)) return CMD_ERROR;
+	if (kind == ModularAirportKind::Building && building >= MODULAR_AIRPORT_BUILDINGS) return CMD_ERROR;
+
+	ModularAirportPlan p{tile};
+	p.kind = kind;
+	if (IsModularAirportTile(tile)) {
+		ModularAirportKind old = GetModularAirportKind(tile);
+		if (old != ModularAirportKind::Taxiway && old != kind) return CommandCost(STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST);
+		if (old == kind && (kind == ModularAirportKind::Stand || kind == ModularAirportKind::Helipad || kind == ModularAirportKind::Heliport)) {
+			return CommandCost(STR_ERROR_ALREADY_BUILT);
+		}
+		if (ModularAirportKindTakesTracks(kind)) p.tracks = GetModularAirportTracks(tile);
+	}
+	if (kind == ModularAirportKind::Hangar) {
+		p.bits = to_underlying(dir);
+		p.tracks = TrackBits{DiagDirToDiagTrack(dir)};
+	} else if (kind == ModularAirportKind::Building) {
+		p.bits = to_underlying(dir);
+		p.building = building;
+	}
+	if (IsModularAirportTile(tile) && GetModularAirportKind(tile) == kind && GB(Tile(tile).m5(), 4, 2) == p.bits &&
+			(kind != ModularAirportKind::Building || GetModularAirportBuilding(tile) == building)) {
+		return CommandCost(STR_ERROR_ALREADY_BUILT);
+	}
+	return BuildModularAirportTiles(flags, {p}, surface, station_to_join, adjacent);
+}
+
+/**
+ * Whether the tile is a modular airport's tile of the station (MakeStationAreaSmaller()).
+ * @param st the station
+ * @param tile the tile
+ */
+static bool TileBelongsToModularAirport(BaseStation *st, TileIndex tile)
+{
+	return IsModularAirportTile(tile) && GetStationIndex(tile) == st->index;
+}
+
+/**
+ * Remove one tile of a modular airport.
+ * @param tile the tile
+ * @param flags operation to perform
+ * @return the cost or an error
+ */
+static CommandCost RemoveModularAirportTile(TileIndex tile, DoCommandFlags flags)
+{
+	Station *st = Station::GetByTile(tile);
+	if (_current_company != OWNER_WATER) {
+		CommandCost ret = CheckOwnership(st->owner);
+		if (ret.Failed()) return ret;
+	}
+	CommandCost ret = EnsureNoVehicleOnGround(tile);
+	if (ret.Failed()) return ret;
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		if (Company::IsValidID(GetTileOwner(tile))) Company::Get(GetTileOwner(tile))->infrastructure.station--;
+		DoClearSquare(tile);
+		st->rect.AfterRemoveTile(st, tile);
+		st->modular_airport = MakeStationAreaSmaller(st, st->modular_airport, TileBelongsToModularAirport);
+		if (st->modular_airport.w == 0 || st->modular_airport.h == 0) {
+			st->modular_airport.Clear();
+			st->facilities.Reset(StationFacility::ModularAirport);
+			SetWindowClassesDirty(WindowClass::VehicleOrders);
+		}
+		st->AfterStationTileSetChange(false, StationType::ModularAirport);
+		InvalidateWindowData(WindowClass::StationView, st->index, -1);
+		DeleteStationIfEmpty(st);
+	}
+	return CommandCost(ExpensesType::Construction, _price[Price::ClearStationAirport]);
+}
+
+/**
+ * The tiles of the runway a modular airport's runway tile is part of: from its end at the lower coordinate of its
+ * axis to the one at the higher (a runway goes whole, a piece of it would be no runway).
+ * @param tile a tile of the runway
+ * @return its tiles
+ */
+static std::vector<TileIndex> ModularAirportRunwayTiles(TileIndex tile)
+{
+	const StationID sid = GetStationIndex(tile);
+	const Axis axis = GetModularAirportRunwayAxis(tile);
+	const TileIndexDiff step = TileOffsByAxis(axis);
+	auto of_runway = [&](TileIndex t) {
+		return IsValidTile(t) && IsModularAirportTile(t) && GetStationIndex(t) == sid && IsModularAirportRunway(t) && GetModularAirportRunwayAxis(t) == axis;
+	};
+	auto low_end = [](TileIndex t) { return GetModularAirportKind(t) == ModularAirportKind::RunwayEnd && !IsModularAirportRunwayHighEnd(t); };
+	auto high_end = [](TileIndex t) { return GetModularAirportKind(t) == ModularAirportKind::RunwayEnd && IsModularAirportRunwayHighEnd(t); };
+	TileIndex first = tile;
+	for (uint i = 0; i < Map::Size() && !low_end(first) && of_runway(TileIndex(first.base() - step)); i++) first = TileIndex(first.base() - step);
+	std::vector<TileIndex> tiles{first};
+	for (TileIndex t = first; !high_end(t) && of_runway(TileIndex(t.base() + step)) && tiles.size() < Map::Size();) {
+		t = TileIndex(t.base() + step);
+		tiles.push_back(t);
+	}
+	return tiles;
+}
+
+/**
+ * Remove a tile of a modular airport, a runway whole (ModularAirportRunwayTiles()).
+ * @param tile the tile
+ * @param flags operation to perform
+ * @return the cost or an error
+ */
+static CommandCost RemoveModularAirportPiece(TileIndex tile, DoCommandFlags flags)
+{
+	if (!IsModularAirportRunway(tile)) return RemoveModularAirportTile(tile, flags);
+	CommandCost cost(ExpensesType::Construction);
+	const std::vector<TileIndex> runway = ModularAirportRunwayTiles(tile);
+	/* All of it can go, or none: tested first. */
+	for (TileIndex t : runway) {
+		CommandCost ret = RemoveModularAirportTile(t, DoCommandFlags{flags}.Reset(DoCommandFlag::Execute));
+		if (ret.Failed()) return ret;
+	}
+	for (TileIndex t : runway) cost.AddCost(RemoveModularAirportTile(t, flags).GetCost());
+	return cost;
+}
+
+/**
+ * Remove the tiles of the company's modular airports in an area.
+ * @param flags operation to perform
+ * @param start one corner of the area
+ * @param end the other corner
+ * @return the cost or an error
+ */
+CommandCost CmdRemoveAirportPiece(DoCommandFlags flags, TileIndex start, TileIndex end)
+{
+	if (start >= Map::Size() || end >= Map::Size()) return CMD_ERROR;
+	CommandCost cost(ExpensesType::Construction);
+	CommandCost last_error(STR_ERROR_THERE_IS_NO_STATION);
+	bool any = false;
+	std::set<TileIndex> runways; ///< the tiles of the runways removed already (in a test they stay, so counted once)
+	for (TileIndex tile : TileArea(start, end)) {
+		if (!IsModularAirportTile(tile) || runways.contains(tile)) continue;
+		if (IsModularAirportRunway(tile)) {
+			for (TileIndex t : ModularAirportRunwayTiles(tile)) runways.insert(t);
+		}
+		CommandCost ret = RemoveModularAirportPiece(tile, flags);
+		if (ret.Failed()) {
+			last_error = std::move(ret);
+			continue;
+		}
+		cost.AddCost(ret.GetCost());
+		any = true;
+	}
+	return any ? cost : last_error;
+}
+
+/**
+ * After a game is loaded: the areas of the stations' modular airports, not saved (Station::modular_airport).
+ */
+void RecomputeModularAirportAreas()
+{
+	for (Station *st : Station::Iterate()) st->modular_airport.Clear();
+	for (const auto tile : Map::Iterate()) {
+		if (!IsModularAirportTile(tile)) continue;
+		Station *st = Station::GetByTile(tile);
+		if (st->modular_airport.tile == INVALID_TILE) {
+			st->modular_airport = TileArea(tile, 1, 1);
+		} else {
+			st->modular_airport.Add(tile);
+		}
+	}
+}
+
 /**
  * Open/close an airport to incoming aircraft.
  * @param flags Operation to perform.
@@ -3368,6 +3779,60 @@ static void DrawBusStopWithGirls(const TileInfo *ti, const DrawTileSprites *t, i
 }
 
 /** @copydoc DrawTileProc */
+/** The looks of a modular airport's tiles in _station_display_datas_modular_airport. */
+enum ModularAirportGfx : uint8_t {
+	MAG_TAXIWAY,
+	MAG_TAXIWAY_X,
+	MAG_TAXIWAY_Y,
+	MAG_TAXIWAY_GRAVEL,
+	MAG_RUNWAY_X,
+	MAG_RUNWAY_X_END,
+	MAG_RUNWAY_Y,
+	MAG_RUNWAY_Y_END,
+	MAG_STAND,
+	MAG_HELIPAD,
+	MAG_HELIPORT,
+	MAG_HANGAR, ///< four, by the entrance (DiagDirection)
+	MAG_BUILDING = MAG_HANGAR + 4, ///< MODULAR_AIRPORT_BUILDINGS of them
+};
+
+/**
+ * The look of a modular airport's tile (air_map.h) in the view: the old airports' sprites by its kind.
+ * @param tile the tile
+ * @return its layout
+ */
+static const DrawTileSprites *GetModularAirportTileLayout(TileIndex tile)
+{
+	uint8_t gfx = MAG_TAXIWAY;
+	switch (GetModularAirportKind(tile)) {
+		case ModularAirportKind::Taxiway: {
+			TrackBits tracks = GetModularAirportTracks(tile);
+			if (GetModularAirportSurface(tile) == AirportSurface::Gravel) {
+				gfx = MAG_TAXIWAY_GRAVEL;
+			} else if (tracks == TrackBits{Track::X}) {
+				gfx = MAG_TAXIWAY_X;
+			} else if (tracks == TrackBits{Track::Y}) {
+				gfx = MAG_TAXIWAY_Y;
+			}
+			break;
+		}
+		case ModularAirportKind::RunwayEnd:
+			gfx = GetModularAirportRunwayAxis(tile) == Axis::X ? MAG_RUNWAY_X_END : MAG_RUNWAY_Y_END;
+			break;
+		case ModularAirportKind::RunwayMiddle:
+			gfx = GetModularAirportRunwayAxis(tile) == Axis::X ? MAG_RUNWAY_X : MAG_RUNWAY_Y;
+			break;
+		case ModularAirportKind::Stand: gfx = MAG_STAND; break;
+		case ModularAirportKind::Helipad: gfx = MAG_HELIPAD; break;
+		case ModularAirportKind::Heliport: gfx = MAG_HELIPORT; break;
+		case ModularAirportKind::Hangar: gfx = MAG_HANGAR + to_underlying(GetModularAirportDirection(tile)); break;
+		case ModularAirportKind::Building: gfx = MAG_BUILDING + std::min<uint8_t>(GetModularAirportBuilding(tile), MODULAR_AIRPORT_BUILDINGS - 1); break;
+		default: break;
+	}
+	static_assert(lengthof(_station_display_datas_modular_airport) == MAG_BUILDING + MODULAR_AIRPORT_BUILDINGS);
+	return &_station_display_datas_modular_airport[gfx];
+}
+
 static void DrawTile_Station(TileInfo *ti)
 {
 	const NewGRFSpriteLayout *layout = nullptr;
@@ -3446,6 +3911,9 @@ static void DrawTile_Station(TileInfo *ti)
 				break;
 		}
 	}
+
+	/* A modular airport's tile: the old airports' sprites by its kind (_station_display_datas_modular_airport). */
+	if (IsModularAirport(ti->tile)) t = GetModularAirportTileLayout(ti->tile);
 
 	Owner owner = GetTileOwner(ti->tile);
 
@@ -3787,6 +4255,9 @@ static void GetTileDesc_Station(TileIndex tile, TileDesc &td)
 		case StationType::Buoy:     str = STR_LAI_STATION_DESCRIPTION_BUOY; break;
 		case StationType::RailWaypoint: str = STR_LAI_STATION_DESCRIPTION_WAYPOINT; break;
 		case StationType::RoadWaypoint: str = STR_LAI_STATION_DESCRIPTION_WAYPOINT; break;
+		case StationType::ModularAirport:
+			str = GetModularAirportKind(tile) == ModularAirportKind::Hangar ? STR_LAI_STATION_DESCRIPTION_AIRCRAFT_HANGAR : STR_LAI_STATION_DESCRIPTION_AIRPORT;
+			break;
 	}
 	td.str = str;
 }
@@ -5066,6 +5537,7 @@ CommandCost ClearTile_Station(TileIndex tile, DoCommandFlags flags)
 			case StationType::Rail:     return CommandCost(STR_ERROR_MUST_DEMOLISH_RAILROAD);
 			case StationType::RailWaypoint: return CommandCost(STR_ERROR_BUILDING_MUST_BE_DEMOLISHED);
 			case StationType::Airport:  return CommandCost(STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST);
+			case StationType::ModularAirport: return CommandCost(STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST);
 			case StationType::Truck:    return CommandCost(HasTileRoadType(tile, RoadTramType::Tram) ? STR_ERROR_MUST_DEMOLISH_CARGO_TRAM_STATION_FIRST : STR_ERROR_MUST_DEMOLISH_TRUCK_STATION_FIRST);
 			case StationType::Bus:      return CommandCost(HasTileRoadType(tile, RoadTramType::Tram) ? STR_ERROR_MUST_DEMOLISH_PASSENGER_TRAM_STATION_FIRST : STR_ERROR_MUST_DEMOLISH_BUS_STATION_FIRST);
 			case StationType::RoadWaypoint: return CommandCost(STR_ERROR_BUILDING_MUST_BE_DEMOLISHED);
@@ -5080,6 +5552,7 @@ CommandCost ClearTile_Station(TileIndex tile, DoCommandFlags flags)
 		case StationType::Rail:     return RemoveRailStation(tile, flags);
 		case StationType::RailWaypoint: return RemoveRailWaypoint(tile, flags);
 		case StationType::Airport:  return RemoveAirport(tile, flags);
+		case StationType::ModularAirport: return RemoveModularAirportPiece(tile, flags);
 		case StationType::Truck:    [[fallthrough]];
 		case StationType::Bus:
 			if (IsDriveThroughStopTile(tile)) {
@@ -5116,6 +5589,7 @@ static CommandCost TerraformTile_Station(TileIndex tile, DoCommandFlags flags, i
 				}
 
 				case StationType::Airport:
+				case StationType::ModularAirport:
 					return CommandCost(ExpensesType::Construction, _price[Price::BuildFoundation]);
 
 				case StationType::Truck:

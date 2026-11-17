@@ -4199,6 +4199,12 @@ bool AfterLoadGame()
 	CrashLog::SetStage("afterload: AfterLoadDecoupleCounts");
 	AfterLoadDecoupleCounts();
 
+	/* The areas of the modular airports, not saved (air_map.h). */
+	if (!IsSavegameVersionBefore(SaveLoadVersion::ModularAirports)) {
+		extern void RecomputeModularAirportAreas();
+		RecomputeModularAirportAreas();
+	}
+
 	_gamelog.PrintDebug(1);
 
 	CrashLog::SetStage("afterload: InitializeWindowsAndCaches");

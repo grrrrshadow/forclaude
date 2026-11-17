@@ -3467,6 +3467,22 @@ STR_STATION_BUILD_DOCK_CAPTION                                  :{WHITE}Dock
 # Airport toolbar
 STR_TOOLBAR_AIRCRAFT_CAPTION                                    :{WHITE}Airports
 STR_TOOLBAR_AIRCRAFT_BUILD_AIRPORT_TOOLTIP                      :{BLACK}Build airport. Ctrl+Click to select another station to join. Also press Shift to show cost estimate only
+STR_TOOLBAR_AIRCRAFT_TAXIWAY                                    :{BLACK}Taxiway
+STR_TOOLBAR_AIRCRAFT_TAXIWAY_TOOLTIP                            :{BLACK}Lay an asphalt taxiway of an airport built tile by tile, dragged as a railway track is. Ctrl+Click to select another station to join
+STR_TOOLBAR_AIRCRAFT_RUNWAY                                     :{BLACK}Runway
+STR_TOOLBAR_AIRCRAFT_RUNWAY_TOOLTIP                             :{BLACK}Build a runway: drag a straight line along either axis, at least 3 tiles. Ctrl+Click to select another station to join
+STR_TOOLBAR_AIRCRAFT_STAND                                      :{BLACK}Stand
+STR_TOOLBAR_AIRCRAFT_STAND_TOOLTIP                              :{BLACK}Build a stand where aircraft load, on clear land or on a taxiway
+STR_TOOLBAR_AIRCRAFT_HELIPAD                                    :{BLACK}Helipad
+STR_TOOLBAR_AIRCRAFT_HELIPAD_TOOLTIP                            :{BLACK}Build a helipad on the ground
+STR_TOOLBAR_AIRCRAFT_HELIPORT                                   :{BLACK}Heliport
+STR_TOOLBAR_AIRCRAFT_HELIPORT_TOOLTIP                           :{BLACK}Build a heliport on a building
+STR_TOOLBAR_AIRCRAFT_HANGAR                                     :{BLACK}Hangar
+STR_TOOLBAR_AIRCRAFT_HANGAR_TOOLTIP                             :{BLACK}Build a hangar, its entrance towards the taxiway next to it. Click an existing hangar to turn its entrance
+STR_TOOLBAR_AIRCRAFT_BUILDING                                   :{BLACK}Building
+STR_TOOLBAR_AIRCRAFT_BUILDING_TOOLTIP                           :{BLACK}Build an airport building: terminal, tower... Click an existing building to change its look
+STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES                              :{BLACK}Remove
+STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES_TOOLTIP                      :{BLACK}Remove the tiles of an airport built tile by tile in a dragged area
 
 # Airport construction window
 STR_STATION_BUILD_AIRPORT_CAPTION                               :{WHITE}Airport Selection
@@ -5999,6 +6015,8 @@ STR_ERROR_MUST_DEMOLISH_PASSENGER_TRAM_STATION_FIRST            :must demolish p
 STR_ERROR_MUST_DEMOLISH_CARGO_TRAM_STATION_FIRST                :must demolish freight tram station first
 STR_ERROR_MUST_DEMOLISH_DOCK_FIRST                              :must demolish dock first
 STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :must demolish airport first
+STR_ERROR_MODULAR_AIRPORT_RUNWAY_STRAIGHT                       :a runway goes straight along one axis
+STR_ERROR_MODULAR_AIRPORT_RUNWAY_TOO_SHORT                      :a runway needs at least 3 tiles
 
 # Waypoint related errors
 STR_ERROR_WAYPOINT_ADJOINS_MORE_THAN_ONE_EXISTING               :adjoins more than one existing waypoint

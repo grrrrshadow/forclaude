@@ -38,6 +38,8 @@
 #include "timer/timer_game_calendar.h"
 
 #include "widgets/airport_widget.h"
+#include "air_map.h"
+#include "rail.h"
 
 #include "table/strings.h"
 
@@ -83,6 +85,81 @@ static void PlaceAirport(TileIndex tile)
 	};
 
 	ShowSelectStationIfNeeded(TileArea(tile, _thd.size.x / TILE_SIZE, _thd.size.y / TILE_SIZE), proc);
+}
+
+/** The look of the next building of a modular airport (air_map.h): each one built takes the next. */
+static uint8_t _modular_airport_building = 0;
+
+/**
+ * Build a piece of a modular airport on a tile (air_map.h): a hangar faces the taxiway next to it, clicked again it
+ * turns; a building takes the next look, clicked again it changes it.
+ * @param tile the tile
+ * @param kind what to build
+ */
+static void PlaceModularAirportPiece(TileIndex tile, ModularAirportKind kind)
+{
+	DiagDirection dir = DiagDirection::SE;
+	uint8_t building = _modular_airport_building;
+	const bool same = IsModularAirportTile(tile) && GetModularAirportKind(tile) == kind;
+	if (same && kind == ModularAirportKind::Hangar) {
+		dir = ChangeDiagDir(GetModularAirportDirection(tile), DiagDirDiff::Right90);
+	} else if (same && kind == ModularAirportKind::Building) {
+		dir = GetModularAirportDirection(tile);
+		building = (GetModularAirportBuilding(tile) + 1) % MODULAR_AIRPORT_BUILDINGS;
+	} else if (kind == ModularAirportKind::Hangar) {
+		for (DiagDirection d : EnumRange(DiagDirection::End)) {
+			TileIndex next = TileAddByDiagDir(tile, d);
+			if (IsValidTile(next) && IsModularAirportTile(next) && GetModularAirportTracks(next).Any(TrackBits{DiagDirToDiagTrack(d)})) {
+				dir = d;
+				break;
+			}
+		}
+	} else if (kind == ModularAirportKind::Building) {
+		_modular_airport_building = (building + 1) % MODULAR_AIRPORT_BUILDINGS;
+	}
+	bool adjacent = _ctrl_pressed;
+	auto proc = [=](bool test, StationID to_join) -> bool {
+		if (test) {
+			return Command<Commands::BuildAirportPiece>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportPiece>()), tile, kind, dir, building, AirportSurface::Asphalt, StationID::Invalid(), adjacent).Succeeded();
+		}
+		return Command<Commands::BuildAirportPiece>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, tile, kind, dir, building, AirportSurface::Asphalt, to_join, adjacent);
+	};
+	ShowSelectStationIfNeeded(TileArea(tile, 1, 1), proc);
+}
+
+/**
+ * Lay a dragged taxiway of a modular airport (air_map.h), as a railway's track is dragged.
+ * @param start the tile the drag started on
+ * @param end the tile it ended on
+ * @param track the piece of track it starts with
+ */
+static void PlaceModularAirportTaxiway(TileIndex start, TileIndex end, Track track)
+{
+	bool adjacent = _ctrl_pressed;
+	auto proc = [=](bool test, StationID to_join) -> bool {
+		if (test) {
+			return Command<Commands::BuildAirportTaxiway>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportTaxiway>()), start, end, track, AirportSurface::Asphalt, StationID::Invalid(), adjacent).Succeeded();
+		}
+		return Command<Commands::BuildAirportTaxiway>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, start, end, track, AirportSurface::Asphalt, to_join, adjacent);
+	};
+	ShowSelectStationIfNeeded(TileArea(start, end), proc);
+}
+
+/**
+ * Build a dragged runway of a modular airport (air_map.h).
+ * @param start one end
+ * @param end the other end
+ */
+static void PlaceModularAirportRunway(TileIndex start, TileIndex end)
+{
+	bool adjacent = _ctrl_pressed;
+	auto proc = [=](bool test, StationID to_join) -> bool {
+		if (test) {
+			return Command<Commands::BuildAirportRunway>::Do(CommandFlagsToDCFlags(GetCommandFlags<Commands::BuildAirportRunway>()), start, end, AirportSurface::Asphalt, StationID::Invalid(), adjacent).Succeeded();
+		}
+		return Command<Commands::BuildAirportRunway>::Post(STR_ERROR_CAN_T_BUILD_AIRPORT_HERE, CcBuildAirport, start, end, AirportSurface::Asphalt, to_join, adjacent);
+	};
+	ShowSelectStationIfNeeded(TileArea(start, end), proc);
 }
 
 /** Airport build toolbar window handler. */
@@ -139,6 +216,27 @@ struct BuildAirToolbarWindow : Window {
 				this->last_user_action = widget;
 				break;
 
+			/* The modular airport (air_map.h). */
+			case WID_AT_TAXIWAY:
+				HandlePlacePushButton(this, widget, GetRailTypeInfo(RAILTYPE_RAIL)->cursor.autorail, HT_RAIL);
+				this->last_user_action = widget;
+				break;
+
+			case WID_AT_RUNWAY:
+			case WID_AT_STAND:
+			case WID_AT_HELIPAD:
+			case WID_AT_HELIPORT:
+			case WID_AT_HANGAR:
+			case WID_AT_BUILDING:
+				HandlePlacePushButton(this, widget, SPR_CURSOR_AIRPORT, HT_RECT);
+				this->last_user_action = widget;
+				break;
+
+			case WID_AT_REMOVE_PIECES:
+				HandlePlacePushButton(this, widget, ANIMCURSOR_DEMOLISH, HT_RECT);
+				this->last_user_action = widget;
+				break;
+
 			default: break;
 		}
 	}
@@ -154,6 +252,15 @@ struct BuildAirToolbarWindow : Window {
 			case WID_AT_DEMOLISH:
 				PlaceProc_DemolishArea(tile);
 				break;
+
+			case WID_AT_TAXIWAY: VpStartPlaceSizing(tile, VPM_RAILDIRS, DDSP_PLACE_RAIL); break;
+			case WID_AT_RUNWAY: VpStartPlaceSizing(tile, VPM_X_OR_Y, DDSP_BUILD_STATION); break;
+			case WID_AT_REMOVE_PIECES: VpStartPlaceSizing(tile, VPM_X_AND_Y, DDSP_REMOVE_STATION); break;
+			case WID_AT_STAND: PlaceModularAirportPiece(tile, ModularAirportKind::Stand); break;
+			case WID_AT_HELIPAD: PlaceModularAirportPiece(tile, ModularAirportKind::Helipad); break;
+			case WID_AT_HELIPORT: PlaceModularAirportPiece(tile, ModularAirportKind::Heliport); break;
+			case WID_AT_HANGAR: PlaceModularAirportPiece(tile, ModularAirportKind::Hangar); break;
+			case WID_AT_BUILDING: PlaceModularAirportPiece(tile, ModularAirportKind::Building); break;
 
 			default: NOT_REACHED();
 		}
@@ -171,8 +278,32 @@ struct BuildAirToolbarWindow : Window {
 
 	void OnPlaceMouseUp([[maybe_unused]] ViewportPlaceMethod select_method, ViewportDragDropSelectionProcess select_proc, [[maybe_unused]] Point pt, TileIndex start_tile, TileIndex end_tile) override
 	{
-		if (pt.x != -1 && select_proc == DDSP_DEMOLISH_AREA) {
-			GUIPlaceProcDragXY(select_proc, start_tile, end_tile);
+		if (pt.x == -1) return;
+		switch (select_proc) {
+			case DDSP_DEMOLISH_AREA:
+				GUIPlaceProcDragXY(select_proc, start_tile, end_tile);
+				break;
+
+			case DDSP_PLACE_RAIL: {
+				/* A taxiway, as the railway's drag (rail_gui.cpp HandleAutodirPlacement()). */
+				Track track = static_cast<Track>(_thd.drawstyle & HT_DIR_MASK);
+				if (_thd.drawstyle & HT_RAIL) {
+					PlaceModularAirportTaxiway(start_tile, start_tile, track);
+				} else {
+					PlaceModularAirportTaxiway(TileVirtXY(_thd.selstart.x, _thd.selstart.y), TileVirtXY(_thd.selend.x, _thd.selend.y), track);
+				}
+				break;
+			}
+
+			case DDSP_BUILD_STATION:
+				PlaceModularAirportRunway(start_tile, end_tile);
+				break;
+
+			case DDSP_REMOVE_STATION:
+				Command<Commands::RemoveAirportPiece>::Post(STR_ERROR_CAN_T_REMOVE_PART_OF_STATION, CcBuildAirport, start_tile, end_tile);
+				break;
+
+			default: break;
 		}
 	}
 
@@ -213,6 +344,15 @@ static constexpr std::initializer_list<NWidgetPart> _nested_air_toolbar_widgets 
 	EndContainer(),
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_AT_AIRPORT), SetFill(0, 1), SetToolbarMinimalSize(2), SetSpriteTip(SPR_IMG_AIRPORT, STR_TOOLBAR_AIRCRAFT_BUILD_AIRPORT_TOOLTIP),
+		/* The modular airport (air_map.h): its pieces one by one. */
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_TAXIWAY), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_TAXIWAY, STR_TOOLBAR_AIRCRAFT_TAXIWAY_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_RUNWAY), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_RUNWAY, STR_TOOLBAR_AIRCRAFT_RUNWAY_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_STAND), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_STAND, STR_TOOLBAR_AIRCRAFT_STAND_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_HELIPAD), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_HELIPAD, STR_TOOLBAR_AIRCRAFT_HELIPAD_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_HELIPORT), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_HELIPORT, STR_TOOLBAR_AIRCRAFT_HELIPORT_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_HANGAR), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_HANGAR, STR_TOOLBAR_AIRCRAFT_HANGAR_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_BUILDING), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_BUILDING, STR_TOOLBAR_AIRCRAFT_BUILDING_TOOLTIP),
+		NWidget(WWT_TEXTBTN, Colours::DarkGreen, WID_AT_REMOVE_PIECES), SetFill(0, 1), SetStringTip(STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES, STR_TOOLBAR_AIRCRAFT_REMOVE_PIECES_TOOLTIP),
 		NWidget(WWT_PANEL, Colours::DarkGreen), SetToolbarSpacerMinimalSize(), SetFill(1, 1), EndContainer(),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_AT_DEMOLISH), SetFill(0, 1), SetToolbarMinimalSize(1), SetSpriteTip(SPR_IMG_DYNAMITE, STR_TOOLTIP_DEMOLISH_BUILDINGS_ETC),
 	EndContainer(),

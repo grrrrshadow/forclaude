@@ -39,6 +39,8 @@
 #include "station_base.h"
 #include "station_cmd.h"
 #include "station_map.h"
+#include "air_map.h"
+#include "airport.h"
 #include "string_func.h"
 #include "strings_func.h"
 #include "terraform_cmd.h"
@@ -72,6 +74,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include "safeguards.h"
@@ -144,7 +147,7 @@ const std::string_view ROUTES = R"json({"ok":true,"game":"OpenTTD Decouple","rou
 {"method":"GET","path":"/towns","what":"every town: where, how many people"},
 {"method":"GET","path":"/stations","what":"every station: where, what it has, the cargo waiting"},
 {"method":"GET","path":"/engines?type=","what":"what the company can buy"},
-{"method":"POST","path":"/build?what=&x=&y=...","what":"build as the company: road, rail, rail_station, road_stop, rail_depot, road_depot, dock, bridge, tunnel, clear, level"},
+{"method":"POST","path":"/build?what=&x=&y=...","what":"build as the company: road, rail, rail_station, road_stop, rail_depot, road_depot, dock, bridge, tunnel, clear, level, airport_taxiway, airport_runway, airport_piece, airport_remove"},
 {"method":"POST","path":"/vehicle?do=&id=...","what":"buy, start, stop, sell, depot, order"},
 {"method":"POST","path":"/console","what":"console commands, one a line of the body; answers what they printed"},
 {"method":"GET","path":"/screenshot","what":"a picture of the screen as it is shown, in the game's screenshot format (PNG where the build has it)"},
@@ -181,6 +184,11 @@ const std::string_view GUIDE =
 	"    tunnel       x, y (the tile of its mouth), transport (road, rail)      [railtype, roadtype]\n"
 	"    clear        x, y [x2, y2]\n"
 	"    level        x, y, x2, y2, mode (level, raise, lower)\n"
+	"    airport      x, y, type (0 small, 1 city, 2 heliport, 3 metropolitan...), layout (an old fixed airport)\n"
+	"    airport_taxiway x, y, x2, y2, track (x, y, upper, lower, left, right; a drag as a railway's) [gravel 0/1]\n"
+	"    airport_runway  x, y, x2, y2 (straight along x or y, at least 3 tiles)  [gravel 0/1]\n"
+	"    airport_piece   x, y, kind (stand, helipad, heliport, hangar, building), dir, building (0..5)\n"
+	"    airport_remove  x, y [x2, y2]  (the tiles of an airport built tile by tile)\n"
 	"  The answer: \"ok\", \"cost\", and \"error\" with the game's own words when it could not be built.\n"
 	"\n"
 	"POST /vehicle         \"do\" is one of:\n"
@@ -431,6 +439,7 @@ Answer StationsAnswer()
 		if (st->facilities.Test(StationFacility::TruckStop)) has.push_back("truck");
 		if (st->facilities.Test(StationFacility::BusStop)) has.push_back("bus");
 		if (st->facilities.Test(StationFacility::Airport)) has.push_back("airport");
+		if (st->facilities.Test(StationFacility::ModularAirport)) has.push_back("modular_airport");
 		if (st->facilities.Test(StationFacility::Dock)) has.push_back("dock");
 		json waiting = json::array();
 		for (const CargoSpec *cs : CargoSpec::Iterate()) {
@@ -536,7 +545,39 @@ Answer BuildAnswer(const Params &p)
 		const LevelMode lm = mode == "raise" ? LevelMode::Raise : mode == "lower" ? LevelMode::Lower : LevelMode::Level;
 		return CommandAnswer(std::get<0>(Command<Commands::LevelLand>::Do(flags, b, a, false, lm)));
 	}
-	return Error(400, "what: road, rail, rail_station, road_stop, rail_depot, road_depot, dock, bridge, tunnel, clear or level");
+	if (what == "airport") {
+		/* One of the old fixed airports: its type (0 small, 1 city, 2 heliport, 3 metropolitan, 4 international...). */
+		return CommandAnswer(Command<Commands::BuildAirport>::Do(flags, a, static_cast<uint8_t>(Clamp(ParamInt(p, "type", 0), 0, NUM_AIRPORTS - 1)),
+				static_cast<uint8_t>(Clamp(ParamInt(p, "layout", 0), 0, 255)), NEW_STATION, false));
+	}
+	/* The modular airport (air_map.h): tile by tile. */
+	const AirportSurface surface = ParamInt(p, "gravel", 0) != 0 ? AirportSurface::Gravel : AirportSurface::Asphalt;
+	if (what == "airport_taxiway") {
+		const std::string tr = ParamText(p, "track");
+		Track track = along_x ? Track::X : Track::Y;
+		if (!tr.empty()) {
+			static constexpr std::pair<std::string_view, Track> TRACKS[] = {{"x", Track::X}, {"y", Track::Y}, {"upper", Track::Upper}, {"lower", Track::Lower}, {"left", Track::Left}, {"right", Track::Right}};
+			auto it = std::ranges::find(TRACKS, std::string_view(tr), &std::pair<std::string_view, Track>::first);
+			if (it == std::end(TRACKS)) return Error(400, "track: x, y, upper, lower, left or right");
+			track = it->second;
+		}
+		return CommandAnswer(Command<Commands::BuildAirportTaxiway>::Do(flags, a, b, track, surface, NEW_STATION, false));
+	}
+	if (what == "airport_runway") {
+		if (!straight) return Error(400, "a runway goes straight along x or y: x == x2 or y == y2");
+		return CommandAnswer(Command<Commands::BuildAirportRunway>::Do(flags, a, b, surface, NEW_STATION, false));
+	}
+	if (what == "airport_piece") {
+		const std::string kind = ParamText(p, "kind");
+		static constexpr std::pair<std::string_view, ModularAirportKind> KINDS[] = {{"stand", ModularAirportKind::Stand}, {"helipad", ModularAirportKind::Helipad},
+				{"heliport", ModularAirportKind::Heliport}, {"hangar", ModularAirportKind::Hangar}, {"building", ModularAirportKind::Building}};
+		auto it = std::ranges::find(KINDS, std::string_view(kind), &std::pair<std::string_view, ModularAirportKind>::first);
+		if (it == std::end(KINDS)) return Error(400, "kind: stand, helipad, heliport, hangar or building");
+		const uint8_t building = static_cast<uint8_t>(Clamp(ParamInt(p, "building", 0), 0, MODULAR_AIRPORT_BUILDINGS - 1));
+		return CommandAnswer(Command<Commands::BuildAirportPiece>::Do(flags, a, it->second, ParamDir(p), building, surface, NEW_STATION, false));
+	}
+	if (what == "airport_remove") return CommandAnswer(Command<Commands::RemoveAirportPiece>::Do(flags, a, b));
+	return Error(400, "what: road, rail, rail_station, road_stop, rail_depot, road_depot, dock, bridge, tunnel, clear, level, airport_taxiway, airport_runway, airport_piece or airport_remove");
 }
 
 Answer VehicleAnswer(const Params &p)

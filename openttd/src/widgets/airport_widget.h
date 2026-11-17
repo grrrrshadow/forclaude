@@ -13,6 +13,14 @@
 /** Widgets of the #BuildAirToolbarWindow class. */
 enum AirportToolbarWidgets : WidgetID {
 	WID_AT_AIRPORT,  ///< Build airport button.
+	WID_AT_TAXIWAY,  ///< Lay a taxiway of a modular airport (air_map.h).
+	WID_AT_RUNWAY,   ///< Build a runway of a modular airport.
+	WID_AT_STAND,    ///< Build a stand of a modular airport.
+	WID_AT_HELIPAD,  ///< Build a helipad of a modular airport.
+	WID_AT_HELIPORT, ///< Build a heliport of a modular airport.
+	WID_AT_HANGAR,   ///< Build a hangar of a modular airport.
+	WID_AT_BUILDING, ///< Build a building of a modular airport.
+	WID_AT_REMOVE_PIECES, ///< Remove tiles of a modular airport.
 	WID_AT_DEMOLISH, ///< Demolish button.
 };
 

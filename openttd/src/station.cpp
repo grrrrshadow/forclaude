@@ -27,6 +27,7 @@
 #include "core/random_func.hpp"
 #include "linkgraph/linkgraph.h"
 #include "linkgraph/linkgraphschedule.h"
+#include "air_map.h"
 
 #include "table/strings.h"
 
@@ -311,6 +312,16 @@ void Station::MarkTilesDirty(bool cargo_change) const
  * @pre IsTileType(tile, TileType::Station)
  * @return The catchment size of the station tile.
  */
+/**
+ * Whether a modular airport's tile has a catchment: its stands and its buildings (air_map.h).
+ * @param tile the tile
+ */
+static bool ModularAirportTileCatches(TileIndex tile)
+{
+	ModularAirportKind kind = GetModularAirportKind(tile);
+	return kind == ModularAirportKind::Stand || kind == ModularAirportKind::Building || kind == ModularAirportKind::Heliport || kind == ModularAirportKind::Helipad;
+}
+
 static uint GetTileCatchmentRadius(TileIndex tile, const Station *st)
 {
 	assert(IsTileType(tile, TileType::Station));
@@ -323,6 +334,7 @@ static uint GetTileCatchmentRadius(TileIndex tile, const Station *st)
 			case StationType::Truck:   return CA_TRUCK;
 			case StationType::Bus:     return CA_BUS;
 			case StationType::Dock:    return CA_DOCK;
+			case StationType::ModularAirport: return ModularAirportTileCatches(tile) ? CA_MODULAR_AIRPORT : CA_NONE;
 
 			default: NOT_REACHED();
 			case StationType::Buoy:
@@ -332,6 +344,7 @@ static uint GetTileCatchmentRadius(TileIndex tile, const Station *st)
 	} else {
 		switch (GetStationType(tile)) {
 			default:               return CA_UNMODIFIED;
+			case StationType::ModularAirport: return ModularAirportTileCatches(tile) ? CA_UNMODIFIED : CA_NONE;
 			case StationType::Buoy:
 			case StationType::RailWaypoint:
 			case StationType::RoadWaypoint: return CA_NONE;
@@ -353,8 +366,10 @@ uint Station::GetCatchmentRadius() const
 		if (this->train_station.tile != INVALID_TILE) ret = std::max<uint>(ret, CA_TRAIN);
 		if (this->ship_station.tile  != INVALID_TILE) ret = std::max<uint>(ret, CA_DOCK);
 		if (this->airport.tile       != INVALID_TILE) ret = std::max<uint>(ret, this->airport.GetSpec()->catchment);
+		if (this->facilities.Test(StationFacility::ModularAirport)) ret = std::max<uint>(ret, CA_MODULAR_AIRPORT);
 	} else {
-		if (this->bus_stops != nullptr || this->truck_stops != nullptr || this->train_station.tile != INVALID_TILE || this->ship_station.tile != INVALID_TILE || this->airport.tile != INVALID_TILE) {
+		if (this->bus_stops != nullptr || this->truck_stops != nullptr || this->train_station.tile != INVALID_TILE || this->ship_station.tile != INVALID_TILE || this->airport.tile != INVALID_TILE ||
+				this->facilities.Test(StationFacility::ModularAirport)) {
 			ret = CA_UNMODIFIED;
 		}
 	}
