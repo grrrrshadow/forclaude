@@ -35,7 +35,10 @@ void AgentApiStop();
 /** The port it listens on, 0 when it does not. */
 uint16_t AgentApiPort();
 
-/** What its requests wait for done, on the game's thread (GameLoop()). */
+/**
+ * What its requests wait for done: on the thread that draws, between the frames, the game's state and the screen's
+ * buffer locked (VideoDriver::Tick()); without a screen on the game's thread (GameLoop()).
+ */
 void AgentApiPump();
 
 #endif /* AGENT_API_H */

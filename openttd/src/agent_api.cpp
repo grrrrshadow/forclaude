@@ -197,7 +197,7 @@ const std::string_view GUIDE =
 	"                      vehicle, console, screenshot, guide), their parameters the tool's arguments.\n"
 	"\n"
 	"Tiles are x, y from the map's north corner; a tile's index is y * (the map's width) + x.\n"
-	"Requests are done on the game's thread between its ticks, one at a time, in the order they came.\n";
+	"Requests are done between the frames, the game standing meanwhile, one at a time, in the order they came.\n";
 
 std::string_view TileKindName(TileType type)
 {

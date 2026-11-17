@@ -1498,8 +1498,9 @@ void GameLoop()
 		return;
 	}
 
-	/* What the agent's interface was asked (agent_api.h), between the ticks. */
-	AgentApiPump();
+	/* What the agent's interface was asked (agent_api.h): here only without a screen (a dedicated server, the null
+	 * video driver) -- with one, on the thread that draws (VideoDriver::Tick()). */
+	if (VideoDriver::GetInstance() == nullptr || !VideoDriver::GetInstance()->HasGUI()) AgentApiPump();
 
 	if (_request_newgrf_scan) {
 		ScanNewGRFFiles(_request_newgrf_scan_callback);

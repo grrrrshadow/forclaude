@@ -9,6 +9,7 @@
 /** @file video_driver.cpp Common code between video driver implementations. */
 
 #include "../stdafx.h"
+#include "../agent_api.h"
 #include "../core/random_func.hpp"
 #include "../network/network.h"
 #include "../blitter/factory.hpp"
@@ -154,6 +155,11 @@ void VideoDriver::Tick()
 			InteractiveRandom();
 
 			this->DrainCommandQueue();
+
+			/* What the agent's interface was asked (agent_api.h): here, on the thread that draws, the screen's
+			 * buffer locked -- as a command typed into the console is done. On the game's thread a command that
+			 * draws at once (the rig's "test3d stred") wrote into a buffer not there: the game went down. */
+			AgentApiPump();
 
 			/* The system's messages, until none are left or a frame's worth of time has gone on them. Under Wine
 			 * a held pointer the game puts back (SetCursorPos, the pin of the map's drag) brings a message of its
