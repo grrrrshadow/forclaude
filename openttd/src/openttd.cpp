@@ -9,6 +9,7 @@
 /** @file openttd.cpp Functions related to starting OpenTTD. */
 
 #include "stdafx.h"
+#include "agent_api.h"
 
 #include "blitter/factory.hpp"
 #include "sound/sound_driver.hpp"
@@ -317,6 +318,8 @@ static void ParseResolution(Dimension &res, std::string_view s)
  */
 static void ShutdownGame()
 {
+	ExitDiary("rozhrani pro agenta");
+	AgentApiStop();
 	ExitDiary("konzole a zaznam anomalii");
 	IConsoleFree();
 	CloseAnomalyLog();
@@ -1472,6 +1475,9 @@ void GameLoop()
 		if (_network_available) NetworkBackgroundLoop();
 		return;
 	}
+
+	/* What the agent's interface was asked (agent_api.h), between the ticks. */
+	AgentApiPump();
 
 	if (_request_newgrf_scan) {
 		ScanNewGRFFiles(_request_newgrf_scan_callback);

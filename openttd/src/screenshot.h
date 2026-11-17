@@ -31,4 +31,14 @@ bool MakeMinimapWorldScreenshot();
 extern std::string _screenshot_format_name;
 extern std::string _full_screenshot_path;
 
+/**
+ * How many screenshots were made (or failed) so far, and the last one's file -- empty when it failed. A screenshot is
+ * made on the video driver's thread after MakeScreenshot() returns; who asked from another thread waits for the count
+ * to go up.
+ */
+uint32_t LastScreenshotMade(std::string *path = nullptr);
+bool ScreenshotOfShown(std::string &path);
+#include <atomic>
+extern std::atomic<bool> _screenshot_no_message; ///< the next screenshot shows no window saying it was made (the agent's interface)
+
 #endif /* SCREENSHOT_H */

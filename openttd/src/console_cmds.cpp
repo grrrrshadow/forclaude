@@ -9,6 +9,7 @@
 /** @file console_cmds.cpp Implementation of the console hooks. */
 
 #include "stdafx.h"
+#include "agent_api.h"
 #include "vehicle_config.h"
 
 #include <atomic>
@@ -16810,6 +16811,36 @@ extern void ConPrintFramerate(); // framerate_gui.cpp
 extern void ShowFramerateWindow();
 
 /** Enable or disable logging of console output. @copydoc IConsoleCmdProc */
+/** 'api [port|off]': the interface for an agent (agent_api.h) turned on at a port of this computer, or off; alone, how it is. */
+static bool ConAgentApi(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "The interface for a program that plays the game (an AI agent, a test): HTTP on 127.0.0.1 only. Usage: 'api [<port>|off]'.");
+		IConsolePrint(CC_HELP, "'api' turns it on at port {}, 'api <port>' at another, 'api off' off. GET /guide says how it is used.", AGENT_API_DEFAULT_PORT);
+		return true;
+	}
+	if (argv.size() > 1 && argv[1] == "off") {
+		AgentApiStop();
+		IConsolePrint(CC_DEFAULT, "The interface for an agent is off.");
+		return true;
+	}
+	uint16_t port = AGENT_API_DEFAULT_PORT;
+	if (argv.size() > 1) {
+		const auto asked = ParseInteger<int>(argv[1]);
+		if (!asked.has_value() || *asked < 1024 || *asked > 65535) {
+			IConsolePrint(CC_ERROR, "The port must be 1024 to 65535.");
+			return true;
+		}
+		port = static_cast<uint16_t>(*asked);
+	}
+	if (const std::string why = AgentApiStart(port); !why.empty()) {
+		IConsolePrint(CC_ERROR, "The interface for an agent cannot start: {}.", why);
+		return true;
+	}
+	IConsolePrint(CC_DEFAULT, "The interface for an agent listens on http://127.0.0.1:{}/ (this computer only); 'api off' stops it.", port);
+	return true;
+}
+
 static bool ConScript(std::span<std::string_view> argv)
 {
 	extern std::optional<FileHandle> _iconsole_output_file;
@@ -19742,6 +19773,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("debug_level",             ConDebugLevel);
 	IConsole::CmdRegister("echo",                    ConEcho);
 	IConsole::CmdRegister("echoc",                   ConEchoC);
+	IConsole::CmdRegister("api",                     ConAgentApi);
 	IConsole::CmdRegister("exec",                    ConExec);
 	IConsole::CmdRegister("schedule",                ConSchedule);
 	IConsole::CmdRegister("exit",                    ConExit);

@@ -9,6 +9,14 @@
 /** @file screenshot.cpp The creation of screenshots! */
 
 #include "stdafx.h"
+#include <chrono>
+#include <cstring>
+#include <thread>
+#include <vector>
+#include <algorithm>
+#include <atomic>
+#include <mutex>
+#include <string>
 #include "core/backup_type.hpp"
 #include "fileio_func.h"
 #include "viewport_func.h"
@@ -419,6 +427,57 @@ void MakeScreenshotWithConfirm(ScreenshotType t)
  * @param height the height of the screenshot of, or 0 for current viewport height (only works for SC_ZOOMEDIN and SC_DEFAULTZOOM).
  * @return true iff the screenshot was made successfully
  */
+static std::mutex _screenshot_made_mutex;    ///< of the two below
+static uint32_t _screenshots_made = 0;       ///< counts the screenshots made or failed
+static std::string _screenshot_made_path;    ///< the last one's file, empty when it failed
+std::atomic<bool> _screenshot_no_message = false; ///< the next screenshot shows no window saying it was made
+
+std::atomic<int> _screen_grab_state = 0; ///< 0 nothing, 1 the screen as shown is asked for, 2 it is in _screen_grab_pixels (the video driver's Paint())
+std::mutex _screen_grab_mutex;           ///< of the three below
+std::vector<uint32_t> _screen_grab_pixels;
+int _screen_grab_width = 0, _screen_grab_height = 0;
+
+/**
+ * A screenshot of the screen as the video driver shows it -- with what it shows straight from the graphics card, which
+ * the game's own screenshot of the view lacks where the card lays the map -- into a file of the game's screenshot
+ * format. Called from a thread of its own (the agent's interface): it waits for the next paint.
+ * @param[out] path the file made
+ * @return false when the video driver did not give it in time (no OpenGL) or the file could not be written
+ */
+bool ScreenshotOfShown(std::string &path)
+{
+	auto provider = GetScreenshotProvider();
+	if (provider == nullptr) return false;
+	int expected = 0;
+	if (!_screen_grab_state.compare_exchange_strong(expected, 1)) return false; // another one is being taken
+	for (int k = 0; _screen_grab_state != 2; k++) {
+		if (k > 50) {
+			expected = 1;
+			if (_screen_grab_state.compare_exchange_strong(expected, 0)) return false;
+			break; // taken just now after all
+		}
+		std::this_thread::sleep_for(std::chrono::milliseconds(100));
+	}
+	std::lock_guard lock(_screen_grab_mutex);
+	const int w = _screen_grab_width, h = _screen_grab_height;
+	const std::vector<uint32_t> &pixels = _screen_grab_pixels;
+	const bool made = w > 0 && h > 0 && provider->MakeImage(MakeScreenshotName("agent_api", provider->GetName()), [&](void *buf, uint y, uint pitch, uint n) {
+		for (uint row = 0; row < n && y + row < static_cast<uint>(h); row++) {
+			std::copy_n(pixels.data() + static_cast<size_t>(y + row) * w, std::min<uint>(pitch, w), static_cast<uint32_t *>(buf) + static_cast<size_t>(row) * pitch);
+		}
+	}, w, h, 32, nullptr);
+	if (made) path = _full_screenshot_path;
+	_screen_grab_state = 0;
+	return made;
+}
+
+uint32_t LastScreenshotMade(std::string *path)
+{
+	std::lock_guard lock(_screenshot_made_mutex);
+	if (path != nullptr) *path = _screenshot_made_path;
+	return _screenshots_made;
+}
+
 static bool RealMakeScreenshot(ScreenshotType t, const std::string &name, uint32_t width, uint32_t height)
 {
 	if (t == SC_VIEWPORT) {
@@ -470,6 +529,15 @@ static bool RealMakeScreenshot(ScreenshotType t, const std::string &name, uint32
 		default:
 			NOT_REACHED();
 	}
+
+	/* Told to who waits for it on another thread (the agent's interface, LastScreenshotMade()); asked by it, no window
+	 * says the screenshot was made -- it would be in the next one. */
+	{
+		std::lock_guard lock(_screenshot_made_mutex);
+		_screenshots_made++;
+		_screenshot_made_path = ret ? _full_screenshot_path : std::string();
+	}
+	if (_screenshot_no_message.exchange(false)) return ret;
 
 	if (ret) {
 		if (t == SC_HEIGHTMAP) {

@@ -37,6 +37,7 @@ static const uint ICON_MAX_RECURSE = 10;     ///< Maximum number of recursion
 }
 
 std::optional<FileHandle> _iconsole_output_file;
+std::vector<std::string> *_iconsole_capture = nullptr; ///< what is printed goes here too (the agent's interface, agent_api.cpp); the game's thread
 
 void IConsoleInit()
 {
@@ -106,6 +107,9 @@ void IConsolePrint(ExtendedTextColour colour_code, const std::string &string)
 	/* Create a copy of the string, strip it of colours and invalid
 	 * characters and (when applicable) assign it to the console buffer */
 	std::string str = StrMakeValid(string, {});
+
+	/* For the agent's interface too, while it runs a request's commands (agent_api.cpp). */
+	if (_iconsole_capture != nullptr) _iconsole_capture->push_back(str);
 
 	if (_network_dedicated) {
 		NetworkAdminConsole("console", str);

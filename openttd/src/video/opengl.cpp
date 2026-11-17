@@ -9,6 +9,8 @@
 /** @file opengl.cpp OpenGL video driver support. */
 
 #include "../stdafx.h"
+#include <mutex>
+#include <atomic>
 
 /* Define to disable buffer syncing. Will increase max fast forward FPS but produces artifacts. Mainly useful for performance testing. */
 // #define NO_GL_BUFFER_SYNC
@@ -1274,6 +1276,28 @@ void OpenGLBackend::Paint()
 		Debug(driver, 0, "OpenGL: the screen as shown into {}.ppm, {} pictures straight from the graphics card", _rig_screen_picture, this->three_d_pictures.size());
 		_rig_screen_picture.clear();
 		if (_rig_screen_quit) _exit_game = true;
+	}
+
+	/* The screen as it is shown asked for by another thread (ScreenshotOfShown() of screenshot.cpp; the agent's
+	 * interface): read here, where it is whole -- with what is shown straight from the card. */
+	extern std::atomic<int> _screen_grab_state;
+	if (_screen_grab_state == 1 && _glReadPixels != nullptr) {
+		extern std::mutex _screen_grab_mutex;
+		extern std::vector<uint32_t> _screen_grab_pixels;
+		extern int _screen_grab_width, _screen_grab_height;
+		std::lock_guard lock(_screen_grab_mutex);
+		const int w = _screen.width, h = _screen.height;
+		std::vector<uint8_t> rgba(static_cast<size_t>(w) * h * 4);
+		_glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		_glReadPixels(0, 0, w, h, GL_RGBA, GL_UNSIGNED_BYTE, rgba.data());
+		_screen_grab_pixels.resize(static_cast<size_t>(w) * h);
+		for (int y = 0; y < h; y++) {
+			const uint8_t *row = rgba.data() + static_cast<size_t>(h - 1 - y) * w * 4; // the card's rows from the bottom
+			for (int x = 0; x < w; x++) _screen_grab_pixels[static_cast<size_t>(y) * w + x] = Colour(row[x * 4], row[x * 4 + 1], row[x * 4 + 2]).data;
+		}
+		_screen_grab_width = w;
+		_screen_grab_height = h;
+		_screen_grab_state = 2;
 	}
 
 	_glEnable(GL_BLEND);
