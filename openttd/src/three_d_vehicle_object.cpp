@@ -2157,6 +2157,11 @@ struct GpuObjectPicture {
  */
 static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk, GpuObjectPicture &gp, const std::shared_ptr<const ThreeDBonesFrame> &bones, bool by_bones)
 {
+	/* All it asks for is for the card alone (ThreeDTexturesForCard): its textures, and the masks of its paint, its
+	 * rust and its add-ons too, which the card lays as it draws it -- asked for as the processor's, the masks of every
+	 * thing in sight kept their pixels here though the card held them (the rig on the player's save: of the vehicles'
+	 * 73 MB of textures here 33 MB so; the player's diary of 17. 11.: 518 MB of them). */
+	const ThreeDTexturesForCard all_for_card;
 	/* A figure on bones posed by the card (bones): whole its shape at rest, the frame's extent and seat its pose's. */
 	const ThreeDVehicleShape &frame_of = bones != nullptr ? bones->posed : whole;
 	const ThreeDParts parts = obj.PartsOf(state);

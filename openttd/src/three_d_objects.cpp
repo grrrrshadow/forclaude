@@ -11399,6 +11399,9 @@ static std::unordered_set<const void *> _textures_asked_by_processor;
 /** The textures' pixels let go of as the card holds them (TrimTextures()); the rig: 'test3d texturykarty 0' keeps them. */
 bool _textures_card_only = true;
 static size_t _texture_bytes_on_card_only = 0;
+/** For the diary: why the pixels of the vehicles' and figures' textures stayed here at the last trimming, bytes: asked for by the processor, the card not holding them, small or the coarsest. Under _lazy_mutex. */
+static size_t _texture_bytes_kept_why[3] = {};
+static size_t _texture_bytes_kept_why_now[3] = {};
 
 /** Keep a texture made in the place of the one there (under _lazy_mutex): that one is kept a while yet. */
 static void KeepTexture(ThreeDTextureLevels &place, ThreeDTextureLevels made)
@@ -11729,12 +11732,24 @@ size_t ThreeDVehicleObject::TrimTextures(std::set<const void *> &seen) const
 		/* The levels the card holds, asked for by none but the card since the last time: their pixels are on the card,
 		 * not twice (the player's log of 15. 11.: the vehicles' textures 575 MB here and 543 MB on the card). Not the
 		 * small ones, nor the coarsest: the processor has that one to draw from till the texture is made again for it. */
-		if (!_textures_card_only || _textures_asked_by_processor.contains(&lv)) return;
+		size_t *why = _texture_bytes_kept_why_now;
+		if (!_textures_card_only || _textures_asked_by_processor.contains(&lv)) {
+			for (const ThreeDObjectTexture &t : lv) why[0] += t.px.size() * sizeof(uint32_t);
+			return;
+		}
+		why[2] += lv.back().px.size() * sizeof(uint32_t);
 		for (size_t i = std::max(keep, 0); i + 1 < lv.size(); i++) {
 			ThreeDObjectTexture &t = lv[i];
-			if (t.px.empty() || std::max(t.w, t.h) <= 256) continue;
+			if (t.px.empty()) continue;
+			if (std::max(t.w, t.h) <= 256) {
+				why[2] += t.px.size() * sizeof(uint32_t);
+				continue;
+			}
 			std::unique_lock<std::mutex> card = ThreeDGpuTexturesLock();
-			if (!ThreeDGpuHoldsTextureLocked(t.uid.value)) continue;
+			if (!ThreeDGpuHoldsTextureLocked(t.uid.value)) {
+				why[1] += t.px.size() * sizeof(uint32_t);
+				continue;
+			}
 			freed += t.px.capacity() * sizeof(uint32_t);
 			_texture_bytes_on_card_only += t.px.capacity() * sizeof(uint32_t);
 			t.px.clear();
@@ -11758,9 +11773,11 @@ static void TrimThreeDTextures()
 	_shapes_replaced.clear();
 	std::set<const void *> seen;
 	size_t freed = 0;
+	std::fill(std::begin(_texture_bytes_kept_why_now), std::end(_texture_bytes_kept_why_now), 0);
 	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
 		for (const ThreeDVehicleObject &v : *list) freed += v.TrimTextures(seen);
 	}
+	std::copy(std::begin(_texture_bytes_kept_why_now), std::end(_texture_bytes_kept_why_now), std::begin(_texture_bytes_kept_why));
 	_texture_levels_asked.clear();
 	_textures_asked_by_processor.clear();
 	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB of levels finer than drawn, or held by the card, let go of ({:.1f} MB as the card holds them so far)", freed / (1024.0 * 1024.0), _texture_bytes_on_card_only / (1024.0 * 1024.0));
@@ -16539,8 +16556,8 @@ std::string DescribeThreeDObjectMemory()
 	std::ranges::sort(biggest, std::greater{});
 	std::string most;
 	for (size_t i = 0; i < std::min<size_t>(biggest.size(), 3); i++) most += fmt::format("{}{} {:.1f} MB", i == 0 ? "" : ", ", biggest[i].second, mb(biggest[i].first));
-	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}; dalsich {:.1f} MB jen na karte), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}; textury {:.1f} a dalsich {:.1f} jen na karte, lakovane procesorem {:.1f} v {} kopiich, tvary {:.1f}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}; textury domu tady proto: ptal se procesor {:.1f} MB, karta je nedrzi {:.1f} MB, male a nejhrubsi {:.1f} MB",
-			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(on_card_only), mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_levels), mb(_house_bytes_on_card_only), mb(house_painted), house_painted_count, mb(house_shapes), mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most, mb(_house_bytes_kept_why[0]), mb(_house_bytes_kept_why[1]), mb(_house_bytes_kept_why[2]));
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}; dalsich {:.1f} MB jen na karte), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}; textury {:.1f} a dalsich {:.1f} jen na karte, lakovane procesorem {:.1f} v {} kopiich, tvary {:.1f}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}; textury domu tady proto: ptal se procesor {:.1f} MB, karta je nedrzi {:.1f} MB, male a nejhrubsi {:.1f} MB; textury vozidel tady proto: ptal se procesor {:.1f} MB, karta je nedrzi {:.1f} MB, male a nejhrubsi {:.1f} MB",
+			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(on_card_only), mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_levels), mb(_house_bytes_on_card_only), mb(house_painted), house_painted_count, mb(house_shapes), mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most, mb(_house_bytes_kept_why[0]), mb(_house_bytes_kept_why[1]), mb(_house_bytes_kept_why[2]), mb(_texture_bytes_kept_why[0]), mb(_texture_bytes_kept_why[1]), mb(_texture_bytes_kept_why[2]));
 }
 
 /**
