@@ -11552,6 +11552,20 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_view_on = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici cely {}", _turned_card_view_on ? "ano" : "ne");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "posun") {
+		/* 'stojici posun 0|1': the picture of the turned main view on the card moved with the view without waiting (1;
+		 * ThreeDGpuMoveViewGround()), or waited for (0). */
+		extern bool _turned_card_move_async;
+		_turned_card_move_async = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici posun {}", _turned_card_move_async ? "bez cekani" : "s cekanim");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "stav") {
+		/* 'stojici stav 0|1': what the card lays on the turned map with each program's uniforms set once a job and the
+		 * pictures' program used again only when a picture comes after buildings (1), or all of it for every building
+		 * as before (0). */
+		extern std::atomic<bool> _gpu_standing_lean;
+		_gpu_standing_lean = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici stav {}", _gpu_standing_lean ? "usporne" : "jako drive");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "kostky") {
 		/* 'stojici kostky 0|1': a building among what the card lays drawn only in the cells of its shape the block
 		 * reaches into (1; GpuBuilding::Cell), or whole (0). */

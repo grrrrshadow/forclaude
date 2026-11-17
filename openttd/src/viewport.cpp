@@ -2653,6 +2653,8 @@ std::string TakeTurnedTimesForDiary(int frames)
 	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
 	extern std::string TakeCardReachForRig();
 	if (s != "-") s += "; " + TakeCardReachForRig();
+	/* The main thread standing on the card, by what it waited for (GpuMainWait of three_d_gpu.cpp). */
+	if (const std::string w = ThreeDGpuMainWaits(); w != "-") s = (s == "-" ? std::string() : s + "; ") + "hlavni vlakno cekalo na kartu: " + w;
 	_turned_card_view_passes = 0;
 	_turned_card_view_moves = 0;
 	_turned_card_band_passes = 0;
@@ -7383,6 +7385,8 @@ static void TurnedCardMapSet(std::vector<uint8_t> &m, int x, int y, int w, int h
  * stands on it kept (it is a picture of its own).
  * @return whether it is the picture it was, not forgotten
  */
+bool _turned_card_move_async = true; ///< Rig: the move of the view's picture on the card given without waiting (test3d stojici posun)
+
 static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 {
 	TurnedCardGround &g = *_tcg;
@@ -7431,11 +7435,20 @@ static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 		move.move_x = dx;
 		move.move_y = dy;
 		uint64_t now = 0;
-		if (!ThreeDGpuDrawGround(move) || (ThreeDGpuViewGround(g.view, &now), now != g.made)) {
+		/* Not waited for (G6): the card moves it before what the main thread gives it next. The rig: 'test3d stojici
+		 * posun 0' waits for it as before. */
+		extern bool _turned_card_move_async;
+		const bool moved = _turned_card_move_async ? ThreeDGpuMoveViewGround(move) : ThreeDGpuDrawGround(move);
+		if (!moved || (ThreeDGpuViewGround(g.view, &now), now != g.made)) {
 			std::fill(g.have.begin(), g.have.end(), 0);
 			std::fill(g.stood.begin(), g.stood.end(), 0);
 			g.made = now;
 		}
+	}
+	/* A move given earlier the card could not do: all laid anew. */
+	if (ThreeDGpuTakeViewMoveFailed()) {
+		std::fill(g.have.begin(), g.have.end(), 0);
+		std::fill(g.stood.begin(), g.stood.end(), 0);
 	}
 	if (g.version != *_tg_version) {
 		/* Its ground changed (the tiles it uncovered drawn into the kept picture): laid again block by block. */

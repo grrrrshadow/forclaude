@@ -26,11 +26,14 @@
 #include "frame_diary.h"
 #include "tile_type.h"
 
+#include <algorithm>
+#include <atomic>
 #include <cfloat>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <map>
+#include <memory>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -476,6 +479,24 @@ struct GlFunctions {
 };
 GlFunctions gl;
 
+/**
+ * For the diary: the calls of OpenGL the card's thread made, all and in the jobs laying the turned map (the player's
+ * phone gives every call through a layer to Vulkan, where a call costs more than it draws: the zoomed out map laid
+ * hundreds of buildings a block, each with its own calls). Each function of the table called through a counting step
+ * (GlCounted), the real one behind it.
+ */
+static std::atomic<uint64_t> _gl_calls = 0;
+static std::atomic<uint64_t> _gl_calls_standing = 0, _gl_calls_ground = 0, _gl_jobs_standing = 0, _gl_jobs_ground = 0, _gl_buildings = 0;
+template <int I, typename F> struct GlCounted;
+template <int I, typename R, typename... A> struct GlCounted<I, R (THREE_D_GL_API *)(A...)> {
+	static inline R (THREE_D_GL_API *real)(A...) = nullptr;
+	static R THREE_D_GL_API Call(A... a)
+	{
+		_gl_calls.fetch_add(1, std::memory_order_relaxed);
+		return real(a...);
+	}
+};
+
 /* The view's pictures shown by the video driver straight from the card -- the turned map's ground and what stands on
  * it -- laid: a fence after each job that lays them, which the video driver's context waits for on the card before it
  * shows them (ThreeDGpuViewPicturesWait()); before, glFinish() after every block, the main thread standing till the card
@@ -511,7 +532,13 @@ struct GpuJob {
 	ThreeDGpuStanding *standing = nullptr; ///< else what stands on a block of the turned map (DrawStandingOnCard())
 	bool done = false;
 	bool ok = false;
+	bool main = false; ///< given by the main thread: its jobs are taken in the order given, before the others (QueueGpuJob())
+	/** Given without waiting and owned by the queue (ThreeDGpuMoveViewGround()): its ground here, the job let go of by
+	 * the card's thread when done; not laid, _view_move_failed told. */
+	std::unique_ptr<ThreeDGpuGround> owned_ground;
 };
+/** A move of the view's picture given without waiting (ThreeDGpuMoveViewGround()) the card could not do: the main thread lays the view anew. */
+static std::atomic<bool> _view_move_failed = false;
 std::mutex _gpu_mutex;              ///< of all below
 std::condition_variable _gpu_wake;  ///< the card's thread: a job, or the end
 std::condition_variable _gpu_done;  ///< those asking: a job done, or the card ready (or not)
@@ -528,11 +555,37 @@ const std::thread::id _gpu_main_thread = std::this_thread::get_id();
 void QueueGpuJob(GpuJob &job)
 {
 	if (std::this_thread::get_id() == _gpu_main_thread) {
-		_gpu_jobs.push_front(&job);
+		/* After the main thread's jobs already there, in the order given: one it gave without waiting (the move of the
+		 * view's picture, ThreeDGpuMoveViewGround(); a block's ground started early) comes before what it gives next. */
+		job.main = true;
+		auto it = std::find_if(_gpu_jobs.begin(), _gpu_jobs.end(), [](const GpuJob *j) { return !j->main; });
+		_gpu_jobs.insert(it, &job);
 	} else {
 		_gpu_jobs.push_back(&job);
 	}
 }
+/**
+ * For the diary: how long the main thread stood waiting for the card, by what it waited for (the player, 17. 11.: "zoom
+ * out je slabý a cuká" -- the drag of the zoomed out map stood on the card at every step), ms and times since asked.
+ * 0 the move of the view's picture, 1 the ground of a block, 2 what stands on a block, 3 the ground started earlier
+ * taken, 4 the moving layer.
+ */
+static constexpr int GPU_WAIT_KINDS = 5;
+static std::atomic<double> _gpu_main_wait_ms[GPU_WAIT_KINDS] = {};
+static std::atomic<uint32_t> _gpu_main_waits[GPU_WAIT_KINDS] = {};
+/** While it lives the main thread's wait on the card is counted as of this kind (GPU_WAIT_KINDS). */
+struct GpuMainWait {
+	int kind;
+	std::chrono::steady_clock::time_point from = std::chrono::steady_clock::now();
+	explicit GpuMainWait(int kind) : kind(kind) {}
+	~GpuMainWait()
+	{
+		if (std::this_thread::get_id() != _gpu_main_thread) return;
+		_gpu_main_wait_ms[this->kind] = _gpu_main_wait_ms[this->kind] + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
+		_gpu_main_waits[this->kind]++;
+	}
+};
+
 bool _gpu_stop = false;
 std::thread _gpu_thread;
 /* The video driver's OpenGL (ThreeDGpuVideoContext()): an EGL display and context, or a WGL device and context. The
@@ -2630,10 +2683,14 @@ void PumpMessages()
 bool LoadGlFunctions(std::string &why)
 {
 #define THREE_D_GL_LOAD(ret, name, args) \
-	gl.name = reinterpret_cast<decltype(gl.name)>(GetGlProc(#name)); \
-	if (gl.name == nullptr) { \
-		why = "OpenGL without " #name; \
-		return false; \
+	{ \
+		using Slot = GlCounted<__COUNTER__, decltype(gl.name)>; \
+		Slot::real = reinterpret_cast<decltype(gl.name)>(GetGlProc(#name)); \
+		if (Slot::real == nullptr) { \
+			why = "OpenGL without " #name; \
+			return false; \
+		} \
+		gl.name = &Slot::Call; \
 	}
 	THREE_D_GL_FUNCTIONS(THREE_D_GL_LOAD)
 #undef THREE_D_GL_LOAD
@@ -5056,8 +5113,41 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform4f(gl.glGetUniformLocation(program, "u_turn"), s.turn[0], s.turn[1], s.turn[2], s.turn[3]);
 		gl.glUniform2f(gl.glGetUniformLocation(program, "u_depth"), s.depth[0], std::max(1e-3f, s.depth[1]));
 	};
+	/* The program's uniforms stay with it when another is used meanwhile (a building's): set once a job, then only the
+	 * program, its textures and its corners bound again -- the zoomed out map laid hundreds of buildings a block, each
+	 * followed by all of this with its names looked up again (the player, 17. 11.: "zoom out je slabý a cuká"). */
+	/* The state buildings one after another leave to each other (_gpu_standing_lean): -1 not known; forgotten when
+	 * anything else is drawn (use_pictures(), flush()). */
+	int lean_cull = -1;                 ///< 0 off, 1 the front, 2 the back left out
+	int lean_depth = -1;                ///< the depth test on (1) or off (0)
+	GLuint lean_tex0 = 0;               ///< the texture on unit 0, 0 not known
+	GLuint lean_vao = 0;                ///< the corners bound
+	std::array<GLuint, 2 * THREE_D_GPU_BUILDING_PAINTS> lean_parts{}; ///< the masks and patterns on the units 1 to 8
+	auto lean_forget = [&]() {
+		lean_cull = -1;
+		lean_depth = -1;
+		lean_tex0 = 0;
+		lean_vao = 0;
+		lean_parts.fill(0);
+	};
+	bool pictures_uniforms_set = false;
 	auto use_pictures = [&]() {
 		gl.glUseProgram(p);
+		if (pictures_uniforms_set && _gpu_standing_lean) {
+			/* As a building before it left the state when it was drawn alone: no depth test, no side left out. */
+			if (lean_depth != 0) gl.glDisable(GL_DEPTH_TEST);
+			if (lean_cull != 0) gl.glDisable(GL_CULL_FACE);
+			lean_forget();
+			gl.glActiveTexture(GL_TEXTURE1);
+			gl.glBindTexture(GL_TEXTURE_2D, s.moving ? pics.standing_order : 0);
+			gl.glActiveTexture(GL_TEXTURE2);
+			gl.glBindTexture(GL_TEXTURE_2D, _standing_near);
+			gl.glActiveTexture(GL_TEXTURE0);
+			gl.glBindVertexArray(_standing_order_vao);
+			gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+			return;
+		}
+		pictures_uniforms_set = true;
 		near_uniforms(p);
 		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
 		gl.glUniform1i(gl.glGetUniformLocation(p, "u_texture"), 0);
@@ -5089,6 +5179,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	 * things by the order kept under them. */
 	auto flush = [&]() {
 		if (corners.empty()) return;
+		lean_forget();
 		if (!s.moving) {
 			gl.glEnable(GL_DEPTH_TEST);
 		} else {
@@ -5134,6 +5225,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	std::vector<GLint> firsts;
 	std::vector<GLsizei> counts;
 	int building_failed = 0; ///< why the last building could not be laid: 1 its shape, 2 a texture of it
+	bool building_uniforms_set = false; ///< the building program's uniforms of the job set (draw_building)
+	bool night_was_set = true;          ///< its u_night maybe 1: set to 0 before the next building's triangles
 	auto draw_building = [&](const ThreeDGpuStandingBuilding &b, uint32_t order) {
 		const GpuBuilding *on = MapBuildingOnCard(b.building);
 		if (on == nullptr) {
@@ -5209,20 +5302,15 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		if (b.night.empty() && std::ranges::none_of(cell_in, [](uint8_t in) { return in != 0; })) return true;
 		const GpuProgram &bp = _standing_building_program;
 		gl.glUseProgram(bp.program);
-		gl.glUniform1i(bp.tex, 0);
-		const GLint night_at = gl.glGetUniformLocation(bp.program, "u_night");
-		gl.glUniform1i(night_at, 0);
-		gl.glUniform1f(gl.glGetUniformLocation(bp.program, "u_order"), static_cast<float>(order));
-		/* How near its depth's 0 and 1 are: each pixel's order by it (STANDING_BUILDING_FRAGMENT). */
-		gl.glUniform2f(bp.depth_range, s.depth[0], s.depth[0] + std::max(1e-3f, s.depth[1]));
-		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
 		/* Its paint (STANDING_BUILDING_FRAGMENT): the masks on the units 1 to 4, the patterns on 5 to 8, for its runs
-		 * of its first texture. */
+		 * of its first texture. The uniforms' places looked up once a program, not for every building. */
 		static GLuint paint_program = 0;
-		static GLint u_parts = -1, u_metres = -1, u_turn = -1;
+		static GLint u_parts = -1, u_metres = -1, u_turn = -1, night_at = -1, u_order = -1;
 		static std::array<GLint, THREE_D_GPU_BUILDING_PAINTS> u_colour, u_about;
 		if (paint_program != bp.program) {
 			paint_program = bp.program;
+			night_at = gl.glGetUniformLocation(bp.program, "u_night");
+			u_order = gl.glGetUniformLocation(bp.program, "u_order");
 			u_parts = gl.glGetUniformLocation(bp.program, "u_parts");
 			u_metres = gl.glGetUniformLocation(bp.program, "u_metres");
 			u_turn = gl.glGetUniformLocation(bp.program, "u_turn");
@@ -5233,22 +5321,52 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				u_about[k] = gl.glGetUniformLocation(bp.program, fmt::format("u_about[{}]", k).c_str());
 			}
 		}
+		/* The job's own once (they stay with the program): its texture unit, how near its depth's 0 and 1 are (each
+		 * pixel's order by it, STANDING_BUILDING_FRAGMENT), the turn of its patterns. */
+		if (!building_uniforms_set || !_gpu_standing_lean) {
+			building_uniforms_set = true;
+			gl.glUniform1i(bp.tex, 0);
+			gl.glUniform2f(bp.depth_range, s.depth[0], s.depth[0] + std::max(1e-3f, s.depth[1]));
+			gl.glUniform1f(u_turn, _standing_paint_turn);
+		}
+		if (night_was_set || !_gpu_standing_lean) {
+			gl.glUniform1i(night_at, 0);
+			night_was_set = false;
+		}
+		gl.glUniform1f(u_order, static_cast<float>(order));
+		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
+		const bool lean = _gpu_standing_lean;
+		if (!lean) lean_forget();
+		bool units_changed = false;
 		for (int k = 0; k < part_count; k++) {
 			const ThreeDGpuBuildingPaint &p = b.building.paints[k];
 			gl.glUniform4f(u_colour[k], p.colour[0], p.colour[1], p.colour[2], std::max(1.0f, p.start));
 			gl.glUniform4f(u_about[k], p.pattern != nullptr ? p.pattern_m : 0.0f, p.only_sloped ? 1.0f : 0.0f, 0.0f, 0.0f);
-			gl.glActiveTexture(GL_TEXTURE1 + k);
-			gl.glBindTexture(GL_TEXTURE_2D, parts[k][0]);
-			gl.glActiveTexture(GL_TEXTURE5 + k);
-			gl.glBindTexture(GL_TEXTURE_2D, parts[k][1]);
+			if (!lean || lean_parts[2 * k] != parts[k][0]) {
+				gl.glActiveTexture(GL_TEXTURE1 + k);
+				gl.glBindTexture(GL_TEXTURE_2D, parts[k][0]);
+				lean_parts[2 * k] = parts[k][0];
+				units_changed = true;
+			}
+			if (!lean || lean_parts[2 * k + 1] != parts[k][1]) {
+				gl.glActiveTexture(GL_TEXTURE5 + k);
+				gl.glBindTexture(GL_TEXTURE_2D, parts[k][1]);
+				lean_parts[2 * k + 1] = parts[k][1];
+				units_changed = true;
+			}
 		}
-		gl.glActiveTexture(GL_TEXTURE0);
+		if (!lean || units_changed) gl.glActiveTexture(GL_TEXTURE0);
 		gl.glUniform3f(u_metres, b.building.to_metres[0], b.building.to_metres[1], b.building.to_metres[2]);
-		gl.glUniform1f(u_turn, _standing_paint_turn);
 		gl.glUniform1i(u_parts, 0);
 		int parts_set = 0;
-		gl.glEnable(GL_DEPTH_TEST);
-		gl.glBindVertexArray(on->vao);
+		if (!lean || lean_depth != 1) {
+			gl.glEnable(GL_DEPTH_TEST);
+			lean_depth = 1;
+		}
+		if (!lean || lean_vao != on->vao) {
+			gl.glBindVertexArray(on->vao);
+			lean_vao = on->vao;
+		}
 		for (const GpuBuilding::Run &r : on->runs) {
 			if (r.texture >= textures.size() || textures[r.texture] == 0) continue;
 			const int run_parts = r.texture == 0 ? part_count : 0;
@@ -5277,13 +5395,20 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (firsts.empty()) continue;
 			/* The side turned away left out, as the processor: a triangle seen from outside goes round clockwise on the
 			 * block (rows down), counter-clockwise on the card's (rows up, the same numbers). */
-			if (!b.building.cull || r.facing == 0) {
-				gl.glDisable(GL_CULL_FACE);
-			} else {
-				gl.glEnable(GL_CULL_FACE);
-				gl.glCullFace(r.facing > 0 ? GL_FRONT : GL_BACK);
+			const int cull = (!b.building.cull || r.facing == 0) ? 0 : r.facing > 0 ? 1 : 2;
+			if (!lean || cull != lean_cull) {
+				if (cull == 0) {
+					gl.glDisable(GL_CULL_FACE);
+				} else {
+					if (!lean || lean_cull <= 0) gl.glEnable(GL_CULL_FACE);
+					gl.glCullFace(cull == 1 ? GL_FRONT : GL_BACK);
+				}
+				lean_cull = cull;
 			}
-			gl.glBindTexture(GL_TEXTURE_2D, textures[r.texture]);
+			if (!lean || lean_tex0 != textures[r.texture]) {
+				gl.glBindTexture(GL_TEXTURE_2D, textures[r.texture]);
+				lean_tex0 = textures[r.texture];
+			}
 			if (firsts.size() > 1 && gl.glMultiDrawArrays != nullptr) {
 				gl.glMultiDrawArrays(GL_TRIANGLES, firsts.data(), counts.data(), static_cast<GLsizei>(firsts.size()));
 			} else {
@@ -5291,9 +5416,17 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 			for (GLsizei c : counts) _gpu_standing_triangles[0] += static_cast<uint64_t>(c / 3);
 		}
-		gl.glDisable(GL_CULL_FACE);
+		if (!lean) {
+			gl.glDisable(GL_CULL_FACE);
+		} else if (lean_cull != 0 && !b.night.empty()) {
+			gl.glDisable(GL_CULL_FACE);
+			lean_cull = 0;
+		}
 		if (!b.night.empty()) {
+			lean_forget();
+			lean_depth = 1;
 			gl.glUniform1i(night_at, 1);
+			night_was_set = true;
 			gl.glUniform1i(u_parts, 0);
 			gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, to_view.data());
 			gl.glBindVertexArray(_standing_tri_vao);
@@ -5311,7 +5444,9 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(night.size() / 6));
 			}
 		}
-		gl.glDisable(GL_DEPTH_TEST);
+		/* Lean, left as it is for the next building; what draws anything else sets its own (use_pictures(), flush()). */
+		if (!lean) gl.glDisable(GL_DEPTH_TEST);
+		_gl_buildings++;
 		return true;
 	};
 	/* The vehicles (ThreeDGpuStandingVehicle): drawn into the picture of the card's own first -- as many as it holds at
@@ -5503,12 +5638,17 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		return true;
 	};
 	bool all = true;
+	bool pictures_owed = false; ///< a building drawn last: the pictures' program owed before anything else (use_pictures())
 	for (const std::array<int, 4> &part : clips) {
 		clip = part;
 		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
 		for (size_t k = 0; k < s.items.size(); k++) {
 			const ThreeDGpuStandingItem &item = s.items[k];
 			if (in_some[k] == 0 || !reaches(clip, reach[k])) continue;
+			if (pictures_owed && item.building < 0) {
+				use_pictures();
+				pictures_owed = false;
+			}
 			if (item.faces >= 0) {
 				flush();
 				if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces], item)) {
@@ -5584,7 +5724,13 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					all = false;
 					break;
 				}
-				use_pictures();
+				/* The pictures' program again only when something else comes: buildings one after another stay with
+				 * theirs. */
+				if (_gpu_standing_lean) {
+					pictures_owed = true;
+				} else {
+					use_pictures();
+				}
 				drawing = 0;
 				continue;
 			}
@@ -7011,9 +7157,15 @@ void GpuThreadMain()
 			} else if (job->eye != nullptr) {
 				drawn = DrawEyeOnCard(*job->eye);
 			} else if (job->ground != nullptr) {
+				const uint64_t calls = _gl_calls;
 				drawn = DrawGroundOnCard(*job->ground);
+				_gl_calls_ground += _gl_calls - calls;
+				_gl_jobs_ground++;
 			} else if (job->standing != nullptr) {
+				const uint64_t calls = _gl_calls;
 				drawn = DrawStandingOnCard(*job->standing);
+				_gl_calls_standing += _gl_calls - calls;
+				_gl_jobs_standing++;
 			} else {
 				DrawPicturesOnCard(job->pics);
 				drawn = std::ranges::any_of(job->pics, [](const ThreeDGpuPicture *p) { return p->drawn; });
@@ -7039,6 +7191,12 @@ void GpuThreadMain()
 			_gpu_ground_ms += ms;
 			_gpu_grounds++;
 			if (!drawn) _gpu_grounds_failed++;
+			if (job->owned_ground != nullptr) {
+				/* Given without waiting: nobody takes it. */
+				if (!drawn) _view_move_failed = true;
+				delete job;
+				continue;
+			}
 			_gpu_done.notify_all();
 			continue;
 		}
@@ -7060,7 +7218,13 @@ void GpuThreadMain()
 		}
 		_gpu_done.notify_all();
 	}
-	for (GpuJob *job : _gpu_jobs) job->done = true;
+	for (GpuJob *job : _gpu_jobs) {
+		if (job->owned_ground != nullptr) {
+			delete job;
+		} else {
+			job->done = true;
+		}
+	}
 	_gpu_jobs.clear();
 	_gpu_state = GpuState::Failed;
 	_gpu_done.notify_all();
@@ -7153,6 +7317,7 @@ bool ThreeDGpuPosesBones()
 bool ThreeDGpuDrawGround(ThreeDGpuGround &ground)
 {
 	if (!ThreeDGpuAvailable()) return false;
+	GpuMainWait waited(ground.move_x != 0 || ground.move_y != 0 ? 0 : 1);
 	GpuJob job{};
 	job.ground = &ground;
 	std::unique_lock lock(_gpu_mutex);
@@ -7164,7 +7329,36 @@ bool ThreeDGpuDrawGround(ThreeDGpuGround &ground)
 	return job.ok;
 }
 
+/**
+ * Move the picture of the view on the card with the view, not waiting (G6; the player, 17. 11.: "zoom out je slabý a
+ * cuká": the drag of the zoomed out map stood 13 ms a step on the card for it, the rig at zoom 5 1.3 s in five). The
+ * main thread's jobs are taken in the order given (QueueGpuJob()): what it lays next comes after the move.
+ * @param move the move (ThreeDGpuGround::move_x, move_y, into_view and the view), copied
+ * @return false: not given (no card): the caller lays the view anew
+ */
+bool ThreeDGpuMoveViewGround(const ThreeDGpuGround &move)
+{
+	if (!ThreeDGpuAvailable()) return false;
+	auto job = std::make_unique<GpuJob>();
+	job->owned_ground = std::make_unique<ThreeDGpuGround>(move);
+	job->ground = job->owned_ground.get();
+	{
+		std::lock_guard lock(_gpu_mutex);
+		if (_gpu_state != GpuState::Ready || _gpu_stop) return false;
+		QueueGpuJob(*job.release());
+	}
+	_gpu_wake.notify_one();
+	return true;
+}
+
+/** Whether a move given without waiting (ThreeDGpuMoveViewGround()) was not done since asked last. */
+bool ThreeDGpuTakeViewMoveFailed()
+{
+	return _view_move_failed.exchange(false);
+}
+
 std::atomic<bool> _three_d_gpu_driver_waits = false;
+std::atomic<bool> _gpu_standing_lean = true; ///< Rig: what stands laid with the programs' uniforms set once a job (test3d stojici stav); else every building and after it as before
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 
 /**
@@ -7191,6 +7385,7 @@ bool ThreeDGpuStandingKeeps(uint64_t key)
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing)
 {
 	if (!ThreeDGpuAvailable()) return false;
+	GpuMainWait waited(standing.moving ? 4 : 2);
 	GpuJob job{};
 	job.standing = &standing;
 	std::unique_lock lock(_gpu_mutex);
@@ -7234,6 +7429,7 @@ bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground)
 bool ThreeDGpuDrawGroundTake()
 {
 	if (_ground_job == nullptr) return false;
+	GpuMainWait waited(3);
 	bool ok;
 	{
 		std::unique_lock lock(_gpu_mutex);
@@ -7424,6 +7620,19 @@ void RigThreeDGpuAtlas(int px)
 	_rig_standing_atlas_size = px;
 }
 
+/** For the diary: the main thread's waits on the card since asked last (GpuMainWait), by what it waited for. */
+std::string ThreeDGpuMainWaits()
+{
+	static const char *names[GPU_WAIT_KINDS] = {"posun pohledu", "zem bloku", "co stoji", "zem predem dana", "vrstva aut"};
+	std::string s;
+	for (int k = 0; k < GPU_WAIT_KINDS; k++) {
+		const uint32_t n = _gpu_main_waits[k].exchange(0);
+		const double ms = _gpu_main_wait_ms[k].exchange(0);
+		if (n > 0) s += fmt::format("{}{} {}x {:.0f} ms", s.empty() ? "" : ", ", names[k], n, ms);
+	}
+	return s.empty() ? "-" : s;
+}
+
 std::string ThreeDGpuMovingTimes()
 {
 	const uint64_t passes = _gpu_moving_passes.exchange(0), things = _gpu_moving_things.exchange(0), copied = _gpu_moving_copied.exchange(0);
@@ -7488,6 +7697,12 @@ std::string ThreeDGpuTimes()
 			_card_sent_of[0].load() >> 20, _card_sent_of[1].load() >> 20, _card_sent_of[2].load() >> 20, _card_sent_of[3].load() >> 20, _card_trims.load(), biggest >> 32, biggest & 0xFFFFFFFF);
 	for (std::atomic<size_t> &b : _card_sent_of) b = 0;
 	s += fmt::format(", of it the ground {} MB and pictures of what stands {} MB", _card_sent_ground.exchange(0) >> 20, _card_sent_standing.exchange(0) >> 20);
+	{
+		const uint64_t jg = _gl_jobs_ground.exchange(0), js = _gl_jobs_standing.exchange(0);
+		const uint64_t cg = _gl_calls_ground.exchange(0), cs = _gl_calls_standing.exchange(0);
+		s += fmt::format("; OpenGL calls {} (ground {} in {} jobs, {} a job; what stands {} in {} jobs, {} a job, buildings {})", _gl_calls.exchange(0),
+				cg, jg, jg > 0 ? cg / jg : 0, cs, js, js > 0 ? cs / js : 0, _gl_buildings.exchange(0));
+	}
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
 	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single);
@@ -7548,17 +7763,21 @@ uint32_t ThreeDGpuViewGround(int, uint64_t *made) { if (made != nullptr) *made =
 uint32_t ThreeDGpuViewStanding(int, uint32_t *lit, uint32_t *order) { if (lit != nullptr) *lit = 0; if (order != nullptr) *order = 0; return 0; }
 void ThreeDGpuMovingLayer(int, bool) {}
 std::string ThreeDGpuMovingTimes() { return "-"; }
+std::string ThreeDGpuMainWaits() { return "-"; }
 void RigThreeDGpuAtlas(int) {}
 void ThreeDGpuForgetView(int, uint64_t) {}
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
 bool ThreeDGpuStandingKeeps(uint64_t) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
 std::atomic<bool> _three_d_gpu_driver_waits = false;
+std::atomic<bool> _gpu_standing_lean = true;
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }
 bool ThreeDGpuDrawGround(ThreeDGpuGround &) { return false; }
+bool ThreeDGpuMoveViewGround(const ThreeDGpuGround &) { return false; }
+bool ThreeDGpuTakeViewMoveFailed() { return false; }
 void ThreeDGpuStop() {}
 std::string ThreeDGpuDescribe() { return "the processor (no card on this system)"; }
 std::string ThreeDGpuTimes() { return "card: none"; }

@@ -606,6 +606,8 @@ bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
 bool ThreeDGpuDrawGround(ThreeDGpuGround &ground);
+bool ThreeDGpuMoveViewGround(const ThreeDGpuGround &move);
+bool ThreeDGpuTakeViewMoveFailed();
 uint32_t ThreeDGpuViewGround(int view, uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
@@ -615,6 +617,7 @@ bool ThreeDGpuStandingKeeps(uint64_t key);
 uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit = nullptr, uint32_t *order = nullptr);
 void ThreeDGpuMovingLayer(int view, bool on);
 std::string ThreeDGpuMovingTimes();
+std::string ThreeDGpuMainWaits();
 void ThreeDGpuForgetView(int view, uint64_t ground_key);
 void ThreeDGpuViewPicturesWait(void (*wait)(void *fence));
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
@@ -632,6 +635,7 @@ size_t ThreeDGpuHeldMB();
 extern std::atomic<bool> _three_d_gpu_show; ///< the view from the eyes shown straight from the card where it can (ThreeDGpuShows()); the rig's test3d gpu ukaz 0: read back
 extern std::atomic<bool> _three_d_gpu_off; ///< the pictures drawn by the processor, as before: the setting gui.three_d_gpu off (by default), or the rig's test3d gpu 0
 extern std::atomic<bool> _three_d_gpu_driver_waits;
+extern std::atomic<bool> _gpu_standing_lean;
 extern std::atomic<bool> _gpu_building_cells_on; ///< the video driver's context waits on the card for the view's pictures (ThreeDGpuViewPicturesWait()): the card fences them, not glFinish()
 
 #endif /* THREE_D_GPU_H */
