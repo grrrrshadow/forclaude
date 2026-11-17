@@ -18605,14 +18605,24 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 	}
 	/* At the other end of it (CabViewCamera::rear), looking back. */
-	const bool rear = in_model_cab && camera.rear && !camera.msts;
+	/* A train going against the way its model faces (turned round where it stood: it drives backwards, its vehicles as
+	 * they were): ahead is behind the model, the stand at its other end the front one (the player, 17. 11.: "the camera
+	 * over the roof, I change the stand and the camera stays, I look the same way"). */
+	bool against = false;
+	if (walker == nullptr && (in_model_cab || over_model) && !v->cab_free && cab_vehicle->type == VehicleType::Train && cab_vehicle->direction != Direction::Invalid) {
+		const Direction going = Train::From(cab_vehicle)->GetMovingDirection();
+		const double way = std::atan2(static_cast<double>(dir_dy[to_underlying(going)]), static_cast<double>(dir_dx[to_underlying(going)]));
+		against = std::cos(own_model.facing * M_PI / 180.0 - way) < -0.1;
+	}
+	const bool turned = camera.rear != against; ///< the eye looks against the model's facing
+	const bool rear = in_model_cab && turned && !camera.msts;
 	if (walker != nullptr) {
 		/* The walker looks where the player turns it, at once. */
 		target = walker->heading;
 		camera.valid = false;
 	} else if ((in_model_cab || over_model) && !v->cab_free) {
 		/* The cab of a model, or over it: as the model faces, which turns smoothly already; at its back end the other way. */
-		target = own_model.facing * M_PI / 180.0 + (rear ? M_PI : 0.0);
+		target = own_model.facing * M_PI / 180.0 + (rear || (over_model && turned) ? M_PI : 0.0);
 		camera.valid = false;
 	} else if (v->cab_free) {
 		/* Driven freely (cab_drive.h): its own heading, finer than the eight directions. */
