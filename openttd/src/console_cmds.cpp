@@ -13717,6 +13717,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_card_vehicles_as_kept_on = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: vrstva aut dava drzene bez tvaru: {}", _card_vehicles_as_kept_on.load() ? "ano" : "ne");
 		return true;
+	} else if (what == "atlas" && argv.size() > 2) {
+		/* 'atlas <px>': the card's kept pictures of what stands on the turned map so big (0 as they are), to fill them. */
+		extern void RigThreeDGpuAtlas(int px);
+		RigThreeDGpuAtlas(number(2).value_or(0));
+		IConsolePrint(CC_DEFAULT, "test3d: atlas {}", number(2).value_or(0));
+		return true;
 	} else if (what == "sberaut" && argv.size() > 2) {
 		/* 'sberaut <n>': the moving layer's gathering n times a frame (TurnedCardLayMovers()), for a debugger's samples. */
 		extern int _rig_movers_repeat;

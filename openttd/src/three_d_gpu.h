@@ -567,6 +567,7 @@ struct ThreeDGpuStanding {
 	std::vector<std::array<int, 4>> parts;
 	std::vector<ThreeDGpuStandingItem> items;
 	mutable uint32_t missing = 0; ///< what comes: the vehicles given as kept only (ThreeDGpuStandingVehicle::kept_only) the card kept no more
+	mutable std::vector<uint64_t> missing_keys; ///< and which (ThreeDGpuStandingVehicle::key): given with their shapes the next time
 	std::vector<ThreeDGpuStandingBuilding> buildings;
 	std::vector<ThreeDGpuStandingFaces> faces;
 	/** The view's turn (TurnWorldPoint() of three_d.h): its cosine and sine, the world point it turns about. */

@@ -141,6 +141,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include "industry_map.h"
 #include "industrytype.h"
 
+#include <span>
 #include <chrono>
 #include <cmath>
 #include <numbers>
@@ -2631,10 +2632,11 @@ std::string TakeTurnedTimesForDiary(int frames)
 	if (s != "-" || _turned_moving_passes > 0) {
 		extern double _turned_moving_collect_ms, _turned_moving_card_ms;
 		extern uint64_t TakeThreeDCardVehiclesAsKept();
+		extern std::string TakeThreeDCardThingsPrepared();
 		extern double _turned_moving_kinds_ms[7];
 		const double *k = _turned_moving_kinds_ms;
-		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), {} veci dano jako drzene bez tvaru", _turned_moving_passes, _turned_moving_ms / n,
-				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), TakeThreeDCardVehiclesAsKept());
+		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), {} veci dano jako drzene bez tvaru, {}", _turned_moving_passes, _turned_moving_ms / n,
+				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), TakeThreeDCardVehiclesAsKept(), TakeThreeDCardThingsPrepared());
 	}
 	_turned_moving_passes = 0;
 	_turned_moving_ms = 0;
@@ -10214,8 +10216,8 @@ static uint32_t TurnedCardLayMoversOnce(bool whole);
 
 void TurnedCardLayMovers()
 {
-	/* The card kept no more a picture given as kept (let go of between the asking and the laying): once more, all of
-	 * them with their shapes. */
+	/* The card had no picture of a thing given as kept (never laid, or let go of since): once more, those with their
+	 * shapes (ThreeDCardVehiclesGiveWhole()). */
 	if (TurnedCardLayMoversOnce(false) > 0) TurnedCardLayMoversOnce(true);
 }
 
@@ -10318,6 +10320,10 @@ static uint32_t TurnedCardLayMoversOnce(bool whole)
 	}
 	_turned_moving_ms += TurnedNow() - t0;
 	_turned_times.moving_ms += TurnedNow() - t0;
+	if (laid && movers.missing > 0) {
+		extern void ThreeDCardVehiclesGiveWhole(std::span<const uint64_t> keys);
+		ThreeDCardVehiclesGiveWhole(movers.missing_keys);
+	}
 	return laid ? movers.missing : 0;
 }
 

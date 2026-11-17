@@ -808,13 +808,48 @@ std::unordered_map<uint64_t, std::array<int, 2>> _standing_places;
 /** The vehicles' pictures among them (their keys, ThreeDGpuStandingVehicle::key), for the main thread to ask (ThreeDGpuStandingKeeps()). */
 std::mutex _standing_kept_mutex;
 std::unordered_set<uint64_t> _standing_kept_keys;
+/** The vehicles given with their shapes whose pictures could not be made (too big, a shape the card could not take): not asked for again. Only the card's thread uses it. */
+std::unordered_set<uint64_t> _standing_failed_keys;
+/**
+ * The kept pictures' places as they are held: so big (a multiple of STANDING_SLOT_STEP each way), last laid from in
+ * the card's pass `used` (_card_clock) at the time `when`, a vehicle's with its key among _standing_kept_keys. When the
+ * pictures are full, the places of those not laid from for STANDING_SLOT_IDLE are given to new ones (StandingReserve();
+ * by the time, not by the passes: a frame is one pass of the moving layer and any number of the blocks') -- not all of them
+ * forgotten: the player's #374, a busy save by day, the vehicles going by filled them with their turns several times
+ * a second, and each time every vehicle in sight was prepared with its shapes and drawn again (the gathering of the
+ * moving layer 20 ms a frame, the card's drawing 10 ms more).
+ */
+struct StandingSlot {
+	int w = 0, h = 0;
+	uint64_t used = 0;
+	std::chrono::steady_clock::time_point when{};
+	uint64_t kept_key = 0;
+	bool vehicle = false;
+};
+constexpr int STANDING_SLOT_STEP = 16;
+constexpr std::chrono::milliseconds STANDING_SLOT_IDLE{1000}; ///< so long not laid from, a place is given to another picture when room is needed
+std::unordered_map<uint64_t, StandingSlot> _standing_slots;
+std::map<std::pair<int, int>, std::vector<std::array<int, 2>>> _standing_free; ///< the places free again, by their size
+std::array<int, 2> _standing_reserved_size = {0, 0}; ///< the size of the place StandingReserve() gave last (kept)
+uint64_t _standing_swept_at = 0;                     ///< the pass the idle places were last looked for
+std::atomic<uint64_t> _standing_places_reused = 0, _standing_places_cleared = 0; ///< for the diary
+std::atomic<int> _rig_standing_atlas_size = 0; ///< Rig ('test3d atlas <px>'): the kept pictures so big, 0 as they are
 
 void ClearStandingPlaces()
 {
 	_standing_places.clear();
+	_standing_slots.clear();
+	_standing_free.clear();
 	std::lock_guard lock(_standing_kept_mutex);
 	_standing_kept_keys.clear();
+	_standing_failed_keys.clear();
 }
+
+/** A kept picture laid from its place in this pass: its place stays its own. */
+void StandingPlaceUsed(uint64_t key);
+
+/** A kept picture has its place, the one StandingReserve() gave last. */
+void StandingPlaceKept(uint64_t key, bool vehicle, uint64_t kept_key);
 GLuint _standing_vao = 0, _standing_vbo = 0;
 GLuint _standing_tri_vao = 0, _standing_tri_vbo = 0; ///< the lit glass of the buildings at night, placed already
 bool _standing_program_ok = false;
@@ -4592,9 +4627,73 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
  * A place of so many pixels among the pictures laid (DrawStandingOnCard()), shelf by shelf: the kept ones (kept) or the
  * block's others. When they are full, those gathered are laid (flush) and they start over -- the kept forgotten.
  */
+void StandingPlaceUsed(uint64_t key)
+{
+	auto it = _standing_slots.find(key);
+	if (it == _standing_slots.end() || it->second.used == _card_clock) return;
+	it->second.used = _card_clock;
+	it->second.when = std::chrono::steady_clock::now();
+}
+
+void StandingPlaceKept(uint64_t key, bool vehicle, uint64_t kept_key)
+{
+	_standing_slots[key] = {_standing_reserved_size[0], _standing_reserved_size[1], _card_clock, std::chrono::steady_clock::now(), kept_key, vehicle};
+}
+
+/** The places of the kept pictures not laid from for STANDING_SLOT_IDLE (nor in this pass) made free, their pictures forgotten; once a pass. */
+static void SweepStandingPlaces()
+{
+	if (_standing_swept_at == _card_clock) return;
+	_standing_swept_at = _card_clock;
+	std::lock_guard lock(_standing_kept_mutex);
+	const auto now = std::chrono::steady_clock::now();
+	for (auto it = _standing_slots.begin(); it != _standing_slots.end();) {
+		if (it->second.used == _card_clock || now - it->second.when < STANDING_SLOT_IDLE) {
+			++it;
+			continue;
+		}
+		if (auto at = _standing_places.find(it->first); at != _standing_places.end()) {
+			_standing_free[{it->second.w, it->second.h}].push_back(at->second);
+			_standing_places.erase(at);
+		}
+		if (it->second.vehicle) _standing_kept_keys.erase(it->second.kept_key);
+		it = _standing_slots.erase(it);
+	}
+}
+
+/** A free place at least so big among the kept pictures', the smallest that is; false: none. */
+static bool TakeFreeStandingPlace(int w, int h, std::array<int, 2> &place)
+{
+	for (auto it = _standing_free.lower_bound({w, 0}); it != _standing_free.end(); ++it) {
+		if (it->first.second < h || it->second.empty()) continue;
+		place = it->second.back();
+		it->second.pop_back();
+		_standing_reserved_size = {it->first.first, it->first.second};
+		if (it->second.empty()) _standing_free.erase(it);
+		_standing_places_reused++;
+		return true;
+	}
+	return false;
+}
+
 std::array<int, 2> StandingReserve(bool kept, int w, int h, const std::function<void()> &flush)
 {
 	StandingShelf &shelf = kept ? _standing_atlas_shelf : _standing_stream_shelf;
+	if (kept) {
+		/* A kept one's place a multiple of the step each way: one let go of fits another of about its size. */
+		w = std::min(_standing_atlas_size, (w + STANDING_SLOT_STEP - 1) / STANDING_SLOT_STEP * STANDING_SLOT_STEP);
+		h = std::min(_standing_atlas_size, (h + STANDING_SLOT_STEP - 1) / STANDING_SLOT_STEP * STANDING_SLOT_STEP);
+		_standing_reserved_size = {w, h};
+		std::array<int, 2> free_place;
+		if (TakeFreeStandingPlace(w, h, free_place)) return free_place;
+		/* No room on the shelves: the places idle the longest given first, all forgotten only when none is. */
+		const bool row_full = shelf.x + w > _standing_atlas_size;
+		if ((row_full ? shelf.y + shelf.h + h : shelf.y + h) > _standing_atlas_size) {
+			SweepStandingPlaces();
+			_standing_reserved_size = {w, h};
+			if (TakeFreeStandingPlace(w, h, free_place)) return free_place;
+		}
+	}
 	if (shelf.x + w > _standing_atlas_size) {
 		shelf.y += shelf.h;
 		shelf.x = 0;
@@ -4603,7 +4702,10 @@ std::array<int, 2> StandingReserve(bool kept, int w, int h, const std::function<
 	if (shelf.y + h > _standing_atlas_size) {
 		flush();
 		shelf = {};
-		if (kept) ClearStandingPlaces();
+		if (kept) {
+			ClearStandingPlaces();
+			_standing_places_cleared++;
+		}
 	}
 	const std::array<int, 2> place = {shelf.x, shelf.y};
 	shelf.x += w;
@@ -4622,6 +4724,7 @@ bool StandingPlace(const ThreeDGpuStandingItem &item, GLuint &texture, std::arra
 		if (it != _standing_places.end()) {
 			texture = _standing_atlas;
 			place = it->second;
+			StandingPlaceUsed(item.key);
 			return true;
 		}
 	}
@@ -4632,7 +4735,10 @@ bool StandingPlace(const ThreeDGpuStandingItem &item, GLuint &texture, std::arra
 	gl.glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	gl.glTexSubImage2D(GL_TEXTURE_2D, 0, place[0], place[1], p.width, p.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, p.pixels.data());
 	_card_sent += static_cast<size_t>(p.width) * p.height * 4;
-	if (kept) _standing_places[item.key] = place;
+	if (kept) {
+		_standing_places[item.key] = place;
+		StandingPlaceKept(item.key, false, 0);
+	}
 	return true;
 }
 
@@ -4786,8 +4892,15 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	const GLuint target = s.moving ? pics.moving_fbo : pics.standing_fbo;
 	const GLsizei target_buffers = s.moving ? 2 : 3;
 	_card_clock++;
+	/* The rig ('test3d atlas <px>'): the kept pictures so small, made anew, to fill them with a few vehicles. */
+	if (const int rig = _rig_standing_atlas_size; rig > 0 && _standing_atlas != 0 && _standing_atlas_size != std::min(rig, _max_texture)) {
+		gl.glDeleteTextures(1, &_standing_atlas);
+		gl.glDeleteTextures(1, &_standing_stream);
+		if (_standing_near != 0) gl.glDeleteTextures(1, &_standing_near);
+		_standing_atlas = _standing_stream = _standing_near = 0;
+	}
 	if (_standing_atlas == 0) {
-		_standing_atlas_size = std::min(4096, _max_texture);
+		_standing_atlas_size = std::min(_rig_standing_atlas_size > 0 ? _rig_standing_atlas_size.load() : 4096, _max_texture);
 		Step(fmt::format("atlas toho, co stoji na plose, {}x{}", _standing_atlas_size, _standing_atlas_size));
 		_standing_atlas = NewGroundTexture(_standing_atlas_size, _standing_atlas_size);
 		_standing_stream = NewGroundTexture(_standing_atlas_size, _standing_atlas_size);
@@ -5333,6 +5446,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glEnable(GL_BLEND);
 		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		_standing_places[key] = place;
+		StandingPlaceKept(key, true, v.key);
 		{
 			std::lock_guard lock(_standing_kept_mutex);
 			_standing_kept_keys.insert(v.key);
@@ -5415,16 +5529,27 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				auto kept = _standing_places.find(key);
 				if (kept != _standing_places.end()) {
 					place = kept->second;
+					StandingPlaceUsed(key);
 					_gpu_standing_vehicles_kept++;
 				} else if (v.kept_only) {
-					/* Given without its shapes, as kept, and let go of since: told, the asker gives it whole. */
-					s.missing++;
+					/* Given without its shapes, as the main thread keeps it, and the card has no picture of it (never
+					 * laid: it was beside the view when it was given whole; or let go of since): told which, the asker
+					 * gives that one whole (TurnedCardLayMovers() of viewport.cpp) -- unless its picture could not be
+					 * made when it was. */
+					if (!_standing_failed_keys.contains(v.key)) {
+						s.missing++;
+						s.missing_keys.push_back(v.key);
+					}
 					continue;
 				} else {
 					flush();
 					const auto draw_started = std::chrono::steady_clock::now();
 					if (vehicle_at[k][0] == -1) draw_vehicles(k);
 					const bool shrunk = vehicle_at[k][0] >= 0 && shrink_vehicle(v, vehicle_at[k], key, place);
+					if (!shrunk) {
+						if (_standing_failed_keys.size() > 4096) _standing_failed_keys.clear();
+						_standing_failed_keys.insert(v.key);
+					}
 					if (s.moving) {
 						_gpu_moving_drawn++;
 						_gpu_moving_draw_ms = _gpu_moving_draw_ms + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - draw_started).count();
@@ -7288,13 +7413,19 @@ void ThreeDGpuMovingLayer(int view, bool on)
 }
 
 /** For the diary: the moving things laid over the views since the last time (ThreeDGpuStanding::moving), counted anew. */
+void RigThreeDGpuAtlas(int px)
+{
+	_rig_standing_atlas_size = px;
+}
+
 std::string ThreeDGpuMovingTimes()
 {
 	const uint64_t passes = _gpu_moving_passes.exchange(0), things = _gpu_moving_things.exchange(0), copied = _gpu_moving_copied.exchange(0);
 	const double ms = _gpu_moving_ms.exchange(0), copy_ms = _gpu_moving_copy_ms.exchange(0), draw_ms = _gpu_moving_draw_ms.exchange(0);
 	const uint64_t drawn = _gpu_moving_drawn.exchange(0);
 	if (passes == 0) return "-";
-	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms (z toho kopie {:.0f} ms, {} aut nakresleno znovu {:.0f} ms)", passes, things, copied / 1e6, ms, copy_ms, drawn, draw_ms);
+	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms (z toho kopie {:.0f} ms, {} aut nakresleno znovu {:.0f} ms), drzene obrazky: mist dano znovu {}, vsechny zahozeny {}x",
+			passes, things, copied / 1e6, ms, copy_ms, drawn, draw_ms, _standing_places_reused.exchange(0), _standing_places_cleared.exchange(0));
 }
 
 /**
@@ -7410,6 +7541,7 @@ uint32_t ThreeDGpuViewGround(int, uint64_t *made) { if (made != nullptr) *made =
 uint32_t ThreeDGpuViewStanding(int, uint32_t *lit, uint32_t *order) { if (lit != nullptr) *lit = 0; if (order != nullptr) *order = 0; return 0; }
 void ThreeDGpuMovingLayer(int, bool) {}
 std::string ThreeDGpuMovingTimes() { return "-"; }
+void RigThreeDGpuAtlas(int) {}
 void ThreeDGpuForgetView(int, uint64_t) {}
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
 bool ThreeDGpuStandingKeeps(uint64_t) { return false; }

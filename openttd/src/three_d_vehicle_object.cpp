@@ -46,6 +46,7 @@
 #include "strings_func.h"
 #include "table/strings.h"
 
+#include <span>
 #include <array>
 #include <atomic>
 #include <bit>
@@ -3386,6 +3387,9 @@ struct CardVehicleKept {
 static std::unordered_map<uint64_t, CardVehicleKept> _card_vehicles_kept; ///< by its key; the main thread's
 static uint64_t _card_vehicles_kept_pass = 0;
 static uint64_t _card_vehicles_kept_given = 0;
+/** For the diary, of the moving layer's pass: things placed, of them prepared anew with their shapes, and how long that took, ms. */
+static uint64_t _card_things_placed = 0, _card_things_prepared = 0;
+static double _card_things_prepared_ms = 0;
 
 /** What the card makes of a thing of the map it draws (CardVehicle()). */
 enum class CardMade : uint8_t {
@@ -3432,7 +3436,11 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	 * frame for a picture drawn long ago). */
 	if (_card_vehicles_as_kept) {
 		auto it = _card_vehicles_kept.find(key);
-		if (it != _card_vehicles_kept.end() && ThreeDGpuStandingKeeps(key)) {
+		/* Given as the main thread keeps it, whether the card has its picture or not: a thing beside the view is never
+		 * sent to the card, so the card never has it -- asked of the card first, such a thing was prepared with its
+		 * shapes again every frame (the rig on the player's save: 13 of them a pass, half of the gathering). The card
+		 * tells which it lacks when it comes to lay one (ThreeDCardVehiclesGiveWhole()). */
+		if (it != _card_vehicles_kept.end()) {
 			it->second.used = _card_vehicles_kept_pass;
 			card = it->second.card;
 			lights = it->second.lights;
@@ -3442,6 +3450,16 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	}
 	GpuObjectPicture gp;
 	bool drawn = false;
+	const auto prepare_from = std::chrono::steady_clock::now();
+	struct PrepareTimed {
+		std::chrono::steady_clock::time_point from;
+		~PrepareTimed()
+		{
+			if (!_card_vehicles_as_kept) return;
+			_card_things_prepared++;
+			_card_things_prepared_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
+		}
+	} prepare_timed{prepare_from};
 	{
 		ThreeDLazyNoWait no_wait;
 		/* A figure on bones posed by the card (ThreeDCardFrame()): its shape at rest and its frame's joints, no shape of
@@ -3523,7 +3541,9 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 void ThreeDCardVehiclesAsKeptBegin(bool whole)
 {
 	_card_vehicles_kept_pass++;
-	if (whole) _card_vehicles_kept.clear();
+	/* The pass again after the card lacked some: those are forgotten already (ThreeDCardVehiclesGiveWhole()), the
+	 * others stay as kept. */
+	(void)whole;
 	_card_vehicles_as_kept = true;
 }
 
@@ -3537,6 +3557,21 @@ void ThreeDCardVehiclesAsKeptEnd()
 }
 
 /** How many things of the moving layer were given as the card keeps them since asked the last time (the diary). */
+/** For the diary: the things the moving layer's passes placed since it was last asked, those prepared anew and the time of that. */
+std::string TakeThreeDCardThingsPrepared()
+{
+	const std::string s = fmt::format("{} veci umisteno, {} pripraveno znovu za {:.0f} ms", _card_things_placed, _card_things_prepared, _card_things_prepared_ms);
+	_card_things_placed = _card_things_prepared = 0;
+	_card_things_prepared_ms = 0;
+	return s;
+}
+
+/** The card had no pictures of these things given as kept (ThreeDGpuStanding::missing_keys): with their shapes the next time. */
+void ThreeDCardVehiclesGiveWhole(std::span<const uint64_t> keys)
+{
+	for (uint64_t key : keys) _card_vehicles_kept.erase(key);
+}
+
 uint64_t TakeThreeDCardVehiclesAsKept()
 {
 	return std::exchange(_card_vehicles_kept_given, 0);
@@ -3730,6 +3765,7 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	int piece = 0;
 	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
 	if (obj == nullptr || piece != obj->anchor) return obj;
+	if (_card_vehicles_as_kept) _card_things_placed++;
 
 	/* The way it faces: a train turned round, the rear head of a double-headed engine, the other way. */
 	const bool reversed = PieceReversed(v);
@@ -3779,7 +3815,8 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	 * 31. 10.: "go on with the GPU"; the walking horses of the Special 3D made their pictures on the thread, read back
 	 * from the card, a hundred in five seconds). Bigger than the card draws one, or without the card, its picture. */
 	if (on_card) {
-		const CardMade made = CardVehicle(PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk), place.card, place.card_lights);
+		const PictureToMake request = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk);
+		const CardMade made = CardVehicle(request, place.card, place.card_lights);
 		place.on_card = made != CardMade::TooBig;
 		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card);
 		if (made == CardMade::NotYet) {
