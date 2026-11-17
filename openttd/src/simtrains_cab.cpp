@@ -658,8 +658,10 @@ void SimtrainsCabSeat::Draw(const Vehicle *v, const CabViewCamera &camera, int l
  */
 bool SimtrainsCabSeat::Drive(const Vehicle *v, DirectionKeys keys, int ms)
 {
-	if (!IsSimtrainsTrain(v)) return false;
+	if (!IsDeskTrain(v)) return false;
 	if (!_settings_client.gui.cab_msts_keys) {
+		/* Another train with the arrows: the cab's arrows as any vehicle's (CabArrows), not a desk's lever. */
+		if (!IsSimtrainsTrain(v)) return false;
 		this->driver.Drive(v, keys, ms);
 	} else {
 		this->driver.Watch(v);
@@ -670,19 +672,45 @@ bool SimtrainsCabSeat::Drive(const Vehicle *v, DirectionKeys keys, int ms)
 /** A key of MSTS pressed at the desk of a train of MSTS, when they are chosen. @return whether it was one */
 bool SimtrainsCabSeat::Key(const Vehicle *v, char32_t key, uint16_t keycode)
 {
-	return _settings_client.gui.cab_msts_keys && IsSimtrainsTrain(v) && this->driver.Key(v, key, keycode);
+	return _settings_client.gui.cab_msts_keys && IsDeskTrain(v) && this->driver.Key(v, key, keycode);
 }
 
 /** The arrows, or the keys of MSTS (the button "controls" of the cab). */
-void SimtrainsCabSeat::ToggleControls()
+void SimtrainsCabSeat::ToggleControls(const Vehicle *v)
 {
 	_settings_client.gui.cab_msts_keys = !_settings_client.gui.cab_msts_keys;
 	this->driver.read = false;
+	/* Another train back to the arrows: the game drives it again, the arrows its limit (a train of MSTS keeps its desk). */
+	if (!_settings_client.gui.cab_msts_keys && v != nullptr && IsDeskTrain(v) && !IsSimtrainsTrain(v) && v->owner == _local_company) {
+		const Train *t = Train::From(v->First());
+		if (t->cab_driven) {
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			Command<Commands::TrainCabControl>::Post(t->tile, t->index, to_underlying(TrainCabControl::Driven), 0);
+		}
+	}
 }
 
 bool IsSimtrainsTrain(const Vehicle *v)
 {
 	return v != nullptr && v->type == VehicleType::Train && SimtrainsEngineOf(v->First()->GetGRFID()) != nullptr;
+}
+
+/**
+ * Whether a train is driven at the desk with the keys of MSTS when they are chosen: any train (the player, 17. 11., in
+ * the Sergej: "I cannot find the switch between our arrows and the controls of MSTS, to press the same keys as in
+ * MSTS"); its desk a train of MSTS's (DeskEngineOf()), the pull and the brakes the game's figures of it (CabAcceleration()).
+ */
+bool IsDeskTrain(const Vehicle *v)
+{
+	return v != nullptr && v->type == VehicleType::Train;
+}
+
+/** The desk of a train: of its engine of MSTS, or of another train a plain one -- its throttle and brake in steps, no electric brake, no vigilance device. */
+static const SimtrainsEngine *DeskEngineOf(const Train *t)
+{
+	if (const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID()); e != nullptr) return e;
+	static const SimtrainsEngine plain{};
+	return &plain;
 }
 
 /** A control of the desk to the game, as the player at it (CmdTrainCabControl()). */
@@ -843,9 +871,9 @@ static constexpr uint64_t ALERTER_GAP_TICKS = 200;
  */
 void SimtrainsCabDriver::Watch(const Vehicle *v)
 {
-	if (!IsSimtrainsTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return;
+	if (!IsDeskTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return;
 	const Train *t = Train::From(v->First());
-	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	const SimtrainsEngine *e = DeskEngineOf(t);
 	if (e == nullptr || !e->vigilance.present) return;
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 	DeskOwn &own = DeskOwnOf(t);
@@ -902,7 +930,7 @@ std::string RigDeskVigilance(const Vehicle *v, int seconds)
 {
 	if (v == nullptr || v->type != VehicleType::Train) return "neni vlak";
 	const Train *t = Train::From(v->First());
-	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	const SimtrainsEngine *e = DeskEngineOf(t);
 	if (e == nullptr || !e->vigilance.present) return "mašina živák nemá";
 	DeskOwn &own = DeskOwnOf(t);
 	const uint64_t ticks = static_cast<uint64_t>(std::max(seconds, 0)) * 1000 / MILLISECONDS_PER_TICK;
@@ -926,10 +954,10 @@ std::string RigDeskVigilance(const Vehicle *v, int seconds)
  */
 void SimtrainsCabDriver::Drive(const Vehicle *v, DirectionKeys now, int ms)
 {
-	if (!IsSimtrainsTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return;
+	if (!IsDeskTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return;
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 	const Train *t = Train::From(v->First());
-	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	const SimtrainsEngine *e = DeskEngineOf(t);
 	if (!this->read) {
 		this->lever = LeverOf(t, e);
 		this->read = true;
@@ -968,10 +996,10 @@ void SimtrainsCabDriver::Drive(const Vehicle *v, DirectionKeys now, int ms)
  */
 bool SimtrainsCabDriver::Key(const Vehicle *v, char32_t key, uint16_t keycode)
 {
-	if (!IsSimtrainsTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return false;
+	if (!IsDeskTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return false;
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 	const Train *t = Train::From(v->First());
-	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	const SimtrainsEngine *e = DeskEngineOf(t);
 	const uint16_t code = keycode & ~WKC_SPECIAL_KEYS;
 	if (key == ' ' || code == WKC_SPACE) {
 		CabHorn(v);
@@ -1052,7 +1080,7 @@ std::string SimtrainsDeskText(const Vehicle *v)
 	if (v == nullptr || v->type != VehicleType::Train) return {};
 	const Train *t = Train::From(v->First());
 	if (!t->cab_driven) return {};
-	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	const SimtrainsEngine *e = DeskEngineOf(t);
 	std::string s;
 	auto add = [&s](std::string part) {
 		if (!s.empty()) s += "  ";
@@ -1118,7 +1146,7 @@ SimtrainsDeskState SimtrainsDeskStateOf(const Vehicle *v)
 	SimtrainsDeskState s;
 	if (v == nullptr || v->type != VehicleType::Train) return s;
 	const Train *t = Train::From(v->First());
-	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	const SimtrainsEngine *e = DeskEngineOf(t);
 	s.speed_kmh = static_cast<float>(t->GetDisplaySpeed());
 	const int notch = NotchOf(e, t->cab_power), notches = NotchCount(e);
 	s.throttle = notch == 0 ? 0.0f : e != nullptr && !e->notches.empty() ? e->notches[std::min(notch, notches) - 1] : notch / static_cast<float>(notches);

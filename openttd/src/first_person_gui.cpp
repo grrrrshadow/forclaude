@@ -1522,7 +1522,14 @@ struct FirstPersonWindow : Window {
 			/* A train of MSTS by its desk's lever (simtrains_cab.h), the others as the cab view drives them. */
 			const DirectionKeys keys = ArrowsWindow() == this ? _dirkeys : DirectionKeys{};
 			const int ms = static_cast<int>(steps) * FIRST_PERSON_TICK_MS;
-			if (!this->seat.Drive(rv, keys, ms)) this->arrows.Drive(rv, keys, ms);
+			if (!this->seat.Drive(rv, keys, ms)) {
+				this->arrows.Drive(rv, keys, ms);
+			} else {
+				/* At a desk the arrows left and right still choose the way at the next switch (CabArrows). */
+				DirectionKeys sides = keys;
+				sides.Reset(DirectionKey::Up).Reset(DirectionKey::Down);
+				this->arrows.Drive(rv, sides, ms);
+			}
 			if (this->arrows.route != route) this->SetWidgetDirty(WID_FP_ROUTE);
 			DiveTowards(rv, ms / 1000.0);
 		}
@@ -1534,7 +1541,7 @@ struct FirstPersonWindow : Window {
 		}
 		/* The button of the route in a vehicle, of running on foot. */
 		bool changed = this->GetWidget<NWidgetStacked>(WID_FP_RUN_SEL)->SetDisplayedPlane(rv != nullptr ? 1 : 0);
-		changed |= this->GetWidget<NWidgetStacked>(WID_FP_CONTROLS_SEL)->SetDisplayedPlane(IsSimtrainsTrain(rv) ? 0 : SZSP_NONE);
+		changed |= this->GetWidget<NWidgetStacked>(WID_FP_CONTROLS_SEL)->SetDisplayedPlane(IsDeskTrain(rv) ? 0 : SZSP_NONE);
 		if (changed) this->ReInit();
 		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
 		const Company *c = Company::GetIfValid(_local_company);
@@ -3004,7 +3011,7 @@ struct FirstPersonWindow : Window {
 				break;
 			case WID_FP_CONTROLS:
 				/* The arrows or the keys of MSTS at the desk of a train of MSTS (as the cab view's). */
-				this->seat.ToggleControls();
+				this->seat.ToggleControls(this->Riding());
 				this->SetDirty();
 				break;
 			case WID_FP_INVENTORY:
@@ -4214,12 +4221,13 @@ std::string RigRideOut()
 
 /**
  * The rig ('kabina klik <tlacitko>'): a button of the view in a vehicle clicked as the player clicks it: trasa (its
- * route or the wheel), nalozit, vylozit, kamera, cely (over the whole screen), zadni (the driver's stand at the other end).
+ * route or the wheel), nalozit, vylozit, kamera, cely (over the whole screen), zadni (the driver's stand at the other end),
+ * ovladani (the arrows or the keys of MSTS in a train).
  */
 std::string RigRideClick(std::string_view name)
 {
 	static const std::pair<std::string_view, WidgetID> buttons[] = {
-		{"trasa", WID_FP_ROUTE}, {"nalozit", WID_FP_LOAD}, {"vylozit", WID_FP_UNLOAD}, {"kamera", WID_FP_CAMERA}, {"cely", WID_FP_FULL}, {"zadni", WID_FP_CENTRE},
+		{"trasa", WID_FP_ROUTE}, {"nalozit", WID_FP_LOAD}, {"vylozit", WID_FP_UNLOAD}, {"kamera", WID_FP_CAMERA}, {"cely", WID_FP_FULL}, {"zadni", WID_FP_CENTRE}, {"ovladani", WID_FP_CONTROLS},
 		{"pripojit", WID_FP_HERE},
 	};
 	FirstPersonWindow *w = RigFirstPerson();

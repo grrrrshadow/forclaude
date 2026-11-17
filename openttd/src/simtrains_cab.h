@@ -129,10 +129,11 @@ struct SimtrainsCabSeat {
 	void Draw(const Vehicle *v, const CabViewCamera &camera, int left, int top, int width, int height);
 	bool Drive(const Vehicle *v, DirectionKeys keys, int ms);
 	bool Key(const Vehicle *v, char32_t key, uint16_t keycode);
-	void ToggleControls();
+	void ToggleControls(const Vehicle *v);
 };
 
 bool IsSimtrainsTrain(const Vehicle *v);
+bool IsDeskTrain(const Vehicle *v);
 void SimtrainsCabLetGo(const Vehicle *v);
 std::string SimtrainsDeskText(const Vehicle *v);
 
