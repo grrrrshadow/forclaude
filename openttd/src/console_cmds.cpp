@@ -1122,6 +1122,15 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testlod: holky na lodich {}", argv[2]);
 		return true;
 	}
+	if (argv.size() == 3 && argv[1] == "ponor") {
+		/* 'testlod ponor <m>': every ship dived so many metres at once (a submarine half dived, between the key's metres). */
+		const float m = static_cast<float>(std::strtod(std::string(argv[2]).c_str(), nullptr));
+		for (Vehicle *v : Vehicle::Iterate()) {
+			if (v->type == VehicleType::Ship && v->IsPrimaryVehicle()) v->cab_dive = v->cab_dive_to = m;
+		}
+		IConsolePrint(CC_DEFAULT, "testlod: ponor {:.2f} m", m);
+		return true;
+	}
 	if (argv.size() == 2 && argv[1] == "hloubka") {
 		/* 'testlod hloubka': the tile of the sea deepest from the eyes (EyeWaterDepth() at its middle), levels. */
 		TileIndex best = INVALID_TILE;

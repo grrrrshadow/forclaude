@@ -19555,10 +19555,97 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		 * not at its height, where the two fought and the game's showed through (the player, 3. 11.), yet there in the
 		 * seams between the models of the tiles, which showed the sky. */
 		static constexpr double OWN_GROUND_SINK = 0.25 * OBJECT_HEIGHT_PER_METRE;
+		/* The boat the eye is aboard or drives (the player, 17. 11., in the submarine half dived: "the water is in the
+		 * submarine"): the sea's surface is not drawn where its hull cuts it -- the outline of its model at the height of
+		 * the waterline, eight corners within it. Seen from outside the hull stands there. */
+		std::vector<std::array<double, 2>> hull_cut;
+		double hull_box[4] = {0, 0, 0, 0}; // x0, y0, x1, y1 of it
+		if (ThreeDEnabled()) {
+			extern VehicleID FirstPersonBoatAboard();
+			const Vehicle *boat = walker != nullptr ? Vehicle::GetIfValid(FirstPersonBoatAboard()) : v;
+			ThreeDEyeVehicle ev;
+			const ThreeDVehicleShape *shape = nullptr;
+			if (boat != nullptr && boat->type == VehicleType::Ship && GetThreeDEyeVehicle(boat, ev, true) && ev.obj != nullptr) shape = ev.obj->TryGetShape();
+			const std::optional<double> surface = shape != nullptr ? EyeWaterSurfaceZ(ev.x, ev.y) : std::nullopt;
+			if (surface.has_value()) {
+				const double line = (*surface - ev.z) / (ev.scale * OBJECT_HEIGHT_PER_METRE); // the waterline, metres up the model
+				double rear = 1e9, front = -1e9, left = 1e9, right = -1e9;
+				for (size_t c = 0; c + 2 < shape->pos.size(); c += 3) {
+					if (std::abs(shape->pos[c + 2] - line) > 0.6) continue;
+					rear = std::min<double>(rear, shape->pos[c]);
+					front = std::max<double>(front, shape->pos[c]);
+					left = std::min<double>(left, shape->pos[c + 1]);
+					right = std::max<double>(right, shape->pos[c + 1]);
+				}
+				if (front - rear > 0.5 && right - left > 0.5) {
+					const double a = ev.facing * M_PI / 180.0, fx = std::cos(a), fy = std::sin(a);
+					const double mid_a = (rear + front) / 2, half_a = (front - rear) / 2 * 0.96, mid_c = (left + right) / 2, half_c = (right - left) / 2 * 0.92;
+					static constexpr double oct[8][2] = {{1, 0.45}, {0.6, 1}, {-0.6, 1}, {-1, 0.45}, {-1, -0.45}, {-0.6, -1}, {0.6, -1}, {1, -0.45}};
+					hull_box[0] = hull_box[1] = 1e18;
+					hull_box[2] = hull_box[3] = -1e18;
+					for (const auto &o : oct) {
+						const double mx = (mid_a + o[0] * half_a) * ev.scale * ev.along * OBJECT_UNITS_PER_METRE, my = (mid_c + o[1] * half_c) * ev.scale * OBJECT_UNITS_PER_METRE;
+						hull_cut.push_back({ev.x + mx * fx - my * fy, ev.y + mx * fy + my * fx});
+						hull_box[0] = std::min(hull_box[0], hull_cut.back()[0]);
+						hull_box[1] = std::min(hull_box[1], hull_cut.back()[1]);
+						hull_box[2] = std::max(hull_box[2], hull_cut.back()[0]);
+						hull_box[3] = std::max(hull_box[3], hull_cut.back()[1]);
+					}
+				}
+			}
+		}
+		/* A triangle of a tile's ground less the hull: the pieces of it outside each side of the hull's outline in turn. */
+		using HullPoint = std::array<double, 3>;
+		auto less_hull = [&hull_cut](std::vector<HullPoint> rest, auto &&draw) {
+			const size_t n = hull_cut.size();
+			double mx = 0, my = 0;
+			for (const auto &c : hull_cut) {
+				mx += c[0] / n;
+				my += c[1] / n;
+			}
+			for (size_t k = 0; k < n && rest.size() >= 3; k++) {
+				const auto &ea = hull_cut[k], &eb = hull_cut[(k + 1) % n];
+				const double ex = eb[0] - ea[0], ey = eb[1] - ea[1];
+				const double in_sign = ex * (my - ea[1]) - ey * (mx - ea[0]) >= 0 ? 1.0 : -1.0;
+				auto side = [&](const HullPoint &q) { return (ex * (q[1] - ea[1]) - ey * (q[0] - ea[0])) * in_sign; };
+				std::vector<HullPoint> in, out;
+				for (size_t i = 0; i < rest.size(); i++) {
+					const HullPoint &q = rest[i], &r = rest[(i + 1) % rest.size()];
+					const double dq = side(q), dr = side(r);
+					(dq >= 0 ? in : out).push_back(q);
+					if ((dq >= 0) != (dr >= 0)) {
+						const double f = dq / (dq - dr);
+						const HullPoint m{q[0] + (r[0] - q[0]) * f, q[1] + (r[1] - q[1]) * f, q[2] + (r[2] - q[2]) * f};
+						in.push_back(m);
+						out.push_back(m);
+					}
+				}
+				if (out.size() >= 3) draw(out);
+				rest = std::move(in);
+			}
+		};
 		for (const CabTile &t : tiles) {
 			if (t.first >= t.end && !t.foundation) continue;
 			Slope s = RemoveHalftileSlope(t.slope);
 			const double sink = t.own_ground ? OWN_GROUND_SINK : 0.0;
+			const uint8_t ground_fill = static_cast<uint8_t>(CAB_FILL_HOLES | (_settings_client.gui.eye_roads ? CAB_ROAD : 0) | (eye_grass ? CAB_GRASS : 0));
+			if (!hull_cut.empty() && s == SLOPE_FLAT && (t.x + 1) * static_cast<double>(TILE_SIZE) > hull_box[0] && t.x * static_cast<double>(TILE_SIZE) < hull_box[2] &&
+					(t.y + 1) * static_cast<double>(TILE_SIZE) > hull_box[1] && t.y * static_cast<double>(TILE_SIZE) < hull_box[3] && EyeWaterTile(t.x, t.y)) {
+				const double x0 = t.x * TILE_SIZE, y0 = t.y * TILE_SIZE, mid = TILE_SIZE / 2.0;
+				for (int i = 0; i < 4; i++) {
+					less_hull({HullPoint{x0 + cxs[i], y0 + cys[i], static_cast<double>(t.z)}, HullPoint{x0 + cxs[(i + 1) % 4], y0 + cys[(i + 1) % 4], static_cast<double>(t.z)}, HullPoint{x0 + mid, y0 + mid, static_cast<double>(t.z)}},
+							[&](const std::vector<HullPoint> &piece) {
+						std::vector<CabPoint> poly;
+						for (const HullPoint &q : piece) {
+							double cx, cy;
+							RemapCoordsF(q[0], q[1], q[2], cx, cy);
+							poly.push_back(CabToEye(eye, q[0], q[1], EyeLevelZ(q[2]) - sink, cx * scale - gl, cy * scale - gt));
+						}
+						CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, std::move(poly), eye, ground_fill);
+					});
+				}
+				continue;
+			}
 			CabPoint p[5];
 			for (int i = 0; i < 5; i++) {
 				double wx = (i < 4) ? t.x * TILE_SIZE + cxs[i] : t.x * TILE_SIZE + TILE_SIZE / 2.0;
