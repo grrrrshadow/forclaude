@@ -285,6 +285,26 @@
      }
     ],
     "popis": "střecha: barva číslem a tapeta tašek jako u domů (grrrrf domy/strechy_prumyslu/strechy.py)"
+   },
+   {
+    "cast": "kominy",
+    "maska": "gymnazium_maska_kominy.png",
+    "zacatek": 161,
+    "paleta": [
+     "9E4A36",
+     "B0583C",
+     "8A3C2C",
+     "7A4A36",
+     "C08A5A",
+     "A86A4A",
+     "6E3A30",
+     "B89270"
+    ],
+    "tapeta": {
+     "soubor": "../tapety/cihly.png",
+     "opakovani_m": 1.6
+    },
+    "popis": "komíny: cihly jako palírna (grrrrf domy/strechy_prumyslu/strechy.py)"
    }
   ]
  },

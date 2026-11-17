@@ -869,7 +869,24 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "hromada uhlí"
+  "poznamka": "hromada uhlí",
+  "vozidla": [
+   {
+    "zaznam": "special_unc",
+    "objekt": "special_unc",
+    "sada_objektu": "special",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poloha": [
+     11.0,
+     2.4,
+     0.0
+    ],
+    "otoceni": 180,
+    "jednou_na_prumysl": true,
+    "poznamka": "nakladač UNC ze Specialu 3D v9 stojí u hromady uhlí, bokem u ní (lopatou k ní se na políčko nevejde) (hráč: „unc bagr do každého 3D dolu až budem dělat special grf tak ho tam dame.“): záznam special_unc, prázdný a bez řidiče, nasedne se E jako na kolečko; skutečná velikost (meritko 1); jednou na důl (uhelného dolu). Bez balíčku Special 3D v9 tu není"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_005",
@@ -2383,7 +2400,24 @@
     "meritko": 0.7
    }
   ],
-  "poznamka": "měděná ruda"
+  "poznamka": "měděná ruda",
+  "vozidla": [
+   {
+    "zaznam": "special_unc",
+    "objekt": "special_unc",
+    "sada_objektu": "special",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poloha": [
+     2.4,
+     2.4,
+     0.0
+    ],
+    "otoceni": 90,
+    "jednou_na_prumysl": true,
+    "poznamka": "nakladač UNC ze Specialu 3D v9 stojí u hromady měděné rudy, lopatou k ní (hráč: „unc bagr do každého 3D dolu až budem dělat special grf tak ho tam dame.“): záznam special_unc, prázdný a bez řidiče, nasedne se E jako na kolečko; skutečná velikost (meritko 1); jednou na důl (měděného dolu). Bez balíčku Special 3D v9 tu není"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_051",
@@ -3112,7 +3146,24 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře"
+  "poznamka": "zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře",
+  "vozidla": [
+   {
+    "zaznam": "special_unc",
+    "objekt": "special_unc",
+    "sada_objektu": "special",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poloha": [
+     8.2,
+     32.0,
+     0.0
+    ],
+    "otoceni": 90,
+    "jednou_na_prumysl": true,
+    "poznamka": "nakladač UNC ze Specialu 3D v9 stojí u větší hromady zlaté rudy, lopatou k ní (hráč: „unc bagr do každého 3D dolu až budem dělat special grf tak ho tam dame.“): záznam special_unc, prázdný a bez řidiče, nasedne se E jako na kolečko; skutečná velikost (meritko 1); jednou na důl (zlatého dolu). Bez balíčku Special 3D v9 tu není"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_073",
@@ -3543,7 +3594,24 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín"
+  "poznamka": "diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín",
+  "vozidla": [
+   {
+    "zaznam": "special_unc",
+    "objekt": "special_unc",
+    "sada_objektu": "special",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poloha": [
+     7.4,
+     27.8,
+     0.0
+    ],
+    "otoceni": 270,
+    "jednou_na_prumysl": true,
+    "poznamka": "nakladač UNC ze Specialu 3D v9 stojí u větší hromady kimberlitu, lopatou k ní (hráč: „unc bagr do každého 3D dolu až budem dělat special grf tak ho tam dame.“): záznam special_unc, prázdný a bez řidiče, nasedne se E jako na kolečko; skutečná velikost (meritko 1); jednou na důl (diamantového dolu). Bez balíčku Special 3D v9 tu není"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_092",
@@ -3823,7 +3891,24 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb"
+  "poznamka": "železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb",
+  "vozidla": [
+   {
+    "zaznam": "special_unc",
+    "objekt": "special_unc",
+    "sada_objektu": "special",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poloha": [
+     11.8,
+     32.4,
+     0.0
+    ],
+    "otoceni": 135,
+    "jednou_na_prumysl": true,
+    "poznamka": "nakladač UNC ze Specialu 3D v9 stojí u hromady železné rudy u první těžní věže, lopatou k ní (hráč: „unc bagr do každého 3D dolu až budem dělat special grf tak ho tam dame.“): záznam special_unc, prázdný a bez řidiče, nasedne se E jako na kolečko; skutečná velikost (meritko 1); jednou na důl (železného dolu). Bez balíčku Special 3D v9 tu není"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_101",
