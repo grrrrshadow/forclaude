@@ -439,6 +439,7 @@ enum class SaveLoadVersion : uint16_t {
 	WalkerNurse, ///< Saveload version: 384\n The walker's health insurance, bought of a nurse before a church, till a day (CompanyProperties::walker_nurse_until).
 	WalkerTents, ///< Saveload version: 385\n The walkers' tents, pitched or carried: the Celtic and the camping tent in the inventory from the start (old games are given them), the pitched ones where (WalkerTent, the WTNT chunk).
 	ModularAirports, ///< Saveload version: 386\n Airports built tile by tile (air_map.h): StationType::ModularAirport tiles, StationFacility::ModularAirport.
+	ModularAircraft, ///< Saveload version: 387\n Aircraft at the modular airports (aircraft_modular.cpp): Aircraft::modular (state, goal, runway direction, trackdir, tile).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

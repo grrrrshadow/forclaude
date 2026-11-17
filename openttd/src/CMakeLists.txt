@@ -53,6 +53,7 @@ add_files(
 add_files(
     aircraft.h
     aircraft_cmd.cpp
+    aircraft_modular.cpp
     aircraft_cmd.h
     aircraft_gui.cpp
     airport.cpp

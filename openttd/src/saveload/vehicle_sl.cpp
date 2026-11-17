@@ -1135,6 +1135,12 @@ public:
 
 		 SLE_CONDVAR(Aircraft, turn_counter, VarTypes::U8, SaveLoadVersion::SplitLoadWaitCounters, SaveLoadVersion::MaxVersion),
 		 SLE_CONDVAR(Aircraft, flags, VarTypes::U8, SaveLoadVersion::NewGRFAircraftRange, SaveLoadVersion::MaxVersion),
+		 /* At a modular airport (aircraft_modular.cpp); its way is found again after loading (AfterLoadModularAircraft()). */
+		 SLE_CONDVARNAME(Aircraft, modular.state, "modular_state", VarTypes::U8, SaveLoadVersion::ModularAircraft, SaveLoadVersion::MaxVersion),
+		 SLE_CONDVARNAME(Aircraft, modular.goal, "modular_goal", VarTypes::U8, SaveLoadVersion::ModularAircraft, SaveLoadVersion::MaxVersion),
+		 SLE_CONDVARNAME(Aircraft, modular.runway_dir, "modular_runway_dir", VarTypes::U8, SaveLoadVersion::ModularAircraft, SaveLoadVersion::MaxVersion),
+		 SLE_CONDVARNAME(Aircraft, modular.trackdir, "modular_trackdir", VarTypes::U8, SaveLoadVersion::ModularAircraft, SaveLoadVersion::MaxVersion),
+		 SLE_CONDVARNAME(Aircraft, modular.tile, "modular_tile", VarTypes::U32, SaveLoadVersion::ModularAircraft, SaveLoadVersion::MaxVersion),
 	};
 	static inline const SaveLoadCompatTable compat_description = _vehicle_aircraft_sl_compat;
 

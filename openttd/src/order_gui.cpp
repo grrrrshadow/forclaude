@@ -766,7 +766,7 @@ static Order GetOrderCmdFromTile(const Vehicle *v, TileIndex tile)
 			switch (v->type) {
 				case VehicleType::Ship:     facil = StationFacility::Dock;    break;
 				case VehicleType::Train:    facil = StationFacility::Train;   break;
-				case VehicleType::Aircraft: facil = StationFacility::Airport; break;
+				case VehicleType::Aircraft: facil = {StationFacility::Airport, StationFacility::ModularAirport}; break;
 				case VehicleType::Road:     facil = {StationFacility::BusStop, StationFacility::TruckStop}; break;
 				default: NOT_REACHED();
 			}

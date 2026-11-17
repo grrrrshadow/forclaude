@@ -41,6 +41,7 @@
 #include "station_map.h"
 #include "air_map.h"
 #include "airport.h"
+#include "aircraft.h"
 #include "string_func.h"
 #include "strings_func.h"
 #include "terraform_cmd.h"
@@ -76,6 +77,8 @@
 #include <thread>
 #include <utility>
 #include <vector>
+
+#include <array>
 
 #include "safeguards.h"
 
@@ -413,6 +416,16 @@ Answer VehiclesAnswer(const Params &p)
 			order["y"] = TileY(v->dest_tile);
 		}
 		one["order"] = std::move(order);
+		/* An aircraft: its state at the airport, at a modular one where it is on it (aircraft_modular.cpp). */
+		if (v->type == VehicleType::Aircraft) {
+			static const std::array<std::string_view, 13> modular_names = {"none", "approach", "landing", "rollout", "taxi", "at stand",
+					"in hangar", "hold short", "takeoff roll", "climb", "heli approach", "heli descend", "heli ascend"};
+			const Aircraft *a = Aircraft::From(v);
+			one["air_state"] = a->state;
+			one["z"] = a->z_pos;
+			const size_t m = to_underlying(a->modular.state);
+			one["modular"] = m < modular_names.size() ? modular_names[m] : "?";
+		}
 		list.push_back(std::move(one));
 	}
 	return JsonAnswer({{"ok", true}, {"vehicles", std::move(list)}});

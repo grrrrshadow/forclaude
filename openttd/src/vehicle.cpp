@@ -3922,6 +3922,8 @@ bool CanVehicleUseStation(EngineID engine_type, const Station *st)
 			return st->facilities.Test(StationFacility::Dock);
 
 		case VehicleType::Aircraft:
+			/* An airport built tile by tile: a runway long enough for a plane, a pad or a stand for a helicopter. */
+			if (IsModularAirportStation(st)) return CanAircraftUseModularAirport(engine_type, st);
 			return st->facilities.Test(StationFacility::Airport) &&
 					st->airport.GetFTA()->flags.Test(e->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL ? AirportFTAClass::Flag::Airplanes : AirportFTAClass::Flag::Helicopters);
 
@@ -3983,7 +3985,7 @@ StringID GetVehicleCannotUseStationReason(const Vehicle *v, const Station *st)
 			return STR_ERROR_NO_DOCK;
 
 		case VehicleType::Aircraft:
-			if (!st->facilities.Test(StationFacility::Airport)) return STR_ERROR_NO_AIRPORT;
+			if (!st->facilities.Any({StationFacility::Airport, StationFacility::ModularAirport})) return STR_ERROR_NO_AIRPORT;
 			if (v->GetEngine()->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL) {
 				return STR_ERROR_AIRPORT_NO_PLANES;
 			} else {

@@ -13,6 +13,9 @@
 
 #include "station_map.h"
 #include "vehicle_base.h"
+#include "track_type.h"
+
+#include <vector>
 
 /**
  * Base values for flight levels above ground level for 'normal' flight and holding patterns.
@@ -61,8 +64,67 @@ void AircraftNextAirportPos_and_Order(Aircraft *v);
 void SetAircraftPosition(Aircraft *v, int x, int y, int z);
 
 void GetAircraftFlightLevelBounds(const Vehicle *v, int *min, int *max);
+int GetAircraftHoldMaxAltitude(const Aircraft *v);
+
+static constexpr uint16_t SPEED_LIMIT_TAXI = 50; ///< Maximum speed of an aircraft while taxiing
+static constexpr uint16_t SPEED_LIMIT_APPROACH = 230; ///< Maximum speed of an aircraft on finals
+static constexpr uint16_t SPEED_LIMIT_BROKEN = 320; ///< Maximum speed of an aircraft that is broken
+static constexpr uint16_t SPEED_LIMIT_HOLD = 425; ///< Maximum speed of an aircraft that flies the holding pattern
+static constexpr uint16_t SPEED_LIMIT_NONE = UINT16_MAX; ///< No environmental speed limit. Speed limit is type dependent
+
+int UpdateAircraftSpeed(Aircraft *v, uint speed_limit = SPEED_LIMIT_NONE, bool hard_limit = true);
+void PlayAircraftSound(const Vehicle *v);
+void AircraftEntersTerminal(Aircraft *v);
 template <class T>
 int GetAircraftFlightLevel(T *v, bool takeoff = false);
+
+/**
+ * Where an aircraft is at a modular airport (air_map.h, aircraft_modular.cpp): the airports built tile by tile have no
+ * movement table, the aircraft finds its own way over their taxiing tracks. None: not at one (the old airports' table,
+ * or the open air).
+ */
+enum class ModularAircraftState : uint8_t {
+	None = 0, ///< Not at a modular airport.
+	Approach = 1, ///< A plane flying to the start of its final approach, its runway and its way off it reserved.
+	Landing = 2, ///< A plane on its final approach, coming down along the runway.
+	Rollout = 3, ///< A plane braking along the runway after touching down.
+	Taxi = 4, ///< On the taxiing tracks, its way reserved to where it goes (ModularAircraft::goal).
+	AtStand = 5, ///< Standing at a stand (a helicopter at its pad): loading, unloading, waiting for its way out.
+	InHangar = 6, ///< In a hangar.
+	HoldShort = 7, ///< A plane at the end of a runway, waiting for it to be free.
+	TakeoffRoll = 8, ///< A plane speeding up along the runway.
+	Climb = 9, ///< A plane climbing out over the end of the runway.
+	HeliApproach = 10, ///< A helicopter flying to the pad it reserved.
+	HeliDescend = 11, ///< A helicopter coming down onto its pad.
+	HeliAscend = 12, ///< A helicopter rising from its pad or its hangar.
+	End, ///< End marker.
+};
+
+/** Where an aircraft taxiing at a modular airport goes. */
+enum class ModularAircraftGoal : uint8_t {
+	Stand = 0, ///< A free stand (to load).
+	Hangar = 1, ///< A hangar (to the depot).
+	Runway = 2, ///< The end of a runway (to take off).
+	End, ///< End marker.
+};
+
+/** A step of an aircraft's way over a modular airport: a tile and the way it goes over it. */
+struct ModularAircraftStep {
+	TileIndex tile; ///< The tile.
+	Trackdir trackdir = Trackdir::Invalid; ///< Its track and direction on it.
+	bool operator==(const ModularAircraftStep &) const = default;
+};
+
+/** An aircraft at a modular airport (aircraft_modular.cpp). */
+struct ModularAircraft {
+	ModularAircraftState state = ModularAircraftState::None; ///< Where it is. Saved.
+	ModularAircraftGoal goal = ModularAircraftGoal::Stand; ///< Where it taxies to. Saved.
+	DiagDirection runway_dir = DiagDirection::NE; ///< The way it lands or takes off along its runway. Saved.
+	Trackdir trackdir = Trackdir::Invalid; ///< Its track and direction on the tile it taxies over. Saved.
+	TileIndex tile = INVALID_TILE; ///< The end of the runway it lands at or takes off from; a helicopter's pad. Saved.
+	std::vector<ModularAircraftStep> path; ///< Its way reserved, from where it is. Not saved: found again after loading.
+	uint path_pos = 0; ///< The step of the way it is at.
+};
 
 /** Variables that are cached to improve performance and such. */
 struct AircraftCache {
@@ -85,6 +147,7 @@ struct Aircraft final : public SpecializedVehicle<Aircraft, VehicleType::Aircraf
 	VehicleAirFlags flags{}; ///< Aircraft flags. @see VehicleAirFlags
 
 	AircraftCache acache{};
+	ModularAircraft modular{}; ///< At a modular airport (aircraft_modular.cpp).
 
 	Aircraft(VehicleID index) : SpecializedVehicleBase(index) {}
 	/** We want to 'destruct' the right class. */
@@ -151,6 +214,18 @@ struct Aircraft final : public SpecializedVehicle<Aircraft, VehicleType::Aircraf
 void GetRotorImage(const Aircraft *v, EngineImageType image_type, VehicleSpriteSeq *result);
 
 Station *GetTargetAirportIfValid(const Aircraft *v);
+
+/* The modular airports (aircraft_modular.cpp). */
+bool IsModularAirportStation(const Station *st);
+bool CanAircraftUseModularAirport(EngineID engine, const Station *st);
+bool ModularAirportHasHangar(const Station *st);
+TileIndex GetModularAirportHangar(const Station *st);
+bool ModularAircraftController(Aircraft *v);
+void ModularAircraftBought(Aircraft *v, TileIndex hangar);
+void ModularAircraftReleaseAll(Aircraft *v);
+void AfterLoadModularAircraft();
+bool ModularAirportTileInUse(TileIndex tile);
+
 void HandleMissingAircraftOrders(Aircraft *v);
 
 #endif /* AIRCRAFT_H */

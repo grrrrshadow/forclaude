@@ -4203,6 +4203,8 @@ bool AfterLoadGame()
 	if (!IsSavegameVersionBefore(SaveLoadVersion::ModularAirports)) {
 		extern void RecomputeModularAirportAreas();
 		RecomputeModularAirportAreas();
+		/* The aircraft's ways over them, not saved, found again; their reservations made again. */
+		AfterLoadModularAircraft();
 	}
 
 	_gamelog.PrintDebug(1);

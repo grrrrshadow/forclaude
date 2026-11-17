@@ -10,6 +10,7 @@
 
 #include "stdafx.h"
 #include "aircraft.h"
+#include "air_map.h"
 #include "cab_drive.h"
 #include "industry.h"
 #include "landscape.h"
@@ -143,7 +144,24 @@ static StationID FindNearestHangar(const Aircraft *v)
 	}
 
 	for (const Station *st : Station::Iterate()) {
-		if (st->owner != v->owner || !st->facilities.Test(StationFacility::Airport) || !st->airport.HasHangar()) continue;
+		if (st->owner != v->owner) continue;
+		/* A modular airport with a hangar the aircraft can use (aircraft_modular.cpp). */
+		if (IsModularAirportStation(st)) {
+			if (!ModularAirportHasHangar(st) || !CanAircraftUseModularAirport(v->engine_type, st)) continue;
+			const TileIndex at = GetModularAirportHangar(st);
+			if (max_range != 0) {
+				uint last_dist = (last_dest != nullptr && last_dest->airport.tile != INVALID_TILE) ? DistanceSquare(at, last_dest->airport.tile) : 0;
+				uint next_dist = (next_dest != nullptr && next_dest->airport.tile != INVALID_TILE) ? DistanceSquare(at, next_dest->airport.tile) : 0;
+				if (last_dist > max_range || next_dist > max_range) continue;
+			}
+			uint distance = DistanceSquare(vtile, at);
+			if (distance < best || index == StationID::Invalid()) {
+				best = distance;
+				index = st->index;
+			}
+			continue;
+		}
+		if (!st->facilities.Test(StationFacility::Airport) || !st->airport.HasHangar()) continue;
 
 		const AirportFTAClass *afc = st->airport.GetFTA();
 
@@ -288,8 +306,9 @@ CommandCost CmdBuildAircraft(DoCommandFlags flags, TileIndex tile, const Engine 
 	/* Prevent building aircraft types at places which can't handle them */
 	if (!CanVehicleUseStation(e->index, st)) return CMD_ERROR;
 
-	/* Make sure all aircraft end up in the first tile of the hangar. */
-	tile = st->airport.GetHangarTile(st->airport.GetHangarNum(tile));
+	/* Make sure all aircraft end up in the first tile of the hangar; a modular airport's hangar is one tile. */
+	const bool modular = IsModularAirportTile(tile);
+	if (!modular) tile = st->airport.GetHangarTile(st->airport.GetHangarNum(tile));
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		Aircraft *v = Aircraft::Create(); // aircraft
@@ -347,12 +366,13 @@ CommandCost CmdBuildAircraft(DoCommandFlags flags, TileIndex tile, const Engine 
 		v->reliability_spd_dec = e->reliability_spd_dec;
 		v->max_age = e->GetLifeLengthInDays();
 
-		v->pos = GetVehiclePosOnBuild(tile);
+		v->pos = modular ? 0 : GetVehiclePosOnBuild(tile);
 
 		v->state = HANGAR;
 		v->previous_pos = v->pos;
 		v->targetairport = GetStationIndex(tile);
 		v->SetNext(u);
+		if (modular) ModularAircraftBought(v, tile);
 
 		v->SetServiceInterval(Company::Get(_current_company)->settings.vehicle.servint_aircraft);
 
@@ -411,6 +431,11 @@ CommandCost CmdBuildAircraft(DoCommandFlags flags, TileIndex tile, const Engine 
 ClosestDepot Aircraft::FindClosestDepot()
 {
 	const Station *st = GetTargetAirportIfValid(this);
+	/* The modular airport it is at or going to, when it has a hangar (aircraft_modular.cpp). */
+	const Station *modular = Station::GetIfValid(this->targetairport);
+	if (modular != nullptr && IsModularAirportStation(modular) && ModularAirportHasHangar(modular) && CanVehicleUseStation(this, modular)) {
+		return ClosestDepot(modular->xy, modular->index);
+	}
 	/* If the station is not a valid airport or if it has no hangars */
 	if (st == nullptr || !CanVehicleUseStation(this, st) || !st->airport.HasHangar()) {
 		/* the aircraft has to search for a hangar on its own */
@@ -441,7 +466,7 @@ static void CheckIfAircraftNeedsService(Aircraft *v)
 	assert(st != nullptr);
 
 	/* only goto depot if the target airport has a depot */
-	if (st->airport.HasHangar() && CanVehicleUseStation(v, st)) {
+	if ((IsModularAirportStation(st) ? ModularAirportHasHangar(st) : st->airport.HasHangar()) && CanVehicleUseStation(v, st)) {
 		v->current_order.MakeGoToDepot(st->index, OrderDepotTypeFlag::Service);
 		SetWindowWidgetDirty(WindowClass::VehicleView, v->index, WID_VV_START_STOP);
 	} else if (v->current_order.IsType(OT_GOTO_DEPOT)) {
@@ -598,7 +623,7 @@ void HandleAircraftEnterHangar(Aircraft *v)
 	SetAircraftPosition(v, v->x_pos, v->y_pos, v->z_pos);
 }
 
-static void PlayAircraftSound(const Vehicle *v)
+void PlayAircraftSound(const Vehicle *v)
 {
 	if (!PlayVehicleSound(v, VSE_START)) {
 		SndPlayVehicleFx(AircraftVehInfo(v->engine_type)->sfx, v);
@@ -642,11 +667,6 @@ void UpdateAircraftCache(Aircraft *v, bool update_range)
 /**
  * Special velocities for aircraft
  */
-static constexpr uint16_t SPEED_LIMIT_TAXI = 50; ///< Maximum speed of an aircraft while taxiing
-static constexpr uint16_t SPEED_LIMIT_APPROACH = 230; ///< Maximum speed of an aircraft on finals
-static constexpr uint16_t SPEED_LIMIT_BROKEN = 320; ///< Maximum speed of an aircraft that is broken
-static constexpr uint16_t SPEED_LIMIT_HOLD = 425; ///< Maximum speed of an aircraft that flies the holding pattern
-static constexpr uint16_t SPEED_LIMIT_NONE = UINT16_MAX; ///< No environmental speed limit. Speed limit is type dependent
 
 /**
  * Sets the new speed for an aircraft
@@ -655,7 +675,7 @@ static constexpr uint16_t SPEED_LIMIT_NONE = UINT16_MAX; ///< No environmental s
  * @param hard_limit If true, the limit is directly enforced, otherwise the plane is slowed down gradually
  * @return The number of position updates needed within the tick
  */
-static int UpdateAircraftSpeed(Aircraft *v, uint speed_limit = SPEED_LIMIT_NONE, bool hard_limit = true)
+int UpdateAircraftSpeed(Aircraft *v, uint speed_limit, bool hard_limit)
 {
 	/**
 	 * 'acceleration' has the unit 3/8 mph/tick. This function is called twice per tick.
@@ -1481,6 +1501,8 @@ void Aircraft::MarkDirty()
 
 uint Aircraft::Crash(bool flooded)
 {
+	/* What it held at a modular airport is free again (aircraft_modular.cpp). */
+	ModularAircraftReleaseAll(this);
 	uint victims = Vehicle::Crash(flooded) + 2; // pilots
 	this->crashed_counter = flooded ? 9000 : 0; // max 10000, disappear pretty fast when flooded
 
@@ -1558,7 +1580,7 @@ static void MaybeCrashAirplane(Aircraft *v)
  * Start loading cargo.
  * @param v Aircraft that arrived.
  */
-static void AircraftEntersTerminal(Aircraft *v)
+void AircraftEntersTerminal(Aircraft *v)
 {
 	if (v->current_order.IsType(OT_GOTO_DEPOT)) return;
 
@@ -2302,6 +2324,10 @@ static bool AircraftEventHandler(Aircraft *v, int loop)
 			AircraftHandleDestTooFar(v, dist > v->acache.cached_max_range_sqr);
 		}
 	}
+
+	/* At an airport built tile by tile, or coming to one: no movement table, the aircraft finds its own way
+	 * (aircraft_modular.cpp). */
+	if (ModularAircraftController(v)) return true;
 
 	if (!v->flags.Test(VehicleAirFlag::DestinationTooFar)) AirportGoToNextPosition(v);
 

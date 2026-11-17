@@ -109,6 +109,9 @@ bool IsHangar(Tile t)
 {
 	assert(IsTileType(t, TileType::Station));
 
+	/* A modular airport's hangar (air_map.h). */
+	if (IsModularAirport(t)) return GetModularAirportKind(t) == ModularAirportKind::Hangar;
+
 	/* If the tile isn't an airport there's no chance it's a hangar. */
 	if (!IsAirport(t)) return false;
 
@@ -655,8 +658,8 @@ void UpdateStationAcceptance(Station *st, bool show_msg)
 
 		/* Make sure the station can accept the goods type. */
 		bool is_passengers = IsCargoInClass(cargo, CargoClass::Passengers);
-		if ((!is_passengers && !st->facilities.Any({StationFacility::Train, StationFacility::TruckStop, StationFacility::Airport, StationFacility::Dock})) ||
-				(is_passengers && !st->facilities.Any({StationFacility::Train, StationFacility::BusStop, StationFacility::Airport, StationFacility::Dock}))) {
+		if ((!is_passengers && !st->facilities.Any({StationFacility::Train, StationFacility::TruckStop, StationFacility::Airport, StationFacility::Dock, StationFacility::ModularAirport})) ||
+				(is_passengers && !st->facilities.Any({StationFacility::Train, StationFacility::BusStop, StationFacility::Airport, StationFacility::Dock, StationFacility::ModularAirport}))) {
 			amt = 0;
 		}
 
@@ -2921,6 +2924,8 @@ static CommandCost BuildModularAirportTiles(DoCommandFlags flags, const std::vec
 	int allowed_z = -1;
 	for (const ModularAirportPlan &p : plan) {
 		if (IsModularAirportTile(p.tile)) {
+			/* Not changed under an aircraft or its reserved way (aircraft_modular.cpp). */
+			if (ModularAirportTileInUse(p.tile)) return CommandCost(STR_ERROR_AIRCRAFT_IN_THE_WAY);
 			cost.AddCost(_price[Price::BuildStationAirport] / 2);
 			continue;
 		}
@@ -3135,6 +3140,8 @@ static CommandCost RemoveModularAirportTile(TileIndex tile, DoCommandFlags flags
 	}
 	CommandCost ret = EnsureNoVehicleOnGround(tile);
 	if (ret.Failed()) return ret;
+	/* An aircraft taxiing over it, standing on it, in its hangar, or its runway reserved (aircraft_modular.cpp). */
+	if (ModularAirportTileInUse(tile)) return CommandCost(STR_ERROR_AIRCRAFT_IN_THE_WAY);
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		if (Company::IsValidID(GetTileOwner(tile))) Company::Get(GetTileOwner(tile))->infrastructure.station--;
