@@ -243,6 +243,8 @@ static bool TileFree(TileIndex t, const std::vector<TileIndex> &own)
 	return true;
 }
 
+static bool RunwayFree(const ModularRunway &r, TileIndex except = INVALID_TILE);
+
 /** Is the tile where an aircraft taxiing with the goal ends its way? */
 static bool IsGoal(TileIndex t, ModularAircraftGoal goal, uint runway_needed)
 {
@@ -251,7 +253,10 @@ static bool IsGoal(TileIndex t, ModularAircraftGoal goal, uint runway_needed)
 		case ModularAircraftGoal::Hangar: return GetModularAirportKind(t) == ModularAirportKind::Hangar;
 		case ModularAircraftGoal::Runway: {
 			if (GetModularAirportKind(t) != ModularAirportKind::RunwayEnd) return false;
-			return RunwayOf(t).tiles.size() >= runway_needed;
+			/* A runway another aircraft has something of reserved (its other end, waiting there) is not taxied to:
+			 * two planes waiting at its two ends would wait for each other for good. */
+			const ModularRunway r = RunwayOf(t);
+			return r.tiles.size() >= runway_needed && RunwayFree(r);
 		}
 		default: return false;
 	}
@@ -374,7 +379,7 @@ static void ReserveRunway(const ModularRunway &r, bool reserved)
 }
 
 /** Is a runway free: not reserved, nothing of it reserved (but the tile an aircraft waits on, except)? */
-static bool RunwayFree(const ModularRunway &r, TileIndex except = INVALID_TILE)
+static bool RunwayFree(const ModularRunway &r, TileIndex except)
 {
 	for (TileIndex t : r.tiles) {
 		if (HasModularAirportRunwayReservation(t)) return false;
