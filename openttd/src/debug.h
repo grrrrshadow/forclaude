@@ -43,6 +43,11 @@ void DebugPrint(std::string_view category, int level, std::string &&message);
 void CrashTrace(std::string &&what);
 std::vector<std::string> GetCrashTrace();
 
+/* The diary of the game's end (konec.log in the player's folder; the one before it konec_minule.log): each step of
+ * ending as it begins. A step that lasts longer than it may is written down as where the end hung, with the trace of
+ * CrashTrace(), and the process is ended there -- the player, 17. 11.: "when I end the program it freezes". */
+void ExitDiary(std::string_view step, int seconds_at_most = 15);
+
 extern int _debug_driver_level;
 extern int _debug_grf_level;
 extern int _debug_map_level;

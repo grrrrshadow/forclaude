@@ -26,7 +26,14 @@
 #include "network/network_admin.h"
 
 #include <array>
+#include <atomic>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <optional>
+#include <string>
+#include <thread>
 #include "safeguards.h"
 
 /** Element in the queue of debug messages that have to be passed to either NetworkAdminConsole or IConsolePrint.*/
@@ -134,6 +141,64 @@ std::vector<std::string> GetCrashTrace()
 	size_t first = _crash_trace_next > CRASH_TRACE_SIZE ? _crash_trace_next - CRASH_TRACE_SIZE : 0;
 	for (size_t i = first; i < _crash_trace_next; i++) out.push_back(_crash_trace[i % CRASH_TRACE_SIZE]);
 	return out;
+}
+
+static std::mutex _exit_diary_mutex; ///< of the diary of the end and what it is at
+static std::optional<FileHandle> _exit_diary;
+static std::string _exit_step;       ///< the step of ending the game is at
+static std::chrono::steady_clock::time_point _exit_step_since, _exit_since;
+static int _exit_step_limit = 0;     ///< seconds it may last
+static std::atomic<bool> _exit_watched = false;
+
+/** A line into the diary of the end, written out at once. Under its mutex. */
+static void ExitDiaryLine(std::string_view text)
+{
+	if (!_exit_diary.has_value()) return;
+	const double secs = std::chrono::duration<double>(std::chrono::steady_clock::now() - _exit_since).count();
+	fmt::print(*_exit_diary, "{:8.3f} s  {}\n", secs, text);
+	fflush(*_exit_diary);
+}
+
+/** Watches the end of the game: a step lasting longer than it may is where it hung -- written down, and the process ended. */
+static void WatchExit()
+{
+	for (;;) {
+		std::this_thread::sleep_for(std::chrono::milliseconds(250));
+		std::unique_lock lock(_exit_diary_mutex);
+		if (std::chrono::steady_clock::now() - _exit_step_since < std::chrono::seconds(_exit_step_limit)) continue;
+		ExitDiaryLine(fmt::format("ZAMRZLO pri kroku \"{}\" (trva dele nez {} s); hra se ukoncuje natvrdo. Kde hra byla:", _exit_step, _exit_step_limit));
+		lock.unlock();
+		for (const std::string &mark : GetCrashTrace()) {
+			std::lock_guard again(_exit_diary_mutex);
+			ExitDiaryLine("  " + mark);
+		}
+#if defined(_WIN32)
+		TerminateProcess(GetCurrentProcess(), 0);
+#endif
+		std::_Exit(0);
+	}
+}
+
+void ExitDiary(std::string_view step, int seconds_at_most)
+{
+	std::lock_guard lock(_exit_diary_mutex);
+	const auto now = std::chrono::steady_clock::now();
+	if (!_exit_watched) {
+		_exit_since = now;
+		/* The diary of the end before this one kept: a frozen end is the one the player sends after starting the game again. */
+		std::error_code ec;
+		const std::string path = FioDiaryPath("konec.log");
+		std::filesystem::rename(std::filesystem::u8path(path), std::filesystem::u8path(FioDiaryPath("konec_minule.log")), ec);
+		_exit_diary = FileHandle::Open(path, "w");
+		if (_exit_diary.has_value()) {
+			fmt::print(*_exit_diary, "OpenTTD Decouple: denik konce hry. Kazdy krok ukoncovani, jak zacal; krok, ktery trva dele, nez smi, je misto, kde konec zamrzl.\n");
+		}
+	}
+	_exit_step = step;
+	_exit_step_since = now;
+	_exit_step_limit = seconds_at_most;
+	ExitDiaryLine(step);
+	if (!_exit_watched.exchange(true)) std::thread(&WatchExit).detach();
 }
 
 /**

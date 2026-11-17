@@ -102,9 +102,12 @@ void VideoDriver::StartGameThread()
 
 void VideoDriver::StopGameThread()
 {
+	ExitDiary("smycka videa skoncila");
 	if (!this->is_game_threaded) return;
 
+	ExitDiary("cekam na vlakno hry", 60);
 	this->game_thread.join();
+	ExitDiary("vlakno hry skoncilo");
 }
 
 void VideoDriver::Tick()

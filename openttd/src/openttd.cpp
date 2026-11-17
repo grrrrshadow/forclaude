@@ -317,34 +317,45 @@ static void ParseResolution(Dimension &res, std::string_view s)
  */
 static void ShutdownGame()
 {
+	ExitDiary("konzole a zaznam anomalii");
 	IConsoleFree();
 	CloseAnomalyLog();
 	/* The threads making the pictures of the 3D vehicles and drawing the view from the eyes, before what they draw from is gone. */
+	ExitDiary("vlakno obrazku 3D vozidel");
 	StopThreeDPictureThread();
+	ExitDiary("vlakno pohledu z oci");
 	StopEyeFrameThread();
 	/* And then the graphics card's, which draws for them (three_d_gpu.h). */
+	ExitDiary("vlakno graficke karty");
 	ThreeDGpuStop();
 
+	ExitDiary("sit");
 	if (_network_available) NetworkShutDown(); // Shut down the network and close any open connections
 
+	ExitDiary("ovladace (video, zvuk, hudba)");
 	SocialIntegration::Shutdown();
 	DriverFactoryBase::ShutdownDrivers();
 
+	ExitDiary("okna");
 	UnInitWindowSystem();
 
 	/* stop the scripts */
+	ExitDiary("skripty");
 	AI::Uninitialize(false);
 	Game::Uninitialize(false);
 
 	/* Uninitialize variables that are allocated dynamically */
+	ExitDiary("pamet hry (pooly)", 60);
 	_gamelog.Reset();
 
 	LinkGraphSchedule::Clear();
 	PoolBase::Clean(PT_ALL);
 
 	/* No NewGRFs were loaded when it was still bootstrapping. */
+	ExitDiary("data NewGRF", 60);
 	if (_game_mode != GameMode::Bootstrap) ResetNewGRFData();
 
+	ExitDiary("pisma");
 	FontCache::UninitializeFontCaches();
 }
 
@@ -501,9 +512,11 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 
 void PostMainLoop()
 {
+	ExitDiary("cekam na dokonceni ukladani hry", 180);
 	WaitTillSaved();
 
 	/* only save config if we have to */
+	ExitDiary("ukladam nastaveni", 30);
 	if (_save_config) {
 		SaveToConfig();
 		SaveHotkeysToConfig();
@@ -513,6 +526,7 @@ void PostMainLoop()
 
 	/* Reset windowing system, stop drivers, free used memory, ... */
 	ShutdownGame();
+	ExitDiary("hra uklizena, proces konci", 10);
 }
 
 #if defined(UNIX)
