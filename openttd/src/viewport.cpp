@@ -15336,6 +15336,15 @@ bool ThreeDLighthouseStandsOn(const TileInfo *ti)
 	return true;
 }
 
+/**
+ * Whether a modular airport's tile is drawn in 3D by its objects (GetThreeDStation(), objekty/letiste): its paint, lights
+ * and buildings; the game's sprites only its ground then (GetModularAirportTileLayout()).
+ */
+bool ThreeDModularAirportOwnLook(TileIndex tile)
+{
+	return ViewportDrawing3D() && !IsTransparencySet(TransparencyOption::Buildings) && ObjectsIndexReadOrOwed() && GetThreeDStation(tile) != nullptr;
+}
+
 bool ThreeDStationStandsOn(const TileInfo *ti)
 {
 	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Buildings) || !ObjectsIndexReadOrOwed()) return false;

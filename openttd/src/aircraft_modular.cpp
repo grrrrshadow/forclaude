@@ -431,6 +431,12 @@ static int GroundZ(TileIndex t)
 	return GetTileMaxPixelZ(t) + 1;
 }
 
+/** The height a helicopter stands at on its pad: a heliport's deck is 3 m up (objekty/letiste let_heliport), a tile's height. */
+static int PadZ(TileIndex t)
+{
+	return GroundZ(t) + (IsValidTile(t) && IsModularAirportTile(t) && GetModularAirportKind(t) == ModularAirportKind::Heliport ? static_cast<int>(TILE_HEIGHT) : 0);
+}
+
 /** The direction from a point towards another, of the eight. */
 static Direction DirectionOf(int dx, int dy)
 {
@@ -973,7 +979,7 @@ static Aircraft *Rotor(Aircraft *v)
 static void HandleHeliDescend(Aircraft *v)
 {
 	const TileIndex pad = v->modular.tile;
-	const int z = GroundZ(pad);
+	const int z = PadZ(pad);
 	v->tile = pad;
 	if (v->z_pos == z) {
 		Aircraft *u = Rotor(v);
@@ -1030,7 +1036,7 @@ static void HandleHeliAscend(Aircraft *v)
 	GetAircraftFlightLevelBounds(v, &z_dest, nullptr);
 	SetAircraftPosition(v, v->x_pos, v->y_pos, std::min(v->z_pos + count, z_dest));
 	/* Its pad free once it is up off it. */
-	if (IsValidTile(pad) && IsModularAirportTile(pad) && GetModularAirportKind(pad) != ModularAirportKind::Hangar && v->z_pos > GroundZ(pad) + static_cast<int>(TILE_HEIGHT)) {
+	if (IsValidTile(pad) && IsModularAirportTile(pad) && GetModularAirportKind(pad) != ModularAirportKind::Hangar && v->z_pos > PadZ(pad) + static_cast<int>(TILE_HEIGHT)) {
 		SetModularAirportReservedTracks(pad, {});
 		v->tile = TileIndex{};
 	}

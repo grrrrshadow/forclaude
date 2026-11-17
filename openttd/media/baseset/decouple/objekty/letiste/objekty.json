@@ -1,0 +1,458 @@
+[
+ {
+  "letiste": "cara",
+  "nazev": {
+   "cs": "pojezd: žlutá osa podél x"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_cara.glb",
+  "jmeno": "let_cara",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.0,
+    14.8
+   ],
+   "y": [
+    3.12,
+    11.68
+   ],
+   "z": [
+    0.0,
+    0.25
+   ]
+  },
+  "trojuhelniku": 386
+ },
+ {
+  "letiste": "oblouk",
+  "nazev": {
+   "cs": "pojezd: oblouk osy kolem severního rohu (TRACK_UPPER)"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_oblouk.glb",
+  "jmeno": "let_oblouk",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.0,
+    8.28
+   ],
+   "y": [
+    0.0,
+    8.28
+   ],
+   "z": [
+    0.0,
+    0.25
+   ]
+  },
+  "trojuhelniku": 120
+ },
+ {
+  "letiste": "draha",
+  "nazev": {
+   "cs": "dráha: střed podél x"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_draha.glb",
+  "jmeno": "let_draha",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.0,
+    14.8
+   ],
+   "y": [
+    0.34,
+    14.46
+   ],
+   "z": [
+    0.0,
+    0.18
+   ]
+  },
+  "trojuhelniku": 392
+ },
+ {
+  "letiste": "draha_konec",
+  "nazev": {
+   "cs": "dráha: konec u malého x (práh)"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_draha_konec.glb",
+  "jmeno": "let_draha_konec",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    -0.03,
+    14.8
+   ],
+   "y": [
+    0.34,
+    14.46
+   ],
+   "z": [
+    0.0,
+    0.18
+   ]
+  },
+  "trojuhelniku": 1566
+ },
+ {
+  "letiste": "stani",
+  "nazev": {
+   "cs": "stání: žlutý rámeček a stop čára"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_stani.glb",
+  "jmeno": "let_stani",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    2.08,
+    12.73
+   ],
+   "y": [
+    2.08,
+    12.73
+   ],
+   "z": [
+    0.0,
+    0.2
+   ]
+  },
+  "trojuhelniku": 396
+ },
+ {
+  "letiste": "helipad",
+  "nazev": {
+   "cs": "helipad: kruh a H"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_helipad.glb",
+  "jmeno": "let_helipad",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    1.39,
+    13.41
+   ],
+   "y": [
+    1.39,
+    13.41
+   ],
+   "z": [
+    0.0,
+    0.18
+   ]
+  },
+  "trojuhelniku": 838
+ },
+ {
+  "letiste": "heliport",
+  "vyska_m": 3.0,
+  "nazev": {
+   "cs": "heliport: plošina 3 m nad zemí"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_heliport.glb",
+  "jmeno": "let_heliport",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    1.35,
+    13.45
+   ],
+   "y": [
+    0.2,
+    13.45
+   ],
+   "z": [
+    0.0,
+    4.0
+   ]
+  },
+  "trojuhelniku": 1574
+ },
+ {
+  "letiste": "hangar",
+  "vjezd": "+x (SW)",
+  "nazev": {
+   "cs": "hangár, vrata k +x"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 2,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_hangar.glb",
+  "jmeno": "let_hangar",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.6,
+    14.85
+   ],
+   "y": [
+    0.78,
+    14.02
+   ],
+   "z": [
+    0.0,
+    8.6
+   ]
+  },
+  "trojuhelniku": 734
+ },
+ {
+  "letiste": "budova",
+  "budova": 0,
+  "nazev": {
+   "cs": "terminál"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_budova_0.glb",
+  "jmeno": "let_budova_0",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    1.98,
+    14.6
+   ],
+   "y": [
+    0.98,
+    13.82
+   ],
+   "z": [
+    0.0,
+    7.45
+   ]
+  },
+  "trojuhelniku": 464
+ },
+ {
+  "letiste": "budova",
+  "budova": 1,
+  "nazev": {
+   "cs": "řídicí věž"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_budova_1.glb",
+  "jmeno": "let_budova_1",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    -3.5,
+    11.42
+   ],
+   "y": [
+    -3.5,
+    11.42
+   ],
+   "z": [
+    0.0,
+    24.5
+   ]
+  },
+  "trojuhelniku": 490
+ },
+ {
+  "letiste": "budova",
+  "budova": 2,
+  "nazev": {
+   "cs": "kulatý terminál"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_budova_2.glb",
+  "jmeno": "let_budova_2",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    -6.2,
+    14.0
+   ],
+   "y": [
+    -6.2,
+    14.0
+   ],
+   "z": [
+    0.0,
+    6.6
+   ]
+  },
+  "trojuhelniku": 496
+ },
+ {
+  "letiste": "budova",
+  "budova": 3,
+  "nazev": {
+   "cs": "dlouhý terminál"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_budova_3.glb",
+  "jmeno": "let_budova_3",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    2.98,
+    14.6
+   ],
+   "y": [
+    0.38,
+    14.42
+   ],
+   "z": [
+    0.0,
+    5.05
+   ]
+  },
+  "trojuhelniku": 376
+ },
+ {
+  "letiste": "budova",
+  "budova": 4,
+  "nazev": {
+   "cs": "terminál s kancelářemi"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_budova_4.glb",
+  "jmeno": "let_budova_4",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    1.54,
+    13.26
+   ],
+   "y": [
+    1.54,
+    13.26
+   ],
+   "z": [
+    0.0,
+    12.4
+   ]
+  },
+  "trojuhelniku": 680
+ },
+ {
+  "letiste": "budova",
+  "budova": 5,
+  "nazev": {
+   "cs": "nízká provozní budova"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 0,
+   "poznamka": "v noci svítí uzel noc (světla dráhy, okna)"
+  },
+  "soubor": "let_budova_5.glb",
+  "jmeno": "let_budova_5",
+  "druh": "letiste",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model letiste/letiste.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    2.98,
+    12.05
+   ],
+   "y": [
+    1.18,
+    13.62
+   ],
+   "z": [
+    0.0,
+    4.05
+   ]
+  },
+  "trojuhelniku": 260
+ }
+]

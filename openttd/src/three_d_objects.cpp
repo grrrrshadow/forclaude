@@ -43,6 +43,7 @@
 #include "road_map.h"
 #include "bridge_map.h"
 #include "station_map.h"
+#include "air_map.h"
 #include "newgrf_roadstop.h"
 #include "table/sprites.h"
 #include "tree_map.h"
@@ -277,6 +278,10 @@ static std::map<std::pair<int, int>, size_t> _three_d_depots;
 static std::vector<size_t> _three_d_lighthouses;
 /** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
 static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
+/** The pieces of the modular airports read (objekty/letiste, "druh": "letiste"; grrrrf letiste/letiste.py): their add-ons' names. */
+static std::set<std::string> _three_d_airport_pieces;
+/** The modular airports' objects (MakeAirportObjects()) by the look of a tile (AirportObjectKey()): objects in _three_d_objects. */
+static std::map<uint32_t, size_t> _three_d_airport_objects;
 
 /*
  * The diary of the 3D houses, 3d_domy.log in the player's folder (the player, 19. 10.: in a new game the temperate
@@ -6306,6 +6311,120 @@ static void MakeStationObjects()
 	}
 }
 
+/* ---------------------------------------------------------------- the modular airports (air_map.h) */
+
+/** What a modular airport's tile shows in 3D (AirportObjectKey()). */
+enum class AirportLook : uint8_t {
+	Taxiway = 1, ///< the yellow lines of its tracks (the tracks in the key)
+	Stand, ///< a stand's box and its tracks' lines
+	Helipad, ///< a helipad's circle and H and its tracks' lines
+	RunwayMiddle, ///< a runway between its ends (its axis)
+	RunwayEnd, ///< a runway's end (its axis, which end)
+	Heliport, ///< the raised deck
+	Hangar, ///< the hangar (its entrance)
+	Building, ///< a building (its look, its front)
+};
+
+/** The key of a look of a modular airport's tile: the look, and its tracks, axis, end, direction or building. */
+static constexpr uint32_t AirportObjectKey(AirportLook look, uint32_t param)
+{
+	return to_underlying(look) << 8 | (param & 0xFF);
+}
+
+/** The key of the look of a modular airport's tile (GetThreeDStation()). */
+static uint32_t AirportObjectKeyOf(TileIndex tile)
+{
+	switch (GetModularAirportKind(tile)) {
+		case ModularAirportKind::Taxiway: return AirportObjectKey(AirportLook::Taxiway, GetModularAirportTracks(tile).base());
+		case ModularAirportKind::Stand: return AirportObjectKey(AirportLook::Stand, GetModularAirportTracks(tile).base());
+		case ModularAirportKind::Helipad: return AirportObjectKey(AirportLook::Helipad, GetModularAirportTracks(tile).base());
+		case ModularAirportKind::RunwayMiddle: return AirportObjectKey(AirportLook::RunwayMiddle, to_underlying(GetModularAirportRunwayAxis(tile)));
+		case ModularAirportKind::RunwayEnd: return AirportObjectKey(AirportLook::RunwayEnd, to_underlying(GetModularAirportRunwayAxis(tile)) | (IsModularAirportRunwayHighEnd(tile) ? 2 : 0));
+		case ModularAirportKind::Heliport: return AirportObjectKey(AirportLook::Heliport, 0);
+		case ModularAirportKind::Hangar: return AirportObjectKey(AirportLook::Hangar, to_underlying(GetModularAirportDirection(tile)));
+		case ModularAirportKind::Building: return AirportObjectKey(AirportLook::Building, GetModularAirportBuilding(tile) << 2 | to_underlying(GetModularAirportDirection(tile)));
+		default: return 0;
+	}
+}
+
+/** How far a piece made facing +x (south-west) is turned to face a way, degrees (as a lorries' bay, StationWayTurn()). */
+static float AirportDirTurn(DiagDirection dir)
+{
+	switch (dir) {
+		case DiagDirection::NE: return 180.0f;
+		case DiagDirection::SE: return 90.0f;
+		case DiagDirection::NW: return -90.0f;
+		default: return 0.0f;
+	}
+}
+
+/**
+ * The modular airports' objects (the player, 17. 11.: "udělame si to rovnou 3D"): for each look of a tile an object
+ * of the pieces of objekty/letiste laid on it, each turned about the tile's middle -- the yellow line of each taxiing
+ * track (along x a line, along y the same turned; each curve the quarter round the north corner, turned to its
+ * corner), a runway's paint along its axis and its end by which end, the stand's box, the helipad, the heliport, the
+ * hangar by its entrance, a building by its look and its front. The ground under them is the game's (asphalt, gravel).
+ */
+static void MakeAirportObjects()
+{
+	_three_d_airport_objects.clear();
+	auto have = [](const char *name) { return _three_d_airport_pieces.contains(name) && _three_d_addons.contains(name); };
+	auto make = [&](uint32_t key, std::string_view name, const std::vector<std::pair<std::string, float>> &pieces) {
+		ThreeDObject obj;
+		obj.name = std::string(name);
+		obj.variants = 0;
+		const double cx = 7.4, cy = 7.4;
+		for (const auto &[piece, turn] : pieces) {
+			if (!have(piece.c_str())) continue;
+			const double a = turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+			ThreeDObjectFigure f;
+			f.figure = piece;
+			const double dx = -cx, dy = -cy;
+			f.at[0] = static_cast<float>(cx + dx * c - dy * s);
+			f.at[1] = static_cast<float>(cy + dx * s + dy * c);
+			f.facing = turn;
+			obj.addon_places.push_back(std::move(f));
+		}
+		if (obj.addon_places.empty()) return;
+		_three_d_airport_objects.emplace(key, _three_d_objects.size());
+		_three_d_objects.push_back(std::move(obj));
+	};
+	/* The yellow lines of the taxiing tracks: X, Y, upper (north), lower (south), left (west), right (east). */
+	auto lines = [](uint32_t tracks) {
+		static const std::pair<const char *, float> track_piece[] = {{"let_cara", 0.0f}, {"let_cara", -90.0f}, {"let_oblouk", 0.0f}, {"let_oblouk", 180.0f}, {"let_oblouk", 90.0f}, {"let_oblouk", -90.0f}};
+		std::vector<std::pair<std::string, float>> out;
+		for (uint t = 0; t < 6; t++) {
+			if (HasBit(tracks, t)) out.emplace_back(track_piece[t].first, track_piece[t].second);
+		}
+		return out;
+	};
+	for (uint32_t tracks = 0; tracks < 64; tracks++) {
+		make(AirportObjectKey(AirportLook::Taxiway, tracks), fmt::format("letiste pojezd {}", tracks), lines(tracks));
+		auto stand = lines(tracks);
+		stand.emplace_back("let_stani", 0.0f);
+		make(AirportObjectKey(AirportLook::Stand, tracks), fmt::format("letiste stani {}", tracks), stand);
+		auto pad = lines(tracks);
+		pad.emplace_back("let_helipad", 0.0f);
+		make(AirportObjectKey(AirportLook::Helipad, tracks), fmt::format("letiste helipad {}", tracks), pad);
+	}
+	for (Axis axis : {Axis::X, Axis::Y}) {
+		const float along = axis == Axis::X ? 0.0f : -90.0f;
+		make(AirportObjectKey(AirportLook::RunwayMiddle, to_underlying(axis)), fmt::format("letiste draha {}", to_underlying(axis)), {{"let_draha", along}});
+		for (bool high : {false, true}) {
+			/* Its threshold at the small x of the piece: at the runway's own end, outward. */
+			const float turn = axis == Axis::X ? (high ? 180.0f : 0.0f) : (high ? -90.0f : 90.0f);
+			make(AirportObjectKey(AirportLook::RunwayEnd, to_underlying(axis) | (high ? 2 : 0)), fmt::format("letiste draha konec {} {}", to_underlying(axis), high), {{"let_draha_konec", turn}});
+		}
+	}
+	make(AirportObjectKey(AirportLook::Heliport, 0), "letiste heliport", {{"let_heliport", 0.0f}});
+	for (DiagDirection dir : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		make(AirportObjectKey(AirportLook::Hangar, to_underlying(dir)), fmt::format("letiste hangar {}", to_underlying(dir)), {{"let_hangar", AirportDirTurn(dir)}});
+		for (uint8_t b = 0; b < MODULAR_AIRPORT_BUILDINGS; b++) {
+			make(AirportObjectKey(AirportLook::Building, b << 2 | to_underlying(dir)), fmt::format("letiste budova {} {}", b, to_underlying(dir)), {{fmt::format("let_budova_{}", b), AirportDirTurn(dir)}});
+		}
+	}
+}
+
 /**
  * The thread reading the indices from the start of the game (StartReadingThreeDObjects()), joined by the first that
  * needs them before they are read (ReadThreeDObjects()), at the latest when the game ends -- before the lists it fills
@@ -6420,7 +6539,9 @@ static void ReadThreeDObjectsNow()
 					if (e.contains("soubor") && e.at("soubor").is_string()) ReadLighthouse(e, folder);
 					continue;
 				}
-				const bool station_piece = kind == "peron" || kind == "smerovani" || kind == "nakladova_rampa";
+				/* A piece of the modular airports (objekty/letiste): an add-on the airport's tiles are made of (MakeAirportObjects()). */
+				if (kind == "letiste" && e.contains("jmeno") && e.at("jmeno").is_string()) _three_d_airport_pieces.insert(e.at("jmeno").get<std::string>());
+				const bool station_piece = kind == "peron" || kind == "smerovani" || kind == "nakladova_rampa" || kind == "letiste";
 				if (station_piece && e.contains("soubor") && e.at("soubor").is_string()) ReadStationPiece(e, kind);
 				if ((kind == "doplnek" || kind == "objekt" || station_piece) && e.contains("soubor") && e.at("soubor").is_string()) {
 					/* An add-on of the buildings (a parasol, a bench): one file, its foot at the origin, facing +x, read
@@ -6521,6 +6642,7 @@ static void ReadThreeDObjectsNow()
 	MakeBusStops();
 	MakeRockTiles();
 	MakeStationObjects();
+	MakeAirportObjects();
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
 		if (o.industry != 0xFF && (o.variant_paint[0] >= 0 || o.variant_paint[1] >= 0)) {
@@ -13474,7 +13596,7 @@ std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope sl
 
 const ThreeDObject *GetThreeDStation(TileIndex tile)
 {
-	if (!_three_d_objects_read || _three_d_station_objects.empty() || !IsValidTile(tile) || !IsTileType(tile, TileType::Station)) return nullptr;
+	if (!_three_d_objects_read || (_three_d_station_objects.empty() && _three_d_airport_objects.empty()) || !IsValidTile(tile) || !IsTileType(tile, TileType::Station)) return nullptr;
 	ThreeDStationKind kind;
 	int way;
 	if (HasStationRail(tile)) {
@@ -13482,6 +13604,10 @@ const ThreeDObject *GetThreeDStation(TileIndex tile)
 		if (IsCustomStationSpecIndex(tile)) return nullptr;
 		kind = IsRailWaypoint(tile) ? ThreeDStationKind::Waypoint : ThreeDStationKind::Platform;
 		way = to_underlying(GetRailStationAxis(tile));
+	} else if (IsModularAirport(tile)) {
+		/* A modular airport's tile (MakeAirportObjects()). */
+		const auto it = _three_d_airport_objects.find(AirportObjectKeyOf(tile));
+		return it == _three_d_airport_objects.end() ? nullptr : &_three_d_objects[it->second];
 	} else if (IsTruckStop(tile) && GetRoadStopSpec(tile) == nullptr) {
 		kind = IsDriveThroughStopTile(tile) ? ThreeDStationKind::TruckStop : ThreeDStationKind::TruckBay;
 		way = kind == ThreeDStationKind::TruckStop ? to_underlying(GetDriveThroughStopAxis(tile)) : to_underlying(GetBayRoadStopDir(tile));

@@ -3890,6 +3890,12 @@ enum ModularAirportGfx : uint8_t {
  */
 static const DrawTileSprites *GetModularAirportTileLayout(TileIndex tile)
 {
+	/* In the 3D views its paint and its buildings are 3D objects (ThreeDModularAirportOwnLook(), objekty/letiste): only
+	 * the ground here, asphalt or gravel. */
+	extern bool ThreeDModularAirportOwnLook(TileIndex tile);
+	if (ThreeDModularAirportOwnLook(tile)) {
+		return &_station_display_datas_modular_airport[GetModularAirportSurface(tile) == AirportSurface::Gravel ? MAG_TAXIWAY_GRAVEL : MAG_TAXIWAY];
+	}
 	uint8_t gfx = MAG_TAXIWAY;
 	switch (GetModularAirportKind(tile)) {
 		case ModularAirportKind::Taxiway: {
