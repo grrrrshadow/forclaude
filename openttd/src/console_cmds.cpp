@@ -11558,6 +11558,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _turned_card_move_async;
 		_turned_card_move_async = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: stojici posun {}", _turned_card_move_async ? "bez cekani" : "s cekanim");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "plot") {
+		/* 'stojici plot 0|1': the view's pictures fenced for the video driver only after the last of the main thread's
+		 * jobs in a row (1), or after every block (0). */
+		extern std::atomic<bool> _gpu_fence_last_only;
+		_gpu_fence_last_only = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici plot {}", _gpu_fence_last_only ? "po posledni" : "po kazde");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "stav") {
 		/* 'stojici stav 0|1': what the card lays on the turned map with each program's uniforms set once a job and the
 		 * pictures' program used again only when a picture comes after buildings (1), or all of it for every building

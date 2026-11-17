@@ -636,6 +636,7 @@ extern std::atomic<bool> _three_d_gpu_show; ///< the view from the eyes shown st
 extern std::atomic<bool> _three_d_gpu_off; ///< the pictures drawn by the processor, as before: the setting gui.three_d_gpu off (by default), or the rig's test3d gpu 0
 extern std::atomic<bool> _three_d_gpu_driver_waits;
 extern std::atomic<bool> _gpu_standing_lean;
+extern std::atomic<bool> _gpu_fence_last_only;
 extern std::atomic<bool> _gpu_building_cells_on; ///< the video driver's context waits on the card for the view's pictures (ThreeDGpuViewPicturesWait()): the card fences them, not glFinish()
 
 #endif /* THREE_D_GPU_H */

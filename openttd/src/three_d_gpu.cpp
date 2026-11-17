@@ -506,12 +506,23 @@ static std::mutex _view_fence_mutex;
 static GLsync _view_fence = nullptr;
 
 /** The view's pictures laid by the card: fenced for the video driver, or finished where it cannot wait for a fence. */
+static bool MainJobQueued();
+static bool _view_fence_owed = false; ///< the card's thread: laid view pictures not fenced yet (ViewPicturesLaid())
+
 static void ViewPicturesLaid()
 {
 	if (!_three_d_gpu_driver_waits || gl.glFenceSync == nullptr || gl.glDeleteSync == nullptr || gl.glFlush == nullptr) {
 		gl.glFinish();
 		return;
 	}
+	/* Another of the main thread's jobs comes next (the blocks of a frame one after another): it fences them all,
+	 * the screen is not shown before it -- not a fence and a flush to the card for every block (the player's phone
+	 * gives them through a layer to Vulkan; 1100 grounds in five seconds of the drag of the zoomed out map). */
+	if (_gpu_fence_last_only && MainJobQueued()) {
+		_view_fence_owed = true;
+		return;
+	}
+	_view_fence_owed = false;
 	GLsync fence = gl.glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 	gl.glFlush();
 	std::lock_guard lock(_view_fence_mutex);
@@ -589,6 +600,13 @@ struct GpuMainWait {
 
 bool _gpu_stop = false;
 std::thread _gpu_thread;
+
+/** Whether a job of the main thread waits in the queue now (ViewPicturesLaid()). */
+static bool MainJobQueued()
+{
+	std::lock_guard lock(_gpu_mutex);
+	return !_gpu_jobs.empty() && _gpu_jobs.front()->main;
+}
 /* The video driver's OpenGL (ThreeDGpuVideoContext()): an EGL display and context, or a WGL device and context. The
  * card's context made sharing its things with it (_video_shared), the view from the eyes is shown straight from the
  * card: the driver draws the card's texture where the picture is (ThreeDGpuEyeFrame::shown). */
@@ -4628,10 +4646,18 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
 	} else {
 		const GLuint p = _ground_program.program;
 		gl.glUseProgram(p);
-		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(g.width), static_cast<float>(g.height));
-		gl.glUniform1i(gl.glGetUniformLocation(p, "u_ground"), 0);
-		gl.glUniform1i(gl.glGetUniformLocation(p, "u_atlas"), 1);
-		gl.glUniform1i(gl.glGetUniformLocation(p, "u_step"), std::max(1, g.fill_step));
+		/* The places of its uniforms looked up once a program, its texture units set once (they stay with it). */
+		static GLuint ground_program = 0;
+		static GLint u_size = -1, u_step = -1;
+		if (ground_program != p) {
+			ground_program = p;
+			u_size = gl.glGetUniformLocation(p, "u_size");
+			u_step = gl.glGetUniformLocation(p, "u_step");
+			gl.glUniform1i(gl.glGetUniformLocation(p, "u_ground"), 0);
+			gl.glUniform1i(gl.glGetUniformLocation(p, "u_atlas"), 1);
+		}
+		gl.glUniform2f(u_size, static_cast<float>(g.width), static_cast<float>(g.height));
+		gl.glUniform1i(u_step, std::max(1, g.fill_step));
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, _ground_atlas);
 		gl.glActiveTexture(GL_TEXTURE0);
@@ -7162,6 +7188,7 @@ void GpuThreadMain()
 		_gpu_jobs.pop_front();
 		lock.unlock();
 		if (job->read != nullptr) {
+			if (_view_fence_owed && !MainJobQueued()) ViewPicturesLaid();
 			/* Not a picture: a texture read back (a screenshot). */
 			const bool read = ReadShownOnCard(*job->read);
 			lock.lock();
@@ -7194,6 +7221,9 @@ void GpuThreadMain()
 		} catch (...) {
 			drawn = false;
 		}
+		/* The view's pictures laid by a job before not fenced yet (ViewPicturesLaid()): now, unless another of the main
+		 * thread's jobs comes next -- before this one is told done, so the screen is never shown without it. */
+		if (_view_fence_owed && !MainJobQueued()) ViewPicturesLaid();
 		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 		if (job->ground != nullptr || job->standing != nullptr) {
 			/* The ground of a block, every frame, and what stands on it: counted apart, in the diary only when the card could not lay it. */
@@ -7379,6 +7409,7 @@ bool ThreeDGpuTakeViewMoveFailed()
 }
 
 std::atomic<bool> _three_d_gpu_driver_waits = false;
+std::atomic<bool> _gpu_fence_last_only = true; ///< Rig: the view's pictures fenced only after the last of the main thread's jobs in a row (test3d stojici plot); else after every one
 std::atomic<bool> _gpu_standing_lean = true; ///< Rig: what stands laid with the programs' uniforms set once a job (test3d stojici stav); else every building and after it as before
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 
@@ -7792,6 +7823,7 @@ bool ThreeDGpuStandingKeeps(uint64_t) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
 std::atomic<bool> _three_d_gpu_driver_waits = false;
 std::atomic<bool> _gpu_standing_lean = true;
+std::atomic<bool> _gpu_fence_last_only = true;
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
