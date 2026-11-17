@@ -658,8 +658,8 @@ static bool ConCztrTest(std::span<std::string_view> argv)
 static bool ConLegacyDecoupleImport(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Import an old decouple 0.10.4 save: map, companies, vehicles and orders. Trains are put stopped into the nearest depot; road vehicles, ships and aircraft carry on.");
-		IConsolePrint(CC_HELP, "Usage: 'legacyimport' to flip it, or 'legacyimport on' / 'legacyimport off', then 'load <file>'.");
+		IConsolePrint(CC_HELP, "Import an old decouple 0.10.4 save: map, companies, vehicles and orders. Trains, road vehicles, ships and aircraft carry on where they were.");
+		IConsolePrint(CC_HELP, "Usage: 'legacyimport' to flip it, or 'legacyimport on' / 'legacyimport off', then 'load <file>'. 'legacyimport depo': the trains are put stopped into the nearest depot instead.");
 		return true;
 	}
 
@@ -673,8 +673,14 @@ static bool ConLegacyDecoupleImport(std::span<std::string_view> argv)
 	bool &want = _file_to_saveload.legacy_decouple_import;
 
 	if (argv.size() >= 2) {
+		extern bool _legacy_import_trains_to_depot;
 		if (argv[1] == "on" || argv[1] == "1") {
 			want = true;
+			_legacy_import_trains_to_depot = false;
+		} else if (argv[1] == "depo") {
+			/* As it was till 17. 11.: every train with an engine stopped in the nearest depot. */
+			want = true;
+			_legacy_import_trains_to_depot = true;
 		} else if (argv[1] == "off" || argv[1] == "0") {
 			want = false;
 		} else {
@@ -684,7 +690,8 @@ static bool ConLegacyDecoupleImport(std::span<std::string_view> argv)
 		want = !want;
 	}
 
-	IConsolePrint(CC_DEFAULT, "Legacy decouple import is now {}.", want ? "ON - the next load reads an old decouple save, trains go stopped into depots" : "off");
+	extern bool _legacy_import_trains_to_depot;
+	IConsolePrint(CC_DEFAULT, "Legacy decouple import is now {}.", !want ? "off" : _legacy_import_trains_to_depot ? "ON - the next load reads an old decouple save, trains go stopped into depots" : "ON - the next load reads an old decouple save, trains stay on their way");
 	return true;
 }
 

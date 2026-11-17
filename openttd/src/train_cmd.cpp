@@ -9613,8 +9613,17 @@ static TileIndex NearestDepotForImportedTrain(const Train *t, int &tier)
  * is what makes the rail types a train can use known) and after every rail
  * reservation on the map has been let go (AfterLoadLegacyDecoupleImportMap()).
  */
+/**
+ * Whether the trains of an imported old game are stood stopped in the nearest depot (the player, 16. 10.: "leave the
+ * trains in the depot and I let them out one by one"); else they stay on their way as the other vehicles do (the
+ * player, 17. 11.: "the load of a save of 0.10.4 leaves the trains in the depot now. try to leave the trains on their
+ * way. the other vehicles are on their way already"). The console: 'legacyimport depo'.
+ */
+bool _legacy_import_trains_to_depot = false;
+
 void SettleLegacyImportedTrains()
 {
+	uint on_way = 0;
 	uint to_depot = 0;
 	uint stayed = 0;
 	uint rakes = 0;
@@ -9671,6 +9680,21 @@ void SettleLegacyImportedTrains()
 					TileX(t->tile), TileY(t->tile),
 					at == StationID::Invalid() ? std::string("na siré trati") : fmt::format("ve stanici {}", GetString(STR_STATION_NAME, at)),
 					t->current_order.IsFullLoadOrder() ? std::string(", az se naplni") : std::string());
+			continue;
+		}
+
+		/* A train with an engine stays where it is and goes on, as the road vehicles, ships and aircraft do: every
+		 * reservation of the map was let go (AfterLoadLegacyDecoupleImportMap()), so it books the track under itself
+		 * and, out on the line, its way on from there -- as a train that turned round does. Its live order, emptied
+		 * if it was one of the old game's own kinds, is picked up again from its list by its index. */
+		if (!_legacy_import_trains_to_depot) {
+			if (!IsWholeTrainInsideDepot(t)) {
+				t->ReserveTrackUnderConsist();
+				if (!t->vehstatus.Test(VehState::Stopped) && !t->current_order.IsType(OT_LOADING)) TryPathReserve(t, true, false);
+			}
+			on_way++;
+			IConsolePrint(CC_INFO, "Prenos stare hry: vlak {} ({}) na ({},{}) zustava na trase{}.", t->unitnumber, GetString(STR_ENGINE_NAME, t->engine_type),
+					TileX(t->tile), TileY(t->tile), t->IsInDepot() ? " (v depu)" : "");
 			continue;
 		}
 
@@ -9735,8 +9759,8 @@ void SettleLegacyImportedTrains()
 		}
 	}
 
-	IConsolePrint(CC_INFO, "Prenos stare hry: {} vlaku zastaveno v depech, {} zastaveno na miste (bez depa), {} rad vozu ceka na spojeni, {} volnych vozu v depech, {} havarovanych ponechano.",
-			to_depot, stayed, rakes, rakes_in_depot, crashed);
+	IConsolePrint(CC_INFO, "Prenos stare hry: {} vlaku zustalo na trase, {} zastaveno v depech, {} zastaveno na miste (bez depa), {} rad vozu ceka na spojeni, {} volnych vozu v depech, {} havarovanych ponechano.",
+			on_way, to_depot, stayed, rakes, rakes_in_depot, crashed);
 }
 
 /**
