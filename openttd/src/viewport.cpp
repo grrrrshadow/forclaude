@@ -18808,9 +18808,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* Driven freely (cab_drive.h): its own heading, finer than the eight directions. */
 		target = v->cab_yaw * (2 * M_PI / CAB_YAW_TURN);
 	} else if (v->direction != Direction::Invalid) {
-		target = std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)]));
+		/* A train the way it goes: backwards after its driver changed the stand, its vehicles facing as they did. */
+		const Direction way = v->type == VehicleType::Train ? Train::From(v)->GetMovingDirection() : v->direction;
+		target = std::atan2(static_cast<double>(dir_dy[to_underlying(way)]), static_cast<double>(dir_dx[to_underlying(way)]));
 		/* On a round curve along the arc (round_track.h). */
-		if (RoundTrackPose pose; GetRoundTrackPose(v, pose)) target = (pose.azimuth + 135.0) * M_PI / 180.0;
+		if (RoundTrackPose pose; GetRoundTrackPose(v, pose)) target = (pose.azimuth + 135.0) * M_PI / 180.0 + (v->type == VehicleType::Train && Train::From(v)->IsDrivingBackwards() ? M_PI : 0.0);
 	}
 	/* In a tunnel (hidden in it): along it at once, as the vehicle goes. A car turned round at its end, the eye turning
 	 * after it over a few frames went sideways out of the tube (the rig of test5). */

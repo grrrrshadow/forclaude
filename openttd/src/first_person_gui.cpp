@@ -2788,11 +2788,25 @@ struct FirstPersonWindow : Window {
 
 	int here_shown = -1; ///< what the button where "Here" was says now: 0 Here, 1 Couple, 2 Decouple
 
+	/**
+	 * Whether the driver's stand of the train ridden is the one at the engine's back, towards what follows it in its
+	 * list (CabDriveOp::CoupleRear). The eye looks back along the way the train goes (CabViewCamera::rear), or the
+	 * train goes backwards -- turned round where it stood by the change of the stand, its list as it was -- and the eye
+	 * looks ahead: either, not both (the player, 17. 11.: "at the back stand the button said Couple though wagons were
+	 * behind it; pressing it did not decouple them").
+	 */
+	bool AtBackStand() const
+	{
+		const Vehicle *v = this->Riding();
+		if (v == nullptr || v->type != VehicleType::Train) return false;
+		return this->camera.rear != Train::From(v->First())->IsDrivingBackwards();
+	}
+
 	/** Whether the button where "Here" was decouples now: riding a train at its engine's back stand with wagons behind it. */
 	bool HereDecouples() const
 	{
 		const Vehicle *v = this->Riding();
-		if (v == nullptr || v->type != VehicleType::Train || !this->camera.rear) return false;
+		if (v == nullptr || v->type != VehicleType::Train || !this->AtBackStand()) return false;
 		const Train *t = Train::From(v->First());
 		if (!t->IsFrontEngine() || t->GetNextUnit() == nullptr) return false;
 		/* A single engine leaves all behind it (TryDecoupleAtStation()). A double-headed one cannot leave its own
@@ -2975,7 +2989,7 @@ struct FirstPersonWindow : Window {
 				 * CoupleRear); another vehicle: nothing. */
 				if (const Vehicle *v = this->Riding(); v != nullptr) {
 					if (v->type == VehicleType::Train) {
-						Command<Commands::CabDrive>::Post(v->tile, v->First()->index, to_underlying(this->camera.rear ? CabDriveOp::CoupleRear : CabDriveOp::CoupleFront));
+						Command<Commands::CabDrive>::Post(v->tile, v->First()->index, to_underlying(this->AtBackStand() ? CabDriveOp::CoupleRear : CabDriveOp::CoupleFront));
 					}
 					this->SetWidgetDirty(WID_FP_HERE);
 					break;
@@ -2996,7 +3010,7 @@ struct FirstPersonWindow : Window {
 					const Vehicle *front = rv->First();
 					if (front->type == VehicleType::Train && front->owner == _local_company && front->cur_speed == 0 && Train::From(front)->IsFrontEngine() &&
 							!front->vehstatus.Test(VehState::Crashed)) {
-						Command<Commands::ReverseTrainDirection>::Post(STR_ERROR_CAN_T_REVERSE_DIRECTION_TRAIN, front->tile, front->index, false);
+						Command<Commands::CabDrive>::Post(STR_ERROR_CAN_T_REVERSE_DIRECTION_TRAIN, front->tile, front->index, to_underlying(CabDriveOp::Stand));
 						this->camera.valid = false;
 						this->camera.head = 0;
 						this->SetDirty();

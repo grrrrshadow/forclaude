@@ -11384,6 +11384,9 @@ static void TurnTrainInsideDepot(Train *consist)
  *            question that has been mis-guessed from reading alone, so the
  *            game answers it itself whenever the trace is on.
  */
+/** A train turned round just now backs up whatever its make-up (ChangeTrainStand()): its vehicles stay where they are. */
+static bool _reverse_by_backing_up = false;
+
 static void ReverseTrainDirection(Train *consist, const char *why)
 {
 	if (IsConduitTrain(consist)) {
@@ -11439,8 +11442,8 @@ static void ReverseTrainDirection(Train *consist, const char *why)
 	/* Check if we were approaching a rail/road-crossing */
 	TileIndex crossing = TrainApproachingCrossingTile(moving_front);
 
-	/* Check if we should back up or flip the train. */
-	if (consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards) || _settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None || consist->Last()->CanLeadTrain()) {
+	/* Check if we should back up or flip the train. Its driver changing the stand (ChangeTrainStand()): backed up always. */
+	if (_reverse_by_backing_up || consist->vehicle_flags.Test(VehicleFlag::DrivingBackwards) || _settings_game.difficulty.train_flip_reverse_allowed == TrainFlipReversingAllowed::None || consist->Last()->CanLeadTrain()) {
 		/* The train will back up. */
 		consist->vehicle_flags.Flip(VehicleFlag::DrivingBackwards);
 
@@ -11536,6 +11539,23 @@ static void ReverseTrainDirection(Train *consist, const char *why)
  * @param reverse_single_veh if true, reverse a unit in a train (needs to be in a depot)
  * @return the cost of this operation or an error
  */
+/**
+ * The driver of a standing train goes to the stand at its other end (CabDriveOp::Stand): the train goes the other way
+ * from now on with its vehicles where they are -- pushing its wagons, as an engine does whose driver changed the cab.
+ * Turned round as the game turns a train with an engine at one end only, its vehicles would change places: the engine
+ * the player sits in came out at the far end of its wagons (the player, 17. 11.: "the Sergej bounces off the wagons,
+ * turns, I am at the other stand and the wagons behind are not coupled").
+ */
+void ChangeTrainStand(Train *v)
+{
+	if (!v->IsFrontEngine() || v->cur_speed != 0 || v->vehstatus.Test(VehState::Crashed) || v->breakdown_ctr != 0) return;
+	v->force_proceed = TFP_NONE;
+	AutoRestoreBackup backing(_reverse_by_backing_up, true);
+	ReverseTrainDirection(v, "zmena stanoviste (ridic v kabine)");
+	InvalidateWindowData(WindowClass::VehicleView, v->index);
+	SetWindowDirty(WindowClass::FirstPerson, 0);
+}
+
 CommandCost CmdReverseTrainDirection(DoCommandFlags flags, VehicleID veh_id, bool reverse_single_veh)
 {
 	Train *v = Train::GetIfValid(veh_id);

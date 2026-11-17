@@ -85,6 +85,7 @@ void NormalizeTrainVehInDepot(const Train *u);
 
 Train *GetTrainCouplePartner(const Train *v, bool *partner_is_behind = nullptr);
 CommandCost CoupleTrainByHand(DoCommandFlags flags, Train *v, bool rear);
+void ChangeTrainStand(Train *v);
 bool TrainAwaitsRescue(Train *v);
 bool IsSignalOverrunOn();
 bool IsSignalOverrunOn(const Train *v);

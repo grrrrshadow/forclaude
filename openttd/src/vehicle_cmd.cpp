@@ -1464,7 +1464,7 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	if (op > to_underlying(CabDriveOp::CoupleRear)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::Stand)) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 	const CabDriveOp what = static_cast<CabDriveOp>(op);
@@ -1472,13 +1472,30 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 	 * engine where the driver's stand is now; at the stand on the side where no wagons are coupled the button does
 	 * nothing"): standing only. At the front, coupled to what stands before it; at the back, the wagons behind the
 	 * engine decoupled, or, the engine alone, coupled to what stands behind it. Else nothing. */
+	if (what == CabDriveOp::Stand) {
+		/* The driver to the stand at the other end of a standing train (ChangeTrainStand()). */
+		if (v->type != VehicleType::Train) return CMD_ERROR;
+		Train *t = Train::From(v);
+		if (t->cur_speed != 0 || !t->IsFrontEngine() || t->breakdown_ctr != 0) return CMD_ERROR;
+		if (flags.Test(DoCommandFlag::Execute)) ChangeTrainStand(t);
+		return CommandCost();
+	}
 	if (what == CabDriveOp::CoupleFront || what == CabDriveOp::CoupleRear) {
 		if (v->type != VehicleType::Train) return CMD_ERROR;
 		Train *t = Train::From(v);
 		if (t->cur_speed != 0 || !t->IsFrontEngine()) return CommandCost();
 		const bool rear = what == CabDriveOp::CoupleRear;
 		if (rear && t->GetNextUnit() != nullptr) {
-			if (flags.Test(DoCommandFlag::Execute)) TryDecoupleAtStation(t, 0, false, OrderLoadType::LoadIfPossible, OrderUnloadType::UnloadIfPossible, 0, StationID::Invalid(), false);
+			if (flags.Test(DoCommandFlag::Execute)) {
+				/* The driver stays at the stand he decoupled from: the engine left alone goes the way it went (pushing,
+				 * backwards) -- else it went forwards again, the driver was at its other end looking away from the wagons
+				 * he had just left, and the button there coupled nothing. */
+				const bool backwards = t->IsDrivingBackwards();
+				const VehicleID id = t->index;
+				TryDecoupleAtStation(t, 0, false, OrderLoadType::LoadIfPossible, OrderUnloadType::UnloadIfPossible, 0, StationID::Invalid(), false);
+				Train *left = Train::GetIfValid(id);
+				if (left != nullptr && left->IsFrontEngine() && left->IsDrivingBackwards() != backwards) ChangeTrainStand(left);
+			}
 			return CommandCost();
 		}
 		return CoupleTrainByHand(flags, t, rear);

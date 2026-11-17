@@ -47,6 +47,7 @@ enum class CabDriveOp : uint8_t {
 	Forward = 7, ///< and forwards again, stopped, held to the slowest speed (CAB_SLOWEST)
 	CoupleFront = 8,  ///< a train standing: couple to what stands at its front, at the driver's stand there (CmdCabDrive())
 	CoupleRear = 9,   ///< couple to what stands at the engine's back, or decouple the wagons coupled there
+	Stand = 10,       ///< a train standing: the driver goes to the stand at its other end -- it goes the other way from now on, its vehicles where they are (ChangeTrainStand())
 };
 
 /** The slowest speed the brake of the cab holds a vehicle to (CabSpeed()); braked further it stops. */
