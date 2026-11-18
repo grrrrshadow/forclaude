@@ -58,6 +58,7 @@ struct CabViewCamera {
 	double collect_ms = 0.0; ///< rig: of it, collecting what to draw, under the lock of the game (CollectEyeFrame())
 	double draw_ms = 0.0; ///< rig: and drawing it, on the thread of the frames (EyeFrameThread())
 	bool fresh = false;   ///< a picture drawn anew was taken by the last call (DrawCabView(), DrawFirstPersonView())
+	uint64_t taken = 0;   ///< the number of the newest frame taken (EyeView()): one collected before it, drawn after it, is not shown
 	int tiles = 0;        ///< rig: tiles drawn in the last picture
 	int billboards = 0;   ///< rig: billboards drawn in the last picture
 	double stage[7] = {}; ///< rig: the milliseconds of the stages of collecting the last picture (CollectEyeFrame())

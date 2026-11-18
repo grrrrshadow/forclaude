@@ -1880,6 +1880,7 @@ void StartReadingThreeDObjects();
 void WaitForReadingThreeDObjects();
 bool ThreeDObjectsIndexRead();
 bool ThreeDObjectReadOrAsked(const ThreeDObject *o);
+bool ThreeDObjectsOweQuiet();
 bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact = nullptr, bool card_paint = false);
 uint64_t ThreeDObjectsReadied();
 uint64_t ThreeDTexturesStoodIn();

@@ -16691,6 +16691,19 @@ static void ForgetUnusedThreeDObjects()
 void ForgetThreeDObjectsIfOwed()
 {
 	if (_three_d_forget_owed) ForgetUnusedThreeDObjectsNow();
+	/* The painted textures over their budget let go of too: put off while a frame from the eyes was drawn, and the
+	 * next one collected meanwhile paints none to let them go then (EyeView() of viewport.cpp). */
+	DropPaintedTextures();
+}
+
+/**
+ * Whether something is to be let go of that a frame of the view from the eyes may draw from (a forgetting put off,
+ * the painted textures over their budget): the next frame is then collected when the one before is drawn, not while
+ * the card draws it (EyeView() of viewport.cpp), so that it is let go of between them (ForgetThreeDObjectsIfOwed()).
+ */
+bool ThreeDObjectsOweQuiet()
+{
+	return _three_d_forget_owed || (_painted_bytes > PAINTED_BUDGET && _three_d_objects_read);
 }
 
 /** The clock of the objects goes on in real time, every fifteen seconds (ForgetUnusedThreeDObjects()). */

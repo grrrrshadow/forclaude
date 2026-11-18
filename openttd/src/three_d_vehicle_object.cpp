@@ -2843,13 +2843,33 @@ static uint64_t _pictures_pinned_from = UINT64_MAX;
 /** And those asked for by the block of the map being drawn: it draws them after it asked for them (KeepThreeDPicturesOfBlock()). */
 static uint64_t _pictures_block_from = UINT64_MAX;
 
+/** The clocks the frames of the view from the eyes pinned from (PinThreeDPictures()): a frame drawn and the next collected meanwhile, two. */
+static std::multiset<uint64_t> _pictures_pins;
+
 /**
- * Keep the pictures of the 3D objects asked for from now on until unpinned: a view that collects its triangles and
- * draws them at once on every core (the view from the eyes) draws their pixels after it asked for more of them.
+ * Keep the pictures of the 3D objects asked for from now on until unpinned (UnpinThreeDPictures()): a view that
+ * collects its triangles and draws them at once on every core (the view from the eyes) draws their pixels after it
+ * asked for more of them. Each frame its own pin: the next is collected while the card draws the one before
+ * (EyeView() of viewport.cpp), whose pictures stay -- a pin of the next one moved the clock past them.
+ * @return the pin, to let go of with UnpinThreeDPictures()
  */
-void PinThreeDPictures(bool pin)
+uint64_t PinThreeDPictures()
 {
-	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
+	const uint64_t from = _object_pictures_clock + 1;
+	_pictures_pins.insert(from);
+	_pictures_pinned_from = *_pictures_pins.begin();
+	return from;
+}
+
+/** A frame's pin let go of (PinThreeDPictures()); UINT64_MAX all of them. */
+void UnpinThreeDPictures(uint64_t pin)
+{
+	if (pin == UINT64_MAX) {
+		_pictures_pins.clear();
+	} else if (auto it = _pictures_pins.find(pin); it != _pictures_pins.end()) {
+		_pictures_pins.erase(it);
+	}
+	_pictures_pinned_from = _pictures_pins.empty() ? UINT64_MAX : *_pictures_pins.begin();
 }
 
 /**

@@ -126,6 +126,16 @@ Times _map_blocks;     ///< of them, the map's blocks (ViewportDoDraw())
 Times _eye_window;     ///< and the canvas of the view from the eyes (its window's DrawWidget)
 Times _ground_waits;   ///< waits for the card laying the ground of the turned map (FinishTurnedGround())
 Times _eye_collected; ///< the view from the eyes collected (the main thread)
+static int _eye_collected_alongside = 0; ///< of them, while the card drew the frame before (EyeView() of viewport.cpp)
+
+/** The view from the eyes collected since the last time (_eye_collected), and how many of them alongside the card; started again. */
+static std::string EyeCollectedTaken()
+{
+	std::string out = _eye_collected.Take();
+	if (_eye_collected_alongside > 0) out += fmt::format(" (soubezne {}x)", _eye_collected_alongside);
+	_eye_collected_alongside = 0;
+	return out;
+}
 Times _eye_drawn;     ///< and drawn (its thread)
 Times _eye_prepared;  ///< of that on the card: its steps and triangles made ready by the processor
 Times _eye_card;      ///< and the card's own work (ThreeDGpuRenderEyeFrame(): sent, drawn, shown)
@@ -212,7 +222,7 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" zpravy = zpravy systemu (mys, klavesy) v klavesach: kolik na snimek a za kolik ms, odlozeno = snimky, ktere zbytek zprav nechaly dalsimu (jejich cas vyprsel);"
 				" rozpad okna: hodiny = hodiny oken (i krok chodce z oci se sberem), bloky = spinave kusy obrazovky kreslene, mapa = bloky herni plochy,"
 				" okno oci = vykresleni platna z oci do okna, zem = cekani na kartu u zeme otocene plochy; druhy oken = ktera okna kreslila nejdel (kusu a ms za 5 s, mapa i s herni plochou);"
-				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
+				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne (soubezne = kolikrat behem kresleni predchoziho snimku kartou), oci kresleni = na jeho vlakne;"
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
 				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta;"
 				" otocena = kresleni otocene mapy na snimek: sprity do textur, stopy domu, polozeni zeme, sber, plakaty, modely (domy kreslene procesorem), a kolik bloku vzalo zem z drzeneho pohledu; zmen naraz = zmeny hlavni mapy polozene kartou jednim kusem (a proc ne), po kouscich = v kolika obdelnicich z nich karta kreslila (a kolik procent plochy kusu), v malych oknech = totez v oknech vozidel a dalsich pohledech; stojici procesorem = bloky, kde co stoji kreslil procesor (bez zeme karty, nebo karta vratila; proc v obrazky: what stands on);"
@@ -231,7 +241,7 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
 			static_cast<double>(_sum.messages) / n, _sum.messages_ms / n, _most_messages, _longest.messages, _longest.messages_ms, _sum.messages_cut,
 			_windows_timers.Take(), _windows_blocks.Take(), _map_blocks.Take(), _eye_window.Take(), _ground_waits.Take(), TakeWindowPaints(),
-			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
+			_game_ticks.Take(), EyeCollectedTaken(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
 			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB(), TakeTurnedTimesForDiary(_frames), TakePicturesForDiary(), TakeThreeDMemoryForDiary());
 	fflush(*_diary);
 	_lines++;
@@ -357,10 +367,20 @@ void FrameDiaryGroundWait(double ms)
 	_ground_waits.Add(ms);
 }
 
-/** The view from the eyes collected (the main thread), milliseconds. */
-void FrameDiaryEyeCollected(double ms)
+/** Rig ('test3d denik'): the view from the eyes since the last time, as the diary writes it; started again. */
+std::string FrameDiaryEyeTaken()
+{
+	return fmt::format("sber {} | kresleni {} | priprava {} | karta {}", EyeCollectedTaken(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take());
+}
+
+/**
+ * The view from the eyes collected (the main thread), milliseconds.
+ * @param alongside while the card drew the frame before
+ */
+void FrameDiaryEyeCollected(double ms, bool alongside)
 {
 	_eye_collected.Add(ms);
+	if (alongside) _eye_collected_alongside++;
 }
 
 /** And drawn (its thread), milliseconds. */

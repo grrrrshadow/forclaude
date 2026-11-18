@@ -2509,12 +2509,22 @@ static TurnedGround _turned_ground;
  * processor and sent all of it to the card, a few megabytes, though the eye moved by a step. Only the tiles whose ground
  * changed or came new are drawn into it, and only what was drawn goes to the card (CollectEyeFrame()).
  */
-static TurnedGround _eye_ground;
+static TurnedGround _eye_grounds[2];
+/**
+ * Which of the two the frame being collected draws into: the next frame is collected while the card draws the one
+ * before (EyeView()), whose ground the card is sent from meanwhile -- into the other one then.
+ */
+static int _eye_ground_at = 0;
+/** The kept ground the frame being collected draws into (_eye_ground_at). */
+static TurnedGround &EyeGround()
+{
+	return _eye_grounds[_eye_ground_at];
+}
 bool _eye_ground_kept = true; ///< Rig: the ground of the view from the eyes kept (test3d zem oci); else drawn anew for every frame as before
 uint64_t _eye_ground_frames[2] = {}; ///< Rig: the frames from the eyes whose ground was drawn for them alone, and kept (test3d zem oci)
 static constexpr size_t EYE_GROUND_PIXELS = static_cast<size_t>(8) << 20; ///< the kept ground of the view from the eyes at most so many pixels (32 MB)
 static constexpr int EYE_GROUND_SIDE = 4096; ///< and so many a side: one texture on the card of a phone
-static constexpr uint64_t EYE_GROUND_CARD_KEY = 2; ///< its name among the card's textures of the ground (ThreeDGpuGroundTexture::key; the turned view's 1)
+static constexpr uint64_t EYE_GROUND_CARD_KEY = 2; ///< its name among the card's textures of the ground (ThreeDGpuGroundTexture::key; the turned view's 1), the second kept ground's 3
 static uint64_t _turned_ground_generations = 0;
 /** Counts the changes of the ground of the turned view: of the kept picture, of the tiles with a foundation (TurnedGroundOfView). */
 static uint64_t _turned_ground_version = 0;
@@ -2571,9 +2581,10 @@ void ResetTurnedGround()
 	_turned_ground_version++;
 	ForgetSmallViewGrounds();
 	/* The view from the eyes' too, once its frame on the way is drawn from it no more. */
-	if (_eye_ground.valid) {
+	if (_eye_grounds[0].valid || _eye_grounds[1].valid) {
 		WaitEyeFrame();
-		_eye_ground = TurnedGround();
+		_eye_grounds[0] = TurnedGround();
+		_eye_grounds[1] = TurnedGround();
 	}
 	extern void ForgetTurnedFoundations();
 	ForgetTurnedFoundations();
@@ -3744,7 +3755,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 	double t0 = TurnedNow();
 	const bool map = &g == &_turned_ground;
 	/* Our grass on the game's (DrawOurGrass()): the tiles drawn again when the player switches it, or its picture comes. */
-	const bool eyes = &g == &_eye_ground;
+	const bool eyes = &g == &_eye_grounds[0] || &g == &_eye_grounds[1];
 	const bool grass = OurGrassOn(eyes);
 	/* The roads of the view from the eyes smooth (DrawEyeRoad()): drawn again when the player switches it, or another
 	 * smooths them (the card, the processor). */
@@ -13627,15 +13638,18 @@ struct EyeFrame {
 	std::deque<std::vector<uint32_t>> colours; ///< textures of this frame alone the triangles point to (a colour, the far land's)
 	std::deque<CabTexture> sprites;           ///< sprites painted for this frame alone (a bridge's, a foundation's)
 	std::deque<EyeCanvas> canvases;           ///< pictures of its own drawn while collecting (a tunnel seen in)
-	std::vector<uint32_t> ground;             ///< the north-up texture of the ground ahead, drawn for it alone (else the kept one, _eye_ground)
+	std::vector<uint32_t> ground;             ///< the north-up texture of the ground ahead, drawn for it alone (else a kept one, _eye_grounds)
 	ThreeDGpuGroundTexture ground_card;       ///< the kept one as the card gets it: what was drawn into it since the card had it (pixels nullptr: none)
+	int ground_at = 0;                        ///< which kept one (_eye_grounds)
+	uint64_t number = 0;                      ///< counts the frames collected (EyeView()): the newer, the bigger
+	bool dropped = false;                     ///< not drawn: the card could not while the next was collected (DrawEyeFrame())
 	std::unordered_map<const uint32_t *, uint64_t> kept; ///< the textures its triangles point to that the frames share (a sprite's), by their number
 	CabEye eye{};                             ///< the eye it is seen from
 	const ThreeDObjectTexture *grass = nullptr; ///< the level of our grass's picture its ground's marks of it are coloured from (CAB_GRASS); nullptr none
 	double near_plane = 0;                    ///< its near plane (_cab_near)
 	const void *client = nullptr;             ///< whose picture it is: the window's camera
 	bool depot = false;                       ///< nothing to draw: the picture was filled while collecting (hidden in a depot)
-	bool pinned = false;                      ///< the pictures of the vehicles pinned for it (PinThreeDPictures())
+	uint64_t pin = UINT64_MAX;                ///< the pictures of the vehicles pinned for it (PinThreeDPictures()), UINT64_MAX none
 	double collect_ms = 0;                    ///< how long collecting took, under the lock
 	double draw_ms = 0;                       ///< and drawing, on the thread
 	bool on_card = false;                     ///< drawn whole by the graphics card
@@ -13706,7 +13720,7 @@ struct EyeCard {
 				if (k != this->of.kept.end()) uid = k->second;
 			}
 			this->frame.textures.push_back({px, w, h, uid});
-			/* The kept ground (_eye_ground): the card keeps its own, only what was drawn into it since sent. */
+			/* A kept ground (_eye_grounds): the card keeps its own, only what was drawn into it since sent. */
 			if (px != nullptr && px == this->of.ground_card.pixels) this->frame.textures.back().ground = &this->of.ground_card;
 		}
 		return it->second;
@@ -14039,6 +14053,16 @@ static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_
 	}
 }
 
+/** The sprites kept as textures (_cab_textures) at CAB_TEXTURES_KEPT: the oldest half goes. No frame may be drawn from them (EyeFrameDrawing()). */
+static void LetGoOfOldCabTextures()
+{
+	if (_cab_textures.size() < CAB_TEXTURES_KEPT) return;
+	std::vector<std::pair<uint64_t, uint64_t>> ages;
+	for (const auto &e : _cab_textures) ages.emplace_back(e.second.used, e.first);
+	std::sort(ages.begin(), ages.end());
+	for (size_t i = 0; i < ages.size() / 2; i++) _cab_textures.erase(ages[i].second);
+}
+
 /**
  * A sprite as a texture at the normal zoom, with its child sprites: the sprite's top left at 0,0 of the texture.
  * Kept for the next frames when it has no children and no sub-sprite (a tree, a house, a vehicle's picture).
@@ -14057,13 +14081,9 @@ static const CabTexture *CabSpriteTexture(const ParentSpriteToDraw &ps)
 			if (_eye_frame != nullptr) _eye_frame->kept[it->second.px.data()] = it->second.uid;
 			return &it->second;
 		}
-		if (_cab_textures.size() >= CAB_TEXTURES_KEPT) {
-			/* The oldest half goes. */
-			std::vector<std::pair<uint64_t, uint64_t>> ages;
-			for (const auto &e : _cab_textures) ages.emplace_back(e.second.used, e.first);
-			std::sort(ages.begin(), ages.end());
-			for (size_t i = 0; i < ages.size() / 2; i++) _cab_textures.erase(ages[i].second);
-		}
+		/* Not while a frame is drawn from them (the next one is collected while the card draws the one before,
+		 * EyeView()): over the count meanwhile, let go of before the next frame collected after it. */
+		if (_cab_textures.size() >= CAB_TEXTURES_KEPT && !EyeFrameDrawing()) LetGoOfOldCabTextures();
 	}
 	static CabTexture scratch;
 	CabTexture &t = cacheable ? _cab_textures[key] : EyeScratchTexture(scratch);
@@ -18919,8 +18939,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* What is drawn goes into the frame (CabRasterTriangle()), drawn when the game's state is let go of; the pictures
 	 * of the vehicles and the figures asked for stay till the frame is taken (PinThreeDPictures()). */
 	AutoRestoreBackup frame_backup(_eye_frame, &out);
-	PinThreeDPictures(true);
-	out.pinned = true;
+	out.pin = PinThreeDPictures();
 	/* The round curves of the rails from the eyes too (round_track.h): the curves' tiles drawn as strips into the ground,
 	 * the trains on the arcs, the eye riding one along it. */
 	RoundTrackPass round_track_pass(true);
@@ -19722,7 +19741,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* Our grass of the ground marked, coloured where the picture is drawn from its picture (CAB_GRASS, CabGrassTexel()). */
 	const bool eye_grass = OurGrassOn(true);
 	out.grass = eye_grass ? OurGrassEyeLevel() : nullptr;
-	/* 3. The ground of all of them, north-up, in one texture at the normal zoom: the kept one (_eye_ground), only the
+	/* 3. The ground of all of them, north-up, in one texture at the normal zoom: a kept one (_eye_grounds), only the
 	 * tiles whose ground changed or came new drawn into it; or one drawn for this frame alone (the rig, or more than
 	 * the kept one may hold). */
 	DrawPixelInfo bigdpi{};
@@ -19758,9 +19777,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	const uint32_t *gpx = nullptr; ///< the texture's pixels
 	int gw = 0, gh = 0;            ///< its size
 	int gl = 0, gt = 0;            ///< its first pixel, pixels of the zoom
-	bool ground_kept = false;      ///< the kept one (_eye_ground): the straight white marks of its roads with its tiles
+	bool ground_kept = false;      ///< a kept one (_eye_grounds): the straight white marks of its roads with its tiles
 	std::vector<EyeRoadMark> frame_marks; ///< else those of the one drawn for this frame (DrawEyeRoad())
-	if (bw > 0 && bh > 0 && _eye_ground_kept && PlaceTurnedGround(_eye_ground, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh}, EYE_GROUND_PIXELS, EYE_GROUND_SIDE)) {
+	if (bw > 0 && bh > 0 && _eye_ground_kept && PlaceTurnedGround(EyeGround(), zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh}, EYE_GROUND_PIXELS, EYE_GROUND_SIDE)) {
 		/* The tiles as the kept ground takes them; one on a foundation with its ground as drawn here: its sprites, then
 		 * the foundation's children (on its top). */
 		std::vector<TurnedTile> ground_tiles;
@@ -19800,8 +19819,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 		}
-		UpdateTurnedGround(_eye_ground, ground_tiles, on_foundations);
-		const TurnedGround &g = _eye_ground;
+		UpdateTurnedGround(EyeGround(), ground_tiles, on_foundations);
+		const TurnedGround &g = EyeGround();
 		gpx = g.px.data();
 		gw = g.Width();
 		gh = g.Height();
@@ -19811,7 +19830,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* What the card gets of it: what was drawn into it since the card had it (FreeEyeFrame() tells it had). */
 		ThreeDGpuGroundTexture &c = out.ground_card;
 		c = {};
-		c.key = EYE_GROUND_CARD_KEY;
+		c.key = EYE_GROUND_CARD_KEY + _eye_ground_at;
+		out.ground_at = _eye_ground_at;
 		c.smooth_roads = _settings_client.gui.eye_roads && EyeRoadsOnCard();
 		c.generation = g.generation;
 		c.from_generation = g.card_whole ? 0 : g.card_generation;
@@ -20059,8 +20079,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			};
 			if (ground_kept) {
 				for (const CabTile &t : tiles) {
-					auto it = _eye_ground.tiles.find(TurnedGroundTileKey(t.x, t.y));
-					if (it != _eye_ground.tiles.end()) lay(it->second.road_marks);
+					auto it = EyeGround().tiles.find(TurnedGroundTileKey(t.x, t.y));
+					if (it != EyeGround().tiles.end()) lay(it->second.road_marks);
 				}
 			} else {
 				lay(frame_marks);
@@ -21160,6 +21180,17 @@ static std::condition_variable _eye_wake;
 static std::unique_ptr<EyeFrame> _eye_to_draw;   ///< handed to the thread, not in its hands yet
 static std::unique_ptr<EyeFrame> _eye_drawn;     ///< drawn, waiting for its window to take it
 static bool _eye_drawing = false;                ///< the thread has one in hand
+/**
+ * The thread waits for the graphics card to draw the frame in hand (DrawEyeFrameOnCard()): it reads nothing of what
+ * collecting writes, only the frame's own lists and the pixels its textures point to (kept: _eye_grounds, the pinned
+ * pictures, _cab_textures not let go of meanwhile), so the next frame may be collected meanwhile (EyeView()).
+ */
+static bool _eye_in_card = false;
+/** The main thread collects the next frame while the card draws the one before (EyeView()): the thread's processor draws nothing meanwhile (DrawEyeFrame()). */
+static bool _eye_alongside = false;
+/** The last frame the thread drew was drawn by the card: the next may be collected alongside the card again. */
+static bool _eye_card_ok = false;
+bool _eye_alongside_on = true; ///< Rig: the next frame collected while the card draws the one before (test3d chodec soubeh); else after it, as before
 static bool _eye_stop = false;
 static std::thread _eye_thread;
 static bool _eye_thread_failed = false;          ///< it could not be started: the frames are drawn at once, as before
@@ -21209,7 +21240,17 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 		}
 	}
 	const double prepared = TurnedNow();
-	if (!ThreeDGpuRenderEyeFrame(c)) return false;
+	/* Its lists made: while the card draws them the next frame may be collected (EyeView()). */
+	{
+		std::lock_guard lock(_eye_mutex);
+		_eye_in_card = true;
+	}
+	const bool rendered = ThreeDGpuRenderEyeFrame(c);
+	{
+		std::lock_guard lock(_eye_mutex);
+		_eye_in_card = false;
+	}
+	if (!rendered) return false;
 	/* Where the time goes on the player's machine (snimky.log): the processor's part and the card's. */
 	FrameDiaryEyeCard(true, prepared - start, TurnedNow() - prepared, c.corners.size());
 	if (c.shown != 0) {
@@ -21227,7 +21268,27 @@ static void DrawEyeFrame(EyeFrame &f)
 	const double start = TurnedNow();
 	f.shown = 0;
 	const bool on_card = DrawEyeFrameOnCard(f);
+	f.dropped = false;
 	if (!on_card) {
+		/* The card could not while the next frame was collected meanwhile (EyeView()): the processor's jobs draw from
+		 * what collecting writes, so not now -- the frame let go of, the window keeps its picture (waiting for the
+		 * collecting could wait for this thread in turn, WaitEyeFrame()). */
+		bool alongside;
+		{
+			std::lock_guard lock(_eye_mutex);
+			alongside = _eye_alongside;
+		}
+		if (alongside) {
+			f.dropped = true;
+			f.passes.clear();
+			f.colours.clear();
+			f.sprites.clear();
+			f.canvases.clear();
+			f.kept.clear();
+			f.draw_ms = TurnedNow() - start;
+			f.on_card = false;
+			return;
+		}
 		FrameDiaryEyeCard(false, 0, 0, 0);
 		/* Its sky and depth first (a frame hidden in a depot was filled while collecting). */
 		if (!f.depot) ClearEyeFrame(f);
@@ -21288,6 +21349,7 @@ static void EyeFrameThread()
 		f->drawn_at = std::chrono::steady_clock::now();
 		FrameDiaryEyeDrawn(std::chrono::duration<double, std::milli>(f->drawn_at - started).count());
 		lock.lock();
+		_eye_card_ok = f->on_card;
 		_eye_drawn = std::move(f);
 		_eye_drawing = false;
 		_eye_wake.notify_all();
@@ -21305,7 +21367,7 @@ bool EyeFrameDrawing()
 static void FreeEyeFrame(std::unique_ptr<EyeFrame> f)
 {
 	/* The card has the kept ground as the frame sent it (DrawEyeFrameOnCard()): what was drawn into it since is sent no more. */
-	TurnedGround &g = _eye_ground;
+	TurnedGround &g = _eye_grounds[f->ground_at];
 	if (f->on_card && f->ground_card.pixels != nullptr && f->ground_card.pixels == g.px.data() && f->ground_card.generation == g.generation) {
 		g.card_generation = g.generation;
 		g.card_x = g.card_y = 0;
@@ -21314,9 +21376,9 @@ static void FreeEyeFrame(std::unique_ptr<EyeFrame> f)
 	}
 	f->ground_card = {};
 	f->on_card = false;
-	if (f->pinned) {
-		PinThreeDPictures(false);
-		f->pinned = false;
+	if (f->pin != UINT64_MAX) {
+		UnpinThreeDPictures(f->pin);
+		f->pin = UINT64_MAX;
 	}
 	if (_eye_free.size() < 3) _eye_free.push_back(std::move(f));
 }
@@ -21336,9 +21398,11 @@ static std::unique_ptr<EyeFrame> NewEyeFrame(const void *client)
 	f->sprites.clear();
 	f->canvases.clear();
 	f->kept.clear();
+	static uint64_t numbered = 0;
+	f->number = ++numbered;
 	f->client = client;
 	f->depot = false;
-	f->pinned = false;
+	f->pin = UINT64_MAX;
 	f->collect_ms = f->draw_ms = 0;
 	f->shown = 0;
 	f->on_card = false;
@@ -21349,6 +21413,10 @@ static std::unique_ptr<EyeFrame> NewEyeFrame(const void *client)
 /** The picture of a frame drawn becomes the window's, with how long it took. */
 static void TakeEyeFrame(EyeFrame &f, CabViewCamera &camera, CabViewPicture &out)
 {
+	/* Collected before the one shown, drawn after it (the next one is collected while the card draws, and one with
+	 * nothing to draw is shown at once): not shown back. */
+	if (f.number < camera.taken || f.dropped) return;
+	camera.taken = f.number;
 	out.width = f.width;
 	out.height = f.height;
 	out.pixels.swap(f.pixels);
@@ -21390,7 +21458,7 @@ void StopEyeFrameThread()
 	_eye_drawn.reset();
 	_eye_drawing = false;
 	_eye_free.clear();
-	PinThreeDPictures(false);
+	UnpinThreeDPictures(UINT64_MAX);
 }
 
 /** A window's frame drawn or to be drawn goes with the window (its camera): the pictures it pinned are let go of. */
@@ -21408,7 +21476,10 @@ void DropEyeFrame(const void *client)
 	if (drawn != nullptr) FreeEyeFrame(std::move(drawn));
 	/* Its kept ground let go of (megabytes), when no frame on the way is drawn from it: the next window lays it anew. */
 	std::lock_guard lock(_eye_mutex);
-	if (_eye_to_draw == nullptr && !_eye_drawing && _eye_drawn == nullptr) _eye_ground = TurnedGround();
+	if (_eye_to_draw == nullptr && !_eye_drawing && _eye_drawn == nullptr) {
+		_eye_grounds[0] = TurnedGround();
+		_eye_grounds[1] = TurnedGround();
+	}
 }
 
 /**
@@ -21436,7 +21507,7 @@ static bool EyeView(const Vehicle *v, const FirstPersonEye *walker, int width, i
 		return true;
 	}
 	std::unique_ptr<EyeFrame> done, stale;
-	bool busy;
+	bool busy, alongside = false;
 	{
 		std::lock_guard lock(_eye_mutex);
 		if (_eye_drawn != nullptr) {
@@ -21448,28 +21519,50 @@ static bool EyeView(const Vehicle *v, const FirstPersonEye *walker, int width, i
 		}
 		/* Another window's frame drawn waits for it: nothing is collected over it. */
 		busy = _eye_to_draw != nullptr || _eye_drawing || _eye_drawn != nullptr;
+		/* This window's frame in the card's hands, nothing else on the way: the next one collected meanwhile, into the
+		 * other kept ground (_eye_grounds) -- the player's diary of 18. 11.: collecting 17-30 ms, drawing 45-57 ms (the
+		 * card 37), one after the other at the window's steps of 40 ms a frame every 80 ms, 12 a second. */
+		alongside = busy && _eye_alongside_on && _eye_card_ok && _eye_in_card && _eye_drawing && _eye_to_draw == nullptr && _eye_drawn == nullptr &&
+				_eye_last_client == &camera && _eye_asked_client == nullptr;
 	}
 	if (stale != nullptr) FreeEyeFrame(std::move(stale));
 	if (done != nullptr) {
 		TakeEyeFrame(*done, camera, out);
 		FreeEyeFrame(std::move(done));
 	}
-	if (busy) {
+	/* Something to let go of that the frame in hand may draw from (_cab_textures full, a forgetting put off, the painted
+	 * textures over their budget): the next frame after it, the letting go between them. */
+	if (alongside && (_cab_textures.size() >= CAB_TEXTURES_KEPT || ThreeDObjectsOweQuiet())) alongside = false;
+	if (busy && !alongside) {
 		if (&camera != _eye_last_client) _eye_asked_client = &camera;
-	} else if (_eye_asked_client != nullptr && _eye_asked_client != &camera && _eye_last_client == &camera) {
+	} else if (!alongside && _eye_asked_client != nullptr && _eye_asked_client != &camera && _eye_last_client == &camera) {
 		/* Another window asked while this one's frame was drawn: its turn (the cab and the walker both open). */
 		_eye_asked_client = nullptr;
 	} else {
-		_eye_asked_client = nullptr;
-		_eye_last_client = &camera;
-		/* Between the frames, none on the way: what was put off forgetting is forgotten now (the frames came one after
-		 * the other, one always drawn, and nothing was ever let go of from the eyes). */
-		extern void ForgetThreeDObjectsIfOwed();
-		ForgetThreeDObjectsIfOwed();
+		if (!alongside) {
+			_eye_asked_client = nullptr;
+			_eye_last_client = &camera;
+			/* Between the frames, none on the way: what was put off forgetting is forgotten now (the frames came one
+			 * after the other, one always drawn, and nothing was ever let go of from the eyes). */
+			extern void ForgetThreeDObjectsIfOwed();
+			ForgetThreeDObjectsIfOwed();
+			LetGoOfOldCabTextures();
+		} else {
+			std::lock_guard lock(_eye_mutex);
+			_eye_alongside = true;
+			_eye_ground_at = 1 - _eye_ground_at;
+		}
 		std::unique_ptr<EyeFrame> f = NewEyeFrame(&camera);
 		const auto collecting = std::chrono::steady_clock::now();
 		const bool collected = CollectEyeFrame(v, walker, width, height, camera, *f);
-		FrameDiaryEyeCollected(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - collecting).count());
+		FrameDiaryEyeCollected(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - collecting).count(), alongside);
+		if (alongside) {
+			{
+				std::lock_guard lock(_eye_mutex);
+				_eye_alongside = false;
+			}
+			_eye_wake.notify_all();
+		}
 		if (!collected) {
 			FreeEyeFrame(std::move(f));
 		} else if (f->depot) {

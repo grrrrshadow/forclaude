@@ -9683,6 +9683,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: obraz z oci {}", _eye_synchronous ? "hned" : "na vlakne, o snimek pozadu");
 			return true;
 		}
+		if (argv.size() > 3 && argv[2] == "soubeh") {
+			/* 'chodec soubeh 0|1': on the thread of the frames the next one collected while the card draws the one before
+			 * (EyeView()); 0 after it, as before. */
+			extern bool _eye_alongside_on;
+			_eye_alongside_on = number(3).value_or(1) != 0;
+			IConsolePrint(CC_DEFAULT, "test3d: sber z oci {}", _eye_alongside_on ? "soubezne s kartou" : "az po nakresleni");
+			return true;
+		}
 		if (!thread_chosen) _eye_synchronous = true;
 		if (argv.size() > 3 && argv[2] == "stoj") {
 			/* 'chodec stoj <steps>': the view's timer so many steps, no key held (the nurse heals there, CmdHealWalkerByNurse()). */
@@ -12252,6 +12260,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string TakeThreeDMainKinds();
 		IConsolePrint(CC_DEFAULT, "test3d: denik hlavni vlakno nacetlo {}", TakeThreeDMainKinds());
 		IConsolePrint(CC_DEFAULT, "test3d: denik karta {}", ThreeDGpuTimes());
+		extern std::string FrameDiaryEyeTaken();
+		extern uint64_t _three_d_forgets_done, _three_d_forgets_put_off;
+		IConsolePrint(CC_DEFAULT, "test3d: denik oci {} | zapomenuti {}, odlozeno {}", FrameDiaryEyeTaken(), _three_d_forgets_done, _three_d_forgets_put_off);
 		return true;
 	} else if (what == "cas") {
 		/* How long the whole screen takes to draw, ten times over, at the angle set; 'cas <n> <w> <h>' a piece of it
