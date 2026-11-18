@@ -4122,6 +4122,20 @@ struct MeshOnCard {
 };
 
 /**
+ * What a picture is drawn with first (its first mesh's corners and texture): the pictures of a batch drawn by it, those
+ * of one shape and texture one after another, their arrays, texture and masks bound once for all of them (the wagons
+ * of a train, the cars of one kind; the rig's 96 Tatras of 16 kinds bound the texture twice a vehicle, the vertex array
+ * almost once). Each picture of a batch has its own rectangle of the frame and its depths there: the order changes no
+ * pixel. Rig 'test3d stojici stav 0': drawn as placed.
+ */
+static std::pair<GLuint, GLuint> PictureKind(const std::vector<MeshOnCard> &draws)
+{
+	if (draws.empty()) return {0, 0};
+	const MeshOnCard &d = draws.front();
+	return {d.shape->vao, d.textures.empty() ? 0 : d.textures.front()};
+}
+
+/**
  * Put on the card what a picture draws (DrawPicturesOnCard()): its shapes, triangles, textures and masks.
  * @return false: something the card cannot hold, or triangles naming a corner their shape has not; the processor draws it
  */
@@ -4345,8 +4359,11 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		gl.glDisable(GL_SCISSOR_TEST);
 		Step(fmt::format("kresleni obrazku {}-{} (glDrawElements)", _gpu_pictures + 1 + at, _gpu_pictures + end));
+		std::vector<const Placed *> order;
+		for (size_t k = at; k < end; k++) order.push_back(&placed[k]);
+		if (_gpu_standing_lean) std::ranges::stable_sort(order, [](const Placed *a, const Placed *b) { return PictureKind(a->draws) < PictureKind(b->draws); });
 		PictureBatch batch;
-		for (size_t k = at; k < end; k++) DrawPictureAt(*placed[k].pic, placed[k].draws, placed[k].x, placed[k].y, &batch);
+		for (const Placed *p : order) DrawPictureAt(*p->pic, p->draws, p->x, p->y, &batch);
 		if (batch.begun || batch.cull_set != -2) EndPictureBatch(batch);
 		/* Read back once, each picture's rows out of it. */
 		Step(fmt::format("cteni obrazku {}-{} zpet (glReadPixels), {}x{}, {}", _gpu_pictures + 1 + at, _gpu_pictures + end, frame_w, frame_h, MemoryNow()));
@@ -6128,8 +6145,14 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		ClearInScissor(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, 0, 0, frame_w, frame_h, 1.0f);
 		gl.glDisable(GL_SCISSOR_TEST);
 		{
+			/* Those of one shape and texture one after another (PictureKind()); the shrinking after keeps the order they
+			 * were placed in. */
+			std::vector<const Placed *> order;
+			order.reserve(placed.size());
+			for (const Placed &p : placed) order.push_back(&p);
+			if (_gpu_standing_lean) std::ranges::stable_sort(order, [](const Placed *a, const Placed *b) { return PictureKind(a->draws) < PictureKind(b->draws); });
 			PictureBatch batch;
-			for (const Placed &p : placed) DrawPictureAt(s.items[p.item].vehicle->pic, p.draws, vehicle_at[p.item][0], vehicle_at[p.item][1], &batch);
+			for (const Placed *p : order) DrawPictureAt(s.items[p->item].vehicle->pic, p->draws, vehicle_at[p->item][0], vehicle_at[p->item][1], &batch);
 			if (batch.begun || batch.cull_set != -2) EndPictureBatch(batch);
 		}
 		/* Each of them shrunk into the kept pictures at once, their places kept: laid from there as each comes (the
