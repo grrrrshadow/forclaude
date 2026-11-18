@@ -39,6 +39,7 @@ struct SpriteCache {
 	int16_t shift_y = 0; ///< And down.
 	uint32_t object_sprite = 0; ///< For a vehicle drawn from a 3D object (SetThreeDVehicleObjectSprite()): its request in three_d_vehicle_object.cpp, from 1; 0 for a sprite of a file.
 	bool dropped = false; ///< Thrown out of the full sprite memory (DeleteEntriesFromSpriteCache()) and not loaded since: the diary counts it when it is loaded again.
+	uint16_t load_tenths = 0; ///< How long it took to read the last time it was read (GetRawSprite()), tenths of a millisecond: one dear to read again not let go of for its age while there is room (IncreaseSpriteLRU()).
 
 	void ClearSpriteData();
 };

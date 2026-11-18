@@ -85,6 +85,7 @@ static struct {
 	uint64_t dropped_bytes = 0; ///< their bytes
 	uint64_t reloaded = 0;      ///< of the thrown out, loaded again
 	double reload_ms = 0;       ///< and how long that took
+	std::array<std::tuple<double, SpriteID, uint32_t>, 3> slowest{}; ///< the slowest of those reloads: ms, the sprite, its bytes
 } _sprite_churn;
 
 /**
@@ -101,6 +102,23 @@ void TakeSpriteCacheChurn(uint64_t &dropped, double &dropped_mb, uint64_t &reloa
 	reloaded = _sprite_churn.reloaded;
 	reload_ms = _sprite_churn.reload_ms;
 	_sprite_churn = {};
+}
+
+/**
+ * For the diary of the frames: the slowest sprites read again since the last time (the player's diary of 18. 11.: on
+ * the map at z5 129 sprites read again in 5 s, 2.4 s of it; which ones?): the sprite, its file, its kilobytes, the ms.
+ * Taken with TakeSpriteCacheChurn(), before it.
+ */
+std::string DescribeSlowestSpriteReloads()
+{
+	std::string s;
+	for (const auto &[ms, id, bytes] : _sprite_churn.slowest) {
+		if (ms <= 0) continue;
+		const SpriteCache *sc = id < _spritecache.size() ? &_spritecache[id] : nullptr;
+		const std::string_view file = sc != nullptr && sc->file != nullptr ? sc->file->GetSimplifiedFilename() : std::string_view("?");
+		s += fmt::format("{}{} ({} {}, {} kB) {:.1f} ms", s.empty() ? "" : ", ", id, file, sc != nullptr ? to_underlying(sc->type) : 0, bytes / 1024, ms);
+	}
+	return s.empty() ? "-" : s;
 }
 
 static inline SpriteCache *GetSpriteCache(uint index)
@@ -1775,6 +1793,9 @@ static void DeleteEntriesFromSpriteCache(size_t to_remove)
 			candidates.size(), candidate_bytes, initial_in_use, _spritecache_bytes_used, to_remove);
 }
 
+/** A sprite whose reading took this long, tenths of a millisecond, is not let go of for its age while there is room (IncreaseSpriteLRU()). */
+static constexpr uint16_t SPRITE_DEAR_TENTHS = 40;
+
 /** After how many half minutes a sprite not drawn is let go of (IncreaseSpriteLRU()): four minutes; 0 never. The rig: 'test3d sprityvek <n>'. */
 size_t _sprite_age_marks = 8;
 
@@ -1804,9 +1825,17 @@ void IncreaseSpriteLRU()
 			while (marks.size() > MARKS + 1) marks.pop_front();
 			const uint32_t before = marks.front();
 			marks.pop_front();
-			size_t count = 0, bytes = 0;
+			size_t count = 0, bytes = 0, kept_dear = 0;
+			/* One dear to read again (SPRITE_DEAR_TENTHS) kept while the memory is under three quarters of the player's
+			 * size: the player's diary of 18. 11., back at z5 after some minutes elsewhere, 21.7 s of 45 minutes reading
+			 * again what was let go of, up to 2.4 s in 5 s (14 ms a sprite on the phone). Over it they go too. */
+			const bool room = _spritecache_bytes_used < target_size / 4 * 3;
 			for (SpriteCache &sc : _spritecache) {
 				if (sc.ptr == nullptr || sc.lru >= before || sc.type != SpriteType::Normal) continue;
+				if (room && sc.load_tenths >= SPRITE_DEAR_TENTHS) {
+					kept_dear++;
+					continue;
+				}
 				bytes += sc.length;
 				count++;
 				sc.ClearSpriteData();
@@ -1814,7 +1843,7 @@ void IncreaseSpriteLRU()
 				_sprite_churn.dropped++;
 				_sprite_churn.dropped_bytes += sc.length;
 			}
-			if (count > 0) Debug(sprite, 1, "Sprites not drawn for four minutes let go of: {}, {:.1f} MB; held {:.1f} MB", count, bytes / (1024.0 * 1024.0), _spritecache_bytes_used / (1024.0 * 1024.0));
+			if (count > 0 || kept_dear > 0) Debug(sprite, 1, "Sprites not drawn for four minutes let go of: {}, {:.1f} MB; kept as dear to read again {}; held {:.1f} MB", count, bytes / (1024.0 * 1024.0), kept_dear, _spritecache_bytes_used / (1024.0 * 1024.0));
 		}
 	}
 
@@ -1944,10 +1973,15 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 			sc->ptr = std::move(cache_allocator.data);
 			sc->length = static_cast<uint32_t>(cache_allocator.size);
 			_spritecache_bytes_used += sc->length;
+			const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+			sc->load_tenths = static_cast<uint16_t>(std::clamp(ms * 10.0, 0.0, 65535.0));
 			if (sc->dropped) {
 				sc->dropped = false;
 				_sprite_churn.reloaded++;
-				_sprite_churn.reload_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+				_sprite_churn.reload_ms += ms;
+				auto &slow = _sprite_churn.slowest;
+				auto least = std::ranges::min_element(slow, {}, [](const auto &e) { return std::get<0>(e); });
+				if (ms > std::get<0>(*least)) *least = {ms, sprite, sc->length};
 			}
 		}
 
