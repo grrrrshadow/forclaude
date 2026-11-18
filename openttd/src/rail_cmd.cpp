@@ -3407,7 +3407,10 @@ static void DrawThreeDBufferStops(const TileInfo *ti, Track t, int z, bool eye)
 		 * within the tile, its back at the edge. */
 		const bool beyond = n != INVALID_TILE && (IsTileType(n, TileType::Clear) || IsTileType(n, TileType::Trees)) && GetTileSlope(n) == SLOPE_FLAT && GetTilePixelZ(n) == z;
 		const double upm = OBJECT_UNITS_PER_METRE, back = (beyond ? THREE_D_STOP_STUB_M : THREE_D_STOP_LONG_M) * upm;
-		const double edge_x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0 + d.x * TILE_SIZE / 2.0, edge_y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0 + d.y * TILE_SIZE / 2.0;
+		/* (Half a tile as a double: d.x * TILE_SIZE, -1 by an unsigned 16, was 4294967280 -- the stops of the north-east
+		 * and north-west ends far off the map; the player, 18. 11.: "the buffer stops only at one end of the track, on
+		 * the SW and SE side".) */
+		const double edge_x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0 + d.x * (TILE_SIZE / 2.0), edge_y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0 + d.y * (TILE_SIZE / 2.0);
 		const double bx = beyond ? edge_x : edge_x - d.x * back, by = beyond ? edge_y : edge_y - d.y * back;
 		const std::string_view name = beyond ? "zarazedlo_kolej" : "zarazedlo";
 		const float facing = static_cast<float>(std::atan2(-d.y, -d.x) * 180.0 / M_PI);
@@ -3623,8 +3626,10 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 	double mx = TILE_SIZE / 2.0, my = TILE_SIZE / 2.0;
 	if (half) {
 		const TileIndexDiffC d = TileIndexDiffCByDiagDir(door);
-		mx += d.x * TILE_SIZE / 4.0;
-		my += d.y * TILE_SIZE / 4.0;
+		/* (A quarter of a tile as a double: -1 by the unsigned TILE_SIZE was far off the map, a depot's door north-east
+		 * or north-west.) */
+		mx += d.x * (TILE_SIZE / 4.0);
+		my += d.y * (TILE_SIZE / 4.0);
 	}
 	const double x = TileX(ti->tile) * TILE_SIZE + mx, y = TileY(ti->tile) * TILE_SIZE + my;
 	/* Across it its embankment, a crossing's panels and ramps. */
