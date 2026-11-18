@@ -1304,6 +1304,7 @@ struct ThreeDVehicleObject {
 	const ThreeDObjectTexture *TryGetTexture(int level, int index = 0) const;
 	const ThreeDVehicleShape *TextureShape(bool wait) const;
 	bool TextureSize(int index, int &w, int &h) const;
+	int CellsKeptLevel(int index, std::span<const float> points) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
 	const ThreeDObjectTexture *GetSecondMask(int level) const;

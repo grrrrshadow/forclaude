@@ -1171,6 +1171,60 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 	return density;
 }
 
+/** Whether the levels of the textures are no coarser than the cells their triangles of one point draw from (CellsLevel()); 'test3d bunky 0|1'. */
+bool _three_d_cells_kept = true;
+
+/**
+ * The coarsest level of a shape's texture that keeps the colours of the cells its triangles of one point draw from
+ * (ThreeDVehicleObject::CellsKeptLevel()): a level is chosen by the triangles that draw from a piece of the picture
+ * (TexelsPerMetre()), and those of one point have their colours mixed with what is about their cells at a level
+ * coarser than these. The player 18. 11. (topic 376): the Tatra 141's tyres blue-grey and its hubs orange on the map,
+ * right only near from the eyes -- its atlas (swatches of 8 x 8 above pictures, 2048 x 512) at level 7, 16 x 4 texels.
+ * @return 255 when it has none
+ */
+static int CellsLevel(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int texture)
+{
+	if (!_three_d_cells_kept) return 255;
+	static std::map<std::tuple<const ThreeDVehicleShape *, size_t, int>, int> known;
+	static std::mutex known_mutex;
+	const auto key = std::make_tuple(&shape, shape.tri.size(), texture);
+	{
+		std::lock_guard lock(known_mutex);
+		auto it = known.find(key);
+		if (it != known.end()) return it->second;
+	}
+	std::set<std::pair<float, float>> at;
+	for (size_t i = 0; i + 2 < shape.tri.size(); i += 3) {
+		const size_t ti = i / 3 < shape.tri_tex.size() ? shape.tri_tex[i / 3] : 0;
+		if (static_cast<int>(ti) != texture) continue;
+		const uint32_t a = shape.tri[i], b = shape.tri[i + 1], c = shape.tri[i + 2];
+		const float u = shape.uv[a * 2], v = shape.uv[a * 2 + 1];
+		if (shape.uv[b * 2] != u || shape.uv[c * 2] != u || shape.uv[b * 2 + 1] != v || shape.uv[c * 2 + 1] != v) continue;
+		at.emplace(u, v);
+	}
+	int level = 255;
+	if (!at.empty()) {
+		std::vector<float> points;
+		points.reserve(at.size() * 2);
+		for (const auto &[u, v] : at) {
+			points.push_back(u);
+			points.push_back(v);
+		}
+		level = obj.CellsKeptLevel(texture, points);
+	}
+	std::lock_guard lock(known_mutex);
+	known.emplace(key, level);
+	return level;
+}
+
+/** The level of detail of the body's texture (0) of a shape for a picture: about a texel to a pixel by all its triangles (TexelsPerMetre()), no coarser than its cells (CellsLevel()). */
+static int BodyLevelAt(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, float pixels)
+{
+	int level = 0;
+	for (float d = TexelsPerMetre(obj, shape); d >= 2.0f * pixels && level < 12; d /= 2.0f) level++;
+	return std::min(level, CellsLevel(obj, shape, 0));
+}
+
 /**
  * The level of detail of a texture of a shape for a picture: about a texel to a pixel, each texture by its own
  * triangles (TexelsPerMetre()) -- an add-on's picture over a few small parts needs a coarser level than the body's.
@@ -1188,10 +1242,10 @@ static int TextureLevelAt(const ThreeDVehicleObject &obj, const ThreeDVehicleSha
 		int tw = 1024, th = 1024;
 		if (!obj.TextureSize(texture, tw, th)) tw = th = 1024;
 		while (std::max(tw, th) >> level > 128 && level < 12) level++;
-		return level;
+		return std::min(level, CellsLevel(obj, shape, texture));
 	}
 	for (double d = density; d >= 2.0 * pixels && level < 12; d /= 2.0) level++;
-	return level;
+	return std::min(level, CellsLevel(obj, shape, texture));
 }
 
 /**
@@ -1678,8 +1732,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	if (width <= 0 || height <= 0 || static_cast<size_t>(width) * height > 64u * 1024 * 1024) return false;
 
 	/* The level of the textures: about a texel to a pixel, each its own. */
-	int level = 0;
-	for (float d = TexelsPerMetre(obj, *shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
+	const int level = BodyLevelAt(obj, *shape, p);
 	auto level_of = [&](int k) {
 		return k == 0 ? level : TextureLevelAt(obj, *shape, k, p);
 	};
@@ -1819,6 +1872,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		/* Its textures at about a texel to a pixel, as big as it is drawn. */
 		int crew_level = 0;
 		for (float d = TexelsPerMetre(*c.fig, *c.shape); d >= 2.0f * p * c.scale && crew_level < 12; d /= 2.0f) crew_level++;
+		crew_level = std::min(crew_level, CellsLevel(*c.fig, *c.shape, 0));
 		std::vector<const ThreeDObjectTexture *> crew_texs(std::max<size_t>(1, c.shape->pngs.size()));
 		for (size_t i = 0; i < crew_texs.size(); i++) crew_texs[i] = c.fig->GetTexture(crew_level, static_cast<int>(i));
 		/* A piece of a load in its cargo's colour over its mask, as a vehicle's paint. */
@@ -2230,8 +2284,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			return cam.LightAt(nx, ny, nz);
 		}, m.light);
 		box(frame_of, vehicle_to);
-		int level = 0;
-		for (float d = TexelsPerMetre(obj, shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
+		const int level = BodyLevelAt(obj, shape, p);
 		/* Its textures as they are, each at its own level, painted by the card as they are drawn (GpuPaintOf()). */
 		m.textures.assign(m.triangles->used.size(), nullptr);
 		std::vector<int> levels(m.textures.size(), level);
@@ -2281,6 +2334,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		box(*crew_posed, crew_to);
 		int crew_level = 0;
 		for (float d = TexelsPerMetre(*wf, *fs); d >= 2.0f * p * w.scale && crew_level < 12; d /= 2.0f) crew_level++;
+		crew_level = std::min(crew_level, CellsLevel(*wf, *fs, 0));
 		m.textures.assign(m.triangles->used.size(), nullptr);
 		for (size_t i = 0; i < m.textures.size(); i++) {
 			const ThreeDTexturesForCard for_card;
@@ -2301,6 +2355,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			for (const ThreeDLoadPlace &at : load.places) biggest = std::max(biggest, at.scale);
 			int load_level = 0;
 			for (float d = TexelsPerMetre(*load.fig, *ls); d >= 2.0f * p * biggest && load_level < 12; d /= 2.0f) load_level++;
+			load_level = std::min(load_level, CellsLevel(*load.fig, *ls, 0));
 			std::shared_ptr<const ThreeDGpuTriangles> triangles = ThreeDGpuTrianglesOf(*ls, 0, false, ls->pngs.size());
 			std::vector<const ThreeDObjectTexture *> textures(triangles->used.size(), nullptr);
 			std::vector<int> levels(textures.size(), load_level);

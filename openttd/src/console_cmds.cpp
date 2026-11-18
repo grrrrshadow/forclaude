@@ -11193,6 +11193,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_texture_numbers_kept = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: texturycisla {}", _texture_numbers_kept ? 1 : 0);
 		return true;
+	} else if (what == "bunky" && argv.size() > 2) {
+		/* 'bunky 0|1': the levels of the vehicles' textures no coarser than the cells their triangles of one point draw
+		 * from (1, CellsLevel() of three_d_vehicle_object.cpp), or by their triangles of pieces of the picture only (0, as
+		 * before 18. 11.); for the pictures made from now on. */
+		extern bool _three_d_cells_kept;
+		_three_d_cells_kept = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: bunky {}", _three_d_cells_kept ? 1 : 0);
+		return true;
 	} else if (what == "maskykarty" && argv.size() > 2) {
 		/* 'maskykarty 0|1': the masks of the vehicles' paint put on the card with only the channels read of them (1,
 		 * MaskOnCard() of three_d_gpu.cpp), or with all four as a texture (0, as before 18. 11.); for what is put on

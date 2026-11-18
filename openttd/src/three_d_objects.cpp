@@ -14719,6 +14719,176 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 	if (cover != nullptr && !cover->empty() && w0 > 1) Debug(misc, 2, "3D texture {}x{}: cover of {} triangles {:.1f} ms, filled {:.1f} ms, all with the levels {:.1f} ms", w0, h0, cover->size() / 6, ms_drawn, ms_fill, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count());
 }
 
+/** The coarsest level a picture's cells are looked for at (PictureCells): a texture of 2048 texels is 8 of them so. */
+static constexpr int CELLS_COARSEST = 8;
+
+/**
+ * Where a picture is of one colour in squares of a level (its cells): for each square of 4 x 4 texels of it, the
+ * coarsest level whose texel over it is of the one colour of all the square's texels -- a texel of a level is the
+ * mean of the square of texels it covers (DecodeTextureLevels()). For a texture whose triangles of one point draw from
+ * the middles of cells (a palette in an atlas of pictures, grrrrf tatra1950/t1950_dily.py: swatches of 8 x 8 above
+ * blocks of pictures): a level coarser than its cells has them mixed with what is about them, of no colour of its.
+ */
+struct PictureCells {
+	int w = 0, h = 0; ///< the picture's size
+	int sw = 0, sh = 0; ///< the squares across and down (whole ones)
+	std::vector<uint8_t> level; ///< each square's coarsest level of its one colour (2 ... CELLS_COARSEST), 0 not of one colour
+};
+
+/** The cells of a picture (PictureCells), worked out from its texels at their finest. */
+static std::shared_ptr<const PictureCells> CellsOfPicture(const std::vector<uint8_t> &png)
+{
+	auto cells = std::make_shared<PictureCells>();
+	std::vector<ThreeDObjectTexture> finest;
+	DecodeTextureLevels(png, finest, 0, false);
+	if (finest.empty() || finest.front().w < 4 || finest.front().h < 4) return cells;
+	const ThreeDObjectTexture &t = finest.front();
+	cells->w = t.w;
+	cells->h = t.h;
+	cells->sw = t.w / 4;
+	cells->sh = t.h / 4;
+	cells->level.assign(static_cast<size_t>(cells->sw) * cells->sh, 0);
+	/* Each square of a level: the least and the most of each channel of its texels, and whether any is none. */
+	struct Square {
+		std::array<uint8_t, 3> lo{255, 255, 255}, hi{0, 0, 0};
+		bool hole = false;
+		bool One() const { return !this->hole && std::max({hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]}) <= CELL_MIXED; }
+		void Add(const Square &o)
+		{
+			this->hole |= o.hole;
+			for (int q = 0; q < 3; q++) {
+				this->lo[q] = std::min(this->lo[q], o.lo[q]);
+				this->hi[q] = std::max(this->hi[q], o.hi[q]);
+			}
+		}
+	};
+	int w = cells->sw, h = cells->sh;
+	std::vector<Square> squares(static_cast<size_t>(w) * h);
+	for (int y = 0; y < h; y++) {
+		for (int x = 0; x < w; x++) {
+			Square &s = squares[static_cast<size_t>(y) * w + x];
+			for (int k = 0; k < 16; k++) {
+				const uint32_t p = t.px[static_cast<size_t>(y * 4 + k / 4) * t.w + x * 4 + k % 4];
+				if (p == 0) {
+					s.hole = true;
+					continue;
+				}
+				const Colour c(p);
+				s.Add(Square{{c.r, c.g, c.b}, {c.r, c.g, c.b}, false});
+			}
+			if (s.One()) cells->level[static_cast<size_t>(y) * w + x] = 2;
+		}
+	}
+	/* Each level coarser: a square of one colour while its four are, all of the one. */
+	for (int level = 3; level <= CELLS_COARSEST && w >= 2 && h >= 2; level++) {
+		const int pw = w / 2, ph = h / 2;
+		std::vector<Square> up(static_cast<size_t>(pw) * ph);
+		for (int y = 0; y < ph; y++) {
+			for (int x = 0; x < pw; x++) {
+				Square &s = up[static_cast<size_t>(y) * pw + x];
+				for (int k = 0; k < 4; k++) s.Add(squares[static_cast<size_t>(y * 2 + k / 2) * w + x * 2 + k % 2]);
+			}
+		}
+		const int shift = level - 2;
+		bool any = false;
+		for (int y = 0; y < (ph << shift) && y < cells->sh; y++) {
+			for (int x = 0; x < (pw << shift) && x < cells->sw; x++) {
+				uint8_t &l = cells->level[static_cast<size_t>(y) * cells->sw + x];
+				if (l == level - 1 && up[static_cast<size_t>(y >> shift) * pw + (x >> shift)].One()) {
+					l = static_cast<uint8_t>(level);
+					any = true;
+				}
+			}
+		}
+		if (!any) break;
+		squares = std::move(up);
+		w = pw;
+		h = ph;
+	}
+	return cells;
+}
+
+/** The cells of the pictures worked out (CellsOfPicture()): of a texture's bytes, while they are; of a file's by its path. */
+struct PictureCellsKept {
+	std::weak_ptr<const std::vector<uint8_t>> bytes;
+	std::shared_ptr<const PictureCells> cells;
+};
+static std::map<const std::vector<uint8_t> *, PictureCellsKept> _picture_cells;
+static std::map<std::string, std::shared_ptr<const PictureCells>> _picture_cells_of_files;
+static std::mutex _picture_cells_mutex;
+
+/**
+ * The coarsest level of one of the object's textures whose texels at the points given are of the colours of its
+ * cells there (PictureCells): no coarser than the cells drawn from by triangles of one point. Points not in a cell
+ * (a corner of a picture, a square of a few texels of one colour) are not counted.
+ * @param points the points, u and v by twos
+ * @return 255 when none is in a cell, or it has no picture (its shape not read: asked as it is drawn, it is)
+ */
+int ThreeDVehicleObject::CellsKeptLevel(int index, std::span<const float> points) const
+{
+	ThreeDTextureBytes png;
+	const bool of_file = index == 0 && !this->paint_file.empty();
+	if (!of_file) {
+		std::lock_guard lock(_lazy_mutex);
+		/* The pictures of the whole shape, as for its size (TextureSize()): a shape drawn has its parts', not them. */
+		const ThreeDVehicleShape *s = this->shape.get();
+		for (size_t f = 0; s == nullptr && f < this->frame_shapes.size(); f++) s = this->frame_shapes[f].get();
+		for (size_t f = 0; s == nullptr && f < this->frame_bones.size(); f++) s = this->frame_bones[f] != nullptr ? this->frame_bones[f]->rest.get() : nullptr;
+		if (s != nullptr && index >= 0 && static_cast<size_t>(index) < s->pngs.size()) png = s->pngs[index];
+		if (png == nullptr) return 255;
+	}
+	std::shared_ptr<const PictureCells> cells;
+	{
+		std::lock_guard lock(_picture_cells_mutex);
+		if (of_file) {
+			auto it = _picture_cells_of_files.find(this->paint_file);
+			if (it != _picture_cells_of_files.end()) cells = it->second;
+		} else {
+			auto it = _picture_cells.find(png.get());
+			if (it != _picture_cells.end() && !it->second.bytes.expired()) cells = it->second.cells;
+		}
+	}
+	if (cells == nullptr) {
+		cells = of_file ? CellsOfPicture(ReadWholeFile(this->paint_file)) : CellsOfPicture(*png);
+		std::lock_guard lock(_picture_cells_mutex);
+		if (of_file) {
+			_picture_cells_of_files[this->paint_file] = cells;
+		} else {
+			if (_picture_cells.size() > 256) std::erase_if(_picture_cells, [](const auto &e) { return e.second.bytes.expired(); });
+			_picture_cells[png.get()] = PictureCellsKept{png, cells};
+		}
+	}
+	/* The points in cells by the levels their cells keep. */
+	std::array<size_t, CELLS_COARSEST + 1> by_level{};
+	size_t in_cells = 0;
+	for (size_t i = 0; i + 1 < points.size() && cells->sw != 0; i += 2) {
+		/* A texture repeats past its edges. */
+		const float u = points[i] - std::floor(points[i]), v = points[i + 1] - std::floor(points[i + 1]);
+		const int x = std::clamp(static_cast<int>(u * cells->w), 0, cells->w - 1) / 4;
+		const int y = std::clamp(static_cast<int>(v * cells->h), 0, cells->h - 1) / 4;
+		if (x >= cells->sw || y >= cells->sh) continue;
+		/* A square of 4 x 4 of one colour is as much a flat bit of a picture as a cell (the colleague's lorries baked:
+		 * a third of their points so); a palette's cells are of 8 x 8 and more. */
+		const int level = cells->level[static_cast<size_t>(y) * cells->sw + x];
+		if (level < 3) continue;
+		by_level[level]++;
+		in_cells++;
+	}
+	/* As a palette keeps its cells (DecodeTextureLevels()): while hardly a point (0.5 %) has its cell mixed -- of
+	 * thousands, a few are where their cells meet (the colleague's lorries: ten thousand points, a handful of them so). */
+	int kept = 255;
+	size_t mixed = 0;
+	for (int level = 3; level <= CELLS_COARSEST && in_cells > 0; level++) {
+		mixed += by_level[level];
+		if (by_level[level] > 0 && mixed * CELL_MIXED_SHARE > in_cells) {
+			kept = level;
+			break;
+		}
+	}
+	if (in_cells > 0) Debug(misc, 1, "3D cells: {} texture {} ({}x{}): {} points of one, {} in cells, by levels {} {} {} {} {} {}, level at most {}", this->name, index, cells->w, cells->h, points.size() / 2, in_cells, by_level[3], by_level[4], by_level[5], by_level[6], by_level[7], by_level[8], kept);
+	return kept;
+}
+
 /** The painted textures kept, bytes; past PAINTED_BUDGET all are dropped and made again as they are drawn. */
 static std::atomic<size_t> _painted_bytes = 0;
 static constexpr size_t PAINTED_BUDGET = static_cast<size_t>(192) << 20;
