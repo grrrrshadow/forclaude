@@ -11664,6 +11664,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_gpu_standing_lean = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici stav {}", _gpu_standing_lean ? "usporne" : "jako drive");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "auta_predem") {
+		/* 'stojici auta_predem 0|1': the vehicles not kept drawn before the view's picture is begun (1), or each as it
+		 * comes while it is laid (0, as before; ThreeDGpuDrawStanding()). */
+		_standing_vehicles_first = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici auta predem {}", _standing_vehicles_first ? "ano" : "ne, jak prijdou");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "kostky") {
 		/* 'stojici kostky 0|1': a building among what the card lays drawn only in the cells of its shape the block
 		 * reaches into (1; GpuBuilding::Cell), or whole (0). */

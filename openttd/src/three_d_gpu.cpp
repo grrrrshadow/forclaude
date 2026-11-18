@@ -1042,6 +1042,9 @@ std::atomic<double> _gpu_moving_ms = 0;
 /** Of the vehicles' layer on the card, for the diary: the copying under them, the vehicles drawn anew and shrunk into their pictures (how many, how long). */
 std::atomic<double> _gpu_moving_copy_ms = 0, _gpu_moving_draw_ms = 0;
 std::atomic<uint64_t> _gpu_moving_drawn = 0;
+/** Of the moving layer's vehicles not kept, those drawn before its picture was begun, and how long that took (ThreeDGpuDrawStanding()). */
+std::atomic<uint64_t> _gpu_moving_first = 0;
+std::atomic<double> _gpu_moving_first_ms = 0;
 /** Whether the card's glClear() keeps to the scissor's rect (TestScissoredClear()); else ClearInScissor() draws over it. */
 static bool _scissored_clear_ok = true;
 /** Whether the card divides an attribute by instance (TestInstancedArrays()); else the meshes alike drawn each on its own. */
@@ -5463,22 +5466,6 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	const std::vector<std::array<int, 4>> clips = StandingClips(s);
 	Step(fmt::format("{} na plose {}x{} v {} kusech: {} obrazku, {} budov", s.moving ? "vrstva aut" : "co stoji", s.width, s.height, clips.size(), s.items.size(), s.buildings.size()));
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, target);
-	gl.glDrawBuffers(target_buffers, STANDING_DRAW_BUFFERS);
-	gl.glDisable(GL_DITHER);
-	gl.glDisable(GL_DEPTH_TEST);
-	gl.glDisable(GL_CULL_FACE);
-	gl.glDisable(GL_BLEND);
-	gl.glViewport(0, 0, s.view_w, s.view_h);
-	gl.glEnable(GL_SCISSOR_TEST);
-	gl.glClearColor(0, 0, 0, 0);
-	/* What stands cleared where it is laid (its order with it), and its depth -- one for all laid on it, each pixel laid
-	 * where it is nearer than what is there (ThreeDGpuStanding::depth); the moving things' picture is copied into below. */
-	for (const std::array<int, 4> &c : clips) {
-		if (s.moving) break;
-		gl.glScissor(c[0], c[1], c[2], c[3]);
-		ClearInScissor(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, c[0], c[1], c[2], c[3], 0.0f);
-	}
 	/* The part being laid: everything that reaches into it laid there, cut to it, each part in turn. */
 	std::array<int, 4> clip = clips.empty() ? std::array<int, 4>{s.view_x, s.view_y, 0, 0} : clips.front();
 	/* Where each thing reaches (StandingReach()), and whether into a part at all: one that does not, not drawn, not
@@ -5492,9 +5479,9 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	/* The moving things' picture: what stands copied into it where they were laid the frame before, where what stands
 	 * was laid since, and where they are now -- all of it when made anew or the view moved. */
 	std::vector<std::array<int, 4>> moved_to;
+	std::vector<float> quads;
+	uint64_t copied = 0;
 	if (s.moving) {
-		std::vector<float> quads;
-		uint64_t copied = 0;
 		auto copy = [&](int x0, int y0, int x1, int y1) {
 			x0 = std::max(x0, 0);
 			y0 = std::max(y0, 0);
@@ -5515,36 +5502,61 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				for (const std::array<int, 4> &r : *rects) copy(r[0], r[1], r[0] + r[2], r[1] + r[3]);
 			}
 		}
-		if (!quads.empty()) {
-			const GLuint cp = _standing_copy_program.program;
-			gl.glDisable(GL_SCISSOR_TEST);
-			gl.glUseProgram(cp);
-			gl.glUniform2f(gl.glGetUniformLocation(cp, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
-			gl.glUniform1i(gl.glGetUniformLocation(cp, "u_colour"), 0);
-			gl.glUniform1i(gl.glGetUniformLocation(cp, "u_lit"), 1);
-			gl.glActiveTexture(GL_TEXTURE1);
-			gl.glBindTexture(GL_TEXTURE_2D, pics.standing_lit);
-			gl.glActiveTexture(GL_TEXTURE0);
-			gl.glBindTexture(GL_TEXTURE_2D, pics.standing);
-			gl.glBindVertexArray(_standing_vao);
-			gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
-			gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(quads.size() * sizeof(float)), quads.data(), GL_STREAM_DRAW);
-			gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(quads.size() / 5));
-			gl.glActiveTexture(GL_TEXTURE1);
-			gl.glBindTexture(GL_TEXTURE_2D, 0);
-			gl.glActiveTexture(GL_TEXTURE0);
-			gl.glBindTexture(GL_TEXTURE_2D, 0);
-			gl.glEnable(GL_SCISSOR_TEST);
-		}
-		_gpu_moving_copied += copied;
-		_gpu_moving_copy_ms = _gpu_moving_copy_ms + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - moving_started).count();
 	}
-	gl.glEnable(GL_BLEND);
-	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-	gl.glDepthFunc(GL_GEQUAL);
-	gl.glDepthMask(GL_TRUE);
-	gl.glClearDepth(0.0);
-	gl.glFrontFace(GL_CCW);
+	/* The view's picture begun: bound, cleared where what stands is laid (its order with it), and its depth -- one for
+	 * all laid on it, each pixel laid where it is nearer than what is there (ThreeDGpuStanding::depth); the moving
+	 * things' picture copied into. After the vehicles not kept are drawn (vehicles first, below): drawing them while it
+	 * was laid left it for another frame and back, on a card drawing by tiles all of its pixels stored and read again
+	 * (the player's diary of 18. 11., #379, the moving layer: "76 aut nakresleno znovu 748 ms" in 5 s, ~10 ms each). */
+	auto begin_target = [&]() {
+		const auto copy_started = std::chrono::steady_clock::now();
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, target);
+		gl.glDrawBuffers(target_buffers, STANDING_DRAW_BUFFERS);
+		gl.glDisable(GL_DITHER);
+		gl.glDisable(GL_DEPTH_TEST);
+		gl.glDisable(GL_CULL_FACE);
+		gl.glDisable(GL_BLEND);
+		gl.glViewport(0, 0, s.view_w, s.view_h);
+		gl.glEnable(GL_SCISSOR_TEST);
+		gl.glClearColor(0, 0, 0, 0);
+		for (const std::array<int, 4> &c : clips) {
+			if (s.moving) break;
+			gl.glScissor(c[0], c[1], c[2], c[3]);
+			ClearInScissor(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, c[0], c[1], c[2], c[3], 0.0f);
+		}
+		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
+		if (s.moving) {
+			if (!quads.empty()) {
+				const GLuint cp = _standing_copy_program.program;
+				gl.glDisable(GL_SCISSOR_TEST);
+				gl.glUseProgram(cp);
+				gl.glUniform2f(gl.glGetUniformLocation(cp, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
+				gl.glUniform1i(gl.glGetUniformLocation(cp, "u_colour"), 0);
+				gl.glUniform1i(gl.glGetUniformLocation(cp, "u_lit"), 1);
+				gl.glActiveTexture(GL_TEXTURE1);
+				gl.glBindTexture(GL_TEXTURE_2D, pics.standing_lit);
+				gl.glActiveTexture(GL_TEXTURE0);
+				gl.glBindTexture(GL_TEXTURE_2D, pics.standing);
+				gl.glBindVertexArray(_standing_vao);
+				gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+				gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(quads.size() * sizeof(float)), quads.data(), GL_STREAM_DRAW);
+				gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(quads.size() / 5));
+				gl.glActiveTexture(GL_TEXTURE1);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glEnable(GL_SCISSOR_TEST);
+			}
+			_gpu_moving_copied += copied;
+			_gpu_moving_copy_ms = _gpu_moving_copy_ms + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - copy_started).count();
+		}
+		gl.glEnable(GL_BLEND);
+		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		gl.glDepthFunc(GL_GEQUAL);
+		gl.glDepthMask(GL_TRUE);
+		gl.glClearDepth(0.0);
+		gl.glFrontFace(GL_CCW);
+	};
 	const GLuint p = _standing_program.program;
 	/* How near each pixel is (STANDING_NEAR_GLSL): the view's turn, where its pixels are, the depth of all on the block. */
 	auto near_uniforms = [&](GLuint program) {
@@ -6232,6 +6244,35 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(face_corners.size() / N));
 		return true;
 	};
+	/* The vehicles not kept drawn and shrunk into the kept pictures first, all at once, before the view's picture is
+	 * begun (begin_target()); those whose place is kept marked used first, so that no place of theirs is given to the new
+	 * ones (SweepStandingPlaces()). One the frame or the atlas has no room for is drawn as it comes, as before. The rig
+	 * ('test3d stojici auta_predem 0'): each drawn as it comes. */
+	if (_standing_vehicles_first && _gpu_standing_lean && _standing_shrink_ok && !s.held_only) {
+		for (size_t k = 0; k < s.items.size(); k++) {
+			if (s.items[k].vehicle == nullptr || in_some[k] == 0) continue;
+			const uint64_t key = s.items[k].vehicle->key | STANDING_VEHICLE_KEY;
+			if (_standing_places.contains(key)) StandingPlaceUsed(key);
+		}
+		const auto first_started = std::chrono::steady_clock::now();
+		const uint64_t vehicle_calls = _gl_calls;
+		_gl_counting_vehicles = true;
+		batch_shrink_calls = 0;
+		draw_vehicles(0);
+		if (const uint64_t after = _gl_calls; after >= vehicle_calls + batch_shrink_calls) _gl_calls_vehicles_draw += after - vehicle_calls - batch_shrink_calls;
+		if (const uint64_t after = _gl_calls; after >= vehicle_calls) _gl_calls_vehicles += after - vehicle_calls;
+		_gl_counting_vehicles = false;
+		if (s.moving) {
+			const auto drawn_first = std::ranges::count_if(vehicle_at, [](const std::array<int, 2> &at) { return at[0] >= 0; });
+			if (drawn_first > 0) {
+				_gpu_moving_first += static_cast<uint64_t>(drawn_first);
+				_gpu_moving_first_ms = _gpu_moving_first_ms + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - first_started).count();
+			}
+		}
+	}
+	begin_target();
+	use_pictures();
+	drawing = 0;
 	bool all = true;
 	/* The rig ('test3d stojici odmitnout <n>'): so many given without waiting not laid all the same, as an error of the
 	 * card's own leaves them -- the first part laid, then all of it cleared. */
@@ -8016,6 +8057,7 @@ bool ThreeDGpuTakeViewMoveFailed()
 std::atomic<bool> _three_d_gpu_driver_waits = false;
 std::atomic<bool> _gpu_fence_last_only = true; ///< Rig: the view's pictures fenced only after the last of the main thread's jobs in a row (test3d stojici plot); else after every one
 std::atomic<bool> _gpu_standing_lean = true; ///< Rig: what stands laid with the programs' uniforms set once a job (test3d stojici stav); else every building and after it as before
+bool _standing_vehicles_first = true; ///< Rig: the vehicles not kept drawn before the view's picture is begun (test3d stojici auta_predem); else each as it comes
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 
 /**
@@ -8468,10 +8510,11 @@ std::string ThreeDGpuMovingTimes()
 {
 	const uint64_t passes = _gpu_moving_passes.exchange(0), things = _gpu_moving_things.exchange(0), copied = _gpu_moving_copied.exchange(0);
 	const double ms = _gpu_moving_ms.exchange(0), copy_ms = _gpu_moving_copy_ms.exchange(0), draw_ms = _gpu_moving_draw_ms.exchange(0);
-	const uint64_t drawn = _gpu_moving_drawn.exchange(0);
+	const uint64_t drawn = _gpu_moving_drawn.exchange(0), first = _gpu_moving_first.exchange(0);
+	const double first_ms = _gpu_moving_first_ms.exchange(0);
 	if (passes == 0) return "-";
-	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms (z toho kopie {:.0f} ms, {} aut nakresleno znovu {:.0f} ms), drzene obrazky: mist dano znovu {}, vsechny zahozeny {}x",
-			passes, things, copied / 1e6, ms, copy_ms, drawn, draw_ms, _standing_places_reused.exchange(0), _standing_places_cleared.exchange(0));
+	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms (z toho kopie {:.0f} ms, {} aut predem {:.0f} ms, {} aut nakresleno znovu {:.0f} ms), drzene obrazky: mist dano znovu {}, vsechny zahozeny {}x",
+			passes, things, copied / 1e6, ms, copy_ms, first, first_ms, drawn, draw_ms, _standing_places_reused.exchange(0), _standing_places_cleared.exchange(0));
 }
 
 /**
@@ -8618,6 +8661,7 @@ bool ThreeDGpuStandingKeeps(uint64_t) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
 std::atomic<bool> _three_d_gpu_driver_waits = false;
 std::atomic<bool> _gpu_standing_lean = true;
+bool _standing_vehicles_first = true;
 std::atomic<bool> _gpu_fence_last_only = true;
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 std::atomic<int> _rig_standing_refuse = 0;
