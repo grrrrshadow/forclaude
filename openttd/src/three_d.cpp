@@ -63,6 +63,21 @@ static double _turn_c = 1.0, _turn_s = 0.0;
 static double _pivot_x = 0.0, _pivot_y = 0.0;
 /** Pixels of a middle-button drag not yet turned into a whole degree. */
 static int _drag_remainder = 0;
+/**
+ * How far down the map view looks, degrees over the horizon (the player, 18. 11.: "pohled shora otáčení nahoru dolu
+ * aspoň kousek, žádný orbitview jinou kamerou"): the game's own THREE_D_PITCH_DEFAULT, or a few steps more or less --
+ * the map itself tipped, its ground and our 3D pictures seen so; the GRFs' pictures standing up as they are drawn.
+ */
+static float _view_pitch = THREE_D_PITCH_DEFAULT;
+/** The ground along the screen's height and the heights, against the game's 30 degrees (ProjectTurnedF()): sin / sin 30, cos / cos 30. */
+static double _pitch_ground = 1.0, _pitch_height = 1.0;
+/** The pixels of a drag up or down not made a step of the tilt yet (TiltViewByDrag()). */
+static int _tilt_remainder = 0;
+/**
+ * Whether the middle button dragged up or down tips the map ('test3d naklon 0|1'): off till the pictures of the
+ * vehicles and what the card lays follow the tilt too (they are drawn for 30 degrees yet), the map as it was.
+ */
+bool _view_tilt_on = false;
 
 /** Whether the 3D of this game is switched on at all (gui.three_d). */
 bool ThreeDEnabled()
@@ -85,7 +100,28 @@ float GetViewYawSigned()
 /** Whether the map view is turned away from north at all: if it is, the second renderer draws it. */
 bool IsViewTurned()
 {
-	return _view_yaw != 0.0f;
+	return _view_yaw != 0.0f || _view_pitch != THREE_D_PITCH_DEFAULT;
+}
+
+/** How far down the map view looks, degrees over the horizon (_view_pitch). */
+float GetViewPitch()
+{
+	return _view_pitch;
+}
+
+/** The tilt of the map view as ProjectTurnedF() takes it: the ground along the screen's height and the heights, against the game's 30 degrees. */
+void GetViewTilt(double &ground, double &height)
+{
+	ground = _pitch_ground;
+	height = _pitch_height;
+}
+
+/** The sine and cosine of how far down the map view looks: the camera of the 3D pictures of the map (0.5 and 0.866 as the game draws). */
+void GetViewPitchSinCos(float &s, float &c)
+{
+	const double a = _view_pitch * 3.14159265358979323846 / 180.0;
+	s = static_cast<float>(std::sin(a));
+	c = static_cast<float>(std::cos(a));
 }
 
 /**
@@ -153,9 +189,12 @@ void GetViewTurn(double &c, double &s, double &px, double &py)
 }
 
 /** Facing north now: no turn, about the world's corner (what is kept of a small view does not change with the main view's pivot). */
-ThreeDNorthCamera::ThreeDNorthCamera() : yaw(_view_yaw), c(_turn_c), s(_turn_s), px(_pivot_x), py(_pivot_y)
+ThreeDNorthCamera::ThreeDNorthCamera() : yaw(_view_yaw), pitch(_view_pitch), c(_turn_c), s(_turn_s), px(_pivot_x), py(_pivot_y), ground(_pitch_ground), height(_pitch_height)
 {
 	_view_yaw = 0.0f;
+	_view_pitch = THREE_D_PITCH_DEFAULT;
+	_pitch_ground = 1.0;
+	_pitch_height = 1.0;
 	_turn_c = 1.0;
 	_turn_s = 0.0;
 	_pivot_x = 0.0;
@@ -166,6 +205,9 @@ ThreeDNorthCamera::ThreeDNorthCamera() : yaw(_view_yaw), c(_turn_c), s(_turn_s),
 ThreeDNorthCamera::~ThreeDNorthCamera()
 {
 	_view_yaw = this->yaw;
+	_view_pitch = this->pitch;
+	_pitch_ground = this->ground;
+	_pitch_height = this->height;
 	_turn_c = this->c;
 	_turn_s = this->s;
 	_pivot_x = this->px;
@@ -193,7 +235,7 @@ void ProjectTurnedF(double x, double y, double z, double &vx, double &vy)
 	double xr, yr;
 	TurnWorldPoint(x, y, xr, yr);
 	vx = (yr - xr) * 2 * ZOOM_BASE;
-	vy = (yr + xr - z) * ZOOM_BASE;
+	vy = ((yr + xr) * _pitch_ground - z * _pitch_height) * ZOOM_BASE;
 }
 
 /** RemapCoords() of the turned view: where a world point is drawn. */
@@ -210,7 +252,7 @@ Point ProjectTurned(int x, int y, int z)
  */
 void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y)
 {
-	double sum = vy / ZOOM_BASE + z;       // xr + yr
+	double sum = (vy / ZOOM_BASE + z * _pitch_height) / _pitch_ground; // xr + yr
 	double diff = vx / (2.0 * ZOOM_BASE);  // yr - xr
 	double xr = (sum - diff) / 2, yr = (sum + diff) / 2;
 	UnturnWorldPoint(xr, yr, x, y);
@@ -551,10 +593,62 @@ void RotateViewByDrag(int pixels)
 	RotateView(static_cast<float>(degrees));
 }
 
-/** North up again: a new game, the setting switched off. */
+/**
+ * Tip the map view up or down (_view_pitch): to a step of THREE_D_PITCH_STEP between THREE_D_PITCH_MIN and
+ * THREE_D_PITCH_MAX. The ground point under the middle of the main view stays under it, as SetViewYaw() keeps it;
+ * what was drawn for the old tilt is made again (ThreeDViewPitchChanged()).
+ * @param degrees how far down it looks, degrees over the horizon
+ */
+void SetViewPitch(float degrees)
+{
+	if (!ThreeDEnabled() || BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) degrees = THREE_D_PITCH_DEFAULT;
+	float pitch = std::round(std::clamp(degrees, THREE_D_PITCH_MIN, THREE_D_PITCH_MAX) / THREE_D_PITCH_STEP) * THREE_D_PITCH_STEP;
+	if (pitch == _view_pitch) return;
+
+	Window *w = FindWindowById(WindowClass::MainWindow, 0);
+	ViewportData *vp = (w != nullptr) ? w->viewport.get() : nullptr;
+	double wx = _pivot_x, wy = _pivot_y, wz = 0;
+	if (vp != nullptr) InverseTurnedGroundF(vp->dest_scrollpos_x + vp->virtual_width / 2, vp->dest_scrollpos_y + vp->virtual_height / 2, wx, wy, wz);
+
+	_view_pitch = pitch;
+	const double a = pitch * 3.14159265358979323846 / 180.0;
+	_pitch_ground = std::sin(a) / 0.5;
+	_pitch_height = std::cos(a) / std::cos(3.14159265358979323846 / 6.0);
+	if (pitch == THREE_D_PITCH_DEFAULT) _pitch_ground = _pitch_height = 1.0;
+
+	if (vp != nullptr) {
+		double vx, vy;
+		ProjectTurnedF(wx, wy, wz, vx, vy);
+		int mask = ScaleByZoom(-1, vp->zoom);
+		vp->dest_scrollpos_x = vp->scrollpos_x = (static_cast<int>(std::lround(vx)) - vp->virtual_width / 2) & mask;
+		vp->dest_scrollpos_y = vp->scrollpos_y = (static_cast<int>(std::lround(vy)) - vp->virtual_height / 2) & mask;
+	}
+	extern void ThreeDViewPitchChanged();
+	ThreeDViewPitchChanged();
+	MarkWholeScreenDirty();
+}
+
+/**
+ * Tip the map view by a drag of the middle mouse button up or down: THREE_D_TILT_DRAG_PIXELS make a step
+ * (SetViewPitch()), the rest is kept for the next move.
+ * @param pixels how far the mouse moved up since the last call (up: looking more from above)
+ */
+void TiltViewByDrag(int pixels)
+{
+	if (!ThreeDEnabled() || !_view_tilt_on) return;
+	_tilt_remainder += pixels;
+	const int steps = _tilt_remainder / THREE_D_TILT_DRAG_PIXELS;
+	if (steps == 0) return;
+	_tilt_remainder -= steps * THREE_D_TILT_DRAG_PIXELS;
+	SetViewPitch(_view_pitch + steps * THREE_D_PITCH_STEP);
+}
+
+/** North up again, looking down as the game does: a new game, the setting switched off, two clicks of the middle button. */
 void ResetViewYaw()
 {
 	_drag_remainder = 0;
+	_tilt_remainder = 0;
+	if (_view_pitch != THREE_D_PITCH_DEFAULT) SetViewPitch(THREE_D_PITCH_DEFAULT);
 	if (_view_yaw == 0.0f) return;
 	SetViewYaw(0.0f);
 }

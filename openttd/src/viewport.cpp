@@ -6029,6 +6029,8 @@ struct ObjectLay {
 	double left = 0, top = 0;  ///< the picture's corner, virtual screen coordinates
 	double scale = 1;          ///< pixels of the picture to a virtual one
 	float yaw = 0;             ///< the angle of the view, for the pictures of the figures
+	float pitch = THREE_D_PITCH_DEFAULT; ///< and how far down it looks (GetViewPitch())
+	double ground = 1, height = 1; ///< the ground along the screen's height and the heights against the game's 30 degrees (GetViewTilt())
 	ZoomLevel zoom = ZoomLevel::Min;
 
 	void Turn(double x, double y, double &xr, double &yr) const
@@ -6042,7 +6044,7 @@ struct ObjectLay {
 		double xr, yr;
 		this->Turn(x, y, xr, yr);
 		sx = ((yr - xr) * 2 * ZOOM_BASE - this->left) * this->scale;
-		sy = ((yr + xr - z) * ZOOM_BASE - this->top) * this->scale;
+		sy = (((yr + xr) * this->ground - z * this->height) * ZOOM_BASE - this->top) * this->scale;
 	}
 };
 
@@ -6055,6 +6057,8 @@ static ObjectLay MapLay(const DrawPixelInfo &frame)
 	lay.top = frame.top;
 	lay.scale = 1.0 / (1 << to_underlying(frame.zoom));
 	lay.yaw = GetViewYaw();
+	lay.pitch = GetViewPitch();
+	GetViewTilt(lay.ground, lay.height);
 	lay.zoom = frame.zoom;
 	return lay;
 }
@@ -7151,6 +7155,18 @@ static void ForWalkerPlantParts(F f)
 			f("kytka_mari_kosata", 1.6f + 0.4f * (age - 120) / (WALKER_PLANT_RIPE_DAYS - 120), 1.0f, x, y, z, facing);
 		}
 	}
+}
+
+/**
+ * The map view tipped up or down (SetViewPitch() of three_d.cpp): what was laid and kept for the old tilt made again --
+ * the ground, the tiles on foundations, the pictures of the sprites.
+ */
+void ForgetTurnedFoundations();
+void ThreeDViewPitchChanged()
+{
+	ResetTurnedGround();
+	ForgetTurnedFoundations();
+	ForgetTurnedSpritePictures();
 }
 
 /** Forget the kept pictures of the tiles with a foundation (ResetTurnedGround()). */

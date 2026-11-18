@@ -3164,10 +3164,13 @@ void HandleMouseEvents()
 			extern bool FirstPersonRoofOrbit(int dx, int dy, bool back);
 			if (FirstPersonRoofOrbit(_cursor.delta.x, _cursor.delta.y, false)) {
 				middle_dragged = true;
-			} else if (_cursor.delta.x != 0) {
-				/* Sideways only: up or down turns nothing (the player, 11. 11.: away with tipping the map up and down). */
+			} else {
+				/* Sideways turns the map; up or down tips it a step at a time, the map itself, no camera of its own (the
+				 * player, 11. 11.: away with the camera going round; 18. 11.: "pohled shora otáčení nahoru dolu aspoň
+				 * kousek, žádný orbitview jinou kamerou"). Dragged up it looks more from above. */
 				middle_dragged = true;
-				RotateViewByDrag(-_cursor.delta.x);
+				if (_cursor.delta.x != 0) RotateViewByDrag(-_cursor.delta.x);
+				if (_cursor.delta.y != 0) TiltViewByDrag(-_cursor.delta.y);
 			}
 		}
 	} else if (middle_was) {

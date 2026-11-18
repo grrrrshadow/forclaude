@@ -191,6 +191,10 @@ static constexpr int THREE_D_KEY_STEP_DEG = 15;
 static constexpr int THREE_D_KEY_STEP_CTRL_DEG = 45;
 /** The middle button dragged this many pixels turns the view by a degree. */
 static constexpr int THREE_D_DRAG_PIXELS_PER_DEG = 4;
+/** How far down the map view looks as the game draws it, degrees over the horizon; and how far it may tip each way, in steps of so many degrees. */
+static constexpr float THREE_D_PITCH_DEFAULT = 30.0f, THREE_D_PITCH_MIN = 20.0f, THREE_D_PITCH_MAX = 50.0f, THREE_D_PITCH_STEP = 5.0f;
+/** The middle button dragged up or down so many pixels tips the map view a step (THREE_D_PITCH_STEP). */
+static constexpr int THREE_D_TILT_DRAG_PIXELS = 40;
 /** Two clicks of the middle button within this many milliseconds, without a drag, put the view back to north. */
 static constexpr int THREE_D_DOUBLE_CLICK_MS = 500;
 
@@ -210,6 +214,11 @@ void SetViewYaw(float degrees);
 void RotateViewByDrag(int pixels);
 void ResetViewYaw();
 void ThreeDViewForBuilding();
+float GetViewPitch();
+void GetViewPitchSinCos(float &s, float &c);
+void GetViewTilt(double &ground, double &height);
+void SetViewPitch(float degrees);
+void TiltViewByDrag(int pixels);
 
 /**
  * The camera facing north while this lives, the main view's turn back after: a small view (a vehicle window, an extra
@@ -225,7 +234,9 @@ public:
 	ThreeDNorthCamera &operator=(const ThreeDNorthCamera &) = delete;
 private:
 	float yaw;           ///< the main view's angle
+	float pitch;         ///< and how far down it looks (GetViewPitch())
 	double c, s, px, py; ///< its turn (GetViewTurn())
+	double ground, height; ///< its tilt's factors (ProjectTurnedF())
 };
 
 void TurnWorldPoint(double x, double y, double &xr, double &yr);
