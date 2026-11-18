@@ -1161,7 +1161,11 @@ void main()
 	float alpha = u_texel_alpha != 0 ? u_glass_alpha * t.a : u_glass_alpha;
 	if (u_glass != 0 && alpha <= 0.0) discard;
 	vec3 own = floor(t.rgb * 255.0 + 0.5);
-	if (u_paint != 0 && t != vec4(0.0)) own = Paint(own, (vec2(at) + 0.5) / vec2(size));
+	/* Painted where the texel is drawn, not at the middle of the texel of the colour's level: the masks have their own
+	 * size, and a coarse level of an atlas of colour swatches (the Tatras 1950: 8 texels a swatch) is a few texels a
+	 * part -- its middle lies on another part of the mask or none (the player, 18. 11.: "tatra 141 ... v dálce zase
+	 * barvu ztratila ve dvou krocích do bleděmodra a pak do šedé"). As the processor paints it (RasterObject()). */
+	if (u_paint != 0 && t != vec4(0.0)) own = Paint(own, f);
 	/* Its own light (ThreeDVehicleShape::tex_glow): u_glow.a 0 none, 1 the texel times its colour, 2 its colour. */
 	vec3 e = u_glow.a == 0.0 ? vec3(0.0) : (u_glow.a < 1.5 ? floor(u_glow.rgb * own / 255.0) : u_glow.rgb);
 	vec3 c = floor(min(vec3(255.0), own * v_light + e)) / 255.0;
