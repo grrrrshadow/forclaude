@@ -3289,7 +3289,7 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 		 * north a track up or across the screen shows wider than one along a tile's edge, and the game's sprites do not
 		 * (the player's #371: "the rails north-south and west-east are wider ... the size of the original rails").
 		 * As long as it is: smaller by it, longer by it along. Turned, as it is: its ends meet the others' there. */
-		const bool narrow = !pipe && name == diagonal && !ViewportDrawingEye() && std::fabs(GetViewYaw()) < 0.5f;
+		const bool narrow = !pipe && (name == diagonal || name.starts_with("kolej_porost_sikma")) && !ViewportDrawingEye() && std::fabs(GetViewYaw()) < 0.5f;
 		const float across = ThreeDTrackWide() ? THREE_D_DIAGONAL_ACROSS_ORIGINAL : THREE_D_DIAGONAL_ACROSS_CZTR;
 		AddThreeDFigureToViewportInBox(name, narrow ? across : 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box,
 				narrow ? 1.0f / across : 0.0f);
@@ -3299,6 +3299,15 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 	if (GetRailTypeInfo(GetRailType(ti->tile))->label == RAILTYPE_LABEL_POWER_LINE) {
 		DrawThreeDPowerLine(ti, track, s, round, eye);
 		return true;
+	}
+
+	/* A track no trains go on grown over (GetTrackOvergrowthStage()): on the map our patches of grass over its pieces
+	 * (kolej_porost_*, porost.py) -- from the eyes our grass's tufts are over it (AddOurGrass() of viewport.cpp) --; not
+	 * on a round curve's arcs (its straight pieces have them), nor on snow or in the desert. */
+	uint overgrown = 0;
+	if (!eye && !pipe && IsPlainRailTile(ti->tile)) {
+		const RailGroundType g = GetRailGroundType(ti->tile);
+		if (g != RailGroundType::SnowOrDesert && g != RailGroundType::HalfTileSnow && g != RailGroundType::HalfTileWater) overgrown = GetTrackOvergrowthStage(ti->tile);
 	}
 
 	for (Track t : track) {
@@ -3327,6 +3336,11 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 			foot = z;
 		}
 		put(name, ox + p.x, oy + p.y, p.ax, p.ay, z, foot, tall, facing);
+		/* Its grass, as it lies; its box over the piece's (drawn after it). */
+		if (overgrown != 0) {
+			const std::string_view kind = name == slope ? "svah" : name == diagonal ? "sikma" : "rovna";
+			put(fmt::format("kolej_porost_{}_{}", kind, overgrown), ox + p.x, oy + p.y, p.ax, p.ay, z, foot + tall, 1, facing);
+		}
 		/* At a dead end of a straight piece on the level its buffer stop (DrawThreeDBufferStops()). */
 		if (s == SLOPE_FLAT && !pipe) DrawThreeDBufferStops(ti, t, ti->z, eye);
 	}
