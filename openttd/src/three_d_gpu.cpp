@@ -826,8 +826,8 @@ struct GpuProgram {
 	GLint matrix = -1, light = -1, lit = -1, tex = -1, glass = -1, glass_alpha = -1, texel_alpha = -1, glow = -1;
 	/* The paint (ThreeDGpuPaint). */
 	GLint paint = -1, detail = -1, detail_colours = -1, paint_mask = -1, addon_mask = -1, rust_mask = -1;
-	GLint colour = -1, target = -1, start = -1, fade = -1, addon_colour = -1, addon_start = -1, tint = -1;
-	GLint rust_colour = -1, rust_time = -1, rust_ramp = -1, rust_moments = -1, rust_delay = -1;
+	GLint paint_values = -1; ///< its colours and numbers at once, five vec4 (MESH_FRAGMENT, SetPaint())
+	GLint rust_moments = -1, rust_delay = -1;
 	GLint near_plane = -1; ///< the view from the eyes' nearest (EYE_BUILDING_FRAGMENT)
 	GLint wheels = -1, wheel_count = -1; ///< the view from the eyes' turning wheels (EyeMeshSource())
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
@@ -1125,8 +1125,18 @@ uniform int u_texel_alpha;
 uniform vec4 u_glow;
 uniform int u_paint;
 uniform sampler2D u_detail, u_detail_colours, u_paint_mask, u_addon_mask, u_rust_mask;
-uniform vec3 u_colour, u_target, u_addon_colour, u_tint, u_rust_colour;
-uniform float u_start, u_fade, u_addon_start, u_rust_time, u_rust_ramp, u_rust_delay;
+uniform vec4 u_paint_values[5]; // set at once (SetPaint()): each a colour and a number of the paint
+uniform float u_rust_delay;
+#define u_colour (u_paint_values[0].xyz)
+#define u_start (u_paint_values[0].w)
+#define u_target (u_paint_values[1].xyz)
+#define u_fade (u_paint_values[1].w)
+#define u_addon_colour (u_paint_values[2].xyz)
+#define u_addon_start (u_paint_values[2].w)
+#define u_tint (u_paint_values[3].xyz)
+#define u_rust_time (u_paint_values[3].w)
+#define u_rust_colour (u_paint_values[4].xyz)
+#define u_rust_ramp (u_paint_values[4].w)
 uniform float u_rust_moments[64];
 noperspective in vec2 v_uv;
 noperspective in float v_light;
@@ -3108,16 +3118,7 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.paint_mask = gl.glGetUniformLocation(p.program, "u_paint_mask");
 	p.addon_mask = gl.glGetUniformLocation(p.program, "u_addon_mask");
 	p.rust_mask = gl.glGetUniformLocation(p.program, "u_rust_mask");
-	p.colour = gl.glGetUniformLocation(p.program, "u_colour");
-	p.target = gl.glGetUniformLocation(p.program, "u_target");
-	p.start = gl.glGetUniformLocation(p.program, "u_start");
-	p.fade = gl.glGetUniformLocation(p.program, "u_fade");
-	p.addon_colour = gl.glGetUniformLocation(p.program, "u_addon_colour");
-	p.addon_start = gl.glGetUniformLocation(p.program, "u_addon_start");
-	p.tint = gl.glGetUniformLocation(p.program, "u_tint");
-	p.rust_colour = gl.glGetUniformLocation(p.program, "u_rust_colour");
-	p.rust_time = gl.glGetUniformLocation(p.program, "u_rust_time");
-	p.rust_ramp = gl.glGetUniformLocation(p.program, "u_rust_ramp");
+	p.paint_values = gl.glGetUniformLocation(p.program, "u_paint_values");
 	p.rust_moments = gl.glGetUniformLocation(p.program, "u_rust_moments");
 	p.rust_delay = gl.glGetUniformLocation(p.program, "u_rust_delay");
 	p.near_plane = gl.glGetUniformLocation(p.program, "u_near");
@@ -3964,16 +3965,14 @@ static void SetPaint(const GpuProgram &program, const ThreeDGpuPaint *paint, con
 		set->values = values;
 	}
 	gl.glUniform1i(program.paint, bits);
-	gl.glUniform3f(program.colour, paint->colour[0], paint->colour[1], paint->colour[2]);
-	gl.glUniform3f(program.target, paint->target[0], paint->target[1], paint->target[2]);
-	gl.glUniform1f(program.start, paint->start);
-	gl.glUniform1f(program.fade, paint->fade);
-	gl.glUniform3f(program.addon_colour, paint->addon_colour[0], paint->addon_colour[1], paint->addon_colour[2]);
-	gl.glUniform1f(program.addon_start, paint->addon_start);
-	gl.glUniform3f(program.tint, paint->tint[0], paint->tint[1], paint->tint[2]);
-	gl.glUniform3f(program.rust_colour, paint->rust_colour[0], paint->rust_colour[1], paint->rust_colour[2]);
-	gl.glUniform1f(program.rust_time, paint->rust_time);
-	gl.glUniform1f(program.rust_ramp, paint->rust_ramp);
+	/* Its colours and numbers in one call (MESH_FRAGMENT's u_paint_values; the player's diary of 18. 11.: ten calls of a
+	 * vehicle's paint each). */
+	const std::array<float, 20> packed = {paint->colour[0], paint->colour[1], paint->colour[2], paint->start,
+			paint->target[0], paint->target[1], paint->target[2], paint->fade,
+			paint->addon_colour[0], paint->addon_colour[1], paint->addon_colour[2], paint->addon_start,
+			paint->tint[0], paint->tint[1], paint->tint[2], paint->rust_time,
+			paint->rust_colour[0], paint->rust_colour[1], paint->rust_colour[2], paint->rust_ramp};
+	gl.glUniform4fv(program.paint_values, 5, packed.data());
 	if ((bits & PAINT_PIECES) != 0) {
 		/* The moments of the vehicle's pieces of rust, in its order (ThreeDVehicleRust::Moments()). */
 		std::array<float, THREE_D_RUST_PIECES> moments;
