@@ -604,6 +604,44 @@ inline RailGroundType GetRailGroundType(Tile t)
 }
 
 /**
+ * The overgrowth of a plain track (the player, 18. 11., topics 362, 373, 374, 379: "slowly, first grass, then grass
+ * and tall marijuana; where the trains go it does not grow, only on tracks not used or used very little"): how long it
+ * has gone without trains, in m7 (unused by the plain rail tiles). It grows in the tile's loop, a train going onto the
+ * tile takes some of it off, the draisine MUV 69 all of it (rail_cmd.cpp TrackOvergrowthGrows(), TrackOvergrowthPassed()).
+ * @pre IsPlainRailTile(t)
+ */
+inline uint8_t GetTrackOvergrowth(Tile t)
+{
+	assert(IsPlainRailTile(t));
+	return t.m7();
+}
+
+/**
+ * Set the overgrowth of a plain track (GetTrackOvergrowth()).
+ * @pre IsPlainRailTile(t)
+ */
+inline void SetTrackOvergrowth(Tile t, uint8_t overgrowth)
+{
+	assert(IsPlainRailTile(t));
+	t.m7() = overgrowth;
+}
+
+/** The overgrowth (GetTrackOvergrowth()) from which grass covers the track: about two years without trains. */
+static constexpr uint8_t TRACK_OVERGROWTH_GRASS = 80;
+/** And from which tall marijuana grows among the grass: about three years more. */
+static constexpr uint8_t TRACK_OVERGROWTH_WEEDS = 200;
+
+/**
+ * How far a plain track is overgrown (GetTrackOvergrowth()): 0 clean, 1 grass, 2 grass and marijuana.
+ * @pre IsPlainRailTile(t)
+ */
+inline uint GetTrackOvergrowthStage(Tile t)
+{
+	const uint8_t o = GetTrackOvergrowth(t);
+	return o >= TRACK_OVERGROWTH_WEEDS ? 2 : o >= TRACK_OVERGROWTH_GRASS ? 1 : 0;
+}
+
+/**
  * Is the given rail tile snowy or deserty.
  * @param t The tile to query.
  * @return \c true iff the tile is snowy or deserty.

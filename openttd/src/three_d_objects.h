@@ -1152,6 +1152,7 @@ struct ThreeDVehicleObject {
 	bool states_of_anchor = false;  ///< its states name their piece ("clanek"): only the anchor's sets pick them (the colleague's wagons), else every piece's (StateStep())
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
 	bool lights_off = false;        ///< "svetla" "vychozi": "off": it has no lights, never lit (a horse, a barrow), VehicleLightsOn()
+	bool cleans_track = false;      ///< "cisti_koleje": a draisine that clears the tracks it goes on of their grass and weeds (the MUV 69, ThreeDTrainCleansTrack())
 	float cab[3] = {};              ///< x, y, z, metres
 	bool has_helm = false;          ///< "ridic" "poloha": where its helmsman stands or sits (the colleague's boats): the walker stands there when he lets go of the wheel
 	float helm[3] = {};             ///< x, y, z, metres
@@ -1389,6 +1390,7 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = 
 std::vector<struct VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine);
 std::vector<struct VehicleConfigAspect> GetThreeDRecordConfigAspects(EngineID engine);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
+bool ThreeDTrainCleansTrack(const Vehicle *front);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
 
 /**

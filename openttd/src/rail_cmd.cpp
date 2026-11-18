@@ -3183,6 +3183,54 @@ static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bo
 	}
 }
 
+/** The plants of marijuana along each piece of a track overgrown with them (GetTrackOvergrowthStage() 2), on the map and from the eyes. */
+static constexpr int THREE_D_OVERGROWN_WEEDS = 2;
+
+/**
+ * Marijuana over our track where no trains go long (the player, 18. 11., topics 362, 373, 374, 379; the stage
+ * GetTrackOvergrowthStage()): the game's kytka_mari_* along each piece, over its embankment and about it, each where
+ * the tile's number puts it, the same each time; on the map drawn after the track. Its grass from the eyes is our
+ * grass's tufts over the track (AddOurGrass() of viewport.cpp). Not on snow nor in the desert.
+ * @param s the tile's slope after its foundation
+ */
+static void DrawThreeDTrackOvergrowth(const TileInfo *ti, TrackBits track, Slope s, bool eye)
+{
+	if (!IsPlainRailTile(ti->tile) || GetTrackOvergrowthStage(ti->tile) < 2) return;
+	const RailGroundType ground = GetRailGroundType(ti->tile);
+	if (ground == RailGroundType::SnowOrDesert || ground == RailGroundType::HalfTileSnow || ground == RailGroundType::HalfTileWater) return;
+	uint32_t seed = TileX(ti->tile) * 2246822519u ^ (TileY(ti->tile) + 0x6A09E667u) * 3266489917u;
+	auto next = [&seed]() {
+		seed ^= seed << 13;
+		seed ^= seed >> 17;
+		seed ^= seed << 5;
+		return (seed & 0xFFFFFF) / static_cast<double>(0x1000000);
+	};
+	static constexpr std::string_view WEEDS[] = {"kytka_mari_mlada", "kytka_mari_vysoka", "kytka_mari_kosata"};
+	static constexpr double WEED_TALL_M = 2.0;
+	const double ox = TileX(ti->tile) * TILE_SIZE, oy = TileY(ti->tile) * TILE_SIZE, upm = OBJECT_UNITS_PER_METRE;
+	const int rails = std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
+	for (Track t : track) {
+		const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
+		const double len = std::max(std::hypot(p.ax, p.ay), 1e-6), ux = -p.ay / len, uy = p.ax / len;
+		for (int k = 0; k < THREE_D_OVERGROWN_WEEDS; k++) {
+			/* Along the piece, across it over the embankment and a little past it. */
+			const double f = next() * 1.8 - 0.9, c = (next() * 2 - 1) * 2.2 * upm;
+			const std::string_view name = WEEDS[std::min(2, static_cast<int>(next() * 3))];
+			const float scale = 0.9f + 0.4f * static_cast<float>(next());
+			const float facing = static_cast<float>(45 * static_cast<int>(next() * 8));
+			const double lx = std::clamp(p.x + f * p.ax + c * ux, 0.0, TILE_SIZE - 0.01), ly = std::clamp(p.y + f * p.ay + c * uy, 0.0, TILE_SIZE - 0.01);
+			const int z = ti->z + (s == SLOPE_FLAT ? 0 : GetPartialPixelZ(static_cast<int>(lx), static_cast<int>(ly), s));
+			if (eye) {
+				AddCabGroundPlant(name, scale, ox + lx, oy + ly, z, facing);
+				continue;
+			}
+			const int ix = static_cast<int>(std::lround(ox + lx)), iy = static_cast<int>(std::lround(oy + ly));
+			const std::array<int, 6> box{ix - 1, iy - 1, z + rails, ix + 1, iy + 1, z + rails + static_cast<int>(std::lround(WEED_TALL_M * OBJECT_HEIGHT_PER_METRE))};
+			AddThreeDFigureToViewportInBox(name, scale, ix, iy, z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+		}
+	}
+}
+
 static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 {
 	const bool eye = ViewportDrawingEye();
@@ -3282,6 +3330,8 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 		/* At a dead end of a straight piece on the level its buffer stop (DrawThreeDBufferStops()). */
 		if (s == SLOPE_FLAT && !pipe) DrawThreeDBufferStops(ti, t, ti->z, eye);
 	}
+	/* Grass and marijuana over it where no trains go (DrawThreeDTrackOvergrowth()). */
+	if (!pipe) DrawThreeDTrackOvergrowth(ti, track, s, eye);
 	/* Its catenary over it, when it is electrified (DrawThreeDCatenary()). */
 	if (!pipe && ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, track, s, round, eye);
 	return true;
@@ -4231,6 +4281,45 @@ static Foundation GetFoundation_Rail(TileIndex tile, Slope tileh)
 	return IsPlainRail(tile) ? GetRailFoundation(tileh, GetTrackBits(tile)) : FlatteningFoundation(tileh);
 }
 
+/** For the rig ('test3d zarust rychlost'): the overgrowth a plain track gains in each of its tile's loops; 0 as the game has it (TrackOvergrowthGrows()). */
+uint8_t _track_overgrowth_rig_step = 0;
+
+/**
+ * A plain track grows over in its tile's loop (GetTrackOvergrowth()): a step in three of eight loops -- a loop about
+ * every three and a half days, some forty steps a year: grass after about two years without trains, marijuana after
+ * about five. Not under snow nor in the desert (the caller).
+ */
+static void TrackOvergrowthGrows(TileIndex tile)
+{
+	const uint8_t before = GetTrackOvergrowth(tile);
+	if (before == UINT8_MAX) return;
+	uint step = _track_overgrowth_rig_step;
+	if (step == 0 && Chance16(3, 8)) step = 1;
+	if (step == 0) return;
+	const uint stage = GetTrackOvergrowthStage(tile);
+	SetTrackOvergrowth(tile, static_cast<uint8_t>(std::min<uint>(UINT8_MAX, before + step)));
+	if (GetTrackOvergrowthStage(tile) != stage) MarkTileDirtyByTile(tile);
+}
+
+/**
+ * The overgrowth a train takes off a plain track it goes onto (TrackOvergrowthPassed()): about three months' growth --
+ * a track with more than some four trains a year stays clean, one with one or two grows over in a few years.
+ */
+static constexpr uint8_t TRACK_OVERGROWTH_TRAIN = 12;
+
+/**
+ * A train goes onto a plain track (VehicleEnterTile_Rail(), its front): its overgrowth (GetTrackOvergrowth()) less by
+ * TRACK_OVERGROWTH_TRAIN, none at all after the draisine MUV 69 (ThreeDTrainCleansTrack(), its set's record says so).
+ */
+static void TrackOvergrowthPassed(TileIndex tile, const Train *front)
+{
+	const uint8_t before = GetTrackOvergrowth(tile);
+	if (before == 0) return;
+	const uint stage = GetTrackOvergrowthStage(tile);
+	SetTrackOvergrowth(tile, ThreeDTrainCleansTrack(front) ? 0 : before - std::min(before, TRACK_OVERGROWTH_TRAIN));
+	if (GetTrackOvergrowthStage(tile) != stage) MarkTileDirtyByTile(tile);
+}
+
 /** @copydoc TileLoopProc */
 static void TileLoop_Rail(TileIndex tile)
 {
@@ -4355,6 +4444,8 @@ set_ground:
 		SetRailGroundType(tile, new_ground);
 		MarkTileDirtyByTile(tile);
 	}
+	/* A plain track grows over where no trains go: not under snow nor in the desert. */
+	if (IsPlainRail(tile) && new_ground != RailGroundType::SnowOrDesert && new_ground != RailGroundType::HalfTileSnow) TrackOvergrowthGrows(tile);
 }
 
 
@@ -4603,6 +4694,9 @@ int TicksToLeaveDepot(const Train *v)
 /** @copydoc VehicleEnterTileProc */
 static VehicleEnterTileStates VehicleEnterTile_Rail(Vehicle *v, TileIndex tile, int x, int y)
 {
+	/* A train's front going onto a plain track (not there yet): its overgrowth less, once a train. */
+	if (v->type == VehicleType::Train && v->tile != tile && IsPlainRail(tile) && Train::From(v)->IsFrontEngine()) TrackOvergrowthPassed(tile, Train::From(v));
+
 	/* This routine applies only to trains in depot tiles. */
 	if (v->type != VehicleType::Train || !IsRailDepotTile(tile)) return {};
 

@@ -7866,6 +7866,8 @@ static void ReadThreeDVehicleObjects()
 					for (int k = 0; k < 3; k++) obj.cab[k] = e.at("kabina").at(k).get<float>();
 					obj.has_cab = true;
 				}
+				/* A draisine that clears the tracks of their grass and weeds (the player, 18. 11., topic 379: "yes, the MUV 69"). */
+				obj.cleans_track = e.contains("cisti_koleje") && e.at("cisti_koleje").is_boolean() && e.at("cisti_koleje").get<bool>();
 				/* The helmsman of a boat (the colleague's hra/3d/LODE-3D-PRO-HRU.md, "ridic"): his eyes the cab's when it has
 				 * no "kabina", and where he stands or sits -- the walker there on the deck when he lets go of the wheel. */
 				if (e.contains("ridic") && e.at("ridic").is_object()) {
@@ -8773,6 +8775,20 @@ static uint64_t PieceKeyOf(const Vehicle *v)
  * @param v the piece, a part of an articulated vehicle or a wagon
  * @param[out] piece which of the object's pieces it is
  */
+/**
+ * Whether a train clears the tracks it goes on of their grass and weeds (GetTrackOvergrowth() of rail_map.h): a
+ * vehicle of it whose 3D object's record says so ("cisti_koleje": the draisine MUV 69 of the set Dresiny) -- the set
+ * says what its vehicle does, the game lets it.
+ */
+bool ThreeDTrainCleansTrack(const Vehicle *front)
+{
+	for (const Vehicle *u = front; u != nullptr; u = u->Next()) {
+		const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(u);
+		if (obj != nullptr && obj->cleans_track) return true;
+	}
+	return false;
+}
+
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece)
 {
 	if (v == nullptr) return nullptr;

@@ -4199,6 +4199,13 @@ bool AfterLoadGame()
 	CrashLog::SetStage("afterload: AfterLoadDecoupleCounts");
 	AfterLoadDecoupleCounts();
 
+	/* The plain tracks' overgrowth (GetTrackOvergrowth(), m7): clean in the games from before it. */
+	if (IsSavegameVersionBefore(SaveLoadVersion::TrackOvergrowth)) {
+		for (const auto t : Map::Iterate()) {
+			if (IsPlainRailTile(t)) SetTrackOvergrowth(t, 0);
+		}
+	}
+
 	/* The areas of the modular airports, not saved (air_map.h). */
 	if (!IsSavegameVersionBefore(SaveLoadVersion::ModularAirports)) {
 		extern void RecomputeModularAirportAreas();

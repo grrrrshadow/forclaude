@@ -10212,6 +10212,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsoleCmdExec(then);
 		}
+	} else if (what == "zavri") {
+		/* 'zavri': every window but the main ones closed (a save's question of its missing sets over the rig's pictures). */
+		CloseAllNonVitalWindows();
+		IConsolePrint(CC_DEFAULT, "test3d: zavri: hotovo");
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {
@@ -11192,6 +11196,39 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _texture_numbers_kept;
 		_texture_numbers_kept = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: texturycisla {}", _texture_numbers_kept ? 1 : 0);
+		return true;
+	} else if (what == "zarust" && argv.size() > 2) {
+		/* The plain tracks' overgrowth (GetTrackOvergrowth() of rail_map.h): 'zarust stav' how many tiles are at each
+		 * stage; 'zarust vse <0-255>' all of them so (80 grass, 200 marijuana); 'zarust dlazdice <x> <y> <0-255>' one;
+		 * 'zarust rychlost <n>' each tile's loop adds n (0 as the game: one step in three of eight loops). */
+		extern uint8_t _track_overgrowth_rig_step;
+		std::array<uint, 3> stages{};
+		uint tiles = 0;
+		const auto set = [](TileIndex t, uint value) {
+			SetTrackOvergrowth(t, static_cast<uint8_t>(std::min<uint>(value, UINT8_MAX)));
+			MarkTileDirtyByTile(t);
+		};
+		if (argv[2] == "rychlost") {
+			_track_overgrowth_rig_step = static_cast<uint8_t>(std::min(number(3).value_or(0), 255));
+		} else if (argv[2] == "vse" && number(3).has_value()) {
+			for (const auto t : Map::Iterate()) {
+				if (IsPlainRailTile(t)) set(t, std::max(0, *number(3)));
+			}
+		} else if (argv[2] == "dlazdice" && number(5).has_value()) {
+			const TileIndex t = TileXY(Clamp(*number(3), 0, Map::MaxX()), Clamp(*number(4), 0, Map::MaxY()));
+			if (!IsPlainRailTile(t)) {
+				IConsolePrint(CC_ERROR, "test3d: zarust: {},{} neni obycejna kolej", TileX(t), TileY(t));
+				return true;
+			}
+			set(t, std::max(0, *number(5)));
+		}
+		std::string some;
+		for (const auto t : Map::Iterate()) {
+			if (!IsPlainRailTile(t)) continue;
+			if (tiles++ % 16 == 0 && tiles < 16 * 8) some += fmt::format(" {},{}", TileX(t), TileY(t));
+			stages[GetTrackOvergrowthStage(t)]++;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: zarust: kolej {} dlazdic, cista {}, trava {}, marihuana {}; rychlost {}; napr.{}", tiles, stages[0], stages[1], stages[2], _track_overgrowth_rig_step, some);
 		return true;
 	} else if (what == "bunky" && argv.size() > 2) {
 		/* 'bunky 0|1': the levels of the vehicles' textures no coarser than the cells their triangles of one point draw

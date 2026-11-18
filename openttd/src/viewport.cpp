@@ -15712,6 +15712,12 @@ static void AddCabPlant(std::string_view name, float scale, float stretch, doubl
 	f.rise_y = rise_y;
 }
 
+/** A plant standing on the ground in the view from the eyes from elsewhere (the marijuana over an overgrown track, DrawThreeDTrackOvergrowth() of rail_cmd.cpp): as AddCabPlant(). */
+void AddCabGroundPlant(std::string_view name, float scale, double x, double y, double z, float facing)
+{
+	AddCabPlant(name, scale, 1.0f, x, y, z, facing);
+}
+
 /** A tile with a foundation in the view from the eyes (DrawEyeRetainingWalls()). */
 struct EyeFoundationTile {
 	TileIndex tile;
@@ -17514,6 +17520,12 @@ static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope,
 	} else if (IsTileType(tile, TileType::Railway) || IsTileType(tile, TileType::Road)) {
 		if (!WayKeepsOff(tile, slope, way)) return;
 		thirds = 3;
+		/* A track overgrown where no trains go (GetTrackOvergrowthStage()): its tufts over it too, with marijuana taller
+		 * (DrawThreeDTrackOvergrowth() of rail_cmd.cpp has the plants). */
+		if (IsPlainRailTile(tile) && GetTrackOvergrowthStage(tile) > 0) {
+			way.clear();
+			rough = GetTrackOvergrowthStage(tile) == 2;
+		}
 	} else if (IsTileType(tile, TileType::Trees)) {
 		if (GetTreeGround(tile) == TreeGround::Grass) {
 			thirds = GetTreeDensity(tile);

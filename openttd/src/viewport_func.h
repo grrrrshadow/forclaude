@@ -80,6 +80,7 @@ bool ThreeDDepotStandsOn(const TileInfo *ti);
 bool ThreeDLighthouseStandsOn(const TileInfo *ti);
 void AddCabFigure(std::string_view name, float size, double x, double y, double z, float facing, int frame = 0, int state = 0);
 void AddCabGroundFigure(std::string_view name, double x, double y, double z, float facing);
+void AddCabGroundPlant(std::string_view name, float scale, double x, double y, double z, float facing);
 struct ThreeDObject;
 void AddThreeDTileObject(const ThreeDObject *obj, TileIndex origin, int z);
 void AddCabWire(double x0, double y0, double ground0, double x1, double y1, double ground1, double metres, uint32_t colour);
