@@ -720,8 +720,10 @@ static std::mutex _gpu_eye_most_mutex;
  */
 uint64_t _gpu_standing_failed[4] = {};
 int _gpu_standing_failed_told = 0; ///< how many of those the card's diary told what of (at most 40)
-double _gpu_ground_ms = 0;          ///< the time the card took laying the ground of the turned map since the last ThreeDGpuTimes()
+double _gpu_ground_ms = 0;          ///< the time the card took laying the ground of the turned map since the last ThreeDGpuTimes(), and what stands on it
 uint64_t _gpu_grounds = 0;          ///< and how many blocks
+double _gpu_ground_only_ms = 0;     ///< of it the ground alone (the player's diary of 18. 11.: "the ground of 136 blocks in 1198 ms" was the ground and what stands together)
+uint64_t _gpu_grounds_only = 0;     ///< and how many blocks of ground
 uint64_t _gpu_grounds_failed = 0;   ///< and how many it could not lay (the processor did)
 
 /* What the card keeps, by the thing's number (ThreeDUniqueId): the corners of the shapes, their triangles, the
@@ -7789,6 +7791,10 @@ void GpuThreadMain()
 			job->done = true;
 			_gpu_ground_ms += ms;
 			_gpu_grounds++;
+			if (job->ground != nullptr) {
+				_gpu_ground_only_ms += ms;
+				_gpu_grounds_only++;
+			}
 			if (!drawn) _gpu_grounds_failed++;
 			if (job->owned_ground != nullptr) {
 				/* Given without waiting: nobody takes it. */
@@ -8502,7 +8508,8 @@ std::string ThreeDGpuTimes()
 		s += fmt::format("; OpenGL calls {} (ground {} in {} jobs, {} a job; what stands {} in {} jobs, {} a job, buildings {} with {} calls, {} a building; vehicles drawn and shrunk {} with {} calls, {} a vehicle, of them drawing {})", _gl_calls.exchange(0),
 				cg, jg, jg > 0 ? cg / jg : 0, cs, js, js > 0 ? cs / js : 0, nb, cb, nb > 0 ? cb / nb : 0, nv, cv, nv > 0 ? cv / nv : 0, _gl_calls_vehicles_draw.exchange(0));
 	}
-	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
+	if (_gpu_grounds > 0) s += fmt::format("; the ground and what stands of {} blocks in {:.1f} ms (the ground alone {} in {:.1f} ms){}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_only, _gpu_ground_only_ms,
+			_gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
 	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single);
 	if (const uint64_t later = _gpu_eye_later.exchange(0); later > 0) s += fmt::format(", {} new left for a later picture", later);
@@ -8538,6 +8545,8 @@ std::string ThreeDGpuTimes()
 	_gpu_standing_triangles[0] = _gpu_standing_triangles[1] = 0;
 	_gpu_ground_ms = 0;
 	_gpu_grounds = 0;
+	_gpu_ground_only_ms = 0;
+	_gpu_grounds_only = 0;
 	_gpu_grounds_failed = 0;
 	_card_sent = 0;
 	_card_trims = 0;
