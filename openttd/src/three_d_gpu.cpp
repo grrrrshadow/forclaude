@@ -825,7 +825,7 @@ std::string MemoryNow()
 /* The programs, the picture drawn into, the corners of the lights at night. */
 struct GpuProgram {
 	GLuint program = 0;
-	GLint matrix = -1, light = -1, lit = -1, tex = -1, glass = -1, glass_alpha = -1, texel_alpha = -1, glow = -1;
+	GLint matrix = -1, light = -1, tex = -1, glass = -1, glass_alpha = -1, texel_alpha = -1, glow = -1;
 	/* The paint (ThreeDGpuPaint). */
 	GLint paint = -1, detail = -1, detail_colours = -1, paint_mask = -1, addon_mask = -1, rust_mask = -1;
 	GLint paint_values = -1; ///< its colours and numbers at once, five vec4 (MESH_FRAGMENT, SetPaint())
@@ -1087,8 +1087,9 @@ layout(location = 2) in vec2 a_uv;
 layout(location = 9) in vec4 a_joints;
 layout(location = 10) in vec4 a_weights;
 uniform mat4 u_matrix;
-uniform vec3 u_light;
-uniform float u_lit;
+uniform vec4 u_light_lit;
+#define u_light (u_light_lit.xyz)
+#define u_lit (u_light_lit.w)
 uniform sampler2D u_bones;
 uniform int u_bone_row;
 noperspective out vec2 v_uv;
@@ -3133,8 +3134,7 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 		return false;
 	}
 	p.matrix = gl.glGetUniformLocation(p.program, "u_matrix");
-	p.light = gl.glGetUniformLocation(p.program, "u_light");
-	p.lit = gl.glGetUniformLocation(p.program, "u_lit");
+	p.light = gl.glGetUniformLocation(p.program, "u_light_lit");
 	p.tex = gl.glGetUniformLocation(p.program, "u_tex");
 	p.glass = gl.glGetUniformLocation(p.program, "u_glass");
 	p.glass_alpha = gl.glGetUniformLocation(p.program, "u_glass_alpha");
@@ -3962,6 +3962,15 @@ static void EndPictureBatch(const PictureBatch &b)
 	gl.glBindVertexArray(0);
 }
 
+/**
+ * The light of a mesh (its direction) and whether it is lit by it, one call: MESH_VERTEX's u_light_lit (the player's
+ * diary of 18. 11.: a vehicle of the turned map took a vec3 and a float, of the 17 calls a vehicle).
+ */
+static void SetLight(const GpuProgram &program, const ThreeDGpuMesh &mesh, const GpuShape &shape)
+{
+	gl.glUniform4f(program.light, mesh.light[0], mesh.light[1], mesh.light[2], mesh.lit && shape.has_nrm ? 1.0f : 0.0f);
+}
+
 static void SetPaint(const GpuProgram &program, const ThreeDGpuPaint *paint, const PaintOnCard *pc, PaintSet *set = nullptr)
 {
 	if (paint == nullptr || pc == nullptr || !paint->Any()) {
@@ -4187,8 +4196,7 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 		const ThreeDGpuMatrix m = Multiply(to_card, d.mesh->matrix);
 		const double determinant = Determinant(m);
 		gl.glUniformMatrix4fv(_mesh_program.matrix, 1, GL_TRUE, m.data());
-		gl.glUniform3f(_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
-		gl.glUniform1f(_mesh_program.lit, d.mesh->lit && d.shape->has_nrm ? 1.0f : 0.0f);
+		SetLight(_mesh_program, *d.mesh, *d.shape);
 		if (!lean || b.glass_set != (glass ? 1 : 0)) gl.glUniform1i(_mesh_program.glass, glass ? 1 : 0);
 		b.glass_set = glass ? 1 : 0;
 		const int bone_row = d.mesh->bones != nullptr && d.shape->has_bones ? BonesOnCard(*d.mesh->bones) : -1;
@@ -6768,8 +6776,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		if (!glass) _gpu_eye_single++;
 		gl.glUniformMatrix4fv(_eye_mesh_program.matrix, 1, GL_TRUE, d.mesh->matrix.data());
 		const double determinant = Determinant(d.mesh->matrix);
-		gl.glUniform3f(_eye_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
-		gl.glUniform1f(_eye_mesh_program.lit, d.mesh->lit && d.shape->has_nrm ? 1.0f : 0.0f);
+		SetLight(_eye_mesh_program, *d.mesh, *d.shape);
 		gl.glUniform1i(_eye_mesh_program.glass, glass ? 1 : 0);
 		SetBones(_eye_mesh_program, *d.mesh, *d.shape);
 		gl.glBindVertexArray(d.shape->vao);
