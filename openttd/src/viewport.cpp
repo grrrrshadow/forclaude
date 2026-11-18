@@ -7157,18 +7157,6 @@ static void ForWalkerPlantParts(F f)
 	}
 }
 
-/**
- * The map view tipped up or down (SetViewPitch() of three_d.cpp): what was laid and kept for the old tilt made again --
- * the ground, the tiles on foundations, the pictures of the sprites.
- */
-void ForgetTurnedFoundations();
-void ThreeDViewPitchChanged()
-{
-	ResetTurnedGround();
-	ForgetTurnedFoundations();
-	ForgetTurnedSpritePictures();
-}
-
 /** Forget the kept pictures of the tiles with a foundation (ResetTurnedGround()). */
 void ForgetTurnedFoundations()
 {
@@ -7196,7 +7184,7 @@ static const Viewport *_turned_vp = nullptr; ///< the viewport whose block is be
 struct TurnedCardGround {
 	const Viewport *vp = nullptr;  ///< whose, nullptr none
 	bool shown = false;            ///< the video driver shows it
-	float yaw = 0;
+	float yaw = 0; ///< the camera it was made for: its angle and tilt (GetViewCameraKey())
 	double pivot_x = 0, pivot_y = 0;
 	ZoomLevel zoom = ZoomLevel::Normal;
 	uint64_t version = 0;          ///< _turned_ground_version it was laid at
@@ -7471,12 +7459,12 @@ static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 	GetViewTurn(c, s, px, py);
 	uint64_t made = 0;
 	ThreeDGpuViewGround(g.view, &made);
-	const bool same_camera = g.vp == &vp && g.yaw == GetViewYaw() && g.pivot_x == px && g.pivot_y == py && g.zoom == zoom &&
+	const bool same_camera = g.vp == &vp && g.yaw == GetViewCameraKey() && g.pivot_x == px && g.pivot_y == py && g.zoom == zoom &&
 			g.band == band && g.w == vp.width + 2 * band && g.h == vp.height + 2 * band && g.made == made;
 	if (!same_camera) {
 		if (&g == &_turned_card_ground) _turned_moving_due = true;
 		g.vp = &vp;
-		g.yaw = GetViewYaw();
+		g.yaw = GetViewCameraKey();
 		g.pivot_x = px;
 		g.pivot_y = py;
 		g.zoom = zoom;
@@ -7852,7 +7840,7 @@ static bool FinishTurnedGround(TurnedGroundLaying &lay)
  * cars and a ghost about ten blocks a frame: 4 frames a second). Turned, zoomed, the ground changed: forgotten.
  */
 struct TurnedGroundOfView {
-	float yaw = 0;
+	float yaw = 0; ///< the camera it was made for: its angle and tilt (GetViewCameraKey())
 	double pivot_x = 0, pivot_y = 0;
 	ZoomLevel zoom = ZoomLevel::Normal;
 	uint64_t version = 0;          ///< _turned_ground_version it was laid at
@@ -7868,7 +7856,7 @@ static bool TurnedGroundOfViewFits(const TurnedGroundOfView &g, ZoomLevel zoom)
 {
 	double c, s, px, py;
 	GetViewTurn(c, s, px, py);
-	return !g.px.empty() && g.yaw == GetViewYaw() && g.pivot_x == px && g.pivot_y == py && g.zoom == zoom && g.version == _turned_ground_version;
+	return !g.px.empty() && g.yaw == GetViewCameraKey() && g.pivot_x == px && g.pivot_y == py && g.zoom == zoom && g.version == _turned_ground_version;
 }
 
 /**
@@ -7909,7 +7897,7 @@ static void KeepTurnedGroundOfView(const DrawPixelInfo &frame)
 	if (!TurnedGroundOfViewFits(g, frame.zoom)) {
 		double c, s;
 		GetViewTurn(c, s, g.pivot_x, g.pivot_y);
-		g.yaw = GetViewYaw();
+		g.yaw = GetViewCameraKey();
 		g.zoom = frame.zoom;
 		g.version = _turned_ground_version;
 		g.l = vl;
@@ -8809,6 +8797,9 @@ static void TurnedStandingNear(ThreeDGpuStanding &s, const DrawPixelInfo &frame,
 	s.turn = {static_cast<float>(c), static_cast<float>(sn), static_cast<float>(px), static_cast<float>(py)};
 	const int scale = ScaleByZoom(1, frame.zoom);
 	s.place = {static_cast<float>(frame.left / scale - s.view_x), static_cast<float>(frame.top / scale - s.view_y), static_cast<float>(scale), static_cast<float>(ZOOM_BASE)};
+	double ground, height;
+	GetViewTilt(ground, height);
+	s.tilt = {static_cast<float>(ground), static_cast<float>(height)};
 	double near0 = std::numeric_limits<double>::max(), near1 = std::numeric_limits<double>::lowest();
 	for (const TurnedSprite &t : standing) {
 		const ParentSpriteToDraw &ps = *t.ps;
@@ -8821,7 +8812,7 @@ static void TurnedStandingNear(ThreeDGpuStanding &s, const DrawPixelInfo &frame,
 	}
 	/* Past the boxes: what of a picture stands out of its box (its upright plane), a figure on a building. */
 	static constexpr double MARGIN = 3 * 64.0;
-	if (near0 > near1) near0 = near1 = static_cast<double>(frame.top) / ZOOM_BASE;
+	if (near0 > near1) near0 = near1 = static_cast<double>(frame.top) / ZOOM_BASE / ground;
 	s.depth = {static_cast<float>(near0 - MARGIN), static_cast<float>(near1 - near0 + 2 * MARGIN)};
 }
 
@@ -8913,6 +8904,10 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		}
 	}
 	std::vector<TurnedTile> tiles;
+	/* The map tipped (GetViewTilt()): its heights and its ground up to so many times as long on the screen as at 30 degrees. */
+	double tilt_ground, tilt_height;
+	GetViewTilt(tilt_ground, tilt_height);
+	const double tilt_reach = std::max({1.0, tilt_ground, tilt_height});
 	for (int ty = ty0; ty <= ty1; ty++) {
 		for (int tx = tx0; tx <= tx1; tx++) {
 			_turned_times.tiles++;
@@ -8929,7 +8924,9 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 			} else {
 				reach += 2 * TILE_HEIGHT;
 			}
-			if (vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE < frame.top || vy - (reach + TILE_PIXELS) * ZOOM_BASE > frame.top + frame.height) continue;
+			/* As far as the map tipped stretches the heights or the ground (GetViewTilt()). */
+			reach = static_cast<int>(std::ceil(reach * tilt_reach));
+			if (vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE * tilt_reach < frame.top || vy - (reach + TILE_PIXELS) * ZOOM_BASE > frame.top + frame.height) continue;
 			if (!only_parts.empty()) {
 				const double l = vx - 2 * TILE_PIXELS * ZOOM_BASE, r = vx + 2 * TILE_PIXELS * ZOOM_BASE;
 				const double top = vy - (reach + TILE_PIXELS) * ZOOM_BASE, bottom = vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE;
@@ -9739,7 +9736,10 @@ static float TurnedGlowOrder(const std::array<double, 4> &g)
  */
 static float TurnedGlowOrderDown(ZoomLevel zoom)
 {
-	return static_cast<float>(2.0 * 32.0 * ScaleByZoom(1, zoom) / ZOOM_BASE);
+	/* A pixel's units of height as the map tipped draws them (GetViewTilt(): heights so much shorter). */
+	double ground, height;
+	GetViewTilt(ground, height);
+	return static_cast<float>(2.0 * 32.0 * ScaleByZoom(1, zoom) / ZOOM_BASE / height);
 }
 
 /**
@@ -9775,6 +9775,9 @@ static TurnedCardGlow TurnedHouseGlow(const std::array<double, 4> &g, ZoomLevel 
 static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double unit, const std::function<void(double, double, double, double &, double &)> &project,
 		const std::function<void(double, double, double, double, Colour, double)> &shine, const std::function<void(double, double, double, double, Colour, double)> &spill)
 {
+	/* The pools of light on the ground as round as the map tipped shows them (half as high as wide at 30 degrees). */
+	double ground, height;
+	GetViewTilt(ground, height);
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
@@ -9794,10 +9797,10 @@ static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double u
 				}
 				break;
 			case ThreeDPictureLight::Kind::PoolNear:
-				spill(px, py, 4 * unit, 2 * unit, pool, 0.4);
+				spill(px, py, 4 * unit, 2 * unit * ground, pool, 0.4);
 				break;
 			case ThreeDPictureLight::Kind::Pool:
-				spill(px, py, 8 * unit, 4 * unit, pool, 0.4);
+				spill(px, py, 8 * unit, 4 * unit * ground, pool, 0.4);
 				break;
 		}
 	};
@@ -9895,9 +9898,9 @@ static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double u
 			/* The pool of the light on the way ahead, then the two lamps. */
 			double px, py;
 			project(v->x_pos + fx * (half + 9), v->y_pos + fy * (half + 9), z, px, py);
-			spill(px, py, 9 * unit, 4.5 * unit, pool, 0.45);
+			spill(px, py, 9 * unit, 4.5 * unit * ground, pool, 0.45);
 			project(v->x_pos + fx * (half + 4), v->y_pos + fy * (half + 4), z, px, py);
-			spill(px, py, 5 * unit, 2.5 * unit, pool, 0.5);
+			spill(px, py, 5 * unit, 2.5 * unit * ground, pool, 0.5);
 			for (int side = -1; side <= 1; side += 2) {
 				project(v->x_pos + fx * half + sx * side * 1.5, v->y_pos + fy * half + sy * side * 1.5, z + 2, px, py);
 				spill(px, py, 1.6 * unit, 1.6 * unit, lamp, 1.2);
@@ -9956,6 +9959,9 @@ static void DrawNight(bool turned)
 	};
 	/* A unit of the world along the ground, in pixels of the block (as wide as the map draws it). */
 	const double unit = 2 * ZOOM_BASE * scale;
+	/* A pool of light on the ground as round as the map tipped shows it (half as high as wide at 30 degrees, GetViewTilt()). */
+	double ground, height;
+	GetViewTilt(ground, height);
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
 	/* The pixels of the lit glass left lit (the windows of the houses, the lights of the vehicles' models): the glow of
 	 * a light only where they are seen -- one on the far side of a house, or hidden behind another, has none left. */
@@ -10031,7 +10037,7 @@ static void DrawNight(bool turned)
 			const double spread = len * std::tan(l.half_angle) * unit;
 			AddNightBeam(dst, dpi.pitch, w, h, px, py, qx, qy, 0.1 * unit, spread, l.colour, 0.35);
 			AddNightLight(dst, dpi.pitch, w, h, px, py, std::max(1.2, 0.6 * unit), std::max(1.2, 0.6 * unit), l.colour, 1.0);
-			if (l.ground > 0) AddNightLight(dst, dpi.pitch, w, h, qx, qy, spread * 1.2, spread * 0.6, l.colour, 0.55);
+			if (l.ground > 0) AddNightLight(dst, dpi.pitch, w, h, qx, qy, spread * 1.2, spread * 0.6 * ground, l.colour, 0.55);
 		}
 	}
 }
@@ -10047,7 +10053,7 @@ struct TurnedCardView {
 	uint64_t pass = UINT64_MAX;       ///< the pass of DrawDirtyBlocks() it was drawn in
 	bool ok = false;                  ///< whether the card laid all of it then
 	const Viewport *vp = nullptr;
-	float yaw = 0;
+	float yaw = 0; ///< the camera it was made for: its angle and tilt (GetViewCameraKey())
 	double pivot_x = 0, pivot_y = 0;
 	ZoomLevel zoom = ZoomLevel::Normal;
 	int left = 0, top = 0, width = 0, height = 0; ///< the view, virtual coordinates (whole pixels of its zoom)
@@ -10150,7 +10156,7 @@ static bool TurnedViewWholeOnCard(const Viewport &vp)
 	const int width = ScaleByZoom(vp.width, vp.zoom) & mask, height = ScaleByZoom(vp.height, vp.zoom) & mask;
 	double c, s, px, py;
 	GetViewTurn(c, s, px, py);
-	const bool same_camera = cv.vp == &vp && cv.yaw == GetViewYaw() && cv.pivot_x == px && cv.pivot_y == py && cv.zoom == vp.zoom &&
+	const bool same_camera = cv.vp == &vp && cv.yaw == GetViewCameraKey() && cv.pivot_x == px && cv.pivot_y == py && cv.zoom == vp.zoom &&
 			cv.width == width && cv.height == height;
 	if (same_camera && cv.left == left && cv.top == top) {
 		/* Laid whole this pass for this camera: a block is a hole for it. Else the camera stays: the blocks drawn again
@@ -10170,7 +10176,7 @@ static bool TurnedViewWholeOnCard(const Viewport &vp)
 		return false;
 	}
 	cv.vp = &vp;
-	cv.yaw = GetViewYaw();
+	cv.yaw = GetViewCameraKey();
 	cv.pivot_x = px;
 	cv.pivot_y = py;
 	cv.zoom = vp.zoom;
@@ -10296,7 +10302,7 @@ void TurnedCardLayDirty(int left, int top, int right, int bottom)
 	const int mask = ScaleByZoom(-1, vp.zoom);
 	double c, s, px, py;
 	GetViewTurn(c, s, px, py);
-	if (cv.vp != &vp || cv.yaw != GetViewYaw() || cv.pivot_x != px || cv.pivot_y != py || cv.zoom != vp.zoom ||
+	if (cv.vp != &vp || cv.yaw != GetViewCameraKey() || cv.pivot_x != px || cv.pivot_y != py || cv.zoom != vp.zoom ||
 			cv.width != (ScaleByZoom(vp.width, vp.zoom) & mask) || cv.height != (ScaleByZoom(vp.height, vp.zoom) & mask) ||
 			cv.left != (vp.virtual_left & mask) || cv.top != (vp.virtual_top & mask)) {
 		_turned_card_dirty_why[1]++;

@@ -25,6 +25,7 @@
 #include "zoom_func.h"
 #include "core/math_func.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 #include "table/three_d_houses.h"
@@ -73,11 +74,8 @@ static float _view_pitch = THREE_D_PITCH_DEFAULT;
 static double _pitch_ground = 1.0, _pitch_height = 1.0;
 /** The pixels of a drag up or down not made a step of the tilt yet (TiltViewByDrag()). */
 static int _tilt_remainder = 0;
-/**
- * Whether the middle button dragged up or down tips the map ('test3d naklon 0|1'): off till the pictures of the
- * vehicles and what the card lays follow the tilt too (they are drawn for 30 degrees yet), the map as it was.
- */
-bool _view_tilt_on = false;
+/** Whether the middle button dragged up or down tips the map ('test3d naklon 0|1', 0 as before 18. 11.). */
+bool _view_tilt_on = true;
 
 /** Whether the 3D of this game is switched on at all (gui.three_d). */
 bool ThreeDEnabled()
@@ -101,6 +99,15 @@ float GetViewYawSigned()
 bool IsViewTurned()
 {
 	return _view_yaw != 0.0f || _view_pitch != THREE_D_PITCH_DEFAULT;
+}
+
+/**
+ * The map view's camera as one number, for what is kept of a view to know it is of the same camera: its angle and how
+ * far down it looks (a tilt is no move of the view -- the card's ground and pictures of the view drawn for the old one).
+ */
+float GetViewCameraKey()
+{
+	return _view_yaw + 1000.0f * _view_pitch;
 }
 
 /** How far down the map view looks, degrees over the horizon (_view_pitch). */
@@ -359,7 +366,7 @@ void TurnDirtyRect(int &left, int &top, int &right, int &bottom)
 				take(tx, ty);
 			}
 		}
-		margin = 2 * max_height * ZOOM_BASE;
+		margin = 2 * max_height * ZOOM_BASE * std::max({1.0, _pitch_ground, _pitch_height});
 	}
 	left = static_cast<int>(std::floor(nl - margin));
 	right = static_cast<int>(std::ceil(nr + margin));
@@ -596,7 +603,7 @@ void RotateViewByDrag(int pixels)
 /**
  * Tip the map view up or down (_view_pitch): to a step of THREE_D_PITCH_STEP between THREE_D_PITCH_MIN and
  * THREE_D_PITCH_MAX. The ground point under the middle of the main view stays under it, as SetViewYaw() keeps it;
- * what was drawn for the old tilt is made again (ThreeDViewPitchChanged()).
+ * what is kept of the view knows its camera (GetViewCameraKey()) and is drawn again.
  * @param degrees how far down it looks, degrees over the horizon
  */
 void SetViewPitch(float degrees)
@@ -623,8 +630,8 @@ void SetViewPitch(float degrees)
 		vp->dest_scrollpos_x = vp->scrollpos_x = (static_cast<int>(std::lround(vx)) - vp->virtual_width / 2) & mask;
 		vp->dest_scrollpos_y = vp->scrollpos_y = (static_cast<int>(std::lround(vy)) - vp->virtual_height / 2) & mask;
 	}
-	extern void ThreeDViewPitchChanged();
-	ThreeDViewPitchChanged();
+	/* What is kept of the view knows its camera (GetViewCameraKey(), the pictures' elevation): drawn again for this one;
+	 * the pictures of the ground's sprites face north whatever the tilt (TurnedGround of viewport.cpp), kept. */
 	MarkWholeScreenDirty();
 }
 

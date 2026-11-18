@@ -74,6 +74,40 @@ static constexpr float PXM_16X = 48.8f;
 /** The camera of the sprites: 30 degrees above the horizon. */
 static constexpr float CAM_SIN = 0.5f;
 static constexpr float CAM_COS = 0.86602540f;
+
+/**
+ * The camera of the pictures being made on this thread: how far down it looks (the map view tipped, GetViewPitch();
+ * the player, 18. 11.: "pohled shora otáčení nahoru dolu aspoň kousek"), its sine and cosine -- the sprites' 30 degrees
+ * but while a picture of the tipped map is made (CameraElevationScope, PictureToMake::elevation).
+ */
+static thread_local float _cam_sin = CAM_SIN, _cam_cos = CAM_COS;
+
+/** The camera of the pictures made on this thread looking down so far while this lives (_cam_sin). */
+struct CameraElevationScope {
+	float was_sin, was_cos;
+	explicit CameraElevationScope(float degrees) : was_sin(_cam_sin), was_cos(_cam_cos)
+	{
+		if (degrees == THREE_D_PITCH_DEFAULT) {
+			_cam_sin = CAM_SIN;
+			_cam_cos = CAM_COS;
+			return;
+		}
+		const float a = degrees * static_cast<float>(M_PI) / 180.0f;
+		_cam_sin = std::sin(a);
+		_cam_cos = std::cos(a);
+	}
+	~CameraElevationScope()
+	{
+		_cam_sin = this->was_sin;
+		_cam_cos = this->was_cos;
+	}
+};
+
+/** How far down the camera of a picture of the map looks: the map view's tilt while the turned map is drawn, else the sprites' 30 degrees (a window's preview). */
+static float MapPictureElevation()
+{
+	return ViewportDrawingTurned() ? GetViewPitch() : THREE_D_PITCH_DEFAULT;
+}
 /** World units along x and y to a metre: a tile, 16 units, is 14.84 m (CZTR's scale). */
 static constexpr double UNITS_PER_METRE = 16.0 / 14.83765;
 /** The foreshortening along a vehicle in the four directions of straight track, as the sets draw it. */
@@ -1428,6 +1462,7 @@ struct ObjectCamera {
 	float fx, fy, lx, ly; ///< the object's front and left in the world, for the light
 	float pitch, pc, ps, roll, rc, rs;
 	float spin, sc, sn;
+	float es = _cam_sin, ec = _cam_cos; ///< how far down the camera looks (the elevation, not the vehicle's pitch): the thread's (CameraElevationScope)
 	const float *k, *kc; ///< the axis a thing that turns turns about, and a point of it
 	float ll;           ///< the length of L
 	static constexpr float L[3] = {-0.55f / 1.0f, 0.35f, 0.75f};
@@ -1501,8 +1536,8 @@ struct ObjectCamera {
 		this->Lean(x, y, z);
 		const float xr = x * this->ca - y * this->sa, yr = x * this->sa + y * this->ca;
 		osx = xr * this->p;
-		osy = (-yr * CAM_SIN - z * CAM_COS) * this->p;
-		od = yr * CAM_COS - z * CAM_SIN;
+		osy = (-yr * this->es - z * this->ec) * this->p;
+		od = yr * this->ec - z * this->es;
 	}
 
 	/** A point of a thing that turns: turned about its axis's point, then placed. */
@@ -2184,7 +2219,7 @@ static ZoomLevel FigurePictureZoom(const ThreeDVehicleShape &shape, float scale,
 	ShapeExtent(shape, e);
 	/* Seen from above at the camera's angle: as wide as its diagonal, as tall as that foreshortened and its height. */
 	const float across = std::hypot(e[1] - e[0], e[3] - e[2]), tall = std::max(0.0f, e[5] - e[4]);
-	const float side_m = std::max(across, across * CAM_SIN + tall * CAM_COS) * scale * SUPERSAMPLE;
+	const float side_m = std::max(across, across * _cam_sin + tall * _cam_cos) * scale * SUPERSAMPLE;
 	up = 0;
 	while (zoom < ZoomLevel::Max && side_m * PXM_16X / (1 << to_underlying(zoom)) > side) {
 		zoom = static_cast<ZoomLevel>(to_underlying(zoom) + 1);
@@ -2923,6 +2958,7 @@ struct PictureToMake {
 	ObjectPictureKey key;
 	const ThreeDVehicleObject *obj = nullptr;
 	float scale = 1, cam_az = 0, world_az = 0, along = 1, pxm = PXM_16X, fade = 0, rust_time = 0, stretch = 1, spin = 0, pitch = 0, roll = 0;
+	float elevation = THREE_D_PITCH_DEFAULT; ///< how far down the camera looks, degrees (MapPictureElevation(); pitch is the vehicle's lean)
 	uint32_t tint = 0, paint_colour = 0;
 	int frame = 0, lights = 0, state = 0;
 	uint64_t walk = 0;
@@ -2951,6 +2987,7 @@ static void RasterObjectsOnCard(std::span<const PictureToMake> ps, std::span<Obj
 	for (size_t i = 0; i < ps.size(); i++) {
 		const PictureToMake &p = ps[i];
 		result[i] = 0;
+		const CameraElevationScope camera(p.elevation);
 		const ThreeDVehicleShape *whole = p.obj->GetShape(p.obj->ShapeFrame(p.frame, p.walk), p.obj->PartsOf(p.state));
 		if (whole == nullptr || !PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gps[i])) continue;
 		result[i] = -1;
@@ -2974,6 +3011,7 @@ static void MakePictures(std::span<const PictureToMake> ps, std::vector<PictureM
 	for (size_t i = 0; i < ps.size(); i++) {
 		const PictureToMake &p = ps[i];
 		if (result[i] < 0) {
+			const CameraElevationScope camera(p.elevation);
 			result[i] = RasterObject(*p.obj, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, rasters[i], p.frame, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk) ? 1 : 0;
 		}
 		made[i].key = p.key;
@@ -3295,7 +3333,11 @@ static PictureToMake PictureRequest(const ThreeDVehicleObject *obj, float scale,
 	pitch = std::clamp(pitch, -60, 60);
 	roll = std::clamp(roll, -60, 60);
 	PictureToMake p;
-	p.key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
+	/* The camera's elevation with the zoom (whole degrees over the zoom's byte): a small view's 30 degrees and the
+	 * tipped main view's pictures of the same thing kept side by side. */
+	p.elevation = MapPictureElevation();
+	const int zoom_seen = to_underlying(zoom) | static_cast<int>(std::lround(p.elevation)) << 8;
+	p.key = std::make_tuple(obj, zoom_seen, cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
 	const float f = cam_step * static_cast<float>(M_PI) / 180.0f;
 	p.obj = obj;
 	p.scale = scale;
@@ -3329,7 +3371,7 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 {
 	const ThreeDVehicleObject *obj = p.obj;
 	const ObjectPictureKey key = p.key;
-	const ZoomLevel zoom = static_cast<ZoomLevel>(std::get<1>(key));
+	const int zoom_seen = std::get<1>(key); // the zoom and the camera's elevation (PictureRequest())
 	const int cam_step = std::get<2>(key), world_step = std::get<3>(key);
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
@@ -3345,8 +3387,8 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 		/* Till it comes: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
 		const ThreeDModelPicture *nearest = nullptr;
 		int best = INT_MAX;
-		for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, to_underlying(zoom), INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
-				n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == to_underlying(zoom); ++n) {
+		for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, zoom_seen, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
+				n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == zoom_seen; ++n) {
 			if (std::get<4>(n->first) != std::get<4>(key) || (std::get<5>(n->first) & 0xFFFF) != (std::get<5>(key) & 0xFFFF) || n->second.picture.width <= 0) continue;
 			auto apart = [](int a, int b) { const int d = std::abs(a - b) % 360; return std::min(d, 360 - d); };
 			const int off = apart(std::get<2>(n->first), cam_step) * 4 + apart(std::get<3>(n->first), world_step);
@@ -3386,7 +3428,7 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
 	if (RasterObject(*obj, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, r, p.frame, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk)) {
-		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
+		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, zoom_seen & 0xFF, r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		PictureOfRaster(e.picture, r);
 	}
@@ -3601,7 +3643,10 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 		} else {
 			whole = p.obj->GetShape(shape_frame, p.obj->PartsOf(p.state));
 		}
-		if (!no_wait.Missed()) drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp, bones, by_bones);
+		if (!no_wait.Missed()) {
+			const CameraElevationScope camera(p.elevation);
+			drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp, bones, by_bones);
+		}
 		if (no_wait.Missed()) {
 			_stand_ins_given++;
 			prepare_timed.how = 2;
@@ -3639,8 +3684,10 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	{
 		const float pc = p.pxm * SUPERSAMPLE;
 		const float further = static_cast<float>(OBJECT_UNITS_PER_METRE * std::sqrt(2.0)), higher = static_cast<float>(2.0 * OBJECT_HEIGHT_PER_METRE);
-		v->near_osy = (further * CAM_SIN - higher * CAM_COS) / pc;
-		v->near_od = -further * CAM_COS - higher * CAM_SIN;
+		/* S and C its camera's (PictureToMake::elevation): the map tipped, the depth's key xr + yr + 2 z the same. */
+		const CameraElevationScope camera(p.elevation);
+		v->near_osy = (further * _cam_sin - higher * _cam_cos) / pc;
+		v->near_od = -further * _cam_cos - higher * _cam_sin;
 		v->near_top = static_cast<float>(gp.top);
 		float lo = std::numeric_limits<float>::max(), hi = std::numeric_limits<float>::lowest();
 		for (const float osy : {v->near_top, v->near_top + gp.pic.height}) {
@@ -4031,7 +4078,7 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	static std::map<std::tuple<uint32_t, uint8_t, bool>, std::pair<const ThreeDVehicleObject *, VehicleObjectPlace>> kept;
 	extern int _rig_movers_repeat; // the rig's samples of the gathering: placed every time
 	if (!on_card || _rig_movers_repeat > 1) return PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
-	const Stamp now{_dirty_blocks_pass, TimerGameTick::counter, GetViewYaw(), ViewportDrawingTurned(), ViewportDrawingNorthObjects(), ViewportDrawingEye()};
+	const Stamp now{_dirty_blocks_pass, TimerGameTick::counter, GetViewCameraKey(), ViewportDrawingTurned(), ViewportDrawingNorthObjects(), ViewportDrawingEye()};
 	if (!(now == kept_for)) {
 		kept_for = now;
 		kept.clear();

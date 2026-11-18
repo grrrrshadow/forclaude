@@ -139,6 +139,9 @@ struct ThreeDPlantationTile {
 bool GetThreeDPlantationTile(TileIndex tile, ThreeDPlantationTile &out);
 const char *ThreeDPlantationWorkerName(int worker);
 
+/** How far down the map view looks as the game draws it, degrees over the horizon; and how far it may tip each way, in steps of so many degrees. */
+static constexpr float THREE_D_PITCH_DEFAULT = 30.0f, THREE_D_PITCH_MIN = 20.0f, THREE_D_PITCH_MAX = 50.0f, THREE_D_PITCH_STEP = 5.0f;
+
 /**
  * The 3D likeness of a vehicle made from its eight sprites (three_d_vehicle.cpp):
  * the surface of the visual hull of the eight outlines, each point with its colour
@@ -148,7 +151,7 @@ struct ThreeDVehicleModel;
 struct Vehicle;
 const ThreeDVehicleModel *GetThreeDVehicleModel(EngineID engine, PaletteID pal, const Vehicle *veh = nullptr);
 ZoomLevel ThreeDVehicleModelZoom(const ThreeDVehicleModel *model);
-bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track, int part = -1);
+bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track, int part = -1, float elevation = THREE_D_PITCH_DEFAULT);
 const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, bool on_track, int part = -1);
 Rect ThreeDVehicleFrame(const ThreeDVehicleModel *model, ZoomLevel zoom);
 std::string DescribeThreeDVehicleModel(const ThreeDVehicleModel *model);
@@ -191,8 +194,6 @@ static constexpr int THREE_D_KEY_STEP_DEG = 15;
 static constexpr int THREE_D_KEY_STEP_CTRL_DEG = 45;
 /** The middle button dragged this many pixels turns the view by a degree. */
 static constexpr int THREE_D_DRAG_PIXELS_PER_DEG = 4;
-/** How far down the map view looks as the game draws it, degrees over the horizon; and how far it may tip each way, in steps of so many degrees. */
-static constexpr float THREE_D_PITCH_DEFAULT = 30.0f, THREE_D_PITCH_MIN = 20.0f, THREE_D_PITCH_MAX = 50.0f, THREE_D_PITCH_STEP = 5.0f;
 /** The middle button dragged up or down so many pixels tips the map view a step (THREE_D_PITCH_STEP). */
 static constexpr int THREE_D_TILT_DRAG_PIXELS = 40;
 /** Two clicks of the middle button within this many milliseconds, without a drag, put the view back to north. */
@@ -215,6 +216,7 @@ void RotateViewByDrag(int pixels);
 void ResetViewYaw();
 void ThreeDViewForBuilding();
 float GetViewPitch();
+float GetViewCameraKey();
 void GetViewPitchSinCos(float &s, float &c);
 void GetViewTilt(double &ground, double &height);
 void SetViewPitch(float degrees);

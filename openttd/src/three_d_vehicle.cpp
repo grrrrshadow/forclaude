@@ -1419,8 +1419,14 @@ ZoomLevel ThreeDVehicleModelZoom(const ThreeDVehicleModel *model)
  *             curve); -1 the whole about the anchor (the purchase preview)
  * @return whether there is a picture
  */
-bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track, int part)
+bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float azimuth, ThreeDModelPicture &out, bool on_track, int part, float elevation)
 {
+	/* The camera looking down so far: the sprites' 30 degrees, or the tipped map's (GetViewPitch()). */
+	float cam_sin = CAM_SIN, cam_cos = CAM_COS;
+	if (elevation != THREE_D_PITCH_DEFAULT) {
+		cam_sin = std::sin(elevation * static_cast<float>(M_PI) / 180.0f);
+		cam_cos = std::cos(elevation * static_cast<float>(M_PI) / 180.0f);
+	}
 	out = {};
 	if (model == nullptr || model->count == 0) return false;
 
@@ -1497,8 +1503,8 @@ bool RenderThreeDVehicle(const ThreeDVehicleModel *model, ZoomLevel zoom, float 
 		float x = (model->xyz[i * 3] - x_at) * along, y = model->xyz[i * 3 + 1], z = model->xyz[i * 3 + 2];
 		float xr = x * c - y * s, yr = x * s + y * c;
 		sx[i] = xr * pxm;
-		sy[i] = (-yr * CAM_SIN - z * CAM_COS) * pxm;
-		depth[i] = yr * CAM_COS - z * CAM_SIN;
+		sy[i] = (-yr * cam_sin - z * cam_cos) * pxm;
+		depth[i] = yr * cam_cos - z * cam_sin;
 		minx = std::min(minx, sx[i]); maxx = std::max(maxx, sx[i]);
 		miny = std::min(miny, sy[i]); maxy = std::max(maxy, sy[i]);
 	}
@@ -1629,7 +1635,10 @@ const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *mo
 {
 	if (model == nullptr) return nullptr;
 	int step = static_cast<int>(std::lround(std::fmod(azimuth + 720.0f, 360.0f) / PICTURE_ANGLE_STEP)) % static_cast<int>(std::lround(360.0f / PICTURE_ANGLE_STEP));
+	/* Seen from as high as the map is tipped (a small view facing north at 30 degrees, ThreeDNorthCamera). */
+	const float elevation = ViewportDrawingTurned() ? GetViewPitch() : THREE_D_PITCH_DEFAULT;
 	uint64_t key = (static_cast<uint64_t>(reinterpret_cast<uintptr_t>(model)) << 20) ^ (static_cast<uint64_t>(part + 1) << 14) ^ (static_cast<uint64_t>(step) << 5) ^ (static_cast<uint64_t>(to_underlying(zoom)) << 1) ^ (on_track ? 1 : 0);
+	key ^= static_cast<uint64_t>(std::lround(elevation)) << 56;
 	auto it = _vehicle_pictures.find(key);
 	if (it != _vehicle_pictures.end()) {
 		it->second.used = ++_vehicle_pictures_clock;
@@ -1646,7 +1655,7 @@ const ThreeDModelPicture *GetThreeDVehiclePictureAt(const ThreeDVehicleModel *mo
 	e.model = model;
 	e.used = ++_vehicle_pictures_clock;
 	auto t0 = std::chrono::steady_clock::now();
-	if (!RenderThreeDVehicle(model, zoom, step * PICTURE_ANGLE_STEP, e.picture, on_track, part)) e.picture = {};
+	if (!RenderThreeDVehicle(model, zoom, step * PICTURE_ANGLE_STEP, e.picture, on_track, part, elevation)) e.picture = {};
 	_likeness_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count();
 	_likeness_pictures_made++;
 	return e.picture.width > 0 ? &e.picture : nullptr;
@@ -1719,7 +1728,7 @@ bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom,
 	float azimuth = (pose != nullptr ? pose->azimuth : ViewAzimuth(to_underlying(v->direction))) + GetViewYaw();
 	/* The map turned so that a sprite's direction shows: the set's own sprites (DoDrawVehicle() draws them), the
 	 * likeness only between (the player: "use the pictures you have"). */
-	if (pose == nullptr && std::fabs(std::fmod(azimuth + 720.0f, 45.0f) - 22.5f) > 22.5f - VIEW_ANGLE_SNAP) return false;
+	if (pose == nullptr && GetViewPitch() == THREE_D_PITCH_DEFAULT && std::fabs(std::fmod(azimuth + 720.0f, 45.0f) - 22.5f) > 22.5f - VIEW_ANGLE_SNAP) return false;
 	const ThreeDModelPicture *pic = GetThreeDVehiclePictureAt(model, zoom, azimuth, true, part);
 	if (pic == nullptr) return false;
 	int ax = v->x_pos, ay = v->y_pos;

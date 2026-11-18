@@ -579,6 +579,8 @@ struct ThreeDGpuStanding {
 	std::array<float, 4> turn{1, 0, 0, 0};
 	/** A pixel of the view's picture to the view's virtual place: (pixel + place[0], pixel + place[1]) * place[2]; ZOOM_BASE in place[3]. */
 	std::array<float, 4> place{0, 0, 1, 1};
+	/** The map's tilt (GetViewTilt() of three_d.h): the ground along the screen's height and the heights against the game's 30 degrees. */
+	std::array<float, 2> tilt{1, 1};
 	/**
 	 * How near is laid as depth (0-1): near minus depth[0], over depth[1] -- one for all laid on the block, the things'
 	 * boxes and the buildings' triangles alike, so that each pixel of each is laid where it is nearer than what is there

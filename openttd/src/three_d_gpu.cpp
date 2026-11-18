@@ -1418,13 +1418,15 @@ void main()
 	"}\n"
 
 /* How near a pixel of a thing standing on the turned map is (ThreeDGpuStandingItem::box): the view's ray through the
- * pixel -- each point of it at w = xr + yr of the turned world, its height w - v, how near 3 w - 2 v -- where it meets
- * the thing's box nearest; past the box, on the upright plane through its middle (mid). Its depth 0-1 as the
- * buildings' (ThreeDGpuStanding::depth). With STANDING_ORDER_GLSL. */
+ * pixel -- each point of it at w = xr + yr of the turned world, its height (g w - v) / h, how near w + 2 z -- where it
+ * meets the thing's box nearest; past the box, on the upright plane through its middle (mid). g and h the map's tilt
+ * (u_tilt, GetViewTilt() of three_d.h: 1 and 1 at the game's 30 degrees, the height w - v, how near 3 w - 2 v). Its
+ * depth 0-1 as the buildings' (ThreeDGpuStanding::depth). With STANDING_ORDER_GLSL. */
 #define STANDING_NEAR_GLSL \
 	"uniform vec4 u_place;\n" \
 	"uniform vec4 u_turn;\n" \
 	"uniform vec2 u_depth;\n" \
+	"uniform vec2 u_tilt;\n" \
 	"void Slab(float p0, float d, float lo, float hi, inout vec2 w)\n" \
 	"{\n" \
 	"\tif (abs(d) < 1e-6) {\n" \
@@ -1444,8 +1446,9 @@ void main()
 	"\tvec2 w = vec2(-1e30, 1e30);\n" \
 	"\tSlab(x0, 0.5 * (c + s), lo.x, hi.x, w);\n" \
 	"\tSlab(y0, 0.5 * (c - s), lo.y, hi.y, w);\n" \
-	"\tSlab(-v, 1.0, lo.z, hi.z, w);\n" \
-	"\treturn 3.0 * (w.x <= w.y ? w.y : mid) - 2.0 * v;\n" \
+	"\tSlab(-v / u_tilt.y, u_tilt.x / u_tilt.y, lo.z, hi.z, w);\n" \
+	"\tfloat at_w = w.x <= w.y ? w.y : mid;\n" \
+	"\treturn at_w + 2.0 * (u_tilt.x * at_w - v) / u_tilt.y;\n" \
 	"}\n" \
 	"float NearDepth(float near)\n" \
 	"{\n" \
@@ -5404,6 +5407,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform4f(gl.glGetUniformLocation(program, "u_place"), s.place[0], s.place[1], s.place[2], s.place[3]);
 		gl.glUniform4f(gl.glGetUniformLocation(program, "u_turn"), s.turn[0], s.turn[1], s.turn[2], s.turn[3]);
 		gl.glUniform2f(gl.glGetUniformLocation(program, "u_depth"), s.depth[0], std::max(1e-3f, s.depth[1]));
+		gl.glUniform2f(gl.glGetUniformLocation(program, "u_tilt"), s.tilt[0], std::max(1e-3f, s.tilt[1]));
 	};
 	/* The program's uniforms stay with it when another is used meanwhile (a building's): set once a job, then only the
 	 * program, its textures and its corners bound again -- the zoomed out map laid hundreds of buildings a block, each

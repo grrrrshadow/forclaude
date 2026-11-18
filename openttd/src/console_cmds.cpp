@@ -11198,13 +11198,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: texturycisla {}", _texture_numbers_kept ? 1 : 0);
 		return true;
 	} else if (what == "naklon" && argv.size() > 2) {
-		/* 'naklon 0|1': the middle button dragged up or down tips the map (1), or not (0, as before 18. 11.; the default
-		 * till the vehicles' pictures and the card follow the tilt); 'naklon stupne <20-50>' tips it so far now. */
+		/* 'naklon 0|1': the middle button dragged up or down tips the map (1, the default), or not (0, as before 18. 11.);
+		 * 'naklon stupne <20-50>' tips it so far now. */
 		extern bool _view_tilt_on;
 		if (argv[2] == "stupne") {
 			SetViewPitch(static_cast<float>(number(3).value_or(30)));
 		} else {
-			_view_tilt_on = number(2).value_or(0) != 0;
+			_view_tilt_on = number(2).value_or(1) != 0;
 			if (!_view_tilt_on) SetViewPitch(THREE_D_PITCH_DEFAULT);
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: naklon {} stupne {}", _view_tilt_on ? 1 : 0, GetViewPitch());
