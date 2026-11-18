@@ -39,6 +39,7 @@
 #include "station_base.h"
 #include "station_cmd.h"
 #include "station_map.h"
+#include "signal_func.h"
 #include "air_map.h"
 #include "airport.h"
 #include "aircraft.h"
@@ -49,6 +50,8 @@
 #include "tile_map.h"
 #include "timer/timer_game_calendar.h"
 #include "town.h"
+#include "train.h"
+#include "train_cmd.h"
 #include "tunnelbridge_cmd.h"
 #include "vehicle_base.h"
 #include "vehicle_cmd.h"
@@ -178,6 +181,7 @@ const std::string_view GUIDE =
 	"POST /build           builds as the local company; the parameters go in the query. \"what\" is one of:\n"
 	"    road         x, y, x2, y2 (a straight line along x or y)              [roadtype]\n"
 	"    rail         x, y, x2, y2 (a straight line along x or y)              [railtype: 0 rail, 4 power line, 5 pipeline]\n"
+	"                 or x, y, track (upper, lower, left, right): one piece of a curve\n"
 	"    rail_station x, y, axis (x or y), tracks, length                      [railtype]\n"
 	"    road_stop    x, y, dir (0 NE, 1 SE, 2 SW, 3 NW), truck (0, 1), through (0, 1) [roadtype]\n"
 	"    rail_depot   x, y, dir                                                 [railtype]\n"
@@ -197,6 +201,7 @@ const std::string_view GUIDE =
 	"POST /vehicle         \"do\" is one of:\n"
 	"    buy    x, y (a depot's tile), engine (an id of /engines)  -> \"id\" of the new vehicle\n"
 	"    start, stop, sell, depot (send it to a depot)   id\n"
+	"    attach id (a wagon in a depot), to (a train in the same depot)\n"
 	"    order  id, x, y (a tile of a station: go there, appended to its orders)\n"
 	"\n"
 	"POST /console         the body is console commands, one a line. The answer has \"lines\": what they printed.\n"
@@ -529,6 +534,15 @@ Answer BuildAnswer(const Params &p)
 		return CommandAnswer(Command<Commands::BuildRoadLong>::Do(flags, to, from, roadtype, along_x ? Axis::X : Axis::Y, DisallowedRoadDirections{}, false, true, false));
 	}
 	if (what == "rail") {
+		/* One piece of a curve on a tile (track=upper|lower|left|right): x, y only. */
+		const std::string_view piece = ParamText(p, "track", "");
+		if (!piece.empty()) {
+			static const std::pair<std::string_view, Track> pieces[] = {{"upper", Track::Upper}, {"lower", Track::Lower}, {"left", Track::Left}, {"right", Track::Right}, {"x", Track::X}, {"y", Track::Y}};
+			for (const auto &[name, track] : pieces) {
+				if (name == piece) return CommandAnswer(Command<Commands::BuildRailLong>::Do(flags, a, a, railtype, track, false, false));
+			}
+			return Error(400, "track is one of upper, lower, left, right, x, y");
+		}
 		if (!straight) return Error(400, "a track goes straight along x or y: x == x2 or y == y2");
 		return CommandAnswer(Command<Commands::BuildRailLong>::Do(flags, b, a, railtype, along_x ? Track::X : Track::Y, false, false));
 	}
@@ -609,6 +623,13 @@ Answer VehicleAnswer(const Params &p)
 		json more = json::object();
 		if (std::get<0>(made).Succeeded()) more["id"] = std::get<1>(made).base();
 		return CommandAnswer(std::get<0>(made), std::move(more));
+	}
+	if (todo == "attach") {
+		/* A wagon standing in a depot hung behind a train standing in the same depot (the rig: a train put together). */
+		const Train *w = Train::GetIfValid(static_cast<VehicleID>(ParamInt(p, "id", -1)));
+		const Train *t = Train::GetIfValid(static_cast<VehicleID>(ParamInt(p, "to", -1)));
+		if (w == nullptr || t == nullptr) return Error(400, "id: a wagon of /vehicles, to: a train of /vehicles");
+		return CommandAnswer(Command<Commands::MoveRailVehicle>::Do(flags, w->index, t->Last()->index, false));
 	}
 	const int id = ParamInt(p, "id", -1);
 	const Vehicle *v = id < 0 ? nullptr : Vehicle::GetIfValid(static_cast<VehicleID>(id));
@@ -995,6 +1016,10 @@ void AgentApiPump()
 		_api_in_job = true;
 		try {
 			answer = job->run();
+			/* Its commands were done straight (Command<>::Do), not through the command queue that brings the signals
+			 * up to date after each: the tiles they marked are updated now, or the next signal update asserts
+			 * (signal.cpp _globset) -- a train started from here ended the game in the rig. */
+			UpdateSignalsInBuffer();
 		} catch (const std::exception &e) {
 			answer = Error(500, e.what());
 		}

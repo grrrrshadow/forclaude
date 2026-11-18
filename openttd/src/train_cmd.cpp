@@ -6487,8 +6487,12 @@ static bool ConsistListAgreesWithGround(const Train *consist)
  *
  * @param consist The merged train.
  */
+/** While a fresh coupling is pulled shut (CloseUpCoupledConsist()): a follower without track refuses its step (TrainController()). */
+static bool _closing_up_coupled = false;
+
 static void CloseUpCoupledConsist(Train *consist)
 {
+	AutoRestoreBackup closing(_closing_up_coupled, true);
 	/* Bounded so a consist that somehow refuses to close cannot spin here for
 	 * ever, but generously: the tile-and-a-bit of an ordinary coupling, plus a
 	 * tile for every vehicle of a casualty laid out one per tile
@@ -6993,9 +6997,20 @@ static void NormaliseCoupledConsistFacing(Train *consist)
 		 * apart in both directions at once -- half its pieces one way, half
 		 * the other -- which is the broken step reported three times over. */
 		if (u->IsArticulatedPart()) {
-			if (unit != nullptr && u->direction != unit->direction) {
-				u->direction = unit->direction;
-				u->flags.Flip(VehicleRailFlag::Flipped);
+			/* Turned round when it faces against its unit -- not given the unit's direction outright. A piece of an
+			 * engine standing across a curve faces up to 45 degrees off the piece in front of it and is right so: the
+			 * head of an M62 on the curve of a junction faces east, its body on the straight behind it south-east.
+			 * Copied over, the body faced east on a straight piece of track, a direction no track there has; pulling
+			 * the coupling shut then walked the wagon behind it off the rails, and the game ended on "Disconnecting
+			 * train" (the player, 18. 11.: a wagon put down off a station, coupled from the cab). Compared as directions,
+			 * as the vehicles below are: only the opposite way is wrong. In a shed, where the pieces stand at one spot,
+			 * this turns a piece left facing the old way round the same as before. */
+			if (unit != nullptr) {
+				const TileIndexDiffC piece = TileIndexDiffCByDir(u->direction), whole = TileIndexDiffCByDir(unit->direction);
+				if (piece.x * whole.x + piece.y * whole.y < 0) {
+					u->direction = ReverseDir(u->direction);
+					u->flags.Flip(VehicleRailFlag::Flipped);
+				}
 			}
 			continue;
 		}
@@ -14890,7 +14905,18 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 
 invalid_rail:
 	/* We've reached end of line?? */
-	if (prev != nullptr) FatalError("Disconnecting train");
+	if (prev != nullptr) {
+		/* Pulling a fresh coupling shut (CloseUpCoupledConsist()) asks to move vehicles of a train put together a moment
+		 * ago: a follower that finds no track to the vehicle ahead there refuses the step -- the close-up stops and
+		 * says so -- rather than ending the game. The cause of such a train is a fault of the coupling and is fixed
+		 * there; this only keeps the player's game alive if another one is found. */
+		if (_closing_up_coupled) {
+			LogAnomaly("SPOJENI: dotazeni narazilo na konec koleje u clanku na ({},{}) kolej {:#x} smer {} - krok odmitnut",
+					v->x_pos, v->y_pos, v->track.base(), to_underlying(v->direction));
+			return false;
+		}
+		FatalError("Disconnecting train");
+	}
 
 reverse_train_direction:
 	if (reverse) {
