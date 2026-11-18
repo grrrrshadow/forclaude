@@ -294,6 +294,8 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 bool _clear_by_drawing = false;
 /** The rig ('test3d gpu instance 0'): the meshes alike of the view from the eyes drawn at once by instances (EyeObjectDraws::Batch); off, each on its own. */
 bool _eye_instances_on = true;
+/** The rig ('test3d maskykarty 0'): the masks of the vehicles' paint on the card with all four channels of their texels, as their textures (as before 18. 11.; MaskOnCard()). */
+bool _gpu_masks_by_channel = true;
 /** The rig ('test3d gpu kosti 0|1'): the card poses the figures on bones where it can (true), or the processor their frames (false), to compare. */
 std::atomic<bool> _card_poses_bones = true;
 
@@ -708,6 +710,7 @@ struct GpuTexture {
 	GLuint name = 0;
 	size_t bytes = 0;
 	uint64_t used = 0;
+	uint8_t channels = 4; ///< of a mask only those its programs read (MaskOnCard())
 };
 std::unordered_map<uint64_t, GpuShape> _card_shapes;
 std::unordered_map<uint64_t, GpuIndices> _card_indices;
@@ -3557,11 +3560,33 @@ const GpuIndices *IndicesOnCard(const ThreeDGpuTriangles &t)
 	return &_card_indices.emplace(t.uid, g).first->second;
 }
 
+/**
+ * Let go of a texture the card holds with fewer channels than asked for now (MaskOnCard()): it is put on again. Not
+ * else: the same pixels are never a mask and a texture drawn in its colours.
+ * @return false: not now, while what stands is given without waiting (TrimCard()); not drawn by the card this time
+ */
+static bool LetGoOfTextureWithFewerChannels(std::unordered_map<uint64_t, GpuTexture>::iterator it)
+{
+	std::lock_guard trim_lock(_card_trim_mutex);
+	if (_standing_async_pending > 0) return false;
+	gl.glDeleteTextures(1, &it->second.name);
+	_card_bytes -= it->second.bytes;
+	_card_bytes_of[2] -= it->second.bytes;
+	CardHeld(_card_held_textures, it->first, false);
+	{
+		std::lock_guard lock(_card_texture_mutex);
+		_card_texture_uids.erase(it->first);
+	}
+	_card_textures.erase(it);
+	return true;
+}
+
 /** A texture on the card, its texels as they are (Colour::data). */
 const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 {
 	auto it = _card_textures.find(t.uid.value);
-	if (it != _card_textures.end()) {
+	if (it != _card_textures.end() && it->second.channels < 4 && !LetGoOfTextureWithFewerChannels(it)) return nullptr;
+	if (it = _card_textures.find(t.uid.value); it != _card_textures.end()) {
 		it->second.used = _card_clock;
 		return &it->second;
 	}
@@ -3582,6 +3607,60 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, t.w, t.h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, t.px.data());
 	g.bytes = static_cast<size_t>(t.w) * t.h * 4;
+	g.used = _card_clock;
+	_card_bytes += g.bytes;
+	_card_bytes_of[2] += g.bytes;
+	_card_sent_of[2] += g.bytes;
+	_card_sent += g.bytes;
+	_card_texture_uids.insert(t.uid.value);
+	CardHeld(_card_held_textures, t.uid.value, true);
+	return &_card_textures.emplace(t.uid.value, g).first->second;
+}
+
+/**
+ * A mask of a vehicle's paint on the card (PaintMasksOnCard()): only the channels the programs read of it -- its red
+ * (MaskAt() of MESH_FRAGMENT), the rust of pieces its red and green --, a quarter or a half of it with all four
+ * (TextureOnCard()). From the eyes among the lorries of a depot the masks were 90 MB of the 700 the card held, as many
+ * as their textures and each of them as big.
+ * @param channels 1 its red, 2 its red and green
+ */
+static const GpuTexture *MaskOnCard(const ThreeDObjectTexture &t, int channels)
+{
+	auto it = _card_textures.find(t.uid.value);
+	if (it != _card_textures.end() && it->second.channels < channels && !LetGoOfTextureWithFewerChannels(it)) return nullptr;
+	if (it = _card_textures.find(t.uid.value); it != _card_textures.end()) {
+		it->second.used = _card_clock;
+		return &it->second;
+	}
+	if (!_gpu_masks_by_channel) return TextureOnCard(t);
+	/* Its pixels read under the lock, as TextureOnCard(). */
+	std::lock_guard pixels_lock(_card_texture_mutex);
+	if (t.w <= 0 || t.h <= 0 || t.w > _max_texture || t.h > _max_texture || t.px.size() < static_cast<size_t>(t.w) * t.h) return nullptr;
+	Step(fmt::format("maska na kartu: {}x{}, {} kanal(y)", t.w, t.h, channels));
+	static std::vector<uint8_t> bytes; // (the card's thread alone)
+	const size_t n = static_cast<size_t>(t.w) * t.h;
+	bytes.resize(n * channels);
+	for (size_t i = 0; i < n; i++) {
+		const Colour c(t.px[i]);
+		bytes[i * channels] = c.r;
+		if (channels > 1) bytes[i * channels + 1] = c.g;
+	}
+	GpuTexture g;
+	gl.glGenTextures(1, &g.name);
+	gl.glBindTexture(GL_TEXTURE_2D, g.name);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, channels == 1 ? GL_R8 : GL_RG8, t.w, t.h, 0, channels == 1 ? GL_RED : GL_RG, GL_UNSIGNED_BYTE, bytes.data());
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	/* Not kept: the largest mask's bytes would stay as long as the game. */
+	if (bytes.capacity() > (4u << 20)) std::vector<uint8_t>().swap(bytes);
+	g.bytes = n * channels;
+	g.channels = static_cast<uint8_t>(channels);
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
 	_card_bytes_of[2] += g.bytes;
@@ -3739,9 +3818,10 @@ struct PaintOnCard {
 /** A texture's paint's masks put on the card: false, one it cannot hold. */
 static bool PaintMasksOnCard(const ThreeDGpuPaint &paint, PaintOnCard &pc)
 {
-	auto mask = [](const ThreeDObjectTexture *tex, GLuint &name) {
+	/* The colours of the details as they are; the masks only the channels read of them (MaskOnCard()). */
+	auto mask = [](const ThreeDObjectTexture *tex, GLuint &name, int channels) {
 		if (tex == nullptr) return true;
-		const GpuTexture *on = TextureOnCard(*tex);
+		const GpuTexture *on = channels < 4 ? MaskOnCard(*tex, channels) : TextureOnCard(*tex);
 		if (on == nullptr) return false;
 		name = on->name;
 		return true;
@@ -3751,7 +3831,8 @@ static bool PaintMasksOnCard(const ThreeDGpuPaint &paint, PaintOnCard &pc)
 		if (on == nullptr || paint.detail_colours == nullptr) return false;
 		pc.detail = on->name;
 	}
-	return mask(paint.detail_colours, pc.detail_colours) && mask(paint.paint_mask, pc.paint_mask) && mask(paint.addon_mask, pc.addon_mask) && mask(paint.rust_mask, pc.rust_mask);
+	return mask(paint.detail_colours, pc.detail_colours, 4) && mask(paint.paint_mask, pc.paint_mask, 1) && mask(paint.addon_mask, pc.addon_mask, 1) &&
+			mask(paint.rust_mask, pc.rust_mask, paint.rust_pieces != nullptr ? 2 : 1);
 }
 
 /**

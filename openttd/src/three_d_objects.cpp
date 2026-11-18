@@ -1011,6 +1011,9 @@ static void DropFinerLevels(std::vector<ThreeDObjectTexture> &lv, int finest)
 	}
 }
 
+/** The rig ('test3d texturycisla 0'): a texture made again of its picture takes numbers of its own (as before 18. 11.), not those of the one made before (KeepLevelNumbers()). */
+bool _texture_numbers_kept = true;
+
 /** The pictures of the textures as one copy each (InternThreeDTextureBytes()), by a hash of their bytes; and those made. */
 static std::unordered_multimap<size_t, std::weak_ptr<const std::vector<uint8_t>>> _texture_bytes;
 static size_t _texture_bytes_made = 0;
@@ -1018,10 +1021,36 @@ static size_t _texture_bytes_made = 0;
 struct TextureLevelsMade {
 	std::weak_ptr<const std::vector<uint8_t>> bytes; ///< its picture, while anything has it (its place cannot be another's then)
 	std::weak_ptr<const std::vector<ThreeDObjectTexture>> levels;
+	std::weak_ptr<const std::vector<float>> cover; ///< where the triangles draw from the picture as it was made (TextureCover())
+	const void *cover_at = nullptr;                ///< and where that was, nullptr made without
+	/** Whether a texture made now with a cover is made the same way as this one: the same cover, or none either time. */
+	bool SameCover(const std::shared_ptr<const std::vector<float>> &now) const
+	{
+		return this->cover_at == now.get() && (now == nullptr || this->cover.lock() == now);
+	}
 };
 static std::map<std::tuple<const std::vector<uint8_t> *, uint32_t, bool>, TextureLevelsMade> _texture_levels;
 /** The textures of files made (TextureLevelsOfFile()), by the file and the colour of what is not in the picture. */
-static std::map<std::pair<std::string, uint32_t>, std::weak_ptr<const std::vector<ThreeDObjectTexture>>> _file_texture_levels;
+static std::map<std::pair<std::string, uint32_t>, TextureLevelsMade> _file_texture_levels;
+
+/**
+ * A texture made again of the same picture as one made before -- a finer level wanted than it has, its finer levels
+ * let go of between the frames, or its pixels let go of as the card held it and the card let go of them since --: its
+ * levels take the numbers of that one's, the same pixels the same texture on the card. With numbers of their own the
+ * card put every level of it on again beside the ones it held already (the player's diary of 17. 11.: from the eyes
+ * at night the card held 794 MB of textures and put on 50 to 270 MB in five seconds; in the rig a third of what the
+ * card held was the same pixels twice, the vehicles' textures that the walker came near again).
+ * @param before the one made before of the same picture, the same way (TextureCover()); nullptr none
+ */
+static void KeepLevelNumbers(std::vector<ThreeDObjectTexture> &made, const std::vector<ThreeDObjectTexture> *before)
+{
+	if (!_texture_numbers_kept || before == nullptr || before->size() != made.size()) return;
+	for (size_t i = 0; i < made.size(); i++) {
+		if ((*before)[i].w != made[i].w || (*before)[i].h != made[i].h) return;
+	}
+	for (size_t i = 0; i < made.size(); i++) made[i].uid.value = (*before)[i].uid.value;
+}
+
 /** The masks of details made (DetailMaskOfFile()), by their file. */
 static std::map<std::string, std::weak_ptr<const ThreeDDetailMask>, std::less<>> _detail_masks_made;
 /**
@@ -1080,21 +1109,26 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
 {
 	const TextureCoverTriangles cover = TextureCover(png);
 	const auto key = std::make_tuple(png.get(), flat, soft);
+	ThreeDTextureLevels before;
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
 		auto it = _texture_levels.find(key);
 		if (it != _texture_levels.end()) {
 			ThreeDTextureLevels known = it->second.levels.lock();
-			if (known != nullptr && it->second.bytes.lock() == png && HasLevel(*known, finest)) return known;
+			if (known != nullptr && it->second.bytes.lock() == png) {
+				if (HasLevel(*known, finest)) return known;
+				if (it->second.SameCover(cover)) before = std::move(known);
+			}
 		}
 	}
 	static const std::vector<uint8_t> none;
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
 	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat, true, cover.get(), soft);
+	KeepLevelNumbers(*made, before.get());
 	DropFinerLevels(*made, DrawnLevel(*made, finest));
 	std::lock_guard lock(_texture_bytes_mutex);
 	if (_texture_levels.size() > 64) std::erase_if(_texture_levels, [](const auto &e) { return e.second.levels.expired(); });
-	_texture_levels[key] = TextureLevelsMade{png, made};
+	_texture_levels[key] = TextureLevelsMade{png, made, cover, cover.get()};
 	return made;
 }
 
@@ -1107,21 +1141,27 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
 static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t flat, const ThreeDTextureBytes &of = nullptr, int finest = 0)
 {
 	const auto key = std::make_pair(file, flat);
+	const TextureCoverTriangles cover = TextureCover(of);
+	ThreeDTextureLevels before;
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
 		auto it = _file_texture_levels.find(key);
 		if (it != _file_texture_levels.end()) {
-			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr && HasLevel(*known, finest)) return known;
+			if (ThreeDTextureLevels known = it->second.levels.lock(); known != nullptr) {
+				if (HasLevel(*known, finest)) return known;
+				if (it->second.SameCover(cover)) before = std::move(known);
+			}
 		}
 	}
 	std::vector<uint8_t> png = ReadWholeFile(file);
 	if (png.empty()) return nullptr;
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
-	const TextureCoverTriangles cover = TextureCover(of);
 	DecodeTextureLevels(png, *made, flat, true, cover.get());
+	/* The same file read again: the same pixels (a file changed meanwhile has another size, or the same as before). */
+	KeepLevelNumbers(*made, before.get());
 	DropFinerLevels(*made, DrawnLevel(*made, finest));
 	std::lock_guard lock(_texture_bytes_mutex);
-	_file_texture_levels[key] = made;
+	_file_texture_levels[key] = TextureLevelsMade{{}, made, cover, cover.get()};
 	return made;
 }
 
@@ -11703,16 +11743,20 @@ bool ThreeDVehicleObject::TextureSize(int index, int &w, int &h) const
  */
 static ThreeDTextureLevels RustPiecesLevels(const std::string &pieces, const std::string &delay, const ThreeDTextureBytes &of, int finest)
 {
-	static std::map<std::pair<std::string, std::string>, std::weak_ptr<std::vector<ThreeDObjectTexture>>> made_of;
+	static std::map<std::pair<std::string, std::string>, TextureLevelsMade> made_of;
 	const auto key = std::make_pair(pieces, delay);
+	const TextureCoverTriangles cover = TextureCover(of);
+	ThreeDTextureLevels before;
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
 		auto it = made_of.find(key);
 		if (it != made_of.end()) {
-			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr && HasLevel(*known, finest)) return known;
+			if (ThreeDTextureLevels known = it->second.levels.lock(); known != nullptr) {
+				if (HasLevel(*known, finest)) return known;
+				if (it->second.SameCover(cover)) before = std::move(known);
+			}
 		}
 	}
-	const TextureCoverTriangles cover = TextureCover(of);
 	std::vector<ThreeDObjectTexture> k0, d0;
 	const std::vector<uint8_t> kp = ReadWholeFile(pieces);
 	if (!kp.empty()) DecodeTextureLevels(kp, k0, Colour(0, 0, 0).data, false, cover.get());
@@ -11752,9 +11796,10 @@ static ThreeDTextureLevels RustPiecesLevels(const std::string &pieces, const std
 		}
 		made->push_back(std::move(half));
 	}
+	KeepLevelNumbers(*made, before.get());
 	DropFinerLevels(*made, finest);
 	std::lock_guard lock(_texture_bytes_mutex);
-	made_of[key] = made;
+	made_of[key] = TextureLevelsMade{{}, made, cover, cover.get()};
 	return made;
 }
 
@@ -16668,7 +16713,7 @@ std::string DescribeThreeDObjectMemory()
 			texture_count++;
 		};
 		for (const auto &[key, made] : _texture_levels) levels_bytes(made.levels.lock());
-		for (const auto &[key, made] : _file_texture_levels) levels_bytes(made.lock());
+		for (const auto &[key, made] : _file_texture_levels) levels_bytes(made.levels.lock());
 		for (const auto &[key, made] : _detail_masks_made) {
 			if (auto m = made.lock(); m != nullptr) masks += VectorBytes(m->index);
 		}

@@ -11185,6 +11185,22 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_textures_card_only = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: texturykarty {}", _textures_card_only ? 1 : 0);
 		return true;
+	} else if (what == "texturycisla" && argv.size() > 2) {
+		/* 'texturycisla 0|1': a texture made again of its picture keeps its levels' numbers (1, KeepLevelNumbers() of
+		 * three_d_objects.cpp); or takes numbers of its own, the card putting it on again beside what it held (0, as
+		 * before 18. 11.). */
+		extern bool _texture_numbers_kept;
+		_texture_numbers_kept = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: texturycisla {}", _texture_numbers_kept ? 1 : 0);
+		return true;
+	} else if (what == "maskykarty" && argv.size() > 2) {
+		/* 'maskykarty 0|1': the masks of the vehicles' paint put on the card with only the channels read of them (1,
+		 * MaskOnCard() of three_d_gpu.cpp), or with all four as a texture (0, as before 18. 11.); for what is put on
+		 * from now on. */
+		extern bool _gpu_masks_by_channel;
+		_gpu_masks_by_channel = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: maskykarty {}", _gpu_masks_by_channel ? 1 : 0);
+		return true;
 	} else if (what == "domykartou" && argv.size() > 2) {
 		/* 'domykartou 0|1': the buildings from the eyes painted by the card as it draws them (1), or of the copies of
 		 * their textures the processor paints (0). */
