@@ -11332,6 +11332,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _clear_by_drawing;
 		_clear_by_drawing = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: gpu mazani {}", _clear_by_drawing ? "kreslenim" : "jak karta umi");
+	} else if (what == "gpu" && argv.size() > 2 && argv[2] == "volani") {
+		/* 'gpu volani [0|1]': the calls of drawing the turned map's vehicles counted by the function (1 on, 0 off, none
+		 * just tell), what was counted so far, the most first. */
+		extern std::string ThreeDGpuCallsByFunction(int on);
+		IConsolePrint(CC_DEFAULT, "test3d: gpu volani {}", ThreeDGpuCallsByFunction(number(3).value_or(-1)));
 	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "instance") {
 		/* 'gpu instance 0|1': the meshes alike of the view from the eyes drawn at once by instances (1), or each on its own (0). */
 		extern bool _eye_instances_on;
