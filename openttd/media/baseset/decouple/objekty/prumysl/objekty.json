@@ -5381,16 +5381,6 @@
     "meritko": 1.377
    },
    {
-    "jmeno": "banan_1",
-    "poloha": [
-     10.6,
-     12.6,
-     0.0
-    ],
-    "otoceni": 200.0,
-    "meritko": 1.4
-   },
-   {
     "jmeno": "kapradi_0",
     "poloha": [
      14.15,
@@ -5582,6 +5572,6 @@
   },
   "autor": "grrrrf: srub, ohniště a interiér z lesa (les_paseka_srub, prumysl/les_dily.py); tráva palouku z plantaz_palouk; palmy, banánovníky, monstery a kapradí jako společné doplňky (Tropical Plants Pack M02P, MozzarellaARC, CC BY 4.0), papírové lucerny ze sady lampy",
   "licence": "GPL-2.0 (vlastní geometrie i textura); doplňky rostlin CC BY 4.0 (MozzarellaARC)",
-  "poznamka": "palouček plantáže s lesním srubem místo rákosové chajdy (hráč 3. 11.: „vem z lesa chajdu … mužou zustat dřevěné okna a dveře. zachovej interier, otviraci okna dveře, venku pryč ten cihlovej grill a zase to vem cely z lesa, ohniště, rožeň, včetně funkčnosti E. nic nemusi byt dvakrat, objekty dělame usporně“; „dej rovnou srub z lesa a skus ho nějak ozdobit zvenku exoticky“): soubor lesního srubu bez posedu, jeho schodů a hromady klád (bez_uzlu; posed stojí na kraji plantáže, plantaz_zem_posed), země v trávě palouku (textury_materialu: les_zem dostane obrázek materiálu plantaz_palouk z plantaz_palouk.glb, stejné UV), ohniště s rožněm a E jako v lese, holky na kládách u ohně, opice; zvenku exoticky: palmy, banánovníky, monstera, kapradí a dvě papírové lucerny pod okapem u dveří"
+  "poznamka": "palouček plantáže s lesním srubem místo rákosové chajdy (hráč 3. 11.: „vem z lesa chajdu … mužou zustat dřevěné okna a dveře. zachovej interier, otviraci okna dveře, venku pryč ten cihlovej grill a zase to vem cely z lesa, ohniště, rožeň, včetně funkčnosti E. nic nemusi byt dvakrat, objekty dělame usporně“; „dej rovnou srub z lesa a skus ho nějak ozdobit zvenku exoticky“): soubor lesního srubu bez posedu, jeho schodů a hromady klád (bez_uzlu; posed stojí na kraji plantáže, plantaz_zem_posed), země v trávě palouku (textury_materialu: les_zem dostane obrázek materiálu plantaz_palouk z plantaz_palouk.glb, stejné UV), ohniště s rožněm a E jako v lese, holky na kládách u ohně, opice; zvenku exoticky: palmy, banánovníky, monstera, kapradí a dvě papírové lucerny pod okapem u dveří; banánovník před srubem pryč (hráč 18. 11.: „dej pryč ten strom bez kmene uprostřed obrázku, před chajdou je ten strom, asi banánovník“)"
  }
 ]
