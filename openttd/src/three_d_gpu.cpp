@@ -5541,6 +5541,11 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glViewport(0, 0, s.view_w, s.view_h);
 		gl.glEnable(GL_SCISSOR_TEST);
 		gl.glClearColor(0, 0, 0, 0);
+		/* Its depth cleared to 0 (each pixel laid where it is nearer, GL_GEQUAL): set here, whatever drew before -- the
+		 * vehicles drawn first leave 1 of their own frame (draw_vehicles()), and the view's depth cleared to it had
+		 * nothing laid on it (the rig: the track built new not drawn, 04cd5b7). */
+		gl.glClearDepth(0.0);
+		gl.glDepthMask(GL_TRUE);
 		for (const std::array<int, 4> &c : clips) {
 			if (s.moving) break;
 			gl.glScissor(c[0], c[1], c[2], c[3]);
