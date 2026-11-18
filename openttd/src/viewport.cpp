@@ -6448,6 +6448,25 @@ static void AddTurnedObjectsToDraw()
 	 * again when it is there (ObjectReadyOrOwed()). The rig: 'test3d stojici pripravit 1' makes them all as before. */
 	extern bool _eye_buildings_card_paint;
 	extern bool _turned_prepare_card_painted;
+	/* Drawn when read: the forest's ground, the fields, an original industry's parts, the dragon farm's hay come here
+	 * read or not (only a building of its own is made ready by ObjectReadyOrOwed()), and the main thread read their
+	 * .glb itself below for their height (the rig on the player's save: a house 400 ms; the player's diary of 18. 11.:
+	 * "dum z glb" 24 times, 0.7 s). Not read yet: read in the background, nothing of it till then, the tiles it stands
+	 * on drawn again when it is (_objects_readied_timer). */
+	std::erase_if(_turned_objects, [](const TurnedObject &to) {
+		bool read = ThreeDObjectReadOrAsked(to.obj);
+		read = ThreeDObjectReadOrAsked(to.ground) && read;
+		for (const ThreeDObject *w : to.with) read = ThreeDObjectReadOrAsked(w) && read;
+		if (read) return false;
+		const int tiles_x = to.obj != nullptr ? to.obj->tiles_x : 1, tiles_y = to.obj != nullptr ? to.obj->tiles_y : 1;
+		for (int ty = 0; ty < std::max(1, tiles_y); ty++) {
+			for (int tx = 0; tx < std::max(1, tiles_x); tx++) {
+				const TileIndex t = TileAddWrap(to.origin, tx, ty);
+				if (t != INVALID_TILE && _tiles_owed_objects.size() < 4096) _tiles_owed_objects.push_back(t);
+			}
+		}
+		return true;
+	});
 	const bool card_paints = _eye_buildings_card_paint && ViewportVehiclesOnCard() && !ViewportDrawingNorthObjects() && !_turned_prepare_card_painted;
 	std::vector<ThreeDTextureWanted> wanted;
 	auto want = [&](const ThreeDObject *o, TileIndex origin) {
@@ -6503,14 +6522,10 @@ static void AddTurnedObjectsToDraw()
 		int ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
 		/* Only figures (the girls by the field road): the box of the tile, as tall as a girl twice the size. */
 		const int tiles_x = to.obj != nullptr ? to.obj->tiles_x : 1, tiles_y = to.obj != nullptr ? to.obj->tiles_y : 1;
-		/* (Its height as read: read now if the textures made above did not read it, ThreeDObject::Read().) The highest of
-		 * it and the parts drawn with it (an industry's block, AddOriginalIndustryTile()). */
-		if (to.obj != nullptr) to.obj->Read();
+		/* Its height as read (all of it is, above). The highest of it and the parts drawn with it (an industry's block,
+		 * AddOriginalIndustryTile()). */
 		int top = to.obj != nullptr ? static_cast<int>(std::ceil(to.obj->top)) : 2 * TILE_HEIGHT;
-		for (const ThreeDObject *w : to.with) {
-			w->Read();
-			top = std::max(top, static_cast<int>(std::ceil(w->top)));
-		}
+		for (const ThreeDObject *w : to.with) top = std::max(top, static_cast<int>(std::ceil(w->top)));
 		ps.xmin = ox;
 		ps.xmax = ox + tiles_x * TILE_SIZE - 1;
 		ps.ymin = oy;
@@ -9378,21 +9393,26 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		/* Drawn by the card with the block's vehicles; nothing while something of it is not made yet (drawn again when it
 		 * comes); bigger than the card draws one, its picture. */
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+		const uint64_t stood_in = ThreeDStandInsGiven();
+		auto owe = [&] { OweThreeDPictureBox(ix - TILE_SIZE / 2, iy - TILE_SIZE / 2, ix + TILE_SIZE / 2, iy + TILE_SIZE / 2, iz - TILE_HEIGHT, iz + height + TILE_HEIGHT); };
 		if (ViewportVehiclesOnCard()) {
-			const uint64_t stood_in = ThreeDStandInsGiven();
 			const std::optional<bool> on_card = GetThreeDPlantOnCard(name, scale, stretch, facing, zoom, &height, NAN, card);
 			if (!on_card.has_value()) return;
 			if (*on_card) {
 				if (card != nullptr) {
 					AddTurnedVehicleOnCard(std::move(card), ix, iy, iz, ix - 1, iy - 1, iz, ix + 1, iy + 1, iz + height);
 				} else if (ThreeDStandInsGiven() != stood_in) {
-					OweThreeDPictureBox(ix - TILE_SIZE / 2, iy - TILE_SIZE / 2, ix + TILE_SIZE / 2, iy + TILE_SIZE / 2, iz - TILE_HEIGHT, iz + height + TILE_HEIGHT);
+					owe();
 				}
 				return;
 			}
 		}
 		const ThreeDModelPicture *pic = GetThreeDPlantPicture(name, scale, stretch, facing, zoom, &height);
-		if (pic == nullptr) return;
+		if (pic == nullptr) {
+			/* Its shape on the way (GetThreeDPlantPicture()): drawn again when it comes. */
+			if (ThreeDStandInsGiven() != stood_in) owe();
+			return;
+		}
 		AddTurnedVehiclePicture(pic, ix, iy, iz, ix - 1, iy - 1, iz, ix + 1, iy + 1, iz + height);
 	});
 	/* The fireworks over the huts. */

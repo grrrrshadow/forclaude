@@ -15398,16 +15398,22 @@ bool ThreeDObject::Read() const
 	return this->IsRead();
 }
 
-/** Whether the house's shape and texture are read (Read()); if not, they are read in the background, there a frame or two on. */
+/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
+static std::atomic<uint64_t> _three_d_objects_readied = 0;
+
+/**
+ * Whether the house's shape and texture are read (Read()); if not, they are read in the background, there a frame or
+ * two on, and ThreeDObjectsReadied() tells when (the places owed it drawn again, ThreeDObjectReadOrAsked()).
+ */
 bool ThreeDObject::TryRead() const
 {
 	if (this->IsRead()) return true;
-	MadeOrAsked(this, LAZY_HOUSE_GLB, [this] { return this->glb_state.value.load() != 0; }, [this] { this->Read(); });
+	MadeOrAsked(this, LAZY_HOUSE_GLB, [this] { return this->glb_state.value.load() != 0; }, [this] {
+		this->Read();
+		_three_d_objects_readied++;
+	});
 	return this->IsRead();
 }
-
-/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
-static std::atomic<uint64_t> _three_d_objects_readied = 0;
 /** How many times a building was drawn with a texture of another level standing in (ThreeDObject::DrawnTexture()). */
 static std::atomic<uint64_t> _three_d_textures_stood_in = 0;
 
@@ -16303,6 +16309,19 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 	for (std::thread &t : threads) t.join();
 }
 
+
+/**
+ * Whether an object's .glb is read, or tried (a file that cannot be read is drawn as nothing), so the turned map can draw
+ * it without the main thread reading it: the forest's ground, the fields and the parts drawn with a building come to
+ * AddTurnedObjectsToDraw() of viewport.cpp without ThreeDObjectReadyToDraw(), and the main thread read them there (the
+ * rig on the player's save: a house 400 ms; the player's diary of 18. 11.: "dum z glb" 0.7 s in 45 minutes). If not,
+ * it is read in the background (TryRead()), ThreeDObjectsReadied() telling when.
+ * @param o the object, nullptr none (read)
+ */
+bool ThreeDObjectReadOrAsked(const ThreeDObject *o)
+{
+	return o == nullptr || o->TryRead() || o->glb_state.value.load(std::memory_order_acquire) != 0;
+}
 
 /**
  * Whether a building's object can be drawn on the map now: its shape read and its texture of the level and paint

@@ -5726,8 +5726,16 @@ static const ThreeDModelPicture *RequestedPicture(PictureToMake p, bool later)
 
 const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, int state)
 {
-	bool later = false;
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later, FIGURE_PICTURE_SIDE, state);
+	bool later = false, not_yet = false;
+	/* Drawing the map its shape is not waited for: read in the background, a stand-in given (nothing), the building it
+	 * stands on drawn again when it comes (ThreeDStandInsGiven()). The main thread read the shapes of the girls on the
+	 * buildings of a view the card does not lay (a small view, the first frames: MakeThreeDPicturesAtOnce()). */
+	const bool no_wait = _three_d_pictures_stand_in && !_three_d_load_at_once;
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later, FIGURE_PICTURE_SIDE, state, false, &not_yet, no_wait);
+	if (not_yet) {
+		_stand_ins_given++;
+		return nullptr;
+	}
 	return p.has_value() ? RequestedPicture(std::move(*p), later) : nullptr;
 }
 
@@ -5861,15 +5869,25 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
  * @param[out] height how tall it is, units of height
  * @param yaw the angle of the view it is seen from, NaN the map's
  */
-/** What the picture of a plant is asked for by (GetThreeDPlantPicture()), and how tall it is; nothing when it is not there. */
-static std::optional<PictureToMake> PlantRequest(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, bool &later, const float *rise)
+/**
+ * What the picture of a plant is asked for by (GetThreeDPlantPicture()), and how tall it is; nothing when it is not there.
+ * @param no_wait its shape not waited for (drawn by the card): read in the background, not_yet set till it is -- the
+ *                main thread read the plants' shapes for the card itself (the rig on the player's save: the plants of
+ *                the farms and the fields, "tvar" of the player's diary of 18. 11., 1.3 s in 45 minutes)
+ * @param[out] not_yet its shape not read yet (no_wait)
+ */
+static std::optional<PictureToMake> PlantRequest(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, bool &later, const float *rise, bool no_wait = false, bool *not_yet = nullptr)
 {
 	static constexpr float PLANT_STEP = 10.0f;
+	if (not_yet != nullptr) *not_yet = false;
 	const ThreeDVehicleObject *plant = GetThreeDFigure(name);
 	if (plant == nullptr) return std::nullopt;
 	later = ViewportDrawingEye();
-	const ThreeDVehicleShape *shape = later ? plant->TryGetShape(0) : plant->GetShape(0);
-	if (shape == nullptr) return std::nullopt;
+	const ThreeDVehicleShape *shape = later || no_wait ? plant->TryGetShape(0) : plant->GetShape(0);
+	if (shape == nullptr) {
+		if (no_wait && not_yet != nullptr && !plant->ShapeTried()) *not_yet = true;
+		return std::nullopt;
+	}
 	if (std::isnan(yaw)) yaw = GetViewYaw();
 	float world_az = std::round((facing - 135.0f) / PLANT_STEP) * PLANT_STEP;
 	float cam_az = std::round((facing - 135.0f + yaw) / PLANT_STEP) * PLANT_STEP;
@@ -5891,8 +5909,13 @@ static std::optional<PictureToMake> PlantRequest(std::string_view name, float sc
 
 const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, const float *rise)
 {
-	bool later = false;
-	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later, rise);
+	bool later = false, not_yet = false;
+	/* Drawing the map its shape is not waited for, as a figure's (GetThreeDFigurePicture()). */
+	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later, rise, _three_d_pictures_stand_in && !_three_d_load_at_once, &not_yet);
+	if (not_yet) {
+		_stand_ins_given++;
+		return nullptr;
+	}
 	return p.has_value() ? RequestedPicture(std::move(*p), later) : nullptr;
 }
 
@@ -5905,8 +5928,14 @@ const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float sca
  */
 std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, const float *rise)
 {
-	bool later = false;
-	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later, rise);
+	bool later = false, not_yet = false;
+	card = nullptr;
+	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later, rise, true, &not_yet);
+	if (not_yet) {
+		/* Its shape read in the background: nothing of it till then, its place drawn again when it comes. */
+		_stand_ins_given++;
+		return true;
+	}
 	if (!p.has_value()) return std::nullopt;
 	std::vector<ThreeDPictureLight> lights;
 	return CardVehicle(*p, card, lights) != CardMade::TooBig;
