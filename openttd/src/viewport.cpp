@@ -2636,18 +2636,18 @@ std::string TakeTurnedTimesForDiary(int frames)
 	extern uint64_t _turned_moving_passes;
 	extern double _turned_moving_ms;
 	if (s != "-" || _turned_moving_passes > 0) {
-		extern double _turned_moving_collect_ms, _turned_moving_card_ms;
+		extern double _turned_moving_collect_ms, _turned_moving_card_ms, _turned_moving_glows_ms;
 		extern uint64_t TakeThreeDCardVehiclesAsKept();
 		extern std::string TakeThreeDCardThingsPrepared();
 		extern double _turned_moving_kinds_ms[7];
 		const double *k = _turned_moving_kinds_ms;
-		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), {} veci dano jako drzene bez tvaru, {}", _turned_moving_passes, _turned_moving_ms / n,
-				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), TakeThreeDCardVehiclesAsKept(), TakeThreeDCardThingsPrepared());
+		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), svetla v noci {:.1f} ms, {} veci dano jako drzene bez tvaru, {}", _turned_moving_passes, _turned_moving_ms / n,
+				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), _turned_moving_glows_ms / n, TakeThreeDCardVehiclesAsKept(), TakeThreeDCardThingsPrepared());
 	}
 	_turned_moving_passes = 0;
 	_turned_moving_ms = 0;
-	extern double _turned_moving_collect_ms, _turned_moving_card_ms;
-	_turned_moving_collect_ms = _turned_moving_card_ms = 0;
+	extern double _turned_moving_collect_ms, _turned_moving_card_ms, _turned_moving_glows_ms;
+	_turned_moving_collect_ms = _turned_moving_card_ms = _turned_moving_glows_ms = 0;
 	extern double _turned_moving_kinds_ms[7];
 	std::fill(std::begin(_turned_moving_kinds_ms), std::end(_turned_moving_kinds_ms), 0.0);
 	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
@@ -7312,6 +7312,7 @@ std::atomic<bool> _card_vehicles_as_kept_on = true; ///< Rig (test3d jakodrzene 
 int _rig_movers_repeat = 1;               ///< the rig: the gathering of the moving layer so many times a frame
 double _turned_moving_kinds_ms[7] = {};   ///< of the gathering: vehicles, walkers, dragons, animals, witches, ufos, drivers
 double _turned_moving_card_ms = 0;        ///< of it: handing them to the card and waiting for it (ThreeDGpuDrawStanding())
+double _turned_moving_glows_ms = 0;       ///< of it: their lights at night told to the card (TurnedMoverGlows())
 
 /** The picture of the view's ground shown no more: the blocks of holes are drawn again with their ground. */
 static void HideTurnedCardGround()
@@ -10370,7 +10371,9 @@ static uint32_t TurnedCardLayMoversOnce(bool whole)
 	const bool laid = ThreeDGpuDrawStanding(movers);
 	_turned_moving_card_ms += TurnedNow() - t_card;
 	/* Their lights at night, the card's too. */
+	const double t_glows = TurnedNow();
 	TurnedMoverGlows(vp);
+	_turned_moving_glows_ms += TurnedNow() - t_glows;
 	_night_lit.clear();
 	_night_lit_through.clear();
 	_night_glows.clear();

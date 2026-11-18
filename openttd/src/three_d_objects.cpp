@@ -9105,6 +9105,20 @@ enum LazyThing : int {
 	LAZY_BONES = 1 << 24,       ///< + the frame: a figure's frame as the card poses it (ThreeDVehicleObject::GetBones())
 };
 
+/** How many times something asked of the thread in the background was made, or the asked were dropped (ThreeDLazyMadeCount()). */
+static std::atomic<uint64_t> _lazy_made_count = 0;
+
+/**
+ * Whether anything not waited for (ThreeDLazyNoWait) may have come since this was last read: a thing of MakeOnce() made
+ * (or failed), the asked dropped (ThreeDLazyForgetAsked()). What found something not made yet need not try again
+ * while it stays the same (CardVehicle(); the player's diary of 18. 11.: 1500 to 4000 things a 5 s prepared anew for
+ * the card only to find again what they wait for not made yet, half a second of the main thread).
+ */
+uint64_t ThreeDLazyMadeCount()
+{
+	return _lazy_made_count.load();
+}
+
 /**
  * Make a thing of an object once, on whichever thread asks for it first; the other waits for it.
  * @param of the object (or the shape) it is of
@@ -9234,11 +9248,13 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
 		if (!lock.owns_lock()) lock.lock();
 		_lazy_making.erase(key);
 		_lazy_asked.erase(key);
+		_lazy_made_count++;
 		_lazy_made.notify_all();
 		throw;
 	}
 	_lazy_making.erase(key);
 	_lazy_asked.erase(key);
+	_lazy_made_count++;
 	_lazy_made.notify_all();
 	note_main(true);
 }
@@ -9260,6 +9276,7 @@ void ThreeDLazyForgetAsked()
 {
 	std::lock_guard lock(_lazy_mutex);
 	_lazy_asked.clear();
+	_lazy_made_count++;
 }
 
 template <typename Made>

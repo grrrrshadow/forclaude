@@ -1889,6 +1889,7 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
  */
 void ThreeDLoadInBackground(std::function<void()> job);
 extern bool _three_d_load_at_once; ///< the rig: a job is run the moment it is asked for, so a picture is of the moment
+uint64_t ThreeDLazyMadeCount(); ///< bumped whenever a thing asked of the thread in the background is made (CardVehicle())
 
 /**
  * While one stands, the getters of the vehicle objects on this thread make nothing that is not made yet (a shape read,

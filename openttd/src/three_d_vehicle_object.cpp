@@ -3373,6 +3373,7 @@ void MakeThreeDPicturesAtOnce(const std::function<void()> &ask)
  * @param front,last its first and its last piece
  */
 static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom);
+static bool ShowsNothing(const ThreeDVehicleObject *obj, int state);
 
 static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed, ZoomLevel zoom)
 {
@@ -3414,6 +3415,7 @@ struct VehicleObjectPlace {
 	bool on_card = false;                    ///< drawn by the card, no picture (card; ViewportVehiclesOnCard())
 	std::shared_ptr<const ThreeDGpuStandingVehicle> card; ///< then its shapes, nullptr when it draws nothing so
 	std::vector<ThreeDPictureLight> card_lights; ///< and its lights on at night, as its picture's
+	int state = 0;                           ///< its state as it was placed (StateStep()), for ObjectDrawsNothing()
 };
 
 /** A thing of the moving layer as it was given to the card the last time, without its shapes (CardVehicle()). */
@@ -3435,6 +3437,13 @@ static uint64_t _card_things_missing = 0, _card_things_missing_again = 0;
 static std::unordered_map<uint64_t, int> _card_things_missing_keys;
 static uint64_t _card_things_prepared_how[4] = {};
 static double _card_things_prepared_how_ms[4] = {};
+
+/** The things last found with something not made yet (CardVehicle()), by their key: ThreeDLazyMadeCount() and the redraw then. */
+static thread_local std::unordered_map<uint64_t, std::pair<uint64_t, uint64_t>> _card_not_yet; ///< each thread its own
+/** At most so many redraws a thing not made yet is not prepared again. */
+static constexpr uint64_t CARD_NOT_YET_RETRY = 8;
+/** For the diary: the things given as not made yet without being prepared again (_card_not_yet). */
+static std::atomic<uint64_t> _card_not_yet_skipped = 0;
 
 /** What the card makes of a thing of the map it draws (CardVehicle()). */
 enum class CardMade : uint8_t {
@@ -3493,6 +3502,20 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 			return it->second.too_big ? CardMade::TooBig : CardMade::Drawn;
 		}
 	}
+	/* Found the last time with something of it not made yet, asked of the thread in the background: not prepared again
+	 * while nothing asked so came since (ThreeDLazyMadeCount()), tried again at least every few redraws all the same.
+	 * Every frame it was prepared with all its shapes only to find the same again (the player's diary of 18. 11.: 1500
+	 * to 4000 things in 5 s, the night switched on, half a second of the main thread). */
+	extern uint64_t _dirty_blocks_pass;
+	const uint64_t made_now = ThreeDLazyMadeCount();
+	if (auto it = _card_not_yet.find(key); it != _card_not_yet.end()) {
+		if (it->second.first == made_now && _dirty_blocks_pass < it->second.second + CARD_NOT_YET_RETRY) {
+			_stand_ins_given++;
+			_card_not_yet_skipped++;
+			return CardMade::NotYet;
+		}
+		_card_not_yet.erase(it);
+	}
 	GpuObjectPicture gp;
 	bool drawn = false;
 	const auto prepare_from = std::chrono::steady_clock::now();
@@ -3527,6 +3550,8 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 		if (no_wait.Missed()) {
 			_stand_ins_given++;
 			prepare_timed.how = 2;
+			if (_card_not_yet.size() > 4096) _card_not_yet.clear();
+			_card_not_yet[key] = {made_now, _dirty_blocks_pass};
 			return CardMade::NotYet;
 		}
 	}
@@ -3623,8 +3648,9 @@ std::string TakeThreeDCardThingsPrepared()
 {
 	const uint64_t *h = _card_things_prepared_how;
 	const double *hm = _card_things_prepared_how_ms;
-	const std::string s = fmt::format("{} veci umisteno, {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); karta nemela {}, z toho opakovane {} ruznych",
-			_card_things_placed, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_things_missing, _card_things_missing_again);
+	const std::string s = fmt::format("{} veci umisteno, {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych",
+			_card_things_placed, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again);
+	_card_not_yet_skipped = 0;
 	_card_things_missing = _card_things_missing_again = 0;
 	_card_things_missing_keys.clear();
 	_card_things_placed = _card_things_prepared = 0;
@@ -3863,6 +3889,9 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 
 	float scale = ObjectScale(obj);
 	const int state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
+	/* Kept with the place: asked of every lit vehicle by night (ObjectDrawsNothing(), its lights and those of what it
+	 * pulls), its state was found again each time -- its set's callbacks every time. */
+	place.state = state;
 	/* Hung from the middle of its pieces (or where its coupling puts it), facing the way it goes: on a round curve as
 	 * the curve has it; else smoothly as its way turns, as the view from the eyes has it (EyeOrigin(); the player,
 	 * 17. 10.: "why do we turn in 45 degrees as the sprites, they can turn smoothly"), in steps of 5 degrees, its trailer
@@ -3986,9 +4015,12 @@ static bool ObjectDrawsNothing(const ThreeDVehicleObject *obj, const Vehicle *v,
 {
 	const Vehicle *anchor = PieceAway(v, obj->anchor - piece);
 	if (anchor == nullptr) return false;
-	if (ShowsNothing(obj, StateStep(obj, anchor->engine_type, anchor, EngineImageType::OnMap))) return true;
+	/* Placed as the frame places it (PlaceVehicleObject(), kept for the frame): whether its state shows nothing found
+	 * with it, not its state found again by its set's callbacks for each piece of each lit vehicle by night (the
+	 * player's diary of 18. 11.: the gathering of the moving layer twice as long by night as by day). */
 	VehicleObjectPlace place;
 	PlaceVehicleObject(anchor, zoom, nullptr, place, ViewportVehiclesOnCard());
+	if (ShowsNothing(obj, place.state)) return true;
 	return place.on_card ? place.card == nullptr : place.pic == nullptr;
 }
 
@@ -4251,10 +4283,13 @@ bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundT
 	int piece = 0;
 	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
 	if (obj == nullptr) return false;
+	const ThreeDVehicleShape *shape = obj->TryGetShape();
+	/* A piece not the anchor of a model with its lights: its lights are its anchor's, told from where the anchor is
+	 * placed -- none of its own (its place is empty, PlaceVehicleObjectNow()); nothing more to find of it. */
+	if (piece != obj->anchor && shape != nullptr && shape->HasLights()) return true;
 	/* An object that draws nothing now has no lights either (not those about its box: a lorry's trailer it has not). */
 	if (ObjectDrawsNothing(obj, v, piece, zoom)) return true;
 	/* Not read yet (read in the background, not waited for): no lights of it now, not those about its box either. */
-	const ThreeDVehicleShape *shape = obj->TryGetShape();
 	if (shape == nullptr && !obj->ShapeTried()) return true;
 	if (shape == nullptr || !shape->HasLights()) return false;
 	VehicleObjectPlace place;
