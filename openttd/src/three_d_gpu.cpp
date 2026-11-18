@@ -522,10 +522,13 @@ GlFunctions gl;
  */
 static std::atomic<uint64_t> _gl_calls = 0;
 static std::atomic<uint64_t> _gl_calls_standing = 0, _gl_calls_ground = 0, _gl_jobs_standing = 0, _gl_jobs_ground = 0, _gl_buildings = 0, _gl_calls_buildings = 0, _gl_vehicles = 0, _gl_calls_vehicles = 0, _gl_calls_vehicles_draw = 0;
-/* The rig ('test3d gpu volani'): the calls of drawing the turned map's vehicles counted by the function, to see which
- * of a vehicle's hundred calls are what (the player's diary of 18. 11.: 107 calls a vehicle, z5 6 frames a second). */
+/* The calls of drawing the turned map's vehicles counted by the function, to see which of a vehicle's calls are what
+ * (the player's diary of 18. 11.: 107 calls a vehicle, z5 6 frames a second; #379: 32, the rig 8 -- few vehicles a
+ * batch in the game). In the diary the most of them (VehicleCallsForDiary()); the rig ('test3d gpu volani') too. */
 static constexpr int GL_COUNTED_FUNCTIONS = 512;
-static std::atomic<bool> _gl_count_by_function = false;
+static std::atomic<bool> _gl_count_by_function = true;
+/** The batches the turned map's vehicles were drawn in (draw_vehicles of ThreeDGpuDrawStanding()), since the diary's last line. */
+static std::atomic<uint64_t> _gl_vehicle_batches = 0;
 static thread_local bool _gl_counting_vehicles = false;
 static std::array<std::atomic<uint64_t>, GL_COUNTED_FUNCTIONS> _gl_function_calls{};
 static std::array<const char *, GL_COUNTED_FUNCTIONS> _gl_function_names{};
@@ -565,6 +568,25 @@ static std::string CallsByFunction(int on)
 		_gl_count_by_function = on != 0;
 	}
 	return s;
+}
+
+/** The diary: the calls of drawing the turned map's vehicles since its last line, the most of them by the function. */
+static std::string VehicleCallsForDiary()
+{
+	/* What the counts were at its last line: they are not started again here, the rig's 'test3d gpu volani' counts
+	 * across the diary's lines (started again there, a count below what was seen is all new). */
+	static std::array<uint64_t, GL_COUNTED_FUNCTIONS> seen{};
+	std::vector<std::pair<uint64_t, const char *>> all;
+	for (int i = 0; i < GL_COUNTED_FUNCTIONS; i++) {
+		const uint64_t now = _gl_function_calls[i].load(std::memory_order_relaxed);
+		const uint64_t n = now >= seen[i] ? now - seen[i] : now;
+		seen[i] = now;
+		if (n > 0) all.emplace_back(n, _gl_function_names[i] != nullptr ? _gl_function_names[i] : "?");
+	}
+	std::ranges::sort(all, std::greater<>{});
+	std::string s;
+	for (size_t k = 0; k < all.size() && k < 10; k++) s += fmt::format("{}{} {}", k == 0 ? "" : ", ", all[k].second, all[k].first);
+	return s.empty() ? "-" : s;
 }
 
 /* The view's pictures shown by the video driver straight from the card -- the turned map's ground and what stands on
@@ -6101,7 +6123,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		shrink_off();
 		return true;
 	};
-	auto draw_vehicles = [&](size_t from) {
+	auto draw_vehicles = [&](size_t from, bool back = true) {
 		/* Its pictures use the units 1 to 6 (their paint and bones): the buildings' masks and patterns there not known after. */
 		lean_forget();
 		/* The picture is drawn anew: those drawn into it before and not shrunk yet (after this one, which comes
@@ -6147,6 +6169,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			return;
 		}
 		Step(fmt::format("vozidla plochy {}: {}x{}", placed.size(), frame_w, frame_h));
+		_gl_vehicle_batches++;
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, _sv_fbo);
 		gl.glDrawBuffers(2, colour_and_lit);
 		gl.glDisable(GL_BLEND);
@@ -6186,7 +6209,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (on) shrink_off();
 			if (const uint64_t after = _gl_calls; after >= shrink_calls) batch_shrink_calls += after - shrink_calls;
 		}
-		/* Back to what stands on the view, as it was. */
+		/* Back to what stands on the view, as it was -- unless it is begun after (begin_target()). */
+		if (!back) return;
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, target);
 		gl.glDrawBuffers(target_buffers, STANDING_DRAW_BUFFERS);
 		gl.glViewport(0, 0, s.view_w, s.view_h);
@@ -6258,7 +6282,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		const uint64_t vehicle_calls = _gl_calls;
 		_gl_counting_vehicles = true;
 		batch_shrink_calls = 0;
-		draw_vehicles(0);
+		draw_vehicles(0, false);
 		if (const uint64_t after = _gl_calls; after >= vehicle_calls + batch_shrink_calls) _gl_calls_vehicles_draw += after - vehicle_calls - batch_shrink_calls;
 		if (const uint64_t after = _gl_calls; after >= vehicle_calls) _gl_calls_vehicles += after - vehicle_calls;
 		_gl_counting_vehicles = false;
@@ -8578,8 +8602,9 @@ std::string ThreeDGpuTimes()
 		const uint64_t cg = _gl_calls_ground.exchange(0), cs = _gl_calls_standing.exchange(0);
 		const uint64_t nb = _gl_buildings.exchange(0), cb = _gl_calls_buildings.exchange(0);
 		const uint64_t nv = _gl_vehicles.exchange(0), cv = _gl_calls_vehicles.exchange(0);
-		s += fmt::format("; OpenGL calls {} (ground {} in {} jobs, {} a job; what stands {} in {} jobs, {} a job, buildings {} with {} calls, {} a building; vehicles drawn and shrunk {} with {} calls, {} a vehicle, of them drawing {})", _gl_calls.exchange(0),
-				cg, jg, jg > 0 ? cg / jg : 0, cs, js, js > 0 ? cs / js : 0, nb, cb, nb > 0 ? cb / nb : 0, nv, cv, nv > 0 ? cv / nv : 0, _gl_calls_vehicles_draw.exchange(0));
+		s += fmt::format("; OpenGL calls {} (ground {} in {} jobs, {} a job; what stands {} in {} jobs, {} a job, buildings {} with {} calls, {} a building; vehicles drawn and shrunk {} with {} calls, {} a vehicle, of them drawing {}, in {} batches; by the function {})", _gl_calls.exchange(0),
+				cg, jg, jg > 0 ? cg / jg : 0, cs, js, js > 0 ? cs / js : 0, nb, cb, nb > 0 ? cb / nb : 0, nv, cv, nv > 0 ? cv / nv : 0, _gl_calls_vehicles_draw.exchange(0), _gl_vehicle_batches.exchange(0),
+				_gl_count_by_function ? VehicleCallsForDiary() : std::string("-"));
 	}
 	if (_gpu_grounds > 0) s += fmt::format("; the ground and what stands of {} blocks in {:.1f} ms (the ground alone {} in {:.1f} ms){}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_only, _gpu_ground_only_ms,
 			_gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
