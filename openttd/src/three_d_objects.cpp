@@ -14465,21 +14465,15 @@ static std::vector<uint8_t> TextureTexelsDrawn(int w, int h, const std::vector<f
 		const int px = static_cast<int>(std::floor(x)), py = static_cast<int>(std::floor(y));
 		if (px >= 0 && py >= 0 && px < w && py < h) drawn[static_cast<size_t>(py) * w + px] = 1;
 	};
-	for (size_t t = 0; t + 5 < cover.size(); t += 6) {
-		double x[3], y[3];
-		for (int k = 0; k < 3; k++) {
-			x[k] = cover[t + k * 2] * w;
-			y[k] = cover[t + k * 2 + 1] * h;
-		}
-		/* A texture repeated: the triangle where its first corner is. */
-		const double ox = std::floor(x[0] / w) * w, oy = std::floor(y[0] / h) * h;
-		for (int k = 0; k < 3; k++) {
-			x[k] -= ox;
-			y[k] -= oy;
-		}
+	/* A texture repeated: the triangle in each of its repeats it reaches into, as the card draws it (MESH_FRAGMENT: the
+	 * place in the texture less its whole repeats). Taken only in the repeat its first corner is in, a triangle with a
+	 * corner on the far edge (u or v 1, a picture laid edge to edge) or a hair past it put the triangle a whole texture
+	 * away, its texels counted not drawn from and the smaller levels empty there -- the logos of the Raj wagons half
+	 * gone, the hopper through them (the player, 18. 11.: "blbne zeleno modrá samolepka na vagonech raj"). */
+	auto mark_triangle = [&](double x[3], double y[3]) {
 		mark((x[0] + x[1] + x[2]) / 3, (y[0] + y[1] + y[2]) / 3);
 		const double area = (x[1] - x[0]) * (y[2] - y[0]) - (y[1] - y[0]) * (x[2] - x[0]);
-		if (std::abs(area) < 1e-9) continue;
+		if (std::abs(area) < 1e-9) return;
 		/* Row by row: where the row's middle crosses the triangle's edges, the texels whose middles are between them
 		 * at once (each texel tried was the most of the time of an atlas of the colleague's). */
 		const int y0 = std::max(0, static_cast<int>(std::floor(std::min({y[0], y[1], y[2]})))), y1 = std::min(h - 1, static_cast<int>(std::ceil(std::max({y[0], y[1], y[2]}))));
@@ -14501,6 +14495,31 @@ static std::vector<uint8_t> TextureTexelsDrawn(int w, int h, const std::vector<f
 			if (!(lo <= hi)) continue;
 			const int px0 = std::max(0, static_cast<int>(std::ceil(lo - 0.5 - 1e-6))), px1 = std::min(w - 1, static_cast<int>(std::floor(hi - 0.5 + 1e-6)));
 			if (px0 <= px1) std::fill_n(drawn.begin() + static_cast<size_t>(py) * w + px0, px1 - px0 + 1, 1);
+		}
+	};
+	for (size_t t = 0; t + 5 < cover.size(); t += 6) {
+		double x[3], y[3];
+		for (int k = 0; k < 3; k++) {
+			x[k] = cover[t + k * 2] * w;
+			y[k] = cover[t + k * 2 + 1] * h;
+		}
+		const double rx0 = std::floor(std::min({x[0], x[1], x[2]}) / w), rx1 = std::floor(std::max({x[0], x[1], x[2]}) / w);
+		const double ry0 = std::floor(std::min({y[0], y[1], y[2]}) / h), ry1 = std::floor(std::max({y[0], y[1], y[2]}) / h);
+		/* Over many repeats along one way (a strip of a texture laid many times): all of it, as one over more than the
+		 * texture both ways. */
+		if ((rx1 - rx0 + 1) * (ry1 - ry0 + 1) > 16) {
+			std::fill(drawn.begin(), drawn.end(), 1);
+			return drawn;
+		}
+		for (double ry = ry0; ry <= ry1; ry++) {
+			for (double rx = rx0; rx <= rx1; rx++) {
+				double sx[3], sy[3];
+				for (int k = 0; k < 3; k++) {
+					sx[k] = x[k] - rx * w;
+					sy[k] = y[k] - ry * h;
+				}
+				mark_triangle(sx, sy);
+			}
 		}
 	}
 	return drawn;
