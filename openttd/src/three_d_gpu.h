@@ -469,6 +469,11 @@ struct ThreeDGpuStandingBuilding {
 	 * matrix's), u, v of its texture (0-1), 256 --, drawn as they are where they are nearer, marked lit. */
 	std::vector<float> night;
 	std::vector<uint8_t> night_texture;   ///< each such triangle's texture (ThreeDGpuBuilding::textures)
+	/** Given without waiting (ThreeDGpuStanding::held_only): the numbers of its textures (0 none) and of its paints'
+	 * masks and patterns as the card holds them, taken when it was given -- the pointers of the building not read on
+	 * the card's thread then, what they point to may go meanwhile. */
+	std::vector<uint64_t> texture_uids;
+	std::vector<std::array<uint64_t, 2>> paint_uids;
 };
 
 /** The most a vehicle (or a figure) drawn by the card among what stands is across or high, subpixels (ThreeDGpuStandingVehicle). */
@@ -593,6 +598,24 @@ struct ThreeDGpuStanding {
 	 * (ThreeDGpuStandingItem::order). Shown instead of what stands from then on (ThreeDGpuMovingLayer()).
 	 */
 	bool moving = false;
+	/**
+	 * Given without waiting (ThreeDGpuDrawStandingAsync()): all it needs the card held when it was given -- the
+	 * buildings' shapes and textures by their numbers (ThreeDGpuStandingBuilding::texture_uids), the vehicles' pictures
+	 * by their keys --, and it lays only from that, nothing of the game's memory read on the card's thread. What it no
+	 * longer finds there it does not lay: the asker learns it at ThreeDGpuStandingSettle().
+	 */
+	bool held_only = false;
+};
+
+/** Why what stands on a block was not given to the card without waiting (ThreeDGpuDrawStandingAsync()), for the diary. */
+enum class ThreeDGpuStandingWait : uint8_t {
+	Given,     ///< given without waiting
+	Building,  ///< a building's shape the card does not hold yet (put there by the job, from the game's memory)
+	Texture,   ///< a texture, a mask or a pattern of a building it does not hold yet
+	Vehicle,   ///< a vehicle or a figure whose picture it does not keep
+	Picture,   ///< a picture bigger than its atlas, or the atlas not made yet
+	Other,     ///< no card, its programs, the moving layer, the lit pixels read back
+	End,
 };
 
 bool ThreeDGpuAvailable(bool wait = false);
@@ -612,6 +635,13 @@ uint32_t ThreeDGpuViewGround(int view, uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing);
+ThreeDGpuStandingWait ThreeDGpuDrawStandingAsync(ThreeDGpuStanding &standing);
+/** A block given without waiting the card did not lay (ThreeDGpuStandingSettle()): whose pictures of the view, and where in them. */
+struct ThreeDGpuStandingRefused {
+	int view = 0;
+	int x = 0, y = 0, w = 0, h = 0;
+};
+size_t ThreeDGpuStandingSettle(std::vector<ThreeDGpuStandingRefused> &refused);
 /** Whether the card keeps the picture of a vehicle of the turned map by its key (ThreeDGpuStandingVehicle::key) now; any thread. */
 bool ThreeDGpuStandingKeeps(uint64_t key);
 uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit = nullptr, uint32_t *order = nullptr);

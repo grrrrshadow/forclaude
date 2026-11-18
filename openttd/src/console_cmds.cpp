@@ -11603,6 +11603,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _turned_card_dirty_on;
 		_turned_card_dirty_on = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: stojici naraz {}", _turned_card_dirty_on ? "ano" : "ne");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "cekat") {
+		/* 'stojici cekat 0|1': what stands on a block of the turned views given to the card without waiting where it
+		 * holds all it is laid from, waited for once before the frame is shown (0; ThreeDGpuDrawStandingAsync()), or
+		 * waited for block by block as before (1). */
+		extern bool _turned_standing_async_on;
+		_turned_standing_async_on = number(3).value_or(0) == 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici cekat {}", _turned_standing_async_on ? "ne, jednou za snimek" : "ano, kazdy blok");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "odmitnout") {
+		/* 'stojici odmitnout <n>': so many blocks given to the card without waiting it does not lay, as an error of its
+		 * own would leave them: drawn again, waited for, before the frame is shown (TurnedStandingSettle()). */
+		extern std::atomic<int> _rig_standing_refuse;
+		_rig_standing_refuse = static_cast<int>(number(3).value_or(1));
+		IConsolePrint(CC_DEFAULT, "test3d: stojici odmitnout {}", _rig_standing_refuse.load());
 	} else if (what == "male" && argv.size() > 2 && argv[2] == "naraz") {
 		/* 'male naraz [0|1]': what changed in the small views the card draws laid by it at once, their moves by the card
 		 * (1; TurnedCardLayDirty()), or block by block and strip by strip as before (0). */

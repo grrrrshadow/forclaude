@@ -1525,6 +1525,12 @@ void DrawDirtyBlocks()
 	_invalid_rect.top = _screen.height;
 	_invalid_rect.right = 0;
 	_invalid_rect.bottom = 0;
+
+	/* Drawn alone (the rig's console, a screenshot of the screen), not as a frame (UpdateWindows() waits at its end):
+	 * what stands given to the card without waiting laid before what was drawn is read, what it did not lay drawn again. */
+	extern bool _turned_standing_settle_later;
+	extern bool TurnedStandingSettle();
+	if (!_turned_standing_settle_later && TurnedStandingSettle()) DrawDirtyBlocks();
 }
 
 /**

@@ -7314,6 +7314,47 @@ double _turned_moving_kinds_ms[7] = {};   ///< of the gathering: vehicles, walke
 double _turned_moving_card_ms = 0;        ///< of it: handing them to the card and waiting for it (ThreeDGpuDrawStanding())
 double _turned_moving_glows_ms = 0;       ///< of it: their lights at night told to the card (TurnedMoverGlows())
 
+/**
+ * What stands on the turned views given to the card without waiting for each block (ThreeDGpuDrawStandingAsync(); the
+ * player, 17. 11.: "zoom out je slabý a cuká", the diary of 18. 11.: at zoom 5 the main thread stood 0.7-1.3 s in 5 s
+ * on the card for what stands, block by block): the main thread goes on collecting the next while the card lays it,
+ * all of it waited for once before the frame is shown (TurnedStandingSettle()). Rig: 'test3d stojici cekat 1' waits
+ * for each block as before.
+ */
+bool _turned_standing_async_on = true;
+/** The pass of DrawDirtyBlocks() till which what stands is waited for again: the card did not lay something given without waiting. */
+static uint64_t _turned_standing_waited_till = 0;
+/** UpdateWindows() is drawing the frame: what stands given without waiting is waited for at its end, not at the end of DrawDirtyBlocks(). */
+bool _turned_standing_settle_later = false;
+
+/** Whether what stands on a block is given to the card without waiting now (ThreeDGpuDrawStandingAsync()). */
+static bool TurnedStandingAsyncNow()
+{
+	extern uint64_t _dirty_blocks_pass;
+	return _turned_standing_async_on && _dirty_blocks_pass > _turned_standing_waited_till;
+}
+
+/**
+ * Wait for what stands given to the card without waiting (ThreeDGpuDrawStandingAsync()), once, before the frame is
+ * shown (UpdateWindows()) or what was drawn is read (DrawDirtyBlocks() called alone). A block the card did not lay all
+ * the same -- it could not but for an error of its own: out of memory and all it held forgotten, the kept pictures
+ * all forgotten meanwhile -- it left clear: all of the view is drawn again now, each block waited for (as before, the
+ * processor drawing what the card cannot), and for a while after.
+ * @return whether the screen is to be drawn again (marked dirty): the caller draws it before it is shown
+ */
+bool TurnedStandingSettle()
+{
+	std::vector<ThreeDGpuStandingRefused> refused;
+	if (ThreeDGpuStandingSettle(refused) == 0) return false;
+	extern uint64_t _dirty_blocks_pass;
+	_turned_standing_waited_till = _dirty_blocks_pass + 600;
+	Debug(misc, 1, "3D: the card did not lay what stands on {} blocks given without waiting (the first at {},{} {}x{} of view {}); all drawn again, waited for", refused.size(),
+			refused[0].x, refused[0].y, refused[0].w, refused[0].h, refused[0].view);
+	/* What stands about the views on the card told not laid (ForgetTurnedCardBand()), all of the screen drawn again. */
+	MarkWholeScreenDirty();
+	return true;
+}
+
 /** The picture of the view's ground shown no more: the blocks of holes are drawn again with their ground. */
 static void HideTurnedCardGround()
 {
@@ -9381,7 +9422,9 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		const size_t glows_before = _night_glows.size();
 		for (const TurnedSprite &s : standing) AddTurnedStandingThingInOrder(on_card, frame, s);
 		const double tc0 = TurnedNow();
-		standing_on_card = ThreeDGpuDrawStanding(on_card);
+		/* Given without waiting where the card holds all it is laid from (ThreeDGpuDrawStandingAsync()): it lays it then
+		 * but for an error of its own, which TurnedStandingSettle() learns before the frame is shown. Else waited for. */
+		standing_on_card = (TurnedStandingAsyncNow() && ThreeDGpuDrawStandingAsync(on_card) == ThreeDGpuStandingWait::Given) || ThreeDGpuDrawStanding(on_card);
 		_turned_times.standing_card_ms += TurnedNow() - tc0;
 		if (standing_on_card) {
 			_turned_times.standing_card++;

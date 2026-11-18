@@ -77,6 +77,38 @@ bool ThreeDGpuHoldsTexture(uint64_t uid)
 	return _card_texture_uids.contains(uid);
 }
 
+/**
+ * All the card holds by number, for the main thread to ask before it gives what stands on a block without waiting
+ * (ThreeDGpuDrawStandingAsync()): the keys of _card_textures (textures, patterns, masks) and of _card_buildings. Set
+ * by the card's thread as it puts them on and lets them go (CardHeld()).
+ */
+static std::mutex _card_held_mutex;
+static std::unordered_set<uint64_t> _card_held_textures, _card_held_buildings;
+
+static void CardHeld(std::unordered_set<uint64_t> &held, uint64_t key, bool on)
+{
+	std::lock_guard lock(_card_held_mutex);
+	if (on) {
+		held.insert(key);
+	} else {
+		held.erase(key);
+	}
+}
+
+/**
+ * The jobs of what stands given without waiting and not done yet (ThreeDGpuDrawStandingAsync()): while there are
+ * any, the card lets nothing go (TrimCard()) -- what the main thread found it holds is there when the job comes. The
+ * mutex is held by TrimCard() and by the main thread as it looks and counts one more.
+ */
+static std::atomic<int> _standing_async_pending = 0;
+static std::mutex _card_trim_mutex;
+/** For the diary: the vehicles of a job given without waiting whose kept pictures went meanwhile (DrawStandingOnCard()). */
+static std::atomic<uint64_t> _standing_async_missed = 0;
+/** The rig ('test3d stojici odmitnout <n>'): so many jobs given without waiting the card does not lay, to see them drawn again. */
+std::atomic<int> _rig_standing_refuse = 0;
+/** The size of the pictures what stands is laid from (_standing_atlas_size) for the main thread: 0 not made yet. */
+static std::atomic<int> _standing_atlas_size_now = 0;
+
 std::atomic<bool> _three_d_gpu_off = true;
 std::atomic<bool> _three_d_gpu_show = true;
 
@@ -548,6 +580,12 @@ struct GpuJob {
 	/** Given without waiting and owned by the queue (ThreeDGpuMoveViewGround()): its ground here, the job let go of by
 	 * the card's thread when done; not laid, _view_move_failed told. */
 	std::unique_ptr<ThreeDGpuGround> owned_ground;
+	/** What stands on a block given without waiting (ThreeDGpuDrawStandingAsync()): here, the job the main thread's
+	 * till ThreeDGpuStandingSettle() takes it, the card's thread only telling it done. */
+	std::unique_ptr<ThreeDGpuStanding> owned_standing;
+	/** And the keys of the vehicles' pictures it lays (ThreeDGpuStandingVehicle::key), their places not given to others
+	 * meanwhile (SweepStandingPlaces()) till it is done. */
+	std::vector<uint64_t> pinned;
 };
 /** A move of the view's picture given without waiting (ThreeDGpuMoveViewGround()) the card could not do: the main thread lays the view anew. */
 static std::atomic<bool> _view_move_failed = false;
@@ -580,9 +618,10 @@ void QueueGpuJob(GpuJob &job)
  * For the diary: how long the main thread stood waiting for the card, by what it waited for (the player, 17. 11.: "zoom
  * out je slabý a cuká" -- the drag of the zoomed out map stood on the card at every step), ms and times since asked.
  * 0 the move of the view's picture, 1 the ground of a block, 2 what stands on a block, 3 the ground started earlier
- * taken, 4 the moving layer.
+ * taken, 4 the moving layer, 5 what stands given without waiting, all of it at the end of the frame
+ * (ThreeDGpuStandingSettle()).
  */
-static constexpr int GPU_WAIT_KINDS = 5;
+static constexpr int GPU_WAIT_KINDS = 6;
 static std::atomic<double> _gpu_main_wait_ms[GPU_WAIT_KINDS] = {};
 static std::atomic<uint32_t> _gpu_main_waits[GPU_WAIT_KINDS] = {};
 /** While it lives the main thread's wait on the card is counted as of this kind (GPU_WAIT_KINDS). */
@@ -884,6 +923,8 @@ std::unordered_map<uint64_t, std::array<int, 2>> _standing_places;
 /** The vehicles' pictures among them (their keys, ThreeDGpuStandingVehicle::key), for the main thread to ask (ThreeDGpuStandingKeeps()). */
 std::mutex _standing_kept_mutex;
 std::unordered_set<uint64_t> _standing_kept_keys;
+/** Of those, the ones a job given without waiting lays (GpuJob::pinned), how many jobs each: their places not given to another meanwhile (SweepStandingPlaces()). */
+std::unordered_map<uint64_t, int> _standing_pinned;
 /** The vehicles given with their shapes whose pictures could not be made (too big, a shape the card could not take): not asked for again. Only the card's thread uses it. */
 std::unordered_set<uint64_t> _standing_failed_keys;
 /**
@@ -3247,6 +3288,11 @@ void ForgetCard()
 		_card_texture_uids.clear();
 	}
 	_card_buildings.clear();
+	{
+		std::lock_guard lock(_card_held_mutex);
+		_card_held_textures.clear();
+		_card_held_buildings.clear();
+	}
 	_card_bytes = 0;
 	for (std::atomic<size_t> &b : _card_bytes_of) b = 0;
 	for (auto &[key, t] : _ground_textures) gl.glDeleteTextures(1, &t.name);
@@ -3264,6 +3310,7 @@ void ForgetCard()
 	_standing_atlas = _standing_stream = _standing_near = 0;
 	_standing_atlas_made++;
 	_standing_atlas_size = 0;
+	_standing_atlas_size_now = 0;
 	ClearStandingPlaces();
 	if (_sv_colour != 0) {
 		gl.glDeleteTextures(1, &_sv_colour);
@@ -3345,6 +3392,10 @@ void TrimCard()
 		any_old = true;
 	}
 	if (_card_bytes <= _card_budget) return;
+	/* Not while what stands is given without waiting: a job of it lays from what the main thread found here (it is
+	 * trimmed once the last of them is done, GpuThreadMain()). */
+	std::lock_guard trim_lock(_card_trim_mutex);
+	if (_standing_async_pending > 0) return;
 	const bool too_much = _card_bytes > _card_at_most;
 	if (!too_much && !any_old) return;
 	const size_t down_to = (too_much ? _card_at_most : _card_budget) / 4 * 3;
@@ -3385,6 +3436,7 @@ void TrimCard()
 			_card_bytes -= t.bytes;
 			_card_bytes_of[2] -= t.bytes;
 			_card_textures.erase(h.uid);
+			CardHeld(_card_held_textures, h.uid, false);
 			std::lock_guard lock(_card_texture_mutex);
 			_card_texture_uids.erase(h.uid);
 		} else {
@@ -3394,6 +3446,7 @@ void TrimCard()
 			_card_bytes -= b.bytes;
 			_card_bytes_of[3] -= b.bytes;
 			_card_buildings.erase(h.uid);
+			CardHeld(_card_held_buildings, h.uid, false);
 		}
 	}
 }
@@ -3535,6 +3588,7 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
 	_card_texture_uids.insert(t.uid.value);
+	CardHeld(_card_held_textures, t.uid.value, true);
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
 
@@ -3567,6 +3621,7 @@ const GpuTexture *PatternOnCard(const ThreeDObjectTexture &t)
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
+	CardHeld(_card_held_textures, t.uid.value, true);
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
 
@@ -3597,6 +3652,7 @@ const GpuTexture *DetailMaskOnCard(const ThreeDDetailMask &m)
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
+	CardHeld(_card_held_textures, m.uid.value, true);
 	return &_card_textures.emplace(m.uid.value, g).first->second;
 }
 
@@ -4251,6 +4307,7 @@ const GpuBuilding *MapBuildingOnCard(const ThreeDGpuBuilding &b)
 	_card_bytes_of[3] += g.bytes;
 	_card_sent_of[3] += g.bytes;
 	_card_sent += g.bytes;
+	CardHeld(_card_held_buildings, key, true);
 	return &_card_buildings.emplace(key, std::move(g)).first->second;
 }
 
@@ -4822,7 +4879,7 @@ static void SweepStandingPlaces()
 	std::lock_guard lock(_standing_kept_mutex);
 	const auto now = std::chrono::steady_clock::now();
 	for (auto it = _standing_slots.begin(); it != _standing_slots.end();) {
-		if (it->second.used == _card_clock || now - it->second.when < STANDING_SLOT_IDLE) {
+		if (it->second.used == _card_clock || now - it->second.when < STANDING_SLOT_IDLE || (it->second.vehicle && _standing_pinned.contains(it->second.kept_key))) {
 			++it;
 			continue;
 		}
@@ -5046,6 +5103,83 @@ static bool MovingPicturesOfSize(ViewPictures &v)
 	return true;
 }
 
+/** Where what stands on a block is laid (DrawStandingOnCard()), x, y, w, h pixels of the view's picture: the parts asked (ThreeDGpuStanding::parts), else all the block. */
+static std::vector<std::array<int, 4>> StandingClips(const ThreeDGpuStanding &s)
+{
+	std::vector<std::array<int, 4>> clips;
+	if (s.parts.empty()) {
+		clips.push_back({s.view_x, s.view_y, s.width, s.height});
+	} else {
+		for (const std::array<int, 4> &p : s.parts) {
+			const int x0 = std::max(0, p[0]), y0 = std::max(0, p[1]), x1 = std::min(s.width, p[0] + p[2]), y1 = std::min(s.height, p[1] + p[3]);
+			if (x1 > x0 && y1 > y0) clips.push_back({s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0});
+		}
+	}
+	return clips;
+}
+
+/** Whether what reaches r (left, top, right, bottom) reaches into the part c (x, y, w, h), pixels of the view's picture. */
+static bool StandingReaches(const std::array<int, 4> &c, const std::array<int, 4> &r)
+{
+	return r[2] > c[0] && r[0] < c[0] + c[2] && r[3] > c[1] && r[1] < c[1] + c[3];
+}
+
+/** Where a thing standing on a block reaches: left, top, right, bottom, pixels of the view's picture; one it cannot tell of all the block. */
+static std::array<int, 4> StandingReach(const ThreeDGpuStanding &s, const ThreeDGpuStandingItem &item)
+{
+	std::array<int, 4> r{s.view_x, s.view_y, s.view_x + s.width, s.view_y + s.height};
+	if (item.faces >= 0) {
+		if (static_cast<size_t>(item.faces) < s.faces.size()) {
+			const std::vector<float> &c = s.faces[item.faces].corners;
+			float x0 = FLT_MAX, y0 = FLT_MAX, x1 = -FLT_MAX, y1 = -FLT_MAX;
+			for (size_t i = 0; i + ThreeDGpuStandingFaces::FLOATS - 1 < c.size(); i += ThreeDGpuStandingFaces::FLOATS) {
+				x0 = std::min(x0, c[i]);
+				x1 = std::max(x1, c[i]);
+				y0 = std::min(y0, c[i + 1]);
+				y1 = std::max(y1, c[i + 1]);
+			}
+			if (x1 >= x0) r = {s.view_x + static_cast<int>(std::floor(x0)) - 1, s.view_y + static_cast<int>(std::floor(y0)) - 1, s.view_x + static_cast<int>(std::ceil(x1)) + 1, s.view_y + static_cast<int>(std::ceil(y1)) + 1};
+		}
+	} else if (item.vehicle != nullptr) {
+		const int times = 1 << std::clamp(item.up, 0, 3);
+		r = {s.view_x + item.x, s.view_y + item.y, s.view_x + item.x + item.vehicle->width * times, s.view_y + item.y + item.vehicle->height * times};
+	} else if (item.building >= 0) {
+		if (static_cast<size_t>(item.building) < s.buildings.size()) {
+			/* Its rectangle (and its figures', its lit glass's): what its depth is cleared over. */
+			const ThreeDGpuStandingBuilding &b = s.buildings[item.building];
+			r = {s.view_x + b.clear_x, s.view_y + b.clear_y, s.view_x + b.clear_x + b.clear_w, s.view_y + b.clear_y + b.clear_h};
+		}
+	} else if (item.picture != nullptr) {
+		r = {s.view_x + item.x, s.view_y + item.y, s.view_x + item.x + item.picture->width, s.view_y + item.y + item.picture->height};
+	}
+	return r;
+}
+
+/** Whether a thing standing on a block is laid at all: it reaches into a part (StandingClips()), and over the moving things' picture it is one of them. */
+static bool StandingInSome(const ThreeDGpuStanding &s, const ThreeDGpuStandingItem &item, const std::array<int, 4> &r, std::span<const std::array<int, 4>> clips)
+{
+	if (s.moving && item.picture == nullptr && item.vehicle == nullptr) return false;
+	return std::ranges::any_of(clips, [&](const std::array<int, 4> &c) { return StandingReaches(c, r); });
+}
+
+/** A texture, a pattern or a mask the card holds, by its number (ThreeDGpuStanding::held_only); nullptr not held: nothing put on it. */
+static const GpuTexture *HeldTextureOnCard(uint64_t uid)
+{
+	auto it = _card_textures.find(uid);
+	if (it == _card_textures.end()) return nullptr;
+	it->second.used = _card_clock;
+	return &it->second;
+}
+
+/** A building of the turned map the card holds, by its shape's number (MapBuildingOnCard()); nullptr not held: nothing put on it. */
+static const GpuBuilding *HeldMapBuildingOnCard(uint64_t uid)
+{
+	auto it = _card_buildings.find(uid | (uint64_t{1} << 63));
+	if (uid == 0 || it == _card_buildings.end()) return nullptr;
+	it->second.used = _card_clock;
+	return &it->second;
+}
+
 /**
  * What stands on a block of the turned map laid by the card into the picture of the view's standing things
  * (ThreeDGpuStanding): the block cleared, far first, each pixel of each thing where it is nearer than what is there --
@@ -5077,6 +5211,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	}
 	if (_standing_atlas == 0) {
 		_standing_atlas_size = std::min(_rig_standing_atlas_size > 0 ? _rig_standing_atlas_size.load() : 4096, _max_texture);
+		_standing_atlas_size_now = _standing_atlas_size;
 		Step(fmt::format("atlas toho, co stoji na plose, {}x{}", _standing_atlas_size, _standing_atlas_size));
 		_standing_atlas = NewGroundTexture(_standing_atlas_size, _standing_atlas_size);
 		_standing_atlas_made++;
@@ -5097,15 +5232,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	}
 	_standing_stream_shelf = {};
 	/* Where it is laid, pixels of the view's picture: the parts asked (ThreeDGpuStanding::parts), else all the block. */
-	std::vector<std::array<int, 4>> clips;
-	if (s.parts.empty()) {
-		clips.push_back({s.view_x, s.view_y, s.width, s.height});
-	} else {
-		for (const std::array<int, 4> &p : s.parts) {
-			const int x0 = std::max(0, p[0]), y0 = std::max(0, p[1]), x1 = std::min(s.width, p[0] + p[2]), y1 = std::min(s.height, p[1] + p[3]);
-			if (x1 > x0 && y1 > y0) clips.push_back({s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0});
-		}
-	}
+	const std::vector<std::array<int, 4>> clips = StandingClips(s);
 	Step(fmt::format("{} na plose {}x{} v {} kusech: {} obrazku, {} budov", s.moving ? "vrstva aut" : "co stoji", s.width, s.height, clips.size(), s.items.size(), s.buildings.size()));
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, target);
@@ -5126,43 +5253,13 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	}
 	/* The part being laid: everything that reaches into it laid there, cut to it, each part in turn. */
 	std::array<int, 4> clip = clips.empty() ? std::array<int, 4>{s.view_x, s.view_y, 0, 0} : clips.front();
-	auto reaches = [&](const std::array<int, 4> &c, const std::array<int, 4> &r) {
-		return r[2] > c[0] && r[0] < c[0] + c[2] && r[3] > c[1] && r[1] < c[1] + c[3];
-	};
-	/* Where each thing reaches (left, top, right, bottom, pixels of the view's picture; one it cannot tell of all the
-	 * block), and whether into a part at all: one that does not, not drawn, not even put on the card. */
+	/* Where each thing reaches (StandingReach()), and whether into a part at all: one that does not, not drawn, not
+	 * even put on the card. */
 	std::vector<std::array<int, 4>> reach(s.items.size());
 	std::vector<uint8_t> in_some(s.items.size(), 0);
 	for (size_t k = 0; k < s.items.size(); k++) {
-		const ThreeDGpuStandingItem &item = s.items[k];
-		std::array<int, 4> r{s.view_x, s.view_y, s.view_x + s.width, s.view_y + s.height};
-		if (item.faces >= 0) {
-			if (static_cast<size_t>(item.faces) < s.faces.size()) {
-				const std::vector<float> &c = s.faces[item.faces].corners;
-				float x0 = FLT_MAX, y0 = FLT_MAX, x1 = -FLT_MAX, y1 = -FLT_MAX;
-				for (size_t i = 0; i + ThreeDGpuStandingFaces::FLOATS - 1 < c.size(); i += ThreeDGpuStandingFaces::FLOATS) {
-					x0 = std::min(x0, c[i]);
-					x1 = std::max(x1, c[i]);
-					y0 = std::min(y0, c[i + 1]);
-					y1 = std::max(y1, c[i + 1]);
-				}
-				if (x1 >= x0) r = {s.view_x + static_cast<int>(std::floor(x0)) - 1, s.view_y + static_cast<int>(std::floor(y0)) - 1, s.view_x + static_cast<int>(std::ceil(x1)) + 1, s.view_y + static_cast<int>(std::ceil(y1)) + 1};
-			}
-		} else if (item.vehicle != nullptr) {
-			const int times = 1 << std::clamp(item.up, 0, 3);
-			r = {s.view_x + item.x, s.view_y + item.y, s.view_x + item.x + item.vehicle->width * times, s.view_y + item.y + item.vehicle->height * times};
-		} else if (item.building >= 0) {
-			if (static_cast<size_t>(item.building) < s.buildings.size()) {
-				/* Its rectangle (and its figures', its lit glass's): what its depth is cleared over. */
-				const ThreeDGpuStandingBuilding &b = s.buildings[item.building];
-				r = {s.view_x + b.clear_x, s.view_y + b.clear_y, s.view_x + b.clear_x + b.clear_w, s.view_y + b.clear_y + b.clear_h};
-			}
-		} else if (item.picture != nullptr) {
-			r = {s.view_x + item.x, s.view_y + item.y, s.view_x + item.x + item.picture->width, s.view_y + item.y + item.picture->height};
-		}
-		reach[k] = r;
-		in_some[k] = std::ranges::any_of(clips, [&](const std::array<int, 4> &c) { return reaches(c, r); }) ? 1 : 0;
-		if (s.moving && item.picture == nullptr && item.vehicle == nullptr) in_some[k] = 0;
+		reach[k] = StandingReach(s, s.items[k]);
+		in_some[k] = StandingInSome(s, s.items[k], reach[k], clips) ? 1 : 0;
 	}
 	/* The moving things' picture: what stands copied into it where they were laid the frame before, where what stands
 	 * was laid since, and where they are now -- all of it when made anew or the view moved. */
@@ -5361,36 +5458,59 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	bool building_uniforms_set = false; ///< the building program's uniforms of the job set (draw_building)
 	bool night_was_set = true;          ///< its u_night maybe 1: set to 0 before the next building's triangles
 	auto draw_building = [&](const ThreeDGpuStandingBuilding &b, uint32_t order) {
-		const GpuBuilding *on = MapBuildingOnCard(b.building);
+		/* Given without waiting: its shape and textures as the card holds them, by their numbers alone -- nothing of the
+		 * game's memory read here (ThreeDGpuStanding::held_only); one let go of meanwhile, not laid. */
+		const GpuBuilding *on = s.held_only ? HeldMapBuildingOnCard(b.building.uid) : MapBuildingOnCard(b.building);
 		if (on == nullptr) {
 			building_failed = 1;
-			if (_gpu_standing_failed_told < 40) {
+			if (_gpu_standing_failed_told < 40 && !s.held_only) {
 				_gpu_standing_failed_told++;
 				Diary(fmt::format("budova plochy procesorem: tvar {} rohu, {} uv, cislo {}", b.building.pos.size() / 3, b.building.uv.size() / 2, b.building.uid), true);
 			}
 			return false;
 		}
 		textures.clear();
-		for (const ThreeDObjectTexture *t : b.building.textures) {
-			const GpuTexture *g = t != nullptr ? TextureOnCard(*t) : nullptr;
-			if (t != nullptr && g == nullptr) {
-				building_failed = 2;
-				if (_gpu_standing_failed_told < 40) {
-					_gpu_standing_failed_told++;
-					Diary(fmt::format("budova plochy procesorem: textura {} z {}, {}x{}, pixelu {}, karta nejvic {}", textures.size(), b.building.textures.size(), t->w, t->h, t->px.size(), _max_texture), true);
+		if (s.held_only) {
+			for (uint64_t uid : b.texture_uids) {
+				const GpuTexture *g = uid != 0 ? HeldTextureOnCard(uid) : nullptr;
+				if (uid != 0 && g == nullptr) {
+					building_failed = 2;
+					return false;
 				}
-				return false;
+				textures.push_back(g != nullptr ? g->name : 0);
 			}
-			textures.push_back(g != nullptr ? g->name : 0);
+		} else {
+			for (const ThreeDObjectTexture *t : b.building.textures) {
+				const GpuTexture *g = t != nullptr ? TextureOnCard(*t) : nullptr;
+				if (t != nullptr && g == nullptr) {
+					building_failed = 2;
+					if (_gpu_standing_failed_told < 40) {
+						_gpu_standing_failed_told++;
+						Diary(fmt::format("budova plochy procesorem: textura {} z {}, {}x{}, pixelu {}, karta nejvic {}", textures.size(), b.building.textures.size(), t->w, t->h, t->px.size(), _max_texture), true);
+					}
+					return false;
+				}
+				textures.push_back(g != nullptr ? g->name : 0);
+			}
 		}
 		/* What paints its first texture (ThreeDGpuBuildingPaint): the masks as they are, the patterns repeating and
 		 * smoothed. One that cannot be put on the card: the processor draws the building, its texture painted. */
 		std::array<std::array<GLuint, 2>, THREE_D_GPU_BUILDING_PAINTS> parts{};
 		const int part_count = static_cast<int>(std::min(b.building.paints.size(), THREE_D_GPU_BUILDING_PAINTS));
+		if (s.held_only && b.paint_uids.size() < static_cast<size_t>(part_count)) {
+			building_failed = 2;
+			return false;
+		}
 		for (int k = 0; k < part_count; k++) {
 			const ThreeDGpuBuildingPaint &bp = b.building.paints[k];
-			const GpuTexture *mask = bp.mask != nullptr ? TextureOnCard(*bp.mask) : nullptr;
-			const GpuTexture *pattern = bp.pattern != nullptr ? PatternOnCard(*bp.pattern) : nullptr;
+			const GpuTexture *mask, *pattern;
+			if (s.held_only) {
+				mask = b.paint_uids[k][0] != 0 ? HeldTextureOnCard(b.paint_uids[k][0]) : nullptr;
+				pattern = b.paint_uids[k][1] != 0 ? HeldTextureOnCard(b.paint_uids[k][1]) : nullptr;
+			} else {
+				mask = bp.mask != nullptr ? TextureOnCard(*bp.mask) : nullptr;
+				pattern = bp.pattern != nullptr ? PatternOnCard(*bp.pattern) : nullptr;
+			}
 			if (mask == nullptr || (bp.pattern != nullptr && pattern == nullptr)) {
 				building_failed = 2;
 				return false;
@@ -5830,13 +5950,19 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		return true;
 	};
 	bool all = true;
+	/* The rig ('test3d stojici odmitnout <n>'): so many given without waiting not laid all the same, as an error of the
+	 * card's own leaves them -- the first part laid, then all of it cleared. */
+	if (s.held_only && _rig_standing_refuse > 0) {
+		_rig_standing_refuse--;
+		all = false;
+	}
 	bool pictures_owed = false; ///< a building drawn last: the pictures' program owed before anything else (use_pictures())
 	for (const std::array<int, 4> &part : clips) {
 		clip = part;
 		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
 		for (size_t k = 0; k < s.items.size(); k++) {
 			const ThreeDGpuStandingItem &item = s.items[k];
-			if (in_some[k] == 0 || !reaches(clip, reach[k])) continue;
+			if (in_some[k] == 0 || !StandingReaches(clip, reach[k])) continue;
 			if (pictures_owed && item.building < 0) {
 				use_pictures();
 				pictures_owed = false;
@@ -5869,6 +5995,13 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					place = kept->second;
 					StandingPlaceUsed(key);
 					_gpu_standing_vehicles_kept++;
+				} else if (s.held_only) {
+					/* Given without waiting as the card kept its picture, and it keeps it no more (all the kept
+					 * pictures forgotten meanwhile): not drawn from its shapes here -- the block not laid, the asker
+					 * learns it (ThreeDGpuStandingSettle()). */
+					_standing_async_missed++;
+					all = false;
+					break;
 				} else if (v.kept_only) {
 					/* Given without its shapes, as the main thread keeps it, and the card has no picture of it (never
 					 * laid: it was beside the view when it was given whole; or let go of since): told which, the asker
@@ -6059,6 +6192,7 @@ const GpuBuilding *BuildingOnCard(const ThreeDGpuBuilding &b)
 	_card_bytes_of[3] += g.bytes;
 	_card_sent_of[3] += g.bytes;
 	_card_sent += g.bytes;
+	CardHeld(_card_held_buildings, b.uid, true);
 	return &_card_buildings.emplace(b.uid, std::move(g)).first->second;
 }
 
@@ -6758,6 +6892,7 @@ const GpuTexture *KeptTextureOnCard(uint64_t uid, const uint32_t *px, int w, int
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
+	CardHeld(_card_held_textures, uid, true);
 	return &_card_textures.emplace(uid, g).first->second;
 }
 
@@ -7400,6 +7535,25 @@ void GpuThreadMain()
 				delete job;
 				continue;
 			}
+			if (job->owned_standing != nullptr) {
+				/* What stands given without waiting: the main thread's (ThreeDGpuStandingSettle()). Its vehicles' places
+				 * free to be given to others again; the last of them done, what was not drawn for long may go now. */
+				if (!job->pinned.empty()) {
+					std::lock_guard kept_lock(_standing_kept_mutex);
+					for (uint64_t key : job->pinned) {
+						auto it = _standing_pinned.find(key);
+						if (it != _standing_pinned.end() && --it->second <= 0) _standing_pinned.erase(it);
+					}
+				}
+				const bool last = --_standing_async_pending == 0;
+				_gpu_done.notify_all();
+				if (last) {
+					lock.unlock();
+					TrimCard();
+					lock.lock();
+				}
+				continue;
+			}
 			_gpu_done.notify_all();
 			continue;
 		}
@@ -7425,6 +7579,8 @@ void GpuThreadMain()
 		if (job->owned_ground != nullptr) {
 			delete job;
 		} else {
+			/* (One given without waiting, not laid: ThreeDGpuStandingSettle() takes it.) */
+			if (job->owned_standing != nullptr) _standing_async_pending--;
 			job->done = true;
 		}
 	}
@@ -7598,6 +7754,171 @@ bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing)
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
 	return job.ok;
+}
+
+/** The jobs of what stands given without waiting not taken yet (ThreeDGpuStandingSettle()): the main thread's. */
+static std::vector<std::unique_ptr<GpuJob>> _standing_async;
+/** For the diary: what stands given without waiting, the blocks of it the card did not lay all the same, and why the
+ * others were waited for (ThreeDGpuStandingWait). The main thread's. */
+static uint64_t _standing_async_given = 0, _standing_async_refused = 0;
+static std::array<uint64_t, static_cast<size_t>(ThreeDGpuStandingWait::End)> _standing_async_why{};
+
+/**
+ * Whether the card holds all that what stands on a block is laid from, as it is given (ThreeDGpuDrawStandingAsync()):
+ * the buildings' shapes and textures, their paints' masks and patterns -- their numbers taken into the job, the
+ * pointers to the game's memory not read on the card's thread --, the vehicles' kept pictures (pinned), the pictures
+ * no bigger than its atlas. Under _card_trim_mutex: nothing is let go of between this and the job (TrimCard()).
+ * @param[out] pinned the keys of the vehicles' pictures pinned for the job
+ */
+static ThreeDGpuStandingWait StandingAllHeld(ThreeDGpuStanding &s, std::vector<uint64_t> &pinned)
+{
+	if (s.moving || s.read_lit || s.width <= 0 || s.height <= 0 || !_standing_program_ok) return ThreeDGpuStandingWait::Other;
+	int atlas = _standing_atlas_size_now;
+	if (const int rig = _rig_standing_atlas_size; rig > 0) atlas = std::min(atlas, rig);
+	if (atlas <= 0) return ThreeDGpuStandingWait::Picture;
+	auto fits = [atlas](const ThreeDGpuStandingPicture &p) {
+		return p.width > 0 && p.height > 0 && p.width <= atlas && p.height <= atlas && p.pixels.size() >= static_cast<size_t>(p.width) * p.height;
+	};
+	/* Only what the card lays: what reaches into none of the parts it does not even look at (DrawStandingOnCard()) --
+	 * a building in the piece about the parts that changed, never put on the card, kept every such piece waiting. */
+	const std::vector<std::array<int, 4>> clips = StandingClips(s);
+	std::vector<uint8_t> laid(s.items.size(), 0);
+	for (size_t k = 0; k < s.items.size(); k++) laid[k] = StandingInSome(s, s.items[k], StandingReach(s, s.items[k]), clips) ? 1 : 0;
+	std::vector<uint8_t> building_laid(s.buildings.size(), 0);
+	for (size_t k = 0; k < s.items.size(); k++) {
+		const ThreeDGpuStandingItem &item = s.items[k];
+		if (laid[k] == 0) continue;
+		if (item.faces < 0 && item.vehicle == nullptr && item.building >= 0 && static_cast<size_t>(item.building) < s.buildings.size()) building_laid[item.building] = 1;
+		if (item.faces >= 0) {
+			if (static_cast<size_t>(item.faces) >= s.faces.size() || !_standing_faces_ok) return ThreeDGpuStandingWait::Other;
+			const ThreeDGpuStandingFaces &f = s.faces[item.faces];
+			if (f.texture != nullptr && !f.corners.empty() && !fits(*f.texture)) return ThreeDGpuStandingWait::Picture;
+		} else if (item.vehicle == nullptr && item.building < 0 && item.picture != nullptr && !fits(*item.picture)) {
+			return ThreeDGpuStandingWait::Picture;
+		}
+	}
+	{
+		std::lock_guard lock(_card_held_mutex);
+		for (size_t i = 0; i < s.buildings.size(); i++) {
+			if (building_laid[i] == 0) continue;
+			ThreeDGpuStandingBuilding &b = s.buildings[i];
+			if (b.building.uid == 0 || !_card_held_buildings.contains(b.building.uid | (uint64_t{1} << 63))) return ThreeDGpuStandingWait::Building;
+			b.texture_uids.clear();
+			for (const ThreeDObjectTexture *t : b.building.textures) {
+				if (t != nullptr && !_card_held_textures.contains(t->uid.value)) return ThreeDGpuStandingWait::Texture;
+				b.texture_uids.push_back(t != nullptr ? t->uid.value : 0);
+			}
+			b.paint_uids.clear();
+			const size_t parts = std::min(b.building.paints.size(), THREE_D_GPU_BUILDING_PAINTS);
+			for (size_t k = 0; k < parts; k++) {
+				const ThreeDGpuBuildingPaint &p = b.building.paints[k];
+				if (p.mask == nullptr || !_card_held_textures.contains(p.mask->uid.value)) return ThreeDGpuStandingWait::Texture;
+				if (p.pattern != nullptr && !_card_held_textures.contains(p.pattern->uid.value)) return ThreeDGpuStandingWait::Texture;
+				b.paint_uids.push_back({p.mask->uid.value, p.pattern != nullptr ? p.pattern->uid.value : 0});
+			}
+		}
+	}
+	/* The vehicles laid from their kept pictures: found and pinned at once (SweepStandingPlaces() takes the same lock). */
+	std::lock_guard lock(_standing_kept_mutex);
+	for (size_t k = 0; k < s.items.size(); k++) {
+		const ThreeDGpuStandingItem &item = s.items[k];
+		if (item.vehicle == nullptr || laid[k] == 0 || !_standing_shrink_ok) continue;
+		if (!_standing_kept_keys.contains(item.vehicle->key)) return ThreeDGpuStandingWait::Vehicle;
+	}
+	for (size_t k = 0; k < s.items.size(); k++) {
+		const ThreeDGpuStandingItem &item = s.items[k];
+		if (item.vehicle == nullptr || laid[k] == 0 || !_standing_shrink_ok) continue;
+		_standing_pinned[item.vehicle->key]++;
+		pinned.push_back(item.vehicle->key);
+	}
+	return ThreeDGpuStandingWait::Given;
+}
+
+/**
+ * Give what stands on a block of the turned map to the card without waiting for it (the player, 17. 11.: "zoom out je
+ * slabý a cuká"; the diary of 18. 11.: at zoom 5 the main thread stood 0.7-1.3 s in 5 s on the card for each block of
+ * what stands, only to learn whether it was laid -- the card never said no but where something was not on it yet):
+ * when all it is laid from the card holds already (StandingAllHeld()), it cannot say no but for an error of its own
+ * (out of memory, everything forgotten), and the main thread goes on as if laid. What the card did not lay all the
+ * same the main thread learns at ThreeDGpuStandingSettle(), before the frame is shown. Else nothing is given: the
+ * caller lays it waiting (ThreeDGpuDrawStanding()), the card putting what was missing on, or the processor drawing it.
+ * @param standing what stands: taken into the job when given (left as it was when not)
+ * @return Given, or why not
+ */
+ThreeDGpuStandingWait ThreeDGpuDrawStandingAsync(ThreeDGpuStanding &standing)
+{
+	auto told = [](ThreeDGpuStandingWait why) {
+		_standing_async_why[static_cast<size_t>(why)]++;
+		return why;
+	};
+	if (std::this_thread::get_id() != _gpu_main_thread || !ThreeDGpuAvailable()) return told(ThreeDGpuStandingWait::Other);
+	auto job = std::make_unique<GpuJob>();
+	{
+		/* Counted before it is looked at: from now on the card lets nothing go (TrimCard()). */
+		std::lock_guard trim_lock(_card_trim_mutex);
+		_standing_async_pending++;
+		const ThreeDGpuStandingWait why = StandingAllHeld(standing, job->pinned);
+		if (why != ThreeDGpuStandingWait::Given) {
+			if (!job->pinned.empty()) {
+				std::lock_guard kept_lock(_standing_kept_mutex);
+				for (uint64_t key : job->pinned) {
+					if (auto it = _standing_pinned.find(key); it != _standing_pinned.end() && --it->second <= 0) _standing_pinned.erase(it);
+				}
+			}
+			_standing_async_pending--;
+			return told(why);
+		}
+	}
+	job->owned_standing = std::make_unique<ThreeDGpuStanding>(std::move(standing));
+	job->owned_standing->held_only = true;
+	job->standing = job->owned_standing.get();
+	{
+		std::lock_guard lock(_gpu_mutex);
+		if (_gpu_state != GpuState::Ready || _gpu_stop) {
+			/* Not taken: given back as it was, laid waiting (nothing will come of it). */
+			standing = std::move(*job->owned_standing);
+			standing.held_only = false;
+			std::lock_guard kept_lock(_standing_kept_mutex);
+			for (uint64_t key : job->pinned) {
+				if (auto it = _standing_pinned.find(key); it != _standing_pinned.end() && --it->second <= 0) _standing_pinned.erase(it);
+			}
+			_standing_async_pending--;
+			return told(ThreeDGpuStandingWait::Other);
+		}
+		QueueGpuJob(*job);
+	}
+	_gpu_wake.notify_one();
+	_standing_async.push_back(std::move(job));
+	_standing_async_given++;
+	return told(ThreeDGpuStandingWait::Given);
+}
+
+/**
+ * Wait for what stands given without waiting (ThreeDGpuDrawStandingAsync()) to be laid -- before the frame is shown,
+ * its last job fenced (ViewPicturesLaid()) -- and let go of it. The main thread's.
+ * @param[out] refused the blocks of it the card did not lay (cleared there): the caller has them drawn again
+ * @return how many those are
+ */
+size_t ThreeDGpuStandingSettle(std::vector<ThreeDGpuStandingRefused> &refused)
+{
+	if (_standing_async.empty()) return 0;
+	{
+		std::unique_lock lock(_gpu_mutex);
+		if (!std::ranges::all_of(_standing_async, [](const auto &job) { return job->done; })) {
+			GpuMainWait waited(5);
+			_gpu_done.wait(lock, [] { return std::ranges::all_of(_standing_async, [](const auto &job) { return job->done; }); });
+		}
+	}
+	size_t n = 0;
+	for (const auto &job : _standing_async) {
+		if (job->ok) continue;
+		const ThreeDGpuStanding &s = *job->owned_standing;
+		refused.push_back({s.view, s.view_x, s.view_y, s.width, s.height});
+		n++;
+	}
+	_standing_async_refused += n;
+	_standing_async.clear();
+	return n;
 }
 
 /** The one ground job given without waiting (ThreeDGpuDrawGroundStart()), until it is taken; the main thread's only. */
@@ -7827,13 +8148,22 @@ void RigThreeDGpuAtlas(int px)
 /** For the diary: the main thread's waits on the card since asked last (GpuMainWait), by what it waited for. */
 std::string ThreeDGpuMainWaits()
 {
-	static const char *names[GPU_WAIT_KINDS] = {"posun pohledu", "zem bloku", "co stoji", "zem predem dana", "vrstva aut"};
+	static const char *names[GPU_WAIT_KINDS] = {"posun pohledu", "zem bloku", "co stoji", "zem predem dana", "vrstva aut", "co stoji dane bez cekani"};
 	std::string s;
 	for (int k = 0; k < GPU_WAIT_KINDS; k++) {
 		const uint32_t n = _gpu_main_waits[k].exchange(0);
 		const double ms = _gpu_main_wait_ms[k].exchange(0);
 		if (n > 0) s += fmt::format("{}{} {}x {:.0f} ms", s.empty() ? "" : ", ", names[k], n, ms);
 	}
+	/* What stands given without waiting, what of it the card did not lay all the same, and why the rest was waited for. */
+	const auto &why = _standing_async_why;
+	const uint64_t waited = why[1] + why[2] + why[3] + why[4] + why[5];
+	if (_standing_async_given + waited > 0) {
+		s += fmt::format("{}co stoji bez cekani {} (karta pozde nepolozila {}, auto uz nedrzela {}), s cekanim {} (karta nema budovu {}, texturu {}, auto {}, obrazek {}, jine {})", s.empty() ? "" : "; ",
+				_standing_async_given, _standing_async_refused, _standing_async_missed.exchange(0), waited, why[1], why[2], why[3], why[4], why[5]);
+	}
+	_standing_async_given = _standing_async_refused = 0;
+	_standing_async_why.fill(0);
 	return s.empty() ? "-" : s;
 }
 
@@ -7873,6 +8203,8 @@ void ThreeDGpuStop()
 	}
 	_gpu_wake.notify_all();
 	if (_gpu_thread.joinable()) _gpu_thread.join();
+	/* What stands given without waiting, told done by the card's thread as it ended: let go of here, on the main thread. */
+	_standing_async.clear();
 }
 
 /** What draws the 3D pictures: the card, or why not. */
@@ -7973,12 +8305,15 @@ std::string ThreeDGpuMainWaits() { return "-"; }
 void RigThreeDGpuAtlas(int) {}
 void ThreeDGpuForgetView(int, uint64_t) {}
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
+ThreeDGpuStandingWait ThreeDGpuDrawStandingAsync(ThreeDGpuStanding &) { return ThreeDGpuStandingWait::Other; }
+size_t ThreeDGpuStandingSettle(std::vector<ThreeDGpuStandingRefused> &) { return 0; }
 bool ThreeDGpuStandingKeeps(uint64_t) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
 std::atomic<bool> _three_d_gpu_driver_waits = false;
 std::atomic<bool> _gpu_standing_lean = true;
 std::atomic<bool> _gpu_fence_last_only = true;
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
+std::atomic<int> _rig_standing_refuse = 0;
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }

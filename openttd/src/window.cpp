@@ -3363,6 +3363,9 @@ void UpdateWindows()
 	}
 
 	const auto blocks_started = std::chrono::steady_clock::now();
+	/* What stands on the turned views given to the card without waiting: waited for once, below (TurnedStandingSettle()). */
+	extern bool _turned_standing_settle_later;
+	_turned_standing_settle_later = true;
 	DrawDirtyBlocks();
 	FrameDiaryWindowsBlocks(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blocks_started).count());
 
@@ -3375,6 +3378,14 @@ void UpdateWindows()
 	 * and the trains ran ahead of the ground; the move had the card's ground and what stands follow the view, and the
 	 * picture of the moving things shown over them stayed where the view was a frame before). */
 	TurnedCardLayMovers();
+	/* What stands given to the card without waiting laid before the frame is shown; what it did not lay (an error of its
+	 * own) drawn again now, waited for, the moving things over it again. */
+	_turned_standing_settle_later = false;
+	extern bool TurnedStandingSettle();
+	if (TurnedStandingSettle()) {
+		DrawDirtyBlocks();
+		TurnedCardLayMovers();
+	}
 	NetworkDrawChatMessage();
 	/* Redraw mouse cursor in case it was hidden */
 	DrawMouseCursor();
