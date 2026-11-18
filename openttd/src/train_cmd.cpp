@@ -5872,6 +5872,54 @@ bool IsCouplePartnerOnPlatform(const Train *v, TileIndex tile)
 	return false;
 }
 
+/** How many tiles along the line from a train's end FirstTrainAlongLine() looks: the reach of a coupling (AreConsistsCloseEnoughToCouple()) and some. */
+static constexpr int COUPLE_LINE_TILES = 4;
+
+/**
+ * The first train standing on the line off a train's end (FindCouplePartnerAlongReservation(),
+ * FindCouplePartnerByHand()): on the end's own tile before it, then tile by tile while the rail goes on straight
+ * along the same axis -- a plain track, a platform, a level crossing -- up to COUPLE_LINE_TILES; a junction, a curve
+ * or the end of the rail ends the look. A train on the next track is not on the line.
+ * @param v the train, any part of it
+ * @param end its vehicle at the end looked from, on a straight track
+ * @param dir the way off that end, along its track
+ * @param[out] met whether a train stands there
+ * @return the front of that train
+ */
+static Train *FirstTrainAlongLine(const Train *v, const Train *end, DiagDirection dir, bool &met)
+{
+	met = false;
+	const Axis axis = DiagDirToAxis(dir);
+	const Track along = AxisToTrack(axis);
+	if (end->track != TrackBits{along}) return nullptr;
+	/* On its own tile: a train of another whose vehicle stands before this end. */
+	const TileIndexDiffC d = TileIndexDiffCByDiagDir(dir);
+	auto ahead_of_end = [&](const Vehicle *o) {
+		return (o->x_pos - end->x_pos) * d.x + (o->y_pos - end->y_pos) * d.y > 0;
+	};
+	TileIndex tile = end->tile;
+	for (int k = 0; k <= COUPLE_LINE_TILES; k++) {
+		if (k > 0) {
+			tile = TileAddByDiagDir(tile, dir);
+			if (!IsValidTile(tile)) return nullptr;
+			/* The rail goes on straight along the axis here, or the line ends. */
+			const bool straight = (IsPlainRailTile(tile) && GetTrackBits(tile) == TrackBits{along}) ||
+					(HasStationTileRail(tile) && GetRailStationAxis(tile) == axis) ||
+					(IsLevelCrossingTile(tile) && GetCrossingRailAxis(tile) == axis);
+			if (!straight) return nullptr;
+		}
+		for (Vehicle *o : VehiclesOnTile(tile)) {
+			if (o->type != VehicleType::Train) continue;
+			Train *t = Train::From(o);
+			if (t->First() == v->First()) continue;
+			if (k == 0 && !ahead_of_end(o)) continue;
+			met = true;
+			return t->First();
+		}
+	}
+	return nullptr;
+}
+
 /**
  * Look for a coupling partner off one end of @p v: first along whatever
  * reservation leads away from that end, then on the tile immediately beyond
@@ -5912,6 +5960,20 @@ static Train *FindCouplePartnerAlongReservation(const Train *v, bool from_rear)
 			if (from_rear) end_td = ReverseTrackdir(end_td);
 			Train *beside = FindCouplePartnerOnAdjacentTile(v, end->tile, end_td);
 			if (beside != nullptr) return beside;
+		}
+	}
+
+	/* A train standing on the line within a few tiles of this end is the one it meets, whatever the reservation
+	 * says: a waiting train's reservation lies flush with the next one's, the walk below glides over it and names
+	 * the train beyond (the player 18. 11.: three draisines uncoupled on one platform, the last coupled to the first
+	 * over the middle one). Not a partner (moving, another owner): nothing to couple to through it. */
+	if (end->track == Track::X || end->track == Track::Y) {
+		Trackdir td = end->GetVehicleTrackdir();
+		if (td != Trackdir::Invalid) {
+			if (from_rear) td = ReverseTrackdir(td);
+			bool met = false;
+			Train *first = FirstTrainAlongLine(v, end, TrackdirToExitdir(td), met);
+			if (met) return IsValidCouplePartner(v, first) ? first : nullptr;
 		}
 	}
 
@@ -6086,14 +6148,27 @@ static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 	 * platform is straight connected track by construction. This cannot be
 	 * left to the walk below, because the track follower crosses a whole
 	 * platform in one step and never visits the tiles in the middle. */
+	/* A train of neither standing between them: the two do not meet, it does (the player 18. 11.: three draisines
+	 * uncoupled on one platform, the last coupled to the first over the middle one, the close-up dragged the first
+	 * through it and the game went down, "Disconnecting train"). */
+	auto third_train_on = [&](TileIndex tile) {
+		for (const Vehicle *o : VehiclesOnTile(tile)) {
+			if (o->type != VehicleType::Train) continue;
+			const Train *t = Train::From(o);
+			if (t->First() != from->First() && t->First() != to->First()) return true;
+		}
+		return false;
+	};
 	if (!from_in_depot && IsRailStationTile(from->tile) && IsRailStationTile(to->tile) &&
 			IsCompatibleTrainStationTile(to->tile, from->tile)) {
 		TileIndexDiff delta = TileOffsByAxis(GetRailStationAxis(from->tile));
 		for (TileIndex t = from->tile + delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, from->tile); t += delta) {
 			if (t == to->tile) return true;
+			if (third_train_on(t)) break;
 		}
 		for (TileIndex t = from->tile - delta; IsRailStationTile(t) && IsCompatibleTrainStationTile(t, from->tile); t -= delta) {
 			if (t == to->tile) return true;
+			if (third_train_on(t)) break;
 		}
 	}
 
@@ -6107,9 +6182,7 @@ static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 	 * own end's tile are its body behind that end and do not count. */
 	auto walled = [&](TileIndex tile) {
 		for (const Vehicle *o : VehiclesOnTile(tile)) {
-			if (o->type != VehicleType::Train) continue;
-			const Train *t = Train::From(o);
-			if (t->First() == from->First() || t->First() == to->First()) return true;
+			if (o->type == VehicleType::Train) return true; // either train's, or a third one standing between them
 		}
 		return false;
 	};
@@ -6139,11 +6212,20 @@ static bool AreCoupleEndsRailConnected(const Train *from, const Train *to)
 			for (Trackdir cand : ft.new_td_bits) {
 				if (ft.new_tile == to->tile && TrackdirToTrack(cand) == target) return true;
 				/* A step onto a platform lands on its far end -- the follower
-				 * crosses the whole platform in one step -- so standing
-				 * anywhere on that platform counts as reached. */
-				if (TrackdirToTrack(cand) == target && IsRailStationTile(ft.new_tile) &&
-						IsRailStationTile(to->tile) && IsCompatibleTrainStationTile(to->tile, ft.new_tile)) {
-					return true;
+				 * crosses the whole platform in one step -- so standing on the
+				 * tiles it crossed counts as reached, up to a train between.
+				 * Those tiles, not any of the station's platforms along the
+				 * axis (IsCompatibleTrainStationTile() says yes to the next
+				 * track's too: the player 18. 11., a draisine coupled to a
+				 * wagon standing on the next track of the station, the
+				 * close-up ran the wagon off the end of its rail and the game
+				 * went down, "Disconnecting train"). */
+				if (TrackdirToTrack(cand) == target && ft.is_station && IsRailStationTile(to->tile)) {
+					TileIndex t = TileAddByDiagDir(tile, ft.exitdir);
+					for (int k = 0; k <= ft.tiles_skipped; k++, t = TileAddByDiagDir(t, ft.exitdir)) {
+						if (t == to->tile) return true;
+						if (walled(t)) break;
+					}
 				}
 				if (walled(ft.new_tile)) continue;
 				auto key = std::pair(ft.new_tile, cand);
@@ -9295,6 +9377,36 @@ static Train *FindCouplePartnerByHand(const Train *v, bool rear)
 	}
 
 	const int reach = 2 * TILE_SIZE;
+	auto fits = [&](const Train *partner) {
+		if (partner->owner != v->owner || partner->vehstatus.Test(VehState::Crashed) || partner->cur_speed != 0) return false;
+		if (IsAnyPartInsideDepot(partner)) return false;
+		if (partner->breakdown_ctr == 1 || partner->IsWrecked() || partner->IsSoldForScrap()) return false;
+		return partner->IsFreeWagon() || partner->IsFrontEngine();
+	};
+
+	/* On a straight track the line off that end says what it meets, not the nearest by air: that may stand on the
+	 * next track (the player 18. 11., a draisine at a platform coupled to a wagon beside it on the station's other
+	 * track, the close-up ran the wagon off the end of its rail and the game went down, "Disconnecting train"). The
+	 * train met there out of reach or no partner: nothing to couple to, the one behind it is not met. */
+	if (end->track == Track::X || end->track == Track::Y) {
+		const bool along_x = end->track == Track::X;
+		const int out = along_x ? out_x : out_y;
+		if (out != 0) {
+			const DiagDirection dir = along_x ? (out > 0 ? DiagDirection::SW : DiagDirection::NE) : (out > 0 ? DiagDirection::SE : DiagDirection::NW);
+			bool met = false;
+			Train *first = FirstTrainAlongLine(v, end, dir, met);
+			if (met) {
+				if (!fits(first)) return nullptr;
+				for (const Train *w = first; w != nullptr; w = w->Next()) {
+					const int dx = w->x_pos - end->x_pos;
+					const int dy = w->y_pos - end->y_pos;
+					if (std::abs(w->z_pos - end->z_pos) <= 8 && dx * dx + dy * dy <= reach * reach) return first;
+				}
+				return nullptr;
+			}
+		}
+	}
+
 	Train *best = nullptr;
 	int best_dist = reach * reach + 1;
 	for (Vehicle *u : VehiclesNearTileXY(end->x_pos, end->y_pos, reach)) {
@@ -9307,10 +9419,7 @@ static Train *FindCouplePartnerByHand(const Train *v, bool rear)
 		if (dx * out_x + dy * out_y <= 0) continue;
 		const int dist = dx * dx + dy * dy;
 		if (dist >= best_dist) continue;
-		if (partner->owner != v->owner || partner->vehstatus.Test(VehState::Crashed) || partner->cur_speed != 0) continue;
-		if (IsAnyPartInsideDepot(partner)) continue;
-		if (partner->breakdown_ctr == 1 || partner->IsWrecked() || partner->IsSoldForScrap()) continue;
-		if (!partner->IsFreeWagon() && !partner->IsFrontEngine()) continue;
+		if (!fits(partner)) continue;
 		best = partner;
 		best_dist = dist;
 	}
