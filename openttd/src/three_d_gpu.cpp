@@ -1028,6 +1028,9 @@ GpuProgram _clear_program;
 bool _clear_program_ok = false;
 GpuProgram _standing_copy_program; ///< what stands copied under the moving things (COPY_FRAGMENT)
 bool _standing_copy_ok = false;
+GLuint _shrink_vao = 0;            ///< the vehicles shrunk into the kept pictures (STANDING_SHRINK_VERTEX): x, y, z, u, v, their nearness and its range (SHRINK_FLOATS)
+/** The floats of a corner of a vehicle shrunk (_shrink_vao). */
+static constexpr int SHRINK_FLOATS = 13;
 GLuint _standing_order_vao = 0;    ///< the pictures laid with their order and box (ThreeDGpuStandingItem::order, ::box): x, y, z, u, v, order, lowest corner and middle, highest corner and how
 /** The floats of a corner of a picture laid (_standing_order_vao, STANDING_BOX_VERTEX). */
 static constexpr int STANDING_BOXED_FLOATS = 14;
@@ -1578,13 +1581,36 @@ void main()
  * picture on the card into the pictures kept there as FinishGpuObject() of three_d_vehicle_object.cpp shrinks it --
  * each pixel the mean of its subpixels (their alpha multiplied in); one any of them is lit of, its colour whole, of
  * alpha THREE_D_GPU_LIT_ALPHA, as a picture's lit pixel (STANDING_FRAGMENT). */
+/* Its corners with how near its pixels are as attributes (the near weights and the first row, its supersampling in
+ * w; the depths and the box's nearness), all the vehicles of a frame shrunk by one drawing (the player's diary of
+ * 18. 11.: four calls a vehicle as uniforms). */
+const char *const STANDING_SHRINK_VERTEX = R"(#version 330 core
+layout(location = 0) in vec3 a_pos;
+layout(location = 1) in vec2 a_uv;
+layout(location = 2) in vec4 a_near;
+layout(location = 3) in vec4 a_near_range;
+uniform vec2 u_size;
+noperspective out vec2 v_uv;
+flat out vec4 v_near;
+flat out vec4 v_near_range;
+void main()
+{
+	gl_Position = vec4(a_pos.xy / u_size * 2.0 - 1.0, a_pos.z * 2.0 - 1.0, 1.0);
+	v_uv = a_uv;
+	v_near = a_near;
+	v_near_range = a_near_range;
+}
+)";
+
 const char *const STANDING_SHRINK_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_colour;
 uniform sampler2D u_lit;
 uniform sampler2D u_depth;
-uniform int u_ss;
-uniform vec4 u_near;
-uniform vec4 u_near_range;
+flat in vec4 v_near;
+flat in vec4 v_near_range;
+#define u_near v_near
+#define u_near_range v_near_range
+#define u_ss int(v_near.w + 0.5)
 noperspective in vec2 v_uv;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_near;
@@ -3173,7 +3199,7 @@ bool StartCard(std::string &why, std::string &describe)
 		_standing_faces_ok = _standing_program_ok && MakeProgram(_standing_faces_program, STANDING_FACES_VERTEX, STANDING_FACES_FRAGMENT, faces_why);
 		if (_standing_program_ok && !_standing_faces_ok) Diary("krabice plochy kresli procesor: " + faces_why, true);
 		std::string shrink_why;
-		_standing_shrink_ok = _standing_program_ok && MakeProgram(_standing_shrink_program, STANDING_VERTEX, STANDING_SHRINK_FRAGMENT, shrink_why);
+		_standing_shrink_ok = _standing_program_ok && MakeProgram(_standing_shrink_program, STANDING_SHRINK_VERTEX, STANDING_SHRINK_FRAGMENT, shrink_why);
 		if (_standing_program_ok && !_standing_shrink_ok) Diary("vozidla plochy jako obrazky: " + shrink_why, true);
 		std::string clear_why;
 		_clear_program_ok = MakeProgram(_clear_program, STANDING_VERTEX, CLEAR_FRAGMENT, clear_why);
@@ -3221,6 +3247,20 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glEnableVertexAttribArray(0);
 	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
+	gl.glBindVertexArray(0);
+	/* The same corners with how near the vehicle's pixels are after them, for shrinking vehicles (STANDING_SHRINK_VERTEX). */
+	gl.glGenVertexArrays(1, &_shrink_vao);
+	gl.glBindVertexArray(_shrink_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+	static constexpr GLsizei SHRINK_STRIDE = SHRINK_FLOATS * sizeof(float);
+	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, SHRINK_STRIDE, nullptr);
+	gl.glEnableVertexAttribArray(0);
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, SHRINK_STRIDE, reinterpret_cast<const void *>(3 * sizeof(float)));
+	gl.glEnableVertexAttribArray(1);
+	gl.glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, SHRINK_STRIDE, reinterpret_cast<const void *>(5 * sizeof(float)));
+	gl.glEnableVertexAttribArray(2);
+	gl.glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, SHRINK_STRIDE, reinterpret_cast<const void *>(9 * sizeof(float)));
+	gl.glEnableVertexAttribArray(3);
 	gl.glBindVertexArray(0);
 	/* The same corners with their order and their box after them (ThreeDGpuStandingItem::order, ::box), for the pictures
 	 * laid (STANDING_BOX_VERTEX). */
@@ -3389,6 +3429,7 @@ void EndCard()
 		if (_standing_vbo != 0) gl.glDeleteBuffers(1, &_standing_vbo);
 		if (_standing_vao != 0) gl.glDeleteVertexArrays(1, &_standing_vao);
 		if (_standing_order_vao != 0) gl.glDeleteVertexArrays(1, &_standing_order_vao);
+		if (_shrink_vao != 0) gl.glDeleteVertexArrays(1, &_shrink_vao);
 		if (_standing_copy_program.program != 0) gl.glDeleteProgram(_standing_copy_program.program);
 		if (_standing_tri_vbo != 0) gl.glDeleteBuffers(1, &_standing_tri_vbo);
 		if (_standing_tri_vao != 0) gl.glDeleteVertexArrays(1, &_standing_tri_vao);
@@ -5901,15 +5942,16 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	 * (draw_vehicles(); the player's diary of 18. 11.: a vehicle shrunk alone switched to the atlas and back, 36 calls). */
 	/* The calls of shrinking a batch drawn at once (draw_vehicles()): not of drawing in the diary. */
 	uint64_t batch_shrink_calls = 0;
-	/* The shrinking program's uniforms' places, and the supersampling set last (shrink_on()). */
+	/* The shrinking program's uniforms' places (shrink_on()). */
 	static struct {
-		GLint size = -1, colour = -1, lit = -1, ss = -1, depth = -1, nearness = -1, nearness_range = -1;
-		int ss_set = -1;
+		GLint size = -1, colour = -1, lit = -1, depth = -1;
 	} shrink_u;
+	/* The corners of the vehicles shrunk since shrink_on(), drawn at once by shrink_off(). */
+	std::vector<float> shrink_corners;
 	auto shrink_fits = [&](const ThreeDGpuStandingVehicle &v) {
 		return v.width > 0 && v.height > 0 && v.width <= _standing_atlas_size && v.height <= _standing_atlas_size;
 	};
-	auto shrink_on = [&](int ss) {
+	auto shrink_on = [&]() {
 		if (_standing_atlas_fbo == 0) {
 			gl.glGenFramebuffers(1, &_standing_atlas_fbo);
 			_standing_atlas_made++;
@@ -5952,41 +5994,36 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			shrink_u.size = gl.glGetUniformLocation(sp, "u_size");
 			shrink_u.colour = gl.glGetUniformLocation(sp, "u_colour");
 			shrink_u.lit = gl.glGetUniformLocation(sp, "u_lit");
-			shrink_u.ss = gl.glGetUniformLocation(sp, "u_ss");
 			shrink_u.depth = gl.glGetUniformLocation(sp, "u_depth");
-			shrink_u.nearness = gl.glGetUniformLocation(sp, "u_near");
-			shrink_u.nearness_range = gl.glGetUniformLocation(sp, "u_near_range");
 			gl.glUniform1i(shrink_u.colour, 0);
 			gl.glUniform1i(shrink_u.lit, 1);
 			gl.glUniform1i(shrink_u.depth, 2);
-			size_set = shrink_u.ss_set = -1;
+			size_set = -1;
 		}
 		if (size_set != _standing_atlas_size) gl.glUniform2f(shrink_u.size, static_cast<float>(_standing_atlas_size), static_cast<float>(_standing_atlas_size));
 		size_set = _standing_atlas_size;
-		if (shrink_u.ss_set != ss) gl.glUniform1i(shrink_u.ss, ss);
-		shrink_u.ss_set = ss;
 		gl.glActiveTexture(GL_TEXTURE2);
 		gl.glBindTexture(GL_TEXTURE_2D, _sv_depth);
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, _sv_lit);
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, _sv_colour);
-		gl.glBindVertexArray(_standing_vao);
+		gl.glBindVertexArray(_shrink_vao);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+		shrink_corners.clear();
 	};
 	auto shrink_into = [&](const ThreeDGpuStandingVehicle &v, const std::array<int, 2> &at, uint64_t key, const std::array<int, 2> &place) {
 		const int ss = std::max(1, v.supersample);
-		if (shrink_u.ss_set != ss) gl.glUniform1i(shrink_u.ss, ss);
-		shrink_u.ss_set = ss;
-		/* Its row in the picture drawn: subpixels from where it is drawn, its first row's from the point it hangs from. */
-		gl.glUniform4f(shrink_u.nearness, v.near_osy, v.near_od, v.near_top - static_cast<float>(at[1]), 0.0f);
-		gl.glUniform4f(shrink_u.nearness_range, v.pic.depth_near, v.pic.depth_far, v.near_min, std::max(1e-3f, v.near_span));
+		/* Its row in the picture drawn: subpixels from where it is drawn, its first row's from the point it hangs from;
+		 * its supersampling with them. Its corners kept, all drawn at once (shrink_off()). */
+		const float nx = v.near_osy, ny = v.near_od, nz = v.near_top - static_cast<float>(at[1]), nw = static_cast<float>(ss);
+		const float rx = v.pic.depth_near, ry = v.pic.depth_far, rz = v.near_min, rw = std::max(1e-3f, v.near_span);
 		const float w = static_cast<float>(v.width), h = static_cast<float>(v.height);
 		const float x0 = static_cast<float>(place[0]), y0 = static_cast<float>(place[1]), x1 = x0 + w, y1 = y0 + h;
 		const float u0 = static_cast<float>(at[0] / ss), v0 = static_cast<float>(at[1] / ss), u1 = u0 + w, v1 = v0 + h;
-		const float quad[] = {x0, y0, 0, u0, v0, x1, y0, 0, u1, v0, x1, y1, 0, u1, v1, x0, y0, 0, u0, v0, x1, y1, 0, u1, v1, x0, y1, 0, u0, v1};
-		gl.glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, 6);
+		for (const auto &[x, y, u, vv] : {std::array<float, 4>{x0, y0, u0, v0}, {x1, y0, u1, v0}, {x1, y1, u1, v1}, {x0, y0, u0, v0}, {x1, y1, u1, v1}, {x0, y1, u0, v1}}) {
+			shrink_corners.insert(shrink_corners.end(), {x, y, 0.0f, u, vv, nx, ny, nz, nw, rx, ry, rz, rw});
+		}
 		_standing_places[key] = place;
 		StandingPlaceKept(key, true, v.key);
 		{
@@ -5996,6 +6033,11 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		_gpu_standing_vehicles++;
 	};
 	auto shrink_off = [&]() {
+		if (!shrink_corners.empty()) {
+			gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(shrink_corners.size() * sizeof(float)), shrink_corners.data(), GL_STREAM_DRAW);
+			gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(shrink_corners.size() / SHRINK_FLOATS));
+			shrink_corners.clear();
+		}
 		/* Not bound while the next are drawn into them. */
 		gl.glActiveTexture(GL_TEXTURE2);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
@@ -6015,7 +6057,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	auto shrink_vehicle = [&](const ThreeDGpuStandingVehicle &v, const std::array<int, 2> &at, uint64_t key, std::array<int, 2> &place) {
 		if (!shrink_fits(v)) return false;
 		place = StandingReserve(true, v.width, v.height, flush);
-		shrink_on(std::max(1, v.supersample));
+		shrink_on();
 		shrink_into(v, at, key, place);
 		shrink_off();
 		return true;
@@ -6091,7 +6133,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				const ThreeDGpuStandingVehicle &v = *s.items[p.item].vehicle;
 				if (!shrink_fits(v)) continue;
 				const std::array<int, 2> place = StandingReserve(true, v.width, v.height, flush);
-				if (!on) shrink_on(std::max(1, v.supersample));
+				if (!on) shrink_on();
 				on = true;
 				shrink_into(v, vehicle_at[p.item], v.key | STANDING_VEHICLE_KEY, place);
 				_gl_vehicles++;
