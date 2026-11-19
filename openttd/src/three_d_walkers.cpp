@@ -54,10 +54,12 @@
 #include "cab_drive.h"
 #include "roadveh.h"
 #include "vehicle_base.h"
+#include "bridge_map.h"
 
 #include <cmath>
 #include <functional>
 #include <map>
+#include <span>
 #include <unordered_map>
 
 #include "safeguards.h"
@@ -121,15 +123,34 @@ struct Point2 {
  * screen, as the walkers: the game knows nothing of it. The figure has no bones, so he flies stiff, a whole.
  */
 constexpr double THROW_KMH = 15.0;        ///< slower than this (km/h) pushed aside, not thrown
+double _throw_kmh = THROW_KMH;            ///< as it is now: the rig pushes at any speed ('test3d lenny odstrc <km/h>')
 constexpr int THROW_GLASS_TICKS = 10;     ///< the ticks he lies on the windscreen
 constexpr int THROW_LIE_TICKS = 60;       ///< lying where he fell
 constexpr int THROW_UP_TICKS = 20;        ///< getting up
 constexpr int THROW_PUSH_TICKS = 10;      ///< pushed aside
 constexpr double THROW_GLASS_DEG = 25.0;  ///< the windscreen's slope over the level: he lies along it, his head to the bonnet
-constexpr double THROW_PUSH_M = 1.3;      ///< how far aside a push puts him, metres
+constexpr double THROW_PUSH_M = 1.3;      ///< how far aside a push puts him at least, metres (past the car's side)
 constexpr double THROW_BEHIND_M = 1.5;    ///< he lands so far behind the car, metres (as long as it drives on as fast)
 constexpr double THROW_GRAVITY = 9.81;    ///< metres a second a second
 constexpr double TICK_SECONDS = MILLISECONDS_PER_TICK / 1000.0;
+
+/*
+ * Lenny in the way of the car the player drives from its cab (the player, 19. 11.: "and Lenny we could spawn into the
+ * way", "Lenny is done, but I do not want to meet him when I do not drive", "at most 2x a drive; I get out, I get in,
+ * there may be Lenny again", "Lenny falls on the ground and vanishes", slower "just push"): standing on the road ahead,
+ * gesturing at the car; run into, on the glass and over the car as Mat (Throw), gone where he falls. Only the screen,
+ * as the walkers. Not in the streets otherwise: his record has no "kde".
+ */
+constexpr std::string_view LENNY_FIGURE = "lenny";        ///< standing still: flying, pushed
+constexpr std::string_view LENNY_GESTURE = "lenny/gesto"; ///< gesturing at the car coming
+constexpr int LENNY_PER_DRIVE = 2;                        ///< he comes so often a drive at most
+constexpr uint64_t LENNY_FIRST = 555, LENNY_FIRST_MORE = 555; ///< the first time after so many ticks of the drive (15 s), and up to so many more
+constexpr uint64_t LENNY_AGAIN = 1110, LENNY_AGAIN_MORE = 1110; ///< again after so many ticks (30 s), and up to so many more
+constexpr uint64_t LENNY_RETRY = 37;                      ///< no road ahead: looked for again after so long (a second)
+constexpr double LENNY_MIN_KMH = 20.0;                    ///< he comes only to a car going at least so fast
+constexpr double LENNY_AHEAD_M[] = {45.0, 40.0, 50.0, 35.0, 55.0}; ///< so far ahead on the road, metres, the first that is road
+constexpr double LENNY_GONE_M = 80.0;                     ///< gone when the car is so far (metres), or past him by THROW_BEHIND_M * 10
+constexpr uint64_t LENNY_STANDS = 1480;                   ///< gone after standing so long (40 s)
 
 /** The car the player drives from its cab (FirstPersonRiding(), Vehicle::IsCabSteered()), as a throw sees it. */
 struct DrivenCar {
@@ -144,7 +165,7 @@ struct DrivenCar {
 
 /** A walker being thrown over or pushed aside by the car (DrivenCar). */
 struct Throw {
-	enum Phase : uint8_t { NONE, GLASS, FLY, LIE, UP, PUSH };
+	enum Phase : uint8_t { NONE, GLASS, FLY, LIE, UP, PUSH, GONE };
 	Phase phase = NONE;
 	int ticks = 0;                ///< in the phase so far
 	VehicleID car = VehicleID::Invalid();
@@ -190,6 +211,7 @@ struct Walker {
 	Point2 door{0, 0}, front{0, 0}; ///< the door and where he steps to it from
 	Point2 approach{0, 0};          ///< and where the way comes to it, on the walkable tile beyond the door's front
 	Throw thrown;                   ///< run into by the car the player drives (Throw)
+	bool lenny = false;             ///< Lenny in the way of the car (Lenny): no way of his own, gone where he falls
 };
 
 std::vector<Walker> _walkers;
@@ -561,11 +583,12 @@ void StartThrow(Walker &w, const DrivenCar &c)
 	t = {};
 	t.car = c.id;
 	t.side = (-(w.x - c.x) * c.fy + (w.y - c.y) * c.fx) / OBJECT_UNITS_PER_METRE;
-	if (c.kmh < THROW_KMH) {
+	if (c.kmh < _throw_kmh) {
 		t.phase = Throw::PUSH;
 		t.from_x = t.x = w.x;
 		t.from_y = t.y = w.y;
-		const double away = (t.side >= 0 ? 1.0 : -1.0) * THROW_PUSH_M * OBJECT_UNITS_PER_METRE;
+		/* Aside out of its way: at least so far, and past its side (a lorry's half width is more than the push). */
+		const double away = (t.side >= 0 ? 1.0 : -1.0) * std::max(THROW_PUSH_M, c.half_width + 0.4 - std::abs(t.side)) * OBJECT_UNITS_PER_METRE;
 		t.to_x = w.x - c.fy * away;
 		t.to_y = w.y + c.fx * away;
 		t.z = w.zf;
@@ -636,6 +659,12 @@ bool Thrown(Walker &w, const ThreeDVehicleObject *fig, const DrivenCar *c)
 			t.pitch += t.spin;
 			t.roll = static_cast<float>(25.0 * std::sin(t.ticks * 0.35));
 			const double ground = GroundZF(t.x, t.y, false);
+			if (t.vz < 0 && t.z <= ground && w.lenny) {
+				/* Lenny falls on the ground and is gone (the player: "leny dopadne na zem a zmizí"). */
+				MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+				t.phase = Throw::GONE;
+				return false;
+			}
 			if (t.vz < 0 && t.z <= ground) {
 				/* Down on his back, a little above the ground (his body's depth). */
 				t.z = ground + 0.15 * OBJECT_HEIGHT_PER_METRE;
@@ -675,12 +704,21 @@ bool Thrown(Walker &w, const ThreeDVehicleObject *fig, const DrivenCar *c)
 				w.x = t.x;
 				w.y = t.y;
 				t = {};
+				if (w.lenny) {
+					/* Lenny has no way: he stands where he was pushed. */
+					w.zf = GroundZF(w.x, w.y, false);
+					w.z = static_cast<int>(std::lround(w.zf));
+					MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+					Redraw(w, fig);
+					return false;
+				}
 				Resume(w, fig);
 				return false;
 			}
 			break;
 		}
-		case Throw::NONE: return false;
+		case Throw::NONE:
+		case Throw::GONE: return false;
 	}
 	/* Where he is drawn: as he walks, the map where he was drawn last and where he is now (Redraw()). */
 	w.x = t.x;
@@ -851,8 +889,139 @@ static TileIndex LifeMiddle()
 	return TurnedViewMiddle();
 }
 
+/** Lenny on the road (Lenny): none, or one. */
+std::vector<Walker> _lennies;
+/** The drive Lenny comes to (Lenny): the car, how often he came on this drive, when he may come next and since when he stands. */
+struct LennyDrive {
+	VehicleID car = VehicleID::Invalid();
+	int met = 0;
+	uint64_t next = 0;
+	uint64_t standing_since = 0;
+};
+LennyDrive _lenny_drive;
+
+/** Lenny's figure, if it is there. */
+const ThreeDVehicleObject *LennyFigure()
+{
+	return GetThreeDFigure(LENNY_FIGURE);
+}
+
+/** Lenny gone from the road, his place on the map drawn again. */
+void LennyGone()
+{
+	for (const Walker &w : _lennies) MarkStandingDirty(LennyFigure(), w.drawn_x, w.drawn_y, w.drawn_z, false);
+	_lennies.clear();
+}
+
+/**
+ * Where on the road ahead of the car Lenny stands so many metres off: the road all the way to there (plain road tiles,
+ * not a crossing, a stop or a bridge's end), the ground there as high as the car's (not under its bridge, not over its
+ * tunnel); false when not.
+ */
+bool LennyPlace(const DrivenCar &c, double metres, double &x, double &y, double &z)
+{
+	x = c.x + c.fx * metres * OBJECT_UNITS_PER_METRE;
+	y = c.y + c.fy * metres * OBJECT_UNITS_PER_METRE;
+	if (x < TILE_SIZE || y < TILE_SIZE || x >= Map::MaxX() * TILE_SIZE || y >= Map::MaxY() * TILE_SIZE) return false;
+	for (double f : {0.25, 0.5, 0.75, 1.0}) {
+		const TileIndex t = TileVirtXY(static_cast<uint>(c.x + (x - c.x) * f), static_cast<uint>(c.y + (y - c.y) * f));
+		if (!IsValidTile(t) || !IsNormalRoadTile(t) || !HasTileRoadType(t, RoadTramType::Road) || IsBridgeAbove(t)) return false;
+	}
+	z = GroundZF(x, y, false);
+	return std::abs(z - c.z) <= 1.5 * OBJECT_HEIGHT_PER_METRE;
+}
+
+/** Lenny on the road ahead of the car now, if there is road; whether he came (counted for the drive). */
+bool SpawnLenny(const DrivenCar &c, std::span<const double> ahead)
+{
+	const ThreeDVehicleObject *fig = LennyFigure();
+	if (fig == nullptr || !_lennies.empty() || _lenny_drive.met >= LENNY_PER_DRIVE) return false;
+	for (double metres : ahead) {
+		double x, y, z;
+		if (!LennyPlace(c, metres, x, y, z)) continue;
+		Walker w{};
+		w.lenny = true;
+		w.x = x;
+		w.y = y;
+		w.zf = z;
+		w.z = static_cast<int>(std::lround(z));
+		w.tile = TileVirtXY(static_cast<uint>(x), static_cast<uint>(y));
+		/* Facing the car coming, gesturing at it. */
+		w.facing = static_cast<float>(std::remainder(c.heading + 180.0, 360.0));
+		w.frame = 0;
+		Redraw(w, fig);
+		_lennies.push_back(std::move(w));
+		_lenny_drive.met++;
+		_lenny_drive.standing_since = TimerGameTick::counter;
+		Debug(misc, 1, "3D: Lenny on the road {:.0f} m ahead of the car {} ({} of {} this drive)", metres, c.id.base(), _lenny_drive.met, LENNY_PER_DRIVE);
+		return true;
+	}
+	return false;
+}
+
+/**
+ * A tick of Lenny (Lenny): none while the player does not drive a car from its cab, a new drive when he gets in again
+ * (or into another); on the road ahead now and then, at most LENNY_PER_DRIVE times a drive; run into, thrown as Mat
+ * and gone where he falls; gone too when the car is far or past him, or after a while.
+ * @param c the car the player drives, nullptr none
+ */
+void LennyTick(const DrivenCar *c)
+{
+	const uint64_t now = TimerGameTick::counter;
+	if (c == nullptr) {
+		LennyGone();
+		_lenny_drive = {};
+		return;
+	}
+	if (c->id != _lenny_drive.car) {
+		LennyGone();
+		_lenny_drive = {c->id, 0, now + LENNY_FIRST + InteractiveRandomRange(static_cast<uint32_t>(LENNY_FIRST_MORE)), 0};
+	}
+	const ThreeDVehicleObject *fig = LennyFigure();
+	if (fig == nullptr) return;
+	if (!_lennies.empty()) {
+		Walker &w = _lennies.front();
+		if (w.thrown.phase != Throw::NONE || HitBy(w, *c)) {
+			if (w.thrown.phase == Throw::NONE) StartThrow(w, *c);
+			if (!Thrown(w, fig, c) && w.thrown.phase == Throw::GONE) {
+				_lennies.clear();
+				_lenny_drive.next = now + LENNY_AGAIN + InteractiveRandomRange(static_cast<uint32_t>(LENNY_AGAIN_MORE));
+			}
+			return;
+		}
+		/* Gone when the car is far, or past him, or after a while. */
+		const double dx = w.x - c->x, dy = w.y - c->y;
+		const double ahead = (dx * c->fx + dy * c->fy) / OBJECT_UNITS_PER_METRE;
+		if (std::hypot(dx, dy) > LENNY_GONE_M * OBJECT_UNITS_PER_METRE || ahead < -10.0 * THROW_BEHIND_M || now - _lenny_drive.standing_since > LENNY_STANDS) {
+			LennyGone();
+			_lenny_drive.next = now + LENNY_AGAIN + InteractiveRandomRange(static_cast<uint32_t>(LENNY_AGAIN_MORE));
+			return;
+		}
+		/* Gesturing at the car: the frames of the pose; the map drawn again only when its fewer poses change (ThreeDMapPose()). */
+		if (const ThreeDVehicleObject *g = GetThreeDFigure(LENNY_GESTURE); g != nullptr && g->frames > 1) {
+			const int frame = static_cast<int>((now / g->frame_ticks) % g->frames);
+			if (frame != w.frame) {
+				const bool map_pose = ThreeDMapPose(LENNY_GESTURE, frame) != ThreeDMapPose(LENNY_GESTURE, std::max(0, w.frame));
+				w.frame = frame;
+				if (map_pose) {
+					MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+					Redraw(w, fig);
+				}
+			}
+		}
+		return;
+	}
+	if (_lenny_drive.met >= LENNY_PER_DRIVE || now < _lenny_drive.next || c->kmh < LENNY_MIN_KMH) return;
+	if (!SpawnLenny(*c, LENNY_AHEAD_M)) _lenny_drive.next = now + LENNY_RETRY;
+}
+
 /** Every tick: the walkers walk on; at their doors they go in; the towns near the view get theirs. */
 const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	/* The car the player drives from its cab: they are thrown over it when it runs into them (Throw), Lenny comes into
+	 * its way (Lenny). */
+	DrivenCar car;
+	const bool driving = GetDrivenCar(car);
+	LennyTick(driving ? &car : nullptr);
 	TileIndex middle = LifeMiddle();
 	const ThreeDVehicleObject *fig = middle != INVALID_TILE ? WalkerFigure() : nullptr;
 	if (fig == nullptr) {
@@ -862,9 +1031,6 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 	}
 	const double speed = WALK_PACE * RoundLength(fig) / (fig->frames * fig->frame_ticks);
 	const uint64_t now = TimerGameTick::counter;
-	/* The car the player drives from its cab: he is thrown over it when it runs into him (Throw). */
-	DrivenCar car;
-	const bool driving = GetDrivenCar(car);
 	for (auto it = _walkers.begin(); it != _walkers.end();) {
 		Walker &w = *it;
 		if (w.thrown.phase != Throw::NONE || (driving && HitBy(w, car))) {
@@ -1270,52 +1436,69 @@ TileIndex ThreeDLifeMiddle()
 	return LifeMiddle();
 }
 
-/** Put the walkers on the turned view being drawn (after its vehicles; ViewportDoDrawTurned()). */
-void AddThreeDWalkersToViewport(ZoomLevel zoom)
+/** A walker on the turned view being drawn (AddThreeDWalkersToViewport()): Mat, or Lenny. */
+static void AddWalkerToViewport(const Walker &w, ZoomLevel zoom, float scale)
 {
-	if (_walkers.empty() || IsTransparencySet(TransparencyOption::Houses)) return;
-	const float scale = WalkerScale();
-	for (const Walker &w : _walkers) {
-		if (w.stage == 1) continue; // inside a depot or a lighthouse
-		/* Where it was drawn again last (Walker::drawn_x): as the screen has it. */
-		const int x = static_cast<int>(std::lround(w.drawn_x)), y = static_cast<int>(std::lround(w.drawn_y));
-		const TileIndex tile = TileVirtXY(std::clamp<int>(x, 0, Map::MaxX() * TILE_SIZE), std::clamp<int>(y, 0, Map::MaxY() * TILE_SIZE));
-		if (w.thrown.phase != Throw::NONE && w.thrown.phase != Throw::PUSH) {
-			/* Thrown over the car (Throw): turned every way, in a box about him as long as he is. */
-			const int r = static_cast<int>(std::lround(1.0 * scale * OBJECT_UNITS_PER_METRE)), tall = static_cast<int>(std::lround(2.0 * scale * OBJECT_HEIGHT_PER_METRE));
-			const std::array<int, 6> box{x - r, y - r, w.drawn_z - tall, x + r, y + r, w.drawn_z + tall};
-			AddThreeDFigureToViewportInBox(WALKER_FIGURE, scale, x, y, w.drawn_z, w.drawn_facing, zoom, tile, 0, std::max(0, w.frame), 0, &box, 0.0f,
-					static_cast<int>(std::lround(w.thrown.pitch)), static_cast<int>(std::lround(w.thrown.roll)));
-			continue;
-		}
-		AddThreeDFigureToViewport(WALKER_FIGURE, scale, x, y, w.drawn_z, w.drawn_facing, zoom, tile, 0, std::max(0, w.frame));
+	if (w.stage == 1) return; // inside a depot or a lighthouse
+	/* Mat, or Lenny gesturing at the car, still when thrown or pushed. */
+	const bool thrown = w.thrown.phase != Throw::NONE;
+	const std::string_view name = !w.lenny ? WALKER_FIGURE : thrown ? LENNY_FIGURE : LENNY_GESTURE;
+	/* (Lenny's gesture on the map in its fewer poses, ThreeDMapPose().) */
+	const int frame = w.lenny ? (thrown ? 0 : ThreeDMapPose(name, std::max(0, w.frame))) : std::max(0, w.frame);
+	/* Where it was drawn again last (Walker::drawn_x): as the screen has it. */
+	const int x = static_cast<int>(std::lround(w.drawn_x)), y = static_cast<int>(std::lround(w.drawn_y));
+	const TileIndex tile = TileVirtXY(std::clamp<int>(x, 0, Map::MaxX() * TILE_SIZE), std::clamp<int>(y, 0, Map::MaxY() * TILE_SIZE));
+	if (thrown && w.thrown.phase != Throw::PUSH) {
+		/* Thrown over the car (Throw): turned every way, in a box about him as long as he is. */
+		const int r = static_cast<int>(std::lround(1.0 * scale * OBJECT_UNITS_PER_METRE)), tall = static_cast<int>(std::lround(2.0 * scale * OBJECT_HEIGHT_PER_METRE));
+		const std::array<int, 6> box{x - r, y - r, w.drawn_z - tall, x + r, y + r, w.drawn_z + tall};
+		AddThreeDFigureToViewportInBox(name, scale, x, y, w.drawn_z, w.drawn_facing, zoom, tile, 0, frame, 0, &box, 0.0f,
+				static_cast<int>(std::lround(w.thrown.pitch)), static_cast<int>(std::lround(w.thrown.roll)));
+		return;
 	}
+	AddThreeDFigureToViewport(name, scale, x, y, w.drawn_z, w.drawn_facing, zoom, tile, 0, frame);
 }
 
-/** The walkers in the view from the eyes, among its figures at their true size (AddCabFigure()). */
+/** Put the walkers on the turned view being drawn (after its vehicles; ViewportDoDrawTurned()): Mat and Lenny. */
+void AddThreeDWalkersToViewport(ZoomLevel zoom)
+{
+	if ((_walkers.empty() && _lennies.empty()) || IsTransparencySet(TransparencyOption::Houses)) return;
+	const float scale = WalkerScale();
+	for (const Walker &w : _walkers) AddWalkerToViewport(w, zoom, scale);
+	for (const Walker &w : _lennies) AddWalkerToViewport(w, zoom, scale);
+}
+
+/** A walker in the view from the eyes at its true size (AddThreeDWalkersToEye()): Mat, or Lenny. */
+static void AddWalkerToEye(const Walker &w, float scale)
+{
+	if (w.stage == 1) return; // inside a depot or a lighthouse
+	const bool thrown = w.thrown.phase != Throw::NONE;
+	const std::string_view name = !w.lenny ? WALKER_FIGURE : thrown ? LENNY_FIGURE : LENNY_GESTURE;
+	const int frame = w.lenny && thrown ? 0 : std::max(0, w.frame);
+	if (thrown && w.thrown.phase != Throw::PUSH) {
+		/* Thrown over the car (Throw): on its windscreen his face to the driver, then over it turning over. On the
+		 * glass where it is in this frame, the eye in it (the car went on since the tick). */
+		Throw t = w.thrown;
+		if (DrivenCar c; t.phase == Throw::GLASS && ReadDrivenCar(c) && c.id == t.car) {
+			OnGlass(t, c);
+		} else {
+			t.x = w.x;
+			t.y = w.y;
+			t.z = w.zf;
+			t.facing = w.facing;
+		}
+		AddCabTumbler(name, scale, t.x, t.y, t.z, t.facing, frame, t.pitch, t.roll);
+		return;
+	}
+	/* Where it is and on the slope's plane, not at whole units (the player, test4: the stairs). */
+	AddCabFigure(name, scale, w.x, w.y, w.zf, w.facing, frame);
+}
+
+/** The walkers in the view from the eyes, among its figures at their true size (AddCabFigure()): Mat and Lenny. */
 void AddThreeDWalkersToEye(float scale)
 {
-	if (_walkers.empty()) return;
-	for (const Walker &w : _walkers) {
-		if (w.stage == 1) continue; // inside a depot or a lighthouse
-		if (w.thrown.phase != Throw::NONE && w.thrown.phase != Throw::PUSH) {
-			/* Thrown over the car (Throw): on its windscreen his face to the driver, then over it turning over. */
-			/* On the glass where it is in this frame, the eye in it (the car went on since the tick). */
-			Throw t = w.thrown;
-			if (DrivenCar c; t.phase == Throw::GLASS && ReadDrivenCar(c) && c.id == t.car) {
-				OnGlass(t, c);
-			} else {
-				t.x = w.x;
-				t.y = w.y;
-				t.z = w.zf;
-				t.facing = w.facing;
-			}
-			AddCabTumbler(WALKER_FIGURE, scale, t.x, t.y, t.z, t.facing, std::max(0, w.frame), t.pitch, t.roll);
-			continue;
-		}
-		/* Where it is and on the slope's plane, not at whole units (the player, test4: the stairs). */
-		AddCabFigure(WALKER_FIGURE, scale, w.x, w.y, w.zf, w.facing, std::max(0, w.frame));
-	}
+	for (const Walker &w : _walkers) AddWalkerToEye(w, scale);
+	for (const Walker &w : _lennies) AddWalkerToEye(w, scale);
 }
 
 /** Send a walker out now in the town nearest the middle of the turned view or the walker of the view from the first person (the rig); whether one went. */
@@ -1362,7 +1545,34 @@ bool ThreeDWalkerAt(int &x, int &y, int &z)
  */
 bool ThreeDThrownNearCab()
 {
-	return std::ranges::any_of(_walkers, [](const Walker &w) { return w.thrown.phase == Throw::GLASS || w.thrown.phase == Throw::FLY; });
+	auto near = [](const Walker &w) { return w.thrown.phase == Throw::GLASS || w.thrown.phase == Throw::FLY; };
+	return std::ranges::any_of(_walkers, near) || std::ranges::any_of(_lennies, near);
+}
+
+/** The rig ('test3d lenny [metres]'): Lenny on the road so far ahead of the car the player drives now, as when he comes (counted for the drive). */
+std::string RigSpawnLenny(double metres)
+{
+	/* 'lenny odstrc <km/h>': pushed aside slower than that (THROW_KMH), the rig's car going faster. */
+	if (metres < 0) {
+		_throw_kmh = -metres;
+		return fmt::format("odstrci pod {:.0f} km/h", _throw_kmh);
+	}
+	DrivenCar c;
+	if (!ReadDrivenCar(c)) return "nikdo neridi";
+	if (_lenny_drive.car != c.id) return "jizda jeste nezacala (tik)";
+	const double ahead[] = {metres};
+	if (!SpawnLenny(c, ahead)) {
+		/* Why not: the road on the way to there, how high the ground is there. */
+		std::string why;
+		const double x = c.x + c.fx * metres * OBJECT_UNITS_PER_METRE, y = c.y + c.fy * metres * OBJECT_UNITS_PER_METRE;
+		for (double f : {0.25, 0.5, 0.75, 1.0}) {
+			const TileIndex t = TileVirtXY(static_cast<uint>(c.x + (x - c.x) * f), static_cast<uint>(c.y + (y - c.y) * f));
+			why += fmt::format(" {},{}:{}{}", TileX(t), TileY(t), IsNormalRoadTile(t) ? "silnice" : "ne", IsBridgeAbove(t) ? "+most" : "");
+		}
+		return fmt::format("neprisel (uz {} z {}, stoji {}, figura {};{} zem {:.1f} auto {:.1f})", _lenny_drive.met, LENNY_PER_DRIVE, _lennies.size(), LennyFigure() != nullptr, why, GroundZF(x, y, false), c.z);
+	}
+	const Walker &w = _lennies.front();
+	return fmt::format("lenny na {:.1f},{:.1f},{:.1f} smer {:.0f}, {} z {}", w.x, w.y, w.zf, w.facing, _lenny_drive.met, LENNY_PER_DRIVE);
 }
 
 /** The rig ('test3d srazit'): where the first walker is and which way he walks, world units and degrees; false when none. */
@@ -1404,6 +1614,11 @@ std::string DescribeThreeDWalkers()
 			continue;
 		}
 		out += fmt::format("\n  town {} at {:.1f},{:.1f},{} facing {:.0f} frame {}, {:.0f} of {:.0f} walked, {} points", w.town.base(), w.x, w.y, w.z, w.facing, w.frame, w.walked, w.at.back(), w.path.size());
+		if (w.thrown.phase != Throw::NONE) out += fmt::format(", thrown {} tick {} z {:.1f} pitch {:.0f} roll {:.0f}", to_underlying(w.thrown.phase), w.thrown.ticks, w.thrown.z, w.thrown.pitch, w.thrown.roll);
+	}
+	out += fmt::format("\n  Lenny {} of {} this drive (car {}), next at tick {} (now {})", _lenny_drive.met, LENNY_PER_DRIVE, _lenny_drive.car.base(), _lenny_drive.next, TimerGameTick::counter);
+	for (const Walker &w : _lennies) {
+		out += fmt::format("\n  lenny at {:.1f},{:.1f},{} facing {:.0f} frame {}", w.x, w.y, w.z, w.facing, w.frame);
 		if (w.thrown.phase != Throw::NONE) out += fmt::format(", thrown {} tick {} z {:.1f} pitch {:.0f} roll {:.0f}", to_underlying(w.thrown.phase), w.thrown.ticks, w.thrown.z, w.thrown.pitch, w.thrown.roll);
 	}
 	TileIndex middle = TurnedViewMiddle();

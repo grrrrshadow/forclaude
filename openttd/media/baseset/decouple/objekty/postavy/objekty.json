@@ -382,5 +382,33 @@
   "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_unc (kostra modelu, IK obou rukou), bez renderu",
   "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
   "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole), čelem k +x, metry; chodidla 0,20 m pod sedem, temeno 1,27 m nad ním. Je udělaný pro nakladač UNC Specialu 3D (special_unc) s meritko 1: sed na přední hraně naší sedačky v kabině, hlavice pák 0,22 m před sedem, 0,30 m nad ním a 0,22 m na každou stranu (pod střechou kabiny je nad sedem 1,35 m, proto ne 1,25 jako u vozíku a ještěrky). Při jiném meritko ruce páky minou. Barvy bez textur, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "lenny.glb",
+  "jmeno": "lenny",
+  "druh": "postava",
+  "nazev": {
+   "cs": "Lenny",
+   "en": "Lenny"
+  },
+  "tema": "springfield",
+  "vyska_m": 1.8,
+  "poza": "stojí a gestikuluje (kostra a pohyb modelu)",
+  "trojuhelniku": 1578,
+  "pozy": {
+   "klid": {
+    "animace": "mixamo.com",
+    "snimku": 1,
+    "tiku": 1
+   },
+   "gesto": {
+    "animace": "mixamo.com",
+    "snimku": 34,
+    "tiku": 2
+   }
+  },
+  "autor": "Lenny Gesture (animated) simpsons, vicente betoret ferrero (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/lenny-gesture-animated-simpsons-b3aeb2286a1a4757adf06f4f590894a6), převod postavy/springfield.py bez renderu",
+  "licence": "CC BY 4.0 (uvést vicente betoret ferrero; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "jen v cestě auta, které hráč řídí z kabiny (hráč 19. 11.: „lennyho bysme mohli spawnout do cesty“, „lenny je hotovej, ale nechci ho potkávat když neřídím“, „max 2x za jízdu“, „leny dopadne na zem a zmizí“): hra ho staví sama (three_d_walkers.cpp), bez \"kde\" na ulice nechodí; stojí a gestikuluje (gesto), sražený letí v klidu. Kostra a pohyb modelu (gesto z Mixama, klid = jeho první snímek); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná velikost (jako Mat)"
  }
 ]

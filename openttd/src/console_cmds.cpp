@@ -12563,17 +12563,34 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: jizda_na: takove auto neni.");
+	} else if (what == "lenny") {
+		/* 'lenny [metres]': Lenny on the road so many metres (40, whole) ahead of the car the player drives, as when he
+		 * comes by himself (Lenny of three_d_walkers.cpp, at most twice a drive). */
+		extern std::string RigSpawnLenny(double metres);
+		/* 'lenny odstrc <km/h>': Mat and Lenny pushed aside slower than that (15), to see the push at the rig's speed. */
+		if (argv.size() > 3 && argv[2] == "odstrc") {
+			IConsolePrint(CC_DEFAULT, "test3d: lenny: {}", RigSpawnLenny(-std::max(1, number(3).value_or(15))));
+			return true;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: lenny: {}", RigSpawnLenny(number(2).value_or(40)));
 	} else if (what == "srazit" && argv.size() > 2) {
 		/* 'srazit <unit> [metres]': the road vehicle driven freely from its cab so many metres (4) behind the first walker
 		 * on his line, heading his way, started, and the walker of the view from the first person in it -- it runs into
 		 * Mat (Throw of three_d_walkers.cpp). */
+		/* 'srazit <unit> na <x> <y> <yaw>': on the middle of that tile, heading so (CAB_YAW_TURN a turn), no walker needed. */
 		auto unit = number(2);
-		const double metres = number(3).value_or(4);
+		const bool on_tile = argv.size() > 6 && argv[3] == "na";
+		const double metres = on_tile ? 0.0 : number(3).value_or(4);
 		extern bool ThreeDWalkerHeading(double &x, double &y, float &facing);
 		extern VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e);
-		double mx, my;
-		float facing;
-		if (!unit.has_value() || !ThreeDWalkerHeading(mx, my, facing)) {
+		double mx = 0, my = 0;
+		float facing = 0;
+		if (on_tile) {
+			mx = number(4).value_or(0) * TILE_SIZE + TILE_SIZE / 2;
+			my = number(5).value_or(0) * TILE_SIZE + TILE_SIZE / 2;
+			facing = static_cast<float>(number(6).value_or(0) * 360.0 / CAB_YAW_TURN);
+		}
+		if (!unit.has_value() || (!on_tile && !ThreeDWalkerHeading(mx, my, facing))) {
 			IConsolePrint(CC_ERROR, "test3d srazit: nikdo nechodi nebo chybi cislo auta.");
 			return true;
 		}
