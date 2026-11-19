@@ -3350,14 +3350,20 @@ static PictureToMake PictureRequest(const ThreeDVehicleObject *obj, float scale,
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
-	pitch = std::clamp(pitch, -60, 60);
-	roll = std::clamp(roll, -60, 60);
+	/* Any angle round, in steps of 2 degrees -- a figure thrown over a car turns over (three_d_walkers.h); the key holds
+	 * a half of it (the slopes' 2 degrees steps as they were, VehicleSlopePitch()). */
+	auto round_angle = [](int a) {
+		a = ((a % 360) + 540) % 360 - 180;
+		return a - (((a % 2) + 2) % 2);
+	};
+	pitch = round_angle(pitch);
+	roll = round_angle(roll);
 	PictureToMake p;
 	/* The camera's elevation with the zoom (whole degrees over the zoom's byte): a small view's 30 degrees and the
 	 * tipped main view's pictures of the same thing kept side by side. */
 	p.elevation = MapPictureElevation();
 	const int zoom_seen = to_underlying(zoom) | static_cast<int>(std::lround(p.elevation)) << 8;
-	p.key = std::make_tuple(obj, zoom_seen, cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
+	p.key = std::make_tuple(obj, zoom_seen, cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), static_cast<int>(static_cast<uint32_t>(fade & 0xFFFF) | static_cast<uint32_t>(pitch / 2 + 90) << 16 | static_cast<uint32_t>(roll / 2 + 90) << 24), frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
 	const float f = cam_step * static_cast<float>(M_PI) / 180.0f;
 	p.obj = obj;
 	p.scale = scale;
@@ -5663,7 +5669,7 @@ void NoteThreeDBlinking(TileIndex tile, int ticks, double x0, double y0, double 
  * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)
  * @return nothing when the figure is not there (or its frame is not read yet)
  */
-static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false, bool *not_yet = nullptr, bool no_wait = false, float along = 0.0f)
+static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false, bool *not_yet = nullptr, bool no_wait = false, float along = 0.0f, int pitch = 0, int roll = 0)
 {
 	if (up != nullptr) *up = 0;
 	later = false;
@@ -5732,7 +5738,7 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 		NoteMovingFigure(tile, ticks, *shape, scale, tall, x, y, z);
 	}
 	/* Its state: a tree's colours of its use (ThreeDVehicleObject::TreeState()). */
-	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, state, frame, -1, 1.0f, spin_step, 0, 0, 0, along, 0);
+	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, state, frame, -1, 1.0f, spin_step, pitch, roll, 0, along, 0);
 }
 
 /** A picture asked for (PictureRequest()) as it is made: now, or not waited for (later, FigureRequest()). */
@@ -5812,7 +5818,7 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
  * drawn on top, the gates, the ship through the lock's concrete").
  * @param box its box, world units, inclusive: xmin, ymin, zmin, xmax, ymax, zmax; nullptr the small one about its feet
  */
-bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state, const std::array<int, 6> *box, float along)
+bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state, const std::array<int, 6> *box, float along, int pitch, int roll)
 {
 	int height = 0, up = 0;
 	bool later = false;
@@ -5824,7 +5830,7 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 	 * picture so that it is within what the card draws one in. */
 	if (ViewportVehiclesOnCard()) {
 		bool not_yet = false;
-		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state, true, &not_yet, false, along);
+		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state, true, &not_yet, false, along, pitch, roll);
 		if (not_yet) {
 			/* Its shape or its bones not read yet (read in the background): nothing of it till they come, its place drawn again then. */
 			_stand_ins_given++;
@@ -5856,7 +5862,7 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 	 * shapes of the trees and the figures itself (the player's test10, snimky.log: "tvar 70x 13381 ms", a frame of
 	 * 14 s; the rig at night: FigureRequest() of DrawTile_Trees()). */
 	bool shape_not_yet = false;
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state, false, &shape_not_yet, _three_d_pictures_stand_in && !_three_d_load_at_once, along);
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state, false, &shape_not_yet, _three_d_pictures_stand_in && !_three_d_load_at_once, along, pitch, roll);
 	if (shape_not_yet) {
 		_stand_ins_given++;
 		OweUnknownFigurePlace(x, y, z);

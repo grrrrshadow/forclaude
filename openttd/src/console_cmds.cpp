@@ -12563,6 +12563,61 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: jizda_na: takove auto neni.");
+	} else if (what == "srazit" && argv.size() > 2) {
+		/* 'srazit <unit> [metres]': the road vehicle driven freely from its cab so many metres (4) behind the first walker
+		 * on his line, heading his way, started, and the walker of the view from the first person in it -- it runs into
+		 * Mat (Throw of three_d_walkers.cpp). */
+		auto unit = number(2);
+		const double metres = number(3).value_or(4);
+		extern bool ThreeDWalkerHeading(double &x, double &y, float &facing);
+		extern VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e);
+		double mx, my;
+		float facing;
+		if (!unit.has_value() || !ThreeDWalkerHeading(mx, my, facing)) {
+			IConsolePrint(CC_ERROR, "test3d srazit: nikdo nechodi nebo chybi cislo auta.");
+			return true;
+		}
+		/* 0: the first of the player's not in a depot, one drawn from its object (with glass) where there is one. */
+		Vehicle *pick = nullptr;
+		for (Vehicle *u : Vehicle::Iterate()) {
+			if (u->type != VehicleType::Road || !u->IsPrimaryVehicle()) continue;
+			if (*unit == 0 ? (u->owner != _local_company || u->IsInDepot()) : u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			if (pick == nullptr || (ThreeDVehicleObjectOf(pick) == nullptr && ThreeDVehicleObjectOf(u) != nullptr)) pick = u;
+		}
+		for (Vehicle *u : Vehicle::Iterate()) {
+			if (u != pick) continue;
+			AutoRestoreBackup cur_company(_current_company, u->owner);
+			if (!u->cab_free) {
+				const CommandCost r = Command<Commands::CabDrive>::Do(DoCommandFlag::Execute, u->index, 0);
+				if (r.Failed()) IConsolePrint(CC_ERROR, "test3d srazit: volna jizda NEJDE ({})", r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
+			}
+			if (u->vehstatus.Test(VehState::Stopped)) Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, u->index, false);
+			RoadVehicle *v = RoadVehicle::From(u);
+			const double a = facing * M_PI / 180.0, back = metres * OBJECT_UNITS_PER_METRE;
+			v->x_pos = static_cast<int>(std::lround(mx - std::cos(a) * back));
+			v->y_pos = static_cast<int>(std::lround(my - std::sin(a) * back));
+			v->tile = TileVirtXY(v->x_pos, v->y_pos);
+			v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			v->cab_yaw = static_cast<uint8_t>(static_cast<int>(std::lround(facing / 360.0 * CAB_YAW_TURN)) & (CAB_YAW_TURN - 1));
+			v->direction = CabYawToDirection(v->cab_yaw);
+			v->UpdatePosition();
+			v->UpdateInclination(true, true);
+			RigFirstPersonBoard(v, false);
+			const VehicleID in = RigFirstPersonBoard(nullptr, true);
+			/* Which it is of the vehicles seen ('chodec na <n>'). */
+			int seen = 0;
+			for (const Vehicle *w : Vehicle::Iterate()) {
+				if (w == u) break;
+				if (w->IsPrimaryVehicle() && !w->vehstatus.Test(VehState::Hidden)) seen++;
+			}
+			const ThreeDVehicleObject *model = ThreeDVehicleObjectOf(u);
+			IConsolePrint(CC_DEFAULT, "test3d: srazit {} ({}. videne, model {}): volne {} na {},{} yaw {}, Mat na {:.0f},{:.0f} smer {:.0f}, chodec ve {}", u->unitnumber, seen,
+					model != nullptr ? model->name : std::string("zadny"), v->cab_free, v->x_pos, v->y_pos, v->cab_yaw, mx, my, facing,
+					in == VehicleID::Invalid() ? std::string("nicem") : fmt::format("vozidle {}", Vehicle::Get(in)->unitnumber));
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d srazit: takove auto neni.");
 	} else if (what == "autojizda" && argv.size() > 3) {
 		/* 'autojizda <type> <unit>': Up pressed twice from the cab, as the player presses it (CabArrows::Drive(), 40 ms a
 		 * look): its speed limit before, after one press and after the second (0 is full speed). */

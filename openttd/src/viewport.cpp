@@ -7035,6 +7035,69 @@ static double CabEyeHeight(const ThreeDVehicleObject &m)
 	return z;
 }
 
+/**
+ * Where the windscreen before the driver of a vehicle's model is (three_d_walkers.h: Mat run into lies on it, his face
+ * to the driver -- the player, 19. 11.: "each car has its windscreen differently high"): where its glass is straight
+ * before the eye of its cab at the eye's height, a little outside it, and how steep the glass is there, degrees over
+ * the level (a car's lies back, a bus's stands up). Its glass cut by the upright plane through the eye along the model:
+ * from the lowest of it to the highest within a few metres before the eye.
+ * @param x,y world units
+ * @param z the game's units of height
+ * @return false when its model has no glass before the eye of its cab, or is not read yet
+ */
+bool ThreeDWindscreenOf(const Vehicle *v, double &x, double &y, double &z, double &incline)
+{
+	/* The piece the model is drawn with (the eye of its cab, CollectEyeFrame()). */
+	ThreeDEyeVehicle ev;
+	for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
+		if (GetThreeDEyeVehicle(u, ev, true) && ev.obj != nullptr) break;
+		ev.obj = nullptr;
+	}
+	if (ev.obj == nullptr) return false;
+	const ThreeDVehicleObject &m = *ev.obj;
+	const ThreeDVehicleShape *shape = m.TryGetShape();
+	const std::optional<std::array<double, 3>> cab = CabEyeOf(m);
+	if (shape == nullptr || !cab.has_value()) return false;
+	const double eye_h = CabEyeHeight(m);
+	double low_x = 0, low_z = 1e9, top_x = 0, top_z = -1e9;
+	auto at = [&](size_t corner, int k) { return static_cast<double>(shape->pos[corner * 3 + k]); };
+	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
+		if (!shape->IsGlass(t)) continue;
+		for (int e = 0; e < 3; e++) {
+			const size_t a = shape->tri[t * 3 + e], b = shape->tri[t * 3 + (e + 1) % 3];
+			if (a * 3 + 2 >= shape->pos.size() || b * 3 + 2 >= shape->pos.size()) continue;
+			/* Where the edge crosses the plane of the eye. */
+			const double ya = at(a, 1) - (*cab)[1], yb = at(b, 1) - (*cab)[1];
+			if ((ya > 0) == (yb > 0) || ya == yb) continue;
+			const double f = ya / (ya - yb);
+			const double px = at(a, 0) + f * (at(b, 0) - at(a, 0)) - (*cab)[0], pz = at(a, 2) + f * (at(b, 2) - at(a, 2));
+			if (px < 0.1 || px > 3.0 || pz < eye_h - 1.0 || pz > eye_h + 1.5) continue;
+			if (pz < low_z) { low_x = px; low_z = pz; }
+			if (pz > top_z) { top_x = px; top_z = pz; }
+		}
+	}
+	if (top_z - low_z < 0.15) return false;
+	const double a = std::clamp(std::atan2(top_z - low_z, low_x - top_x), 10.0 * M_PI / 180.0, M_PI / 2);
+	/* At the eye's height on it, the middle of his body (12 cm) before it. */
+	const double f = std::clamp((eye_h - low_z) / (top_z - low_z), 0.0, 1.0);
+	const double gx = low_x + f * (top_x - low_x) + 0.12 * std::sin(a), gz = low_z + f * (top_z - low_z) + 0.12 * std::cos(a);
+	/* Into the world as the eye of its cab (CollectEyeFrame()). */
+	const ThreeDVehicleState *st = m.State(ev.state);
+	const double ta = (st != nullptr ? st->turn : 0.0) * M_PI / 180.0;
+	const double kx = (*cab)[0] + gx, ky = (*cab)[1];
+	const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
+	const double across = ev.scale * OBJECT_UNITS_PER_METRE, ahead = across * ev.along;
+	const double pa = ev.pitch * M_PI / 180.0;
+	const double mx = cx * ahead / OBJECT_UNITS_PER_METRE, mz = gz * ev.scale;
+	const double along = (mx * std::cos(pa) - mz * std::sin(pa)) * OBJECT_UNITS_PER_METRE;
+	const double mfx = std::cos(ev.facing * M_PI / 180.0), mfy = std::sin(ev.facing * M_PI / 180.0);
+	x = ev.x + along * mfx - cy * across * mfy;
+	y = ev.y + along * mfy + cy * across * mfx;
+	z = ev.z + (mx * std::sin(pa) + mz * std::cos(pa)) * OBJECT_HEIGHT_PER_METRE;
+	incline = a * 180.0 / M_PI;
+	return true;
+}
+
 /** How a model of a vehicle lies along its length and how high it is, metres in its frame (CabModelBoxOf()). */
 struct CabModelBox {
 	double rear = -2.0;  ///< its back, along the way it goes
@@ -14353,6 +14416,27 @@ static constexpr int CAB_DECK = 2;
  * built of it (the ground, foundations, bridges, ramps, tunnels, the far land); what stands on it (houses, vehicles,
  * figures, trees) keeps its metres, lifted with the land under it (EyeStandZ()).
  */
+/** The vehicle the eye in the driver's head was last in, and where the eye was from it (world units, the game's height). */
+static VehicleID _cab_eye_vehicle = VehicleID::Invalid();
+static std::array<double, 3> _cab_eye_at{};
+
+/**
+ * Where the eye in the driver's head of a vehicle is: where it was from the vehicle when the view from it was last
+ * collected (three_d_walkers.h: Mat run into by a car without a model, so without glass, lies before it).
+ * @param x,y world units
+ * @param z the game's units of height
+ * @return false when the view from its driver's head was not collected
+ */
+bool ThreeDDriverEyeOf(VehicleID id, double &x, double &y, double &z)
+{
+	const Vehicle *v = id == _cab_eye_vehicle ? Vehicle::GetIfValid(id) : nullptr;
+	if (v == nullptr) return false;
+	x = v->x_pos + _cab_eye_at[0];
+	y = v->y_pos + _cab_eye_at[1];
+	z = v->z_pos + _cab_eye_at[2];
+	return true;
+}
+
 static constexpr double EyeLevelZ(double z)
 {
 	return z * EYE_LEVEL_STRETCH;
@@ -15523,6 +15607,7 @@ struct CabFigure {
 	double curvature = 0; ///< how much its way turns, radians a world unit: its front wheels steer by it
 	bool own_cab = false; ///< the vehicle whose cab the eye is in: drawn round the eye, its driver not
 	double pitch = 0;     ///< degrees its +x is raised over the level (an arrow flying, AddCabMissile())
+	double roll = 0;      ///< degrees it is turned about its own +x, its left side (+y) up (a figure thrown over a car, AddCabTumbler())
 	bool missile = false; ///< an arrow or a bolt: always by its triangles, however small
 	bool lies = false;    ///< lies along the ground (a piece of track, AddCabGroundFigure()): always by its triangles
 	float rise_x = 0, rise_y = 0; ///< a plant sheared along the ground under it: units of height it rises a world unit along x and y (AddOurGrass())
@@ -15678,6 +15763,23 @@ void AddCabWaterFigure(std::string_view name, float size, double x, double y, do
 	f.base = base;
 	f.pitch = pitch;
 	if (glows) f.glow = Colour(255, 255, 255, ThreeDVehicleShape::GLOW_TEXTURED).data;
+	_cab_figures.push_back(std::move(f));
+}
+
+/**
+ * A figure thrown over a car in the view from the eyes (three_d_walkers.h): by its triangles however small, as a
+ * missile, turned every way.
+ * @param x,y,z its origin (between its feet), world units and units of height
+ * @param facing degrees its front faces, 0 along +x
+ * @param pitch degrees its front (+x) is raised about its y
+ * @param roll degrees it is turned about its own +x, its left side (+y) up
+ */
+void AddCabTumbler(std::string_view name, float size, double x, double y, double z, float facing, int frame, float pitch, float roll)
+{
+	CabFigure f{std::string(name), size, x, y, z, facing, frame};
+	f.pitch = pitch;
+	f.roll = roll;
+	f.missile = true;
 	_cab_figures.push_back(std::move(f));
 }
 
@@ -16552,6 +16654,7 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 	const std::vector<const ThreeDObjectTexture *> texs = painted(fig, fg.state, model.texs, model.paints);
 	const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
 	const double pa = fg.pitch * M_PI / 180.0, pc = std::cos(pa), ps = std::sin(pa);
+	const double ra = fg.roll * M_PI / 180.0, rc = std::cos(ra), rs = std::sin(ra);
 	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * fg.stretch * OBJECT_HEIGHT_PER_METRE;
 	/* A vehicle foreshortened along itself as the game spaces its vehicles. */
 	const double length = across * fg.along;
@@ -16651,7 +16754,16 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 			turned(nx, ny);
 			/* In metres as it stands, foreshortened, and then raised about its y, its front (+x) up: as steep as the
 			 * ground under it, not steeper for its length shortened (#287). */
-			double mx = px * length / OBJECT_UNITS_PER_METRE, mz = pz * up / OBJECT_HEIGHT_PER_METRE;
+			double mx = px * length / OBJECT_UNITS_PER_METRE, mz = pz * up / OBJECT_HEIGHT_PER_METRE, my = py * across / OBJECT_UNITS_PER_METRE;
+			/* Turned about its own +x first (a figure thrown over a car, AddCabTumbler()). */
+			if (fg.roll != 0) {
+				const double qy = my * rc - mz * rs, qz = my * rs + mz * rc;
+				my = qy;
+				mz = qz;
+				const double ry = ny * rc - nz * rs, rz = ny * rs + nz * rc;
+				ny = ry;
+				nz = rz;
+			}
 			if (fg.pitch != 0) {
 				const double qx = mx * pc - mz * ps, qz = mx * ps + mz * pc;
 				mx = qx;
@@ -16660,7 +16772,7 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 				nx = rx;
 				nz = rz;
 			}
-			const double fx = mx * OBJECT_UNITS_PER_METRE, fy = py * across;
+			const double fx = mx * OBJECT_UNITS_PER_METRE, fy = my * OBJECT_UNITS_PER_METRE;
 			const double ox = fx * ca - fy * sa, oy = fx * sa + fy * ca;
 			pts[i] = CabToEye(eye, fg.x + ox, fg.y + oy, fg.z + mz * OBJECT_HEIGHT_PER_METRE + fg.rise_x * ox + fg.rise_y * oy, s.uv[i * 2], s.uv[i * 2 + 1]);
 			if (pts[i].f >= _cab_near) scr[i] = CabProject(eye, pts[i]);
@@ -16840,15 +16952,16 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		return M3{c, -s, 0, s, c, 0, 0, 0, 1};
 	};
 	const double pa = fg.pitch * M_PI / 180.0, pc = std::cos(pa), ps = std::sin(pa);
+	const double ra = fg.roll * M_PI / 180.0, rc = std::cos(ra), rs = std::sin(ra);
 	/* As CabDrawFigureModel() places a corner: turned by its state, in metres sized (along it foreshortened, up stretched),
-	 * raised about its y, turned to where it faces, in world units; its normals turned alike. */
-	const M3 turn = about_z(model.turn), pitch{pc, 0, -ps, 0, 1, 0, ps, 0, pc}, facing = about_z(fg.facing);
+	 * turned about its x, raised about its y, turned to where it faces, in world units; its normals turned alike. */
+	const M3 turn = about_z(model.turn), pitch{pc, 0, -ps, 0, 1, 0, ps, 0, pc}, roll{1, 0, 0, 0, rc, -rs, 0, rs, rc}, facing = about_z(fg.facing);
 	const M3 size{fg.size * fg.along, 0, 0, 0, fg.size, 0, 0, 0, fg.size * fg.stretch};
 	const M3 units{OBJECT_UNITS_PER_METRE, 0, 0, 0, OBJECT_UNITS_PER_METRE, 0, 0, 0, OBJECT_HEIGHT_PER_METRE};
-	const M3 rotate = mul(facing, mul(pitch, turn));
+	const M3 rotate = mul(facing, mul(pitch, mul(roll, turn)));
 	/* A plant sheared along the ground under it (AddOurGrass()): its height raised by its place along x and y. */
 	const M3 shear{1, 0, 0, 0, 1, 0, fg.rise_x, fg.rise_y, 1};
-	const M3 place = mul(shear, mul(units, mul(facing, mul(pitch, mul(size, turn)))));
+	const M3 place = mul(shear, mul(units, mul(facing, mul(pitch, mul(roll, mul(size, turn))))));
 	const std::array<double, 16> clip = EyeClip(eye, width, height, fg.x, fg.y, fg.z, near);
 	static constexpr double L[3] = {-0.45, 0.35, 0.82};
 	/* A shape whose corners are first placed in the model's frame by local and at (a figure of its crew). */
@@ -19200,6 +19313,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * looking down sees the ground at its feet, nearer than the cab's near plane: a ground cut off there showed the
 	 * sky under it at the bottom of the picture. */
 	_cab_near = in_model_cab ? 0.15 : (walker != nullptr ? 0.25 : CAB_NEAR);
+	/* Mat on the windscreen, his face to the driver, or flying over the car (three_d_walkers.h): nearer than that. */
+	extern bool ThreeDThrownNearCab();
+	if (ThreeDThrownNearCab()) _cab_near = std::min(_cab_near, 0.25);
+	/* Where the eye in the driver's head is: a car without a model has no glass, he lies before the eye (CabEyeOf()). */
+	if (walker == nullptr && !roof) {
+		const Vehicle *first = v->First();
+		_cab_eye_vehicle = first->index;
+		/* From the vehicle, as it moves on before the next frame; back in the game's heights, the land under it
+		 * unstretched (EyeStandZ()). */
+		_cab_eye_at = {eye.x - first->x_pos, eye.y - first->y_pos, eye.z - (EYE_LEVEL_STRETCH - 1.0) * EyeBaseZ(eye.x, eye.y, first->z_pos) - first->z_pos};
+	}
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
 	/* In a cab tipped up a slope, up with it as far as the head looks ahead (turned aside, the slope is across the view). */

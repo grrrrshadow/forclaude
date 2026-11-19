@@ -51,6 +51,9 @@
 #include "transparency.h"
 #include "debug.h"
 #include "gfx_type.h"
+#include "cab_drive.h"
+#include "roadveh.h"
+#include "vehicle_base.h"
 
 #include <cmath>
 #include <functional>
@@ -60,6 +63,9 @@
 #include "safeguards.h"
 
 bool FirstPersonWalkerAt(double &x, double &y);
+const Vehicle *FirstPersonRiding();
+bool ThreeDWindscreenOf(const Vehicle *v, double &x, double &y, double &z, double &incline);
+bool ThreeDDriverEyeOf(VehicleID id, double &x, double &y, double &z);
 
 namespace {
 
@@ -106,6 +112,51 @@ struct Point2 {
 	double x, y;
 };
 
+/*
+ * Mat run into by the car the player drives from its cab (the player, 19. 11.: "when I drive and run into Mat, let him
+ * fly over the roof as in GTA 6, and then he gets up and goes where he needed. Only Mat, the others I do not want to
+ * run into"; "the face at the driver, one leg over the roof, so that from the other views it is seen they fly"; slower
+ * "just push"): a moment on the windscreen, his face to the driver and his feet over the roof, then thrown over the car
+ * turning over, lying a while where he fell, up again and on his way. Slower than THROW_KMH only pushed aside. Only the
+ * screen, as the walkers: the game knows nothing of it. The figure has no bones, so he flies stiff, a whole.
+ */
+constexpr double THROW_KMH = 15.0;        ///< slower than this (km/h) pushed aside, not thrown
+constexpr int THROW_GLASS_TICKS = 10;     ///< the ticks he lies on the windscreen
+constexpr int THROW_LIE_TICKS = 60;       ///< lying where he fell
+constexpr int THROW_UP_TICKS = 20;        ///< getting up
+constexpr int THROW_PUSH_TICKS = 10;      ///< pushed aside
+constexpr double THROW_GLASS_DEG = 25.0;  ///< the windscreen's slope over the level: he lies along it, his head to the bonnet
+constexpr double THROW_PUSH_M = 1.3;      ///< how far aside a push puts him, metres
+constexpr double THROW_BEHIND_M = 1.5;    ///< he lands so far behind the car, metres (as long as it drives on as fast)
+constexpr double THROW_GRAVITY = 9.81;    ///< metres a second a second
+constexpr double TICK_SECONDS = MILLISECONDS_PER_TICK / 1000.0;
+
+/** The car the player drives from its cab (FirstPersonRiding(), Vehicle::IsCabSteered()), as a throw sees it. */
+struct DrivenCar {
+	VehicleID id = VehicleID::Invalid();
+	double x = 0, y = 0, z = 0;   ///< its middle, world units; its foot, units of height
+	double fx = 1, fy = 0;        ///< the way it heads
+	float heading = 0;            ///< and in degrees, 0 along +x
+	double front = 2.2, half_width = 0.9, roof = 1.45, length = 4.4; ///< its shape, metres as drawn
+	double kmh = 0;               ///< its speed
+	double step = 0;              ///< how far it went the last tick, world units
+};
+
+/** A walker being thrown over or pushed aside by the car (DrivenCar). */
+struct Throw {
+	enum Phase : uint8_t { NONE, GLASS, FLY, LIE, UP, PUSH };
+	Phase phase = NONE;
+	int ticks = 0;                ///< in the phase so far
+	VehicleID car = VehicleID::Invalid();
+	double side = 0;              ///< his place across the car at the hit, metres, its left (+y) positive
+	double x = 0, y = 0, z = 0;   ///< where he is, world units and units of height (his feet)
+	double vx = 0, vy = 0, vz = 0; ///< flying: a tick
+	double gravity = 0;           ///< flying: units of height a tick a tick
+	float facing = 0, pitch = 0, roll = 0; ///< how he is turned, degrees
+	float spin = 0;               ///< flying: degrees a tick he turns over
+	double from_x = 0, from_y = 0, to_x = 0, to_y = 0; ///< pushed aside: from where to where
+};
+
 /** A door of a house looking out onto a road of the town, and the way from it to the pavement. */
 struct Door {
 	TileIndex house; ///< the north tile of the house
@@ -138,6 +189,7 @@ struct Walker {
 	uint64_t until = 0;             ///< inside till then
 	Point2 door{0, 0}, front{0, 0}; ///< the door and where he steps to it from
 	Point2 approach{0, 0};          ///< and where the way comes to it, on the walkable tile beyond the door's front
+	Throw thrown;                   ///< run into by the car the player drives (Throw)
 };
 
 std::vector<Walker> _walkers;
@@ -397,6 +449,252 @@ void Measure(Walker &w)
 	for (size_t i = 1; i < w.path.size(); i++) w.at.push_back(w.at.back() + std::hypot(w.path[i].x - w.path[i - 1].x, w.path[i].y - w.path[i - 1].y));
 }
 
+/** Where the car the player drives was the tick before (DrivenCar::step), by the car. */
+std::map<VehicleID, std::pair<double, double>> _driven_were;
+
+/** The car the player drives from its cab now, if one (a road vehicle; no train, the player: "1 vlak ne"); without its step (GetDrivenCar()). */
+bool ReadDrivenCar(DrivenCar &c)
+{
+	const Vehicle *v = FirstPersonRiding();
+	if (v == nullptr || v->type != VehicleType::Road || !v->First()->IsCabSteered()) return false;
+	v = v->First();
+	c.id = v->index;
+	/* Driven freely its place to the subunit (a whole unit only every few ticks): where it is, and its step smooth. */
+	c.x = v->cab_free ? static_cast<double>(v->cab_px) / CAB_SUBUNIT : v->x_pos;
+	c.y = v->cab_free ? static_cast<double>(v->cab_py) / CAB_SUBUNIT : v->y_pos;
+	c.z = v->z_pos;
+	const int yaw = v->cab_free ? v->cab_yaw : (v->direction != Direction::Invalid ? DirectionToCabYaw(v->direction) : 0);
+	const double heading = yaw * 2 * M_PI / CAB_YAW_TURN;
+	c.fx = std::cos(heading);
+	c.fy = std::sin(heading);
+	c.heading = static_cast<float>(heading * 180.0 / M_PI);
+	c.kmh = v->GetDisplaySpeed();
+	const float scale = WalkerScale();
+	if (const ThreeDVehicleObject *o = ThreeDVehicleObjectOf(v); o != nullptr) {
+		if (const ThreeDVehicleShape *shape = o->TryGetShape(0); shape != nullptr && shape->x1 > shape->x0) {
+			c.front = shape->x1 * scale;
+			c.length = (shape->x1 - shape->x0) * scale;
+			/* (Its width and height where known: the extent across and up is not kept for every shape.) */
+			const float across = std::max({std::abs(shape->y0), std::abs(shape->y1), std::abs(shape->all[2]), std::abs(shape->all[3])});
+			if (across > 0.4f) c.half_width = across * scale;
+			const float roof = std::max(shape->z1, shape->all[5]);
+			if (roof > 0.8f) c.roof = roof * scale;
+		}
+	}
+	return true;
+}
+
+/** The car the player drives from its cab now, if one, with its step: once a tick. */
+bool GetDrivenCar(DrivenCar &c)
+{
+	if (!ReadDrivenCar(c)) {
+		_driven_were.clear();
+		return false;
+	}
+	auto were = _driven_were.find(c.id);
+	const double step = were != _driven_were.end() ? std::hypot(c.x - were->second.first, c.y - were->second.second) : 0.0;
+	_driven_were[c.id] = {c.x, c.y};
+	/* Smoothed: on the road its place moves by whole units. */
+	static double smooth = 0;
+	smooth = were != _driven_were.end() ? smooth * 0.8 + step * 0.2 : step;
+	c.step = smooth;
+	return true;
+}
+
+/** Where a point of the car's own frame is in the world (metres ahead and to its left), world units. */
+void CarPoint(const DrivenCar &c, double ahead, double left, double &x, double &y)
+{
+	const double a = ahead * OBJECT_UNITS_PER_METRE, l = left * OBJECT_UNITS_PER_METRE;
+	x = c.x + c.fx * a - c.fy * l;
+	y = c.y + c.fy * a + c.fx * l;
+}
+
+/**
+ * On the windscreen of the car: his front (+x) to the glass and the driver behind it, his head (+z) down along it to
+ * the bonnet, his feet back up it over the roof (the player: "the face at the driver, one leg over the roof"). Where
+ * its model has the glass before the driver's eye (ThreeDWindscreenOf(): "each car has its windscreen differently
+ * high"); a car without a model before the eye in the driver's head (it has no glass); else over the edge of its
+ * roof as its shape has it, on the driver's side.
+ */
+void OnGlass(Throw &t, const DrivenCar &c)
+{
+	t.facing = c.heading;
+	t.roll = 0;
+	double gx, gy, gz, incline = THROW_GLASS_DEG;
+	const Vehicle *v = Vehicle::GetIfValid(c.id);
+	bool glass = v != nullptr && ThreeDWindscreenOf(v, gx, gy, gz, incline);
+	t.pitch = static_cast<float>(-(90.0 + incline));
+	/* Without a model no glass: before the eye in the driver's head, a little over it. */
+	if (!glass && ThreeDDriverEyeOf(c.id, gx, gy, gz)) {
+		gx += c.fx * 0.65 * OBJECT_UNITS_PER_METRE;
+		gy += c.fy * 0.65 * OBJECT_UNITS_PER_METRE;
+		gz += 0.1 * OBJECT_HEIGHT_PER_METRE;
+		glass = true;
+	}
+	if (glass) {
+		/* His face there, his feet back up the glass from it. */
+		const double face = 1.55 * WalkerScale(), a = incline * M_PI / 180.0;
+		t.x = gx - c.fx * face * std::cos(a) * OBJECT_UNITS_PER_METRE;
+		t.y = gy - c.fy * face * std::cos(a) * OBJECT_UNITS_PER_METRE;
+		t.z = gz + face * std::sin(a) * OBJECT_HEIGHT_PER_METRE;
+		return;
+	}
+	const double roof_edge = c.front - 0.42 * c.length;
+	CarPoint(c, roof_edge, std::min(0.35, c.half_width * 0.5), t.x, t.y);
+	t.z = c.z + (c.roof + 0.3) * OBJECT_HEIGHT_PER_METRE;
+}
+
+/** Whether the car runs into him now: he is just before its front, within its width, as high. */
+bool HitBy(const Walker &w, const DrivenCar &c)
+{
+	if (w.stage == 1 || w.thrown.phase != Throw::NONE || c.kmh < 2) return false;
+	const double dx = w.x - c.x, dy = w.y - c.y;
+	const double ahead = (dx * c.fx + dy * c.fy) / OBJECT_UNITS_PER_METRE, left = (-dx * c.fy + dy * c.fx) / OBJECT_UNITS_PER_METRE;
+	if (std::abs(w.zf - c.z) > 2.0 * OBJECT_HEIGHT_PER_METRE) return false;
+	return ahead >= c.front - 0.6 && ahead <= c.front + 0.4 && std::abs(left) <= c.half_width + 0.25;
+}
+
+/** Run into: thrown over the car, or pushed aside when it is slow. */
+void StartThrow(Walker &w, const DrivenCar &c)
+{
+	Throw &t = w.thrown;
+	t = {};
+	t.car = c.id;
+	t.side = (-(w.x - c.x) * c.fy + (w.y - c.y) * c.fx) / OBJECT_UNITS_PER_METRE;
+	if (c.kmh < THROW_KMH) {
+		t.phase = Throw::PUSH;
+		t.from_x = t.x = w.x;
+		t.from_y = t.y = w.y;
+		const double away = (t.side >= 0 ? 1.0 : -1.0) * THROW_PUSH_M * OBJECT_UNITS_PER_METRE;
+		t.to_x = w.x - c.fy * away;
+		t.to_y = w.y + c.fx * away;
+		t.z = w.zf;
+		t.facing = w.facing;
+		return;
+	}
+	t.phase = Throw::GLASS;
+	OnGlass(t, c);
+}
+
+/** Back on his way from where he is: straight to his way again, then along the rest of it. */
+void Resume(Walker &w, const ThreeDVehicleObject *fig)
+{
+	size_t i = 1;
+	while (i + 1 < w.path.size() && w.at[i] < w.walked) i++;
+	std::vector<Point2> path{{w.x, w.y}};
+	path.insert(path.end(), w.path.begin() + i, w.path.end());
+	w.path = std::move(path);
+	Measure(w);
+	w.walked = 0;
+	Place(w, fig);
+}
+
+/**
+ * A tick of a walker being thrown (Throw): his place and how he is turned; false when it is over (he walks on).
+ * @param c the car the player drives now, nullptr none
+ */
+bool Thrown(Walker &w, const ThreeDVehicleObject *fig, const DrivenCar *c)
+{
+	Throw &t = w.thrown;
+	t.ticks++;
+	switch (t.phase) {
+		case Throw::GLASS: {
+			/* On the glass as long as the car is there; then off over it. */
+			if (c != nullptr && c->id == t.car) OnGlass(t, *c);
+			if (t.ticks < THROW_GLASS_TICKS && c != nullptr && c->id == t.car) break;
+			/* Thrown up and over: as far forward as the car goes but falling behind it, to land THROW_BEHIND_M behind
+			 * its back as long as it drives on as fast (it may not: then wherever), turning over backwards to land on
+			 * his back. */
+			const double kmh = c != nullptr ? c->kmh : THROW_KMH;
+			const double up = std::clamp(0.3 * kmh / 3.6, 2.5, 7.0); // metres a second
+			const double h = (t.z - (c != nullptr ? c->z : t.z - OBJECT_HEIGHT_PER_METRE)) / OBJECT_HEIGHT_PER_METRE;
+			const double seconds = (up + std::sqrt(up * up + 2 * THROW_GRAVITY * std::max(0.0, h))) / THROW_GRAVITY;
+			const double ticks = std::max(1.0, seconds / TICK_SECONDS);
+			t.gravity = THROW_GRAVITY * OBJECT_HEIGHT_PER_METRE * TICK_SECONDS * TICK_SECONDS;
+			t.vz = up * OBJECT_HEIGHT_PER_METRE * TICK_SECONDS;
+			double fwd = 0;
+			if (c != nullptr) {
+				/* From where he lies on it to behind its back. */
+				const double on = ((t.x - c->x) * c->fx + (t.y - c->y) * c->fy) / OBJECT_UNITS_PER_METRE;
+				const double back_m = std::max(0.5, on - (c->front - c->length)) + THROW_BEHIND_M;
+				const double lag = std::clamp(back_m * OBJECT_UNITS_PER_METRE / (ticks * std::max(c->step, 0.01)), 0.1, 0.9);
+				fwd = c->step * (1.0 - lag);
+				t.vx = c->fx * fwd;
+				t.vy = c->fy * fwd;
+			}
+			/* From lying on the glass (-115) round backwards once and a bit to his back (-630 = 90). */
+			t.spin = static_cast<float>((-630.0 - t.pitch) / ticks);
+			t.phase = Throw::FLY;
+			t.ticks = 0;
+			break;
+		}
+		case Throw::FLY: {
+			t.x += t.vx;
+			t.y += t.vy;
+			t.z += t.vz;
+			t.vz -= t.gravity;
+			t.pitch += t.spin;
+			t.roll = static_cast<float>(25.0 * std::sin(t.ticks * 0.35));
+			const double ground = GroundZF(t.x, t.y, false);
+			if (t.vz < 0 && t.z <= ground) {
+				/* Down on his back, a little above the ground (his body's depth). */
+				t.z = ground + 0.15 * OBJECT_HEIGHT_PER_METRE;
+				t.pitch = 90;
+				t.roll = 0;
+				t.phase = Throw::LIE;
+				t.ticks = 0;
+			}
+			break;
+		}
+		case Throw::LIE:
+			if (t.ticks >= THROW_LIE_TICKS) {
+				t.phase = Throw::UP;
+				t.ticks = 0;
+			}
+			break;
+		case Throw::UP: {
+			const double f = std::min(1.0, static_cast<double>(t.ticks) / THROW_UP_TICKS);
+			t.pitch = static_cast<float>(90.0 * (1.0 - f));
+			const double ground = GroundZF(t.x, t.y, false);
+			t.z = ground + 0.15 * OBJECT_HEIGHT_PER_METRE * (1.0 - f);
+			if (f >= 1.0) {
+				w.x = t.x;
+				w.y = t.y;
+				t = {};
+				Resume(w, fig);
+				return false;
+			}
+			break;
+		}
+		case Throw::PUSH: {
+			const double f = std::min(1.0, static_cast<double>(t.ticks) / THROW_PUSH_TICKS);
+			t.x = t.from_x + (t.to_x - t.from_x) * f;
+			t.y = t.from_y + (t.to_y - t.from_y) * f;
+			t.z = GroundZF(t.x, t.y, false);
+			if (f >= 1.0) {
+				w.x = t.x;
+				w.y = t.y;
+				t = {};
+				Resume(w, fig);
+				return false;
+			}
+			break;
+		}
+		case Throw::NONE: return false;
+	}
+	/* Where he is drawn: as he walks, the map where he was drawn last and where he is now (Redraw()). */
+	w.x = t.x;
+	w.y = t.y;
+	w.zf = t.z;
+	w.z = static_cast<int>(std::lround(t.z));
+	w.facing = t.facing;
+	const int ix = std::clamp<int>(static_cast<int>(w.x), 0, Map::MaxX() * TILE_SIZE), iy = std::clamp<int>(static_cast<int>(w.y), 0, Map::MaxY() * TILE_SIZE);
+	w.tile = TileVirtXY(ix, iy);
+	MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+	Redraw(w, fig);
+	return true;
+}
+
 /** Send a walker out in a town now, if it has two doors with a way between; whether one went. */
 bool Send(const Town *town, const ThreeDVehicleObject *fig)
 {
@@ -564,8 +862,17 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 	}
 	const double speed = WALK_PACE * RoundLength(fig) / (fig->frames * fig->frame_ticks);
 	const uint64_t now = TimerGameTick::counter;
+	/* The car the player drives from its cab: he is thrown over it when it runs into him (Throw). */
+	DrivenCar car;
+	const bool driving = GetDrivenCar(car);
 	for (auto it = _walkers.begin(); it != _walkers.end();) {
 		Walker &w = *it;
+		if (w.thrown.phase != Throw::NONE || (driving && HitBy(w, car))) {
+			if (w.thrown.phase == Throw::NONE) StartThrow(w, car);
+			Thrown(w, fig, driving ? &car : nullptr);
+			++it;
+			continue;
+		}
 		if (w.visit != INVALID_TILE) {
 			/* A visit: to the door and in, a while inside, out and off (SendVisit()). */
 			if (DistanceManhattan(w.visit, middle) > TOWN_GONE || ThreeDPeopleDoorsAt(w.visit).empty()) {
@@ -973,6 +1280,14 @@ void AddThreeDWalkersToViewport(ZoomLevel zoom)
 		/* Where it was drawn again last (Walker::drawn_x): as the screen has it. */
 		const int x = static_cast<int>(std::lround(w.drawn_x)), y = static_cast<int>(std::lround(w.drawn_y));
 		const TileIndex tile = TileVirtXY(std::clamp<int>(x, 0, Map::MaxX() * TILE_SIZE), std::clamp<int>(y, 0, Map::MaxY() * TILE_SIZE));
+		if (w.thrown.phase != Throw::NONE && w.thrown.phase != Throw::PUSH) {
+			/* Thrown over the car (Throw): turned every way, in a box about him as long as he is. */
+			const int r = static_cast<int>(std::lround(1.0 * scale * OBJECT_UNITS_PER_METRE)), tall = static_cast<int>(std::lround(2.0 * scale * OBJECT_HEIGHT_PER_METRE));
+			const std::array<int, 6> box{x - r, y - r, w.drawn_z - tall, x + r, y + r, w.drawn_z + tall};
+			AddThreeDFigureToViewportInBox(WALKER_FIGURE, scale, x, y, w.drawn_z, w.drawn_facing, zoom, tile, 0, std::max(0, w.frame), 0, &box, 0.0f,
+					static_cast<int>(std::lround(w.thrown.pitch)), static_cast<int>(std::lround(w.thrown.roll)));
+			continue;
+		}
 		AddThreeDFigureToViewport(WALKER_FIGURE, scale, x, y, w.drawn_z, w.drawn_facing, zoom, tile, 0, std::max(0, w.frame));
 	}
 }
@@ -983,6 +1298,21 @@ void AddThreeDWalkersToEye(float scale)
 	if (_walkers.empty()) return;
 	for (const Walker &w : _walkers) {
 		if (w.stage == 1) continue; // inside a depot or a lighthouse
+		if (w.thrown.phase != Throw::NONE && w.thrown.phase != Throw::PUSH) {
+			/* Thrown over the car (Throw): on its windscreen his face to the driver, then over it turning over. */
+			/* On the glass where it is in this frame, the eye in it (the car went on since the tick). */
+			Throw t = w.thrown;
+			if (DrivenCar c; t.phase == Throw::GLASS && ReadDrivenCar(c) && c.id == t.car) {
+				OnGlass(t, c);
+			} else {
+				t.x = w.x;
+				t.y = w.y;
+				t.z = w.zf;
+				t.facing = w.facing;
+			}
+			AddCabTumbler(WALKER_FIGURE, scale, t.x, t.y, t.z, t.facing, std::max(0, w.frame), t.pitch, t.roll);
+			continue;
+		}
 		/* Where it is and on the slope's plane, not at whole units (the player, test4: the stairs). */
 		AddCabFigure(WALKER_FIGURE, scale, w.x, w.y, w.zf, w.facing, std::max(0, w.frame));
 	}
@@ -1026,6 +1356,28 @@ bool ThreeDWalkerAt(int &x, int &y, int &z)
 	return true;
 }
 
+/**
+ * Whether a walker lies on the windscreen of the car the player drives, or flies over it (Throw): the view from its cab
+ * draws what is near then (its near plane 2 units off, he was cut off on the glass).
+ */
+bool ThreeDThrownNearCab()
+{
+	return std::ranges::any_of(_walkers, [](const Walker &w) { return w.thrown.phase == Throw::GLASS || w.thrown.phase == Throw::FLY; });
+}
+
+/** The rig ('test3d srazit'): where the first walker is and which way he walks, world units and degrees; false when none. */
+bool ThreeDWalkerHeading(double &x, double &y, float &facing)
+{
+	for (const Walker &w : _walkers) {
+		if (w.stage == 1) continue;
+		x = w.x;
+		y = w.y;
+		facing = w.facing;
+		return true;
+	}
+	return false;
+}
+
 /** Whether Mat walks within reach of a point (the walker), metres: he sells marijuana a piece at a time (walker_inventory.h). */
 bool ThreeDMatNear(double x, double y, double reach_m)
 {
@@ -1052,6 +1404,7 @@ std::string DescribeThreeDWalkers()
 			continue;
 		}
 		out += fmt::format("\n  town {} at {:.1f},{:.1f},{} facing {:.0f} frame {}, {:.0f} of {:.0f} walked, {} points", w.town.base(), w.x, w.y, w.z, w.facing, w.frame, w.walked, w.at.back(), w.path.size());
+		if (w.thrown.phase != Throw::NONE) out += fmt::format(", thrown {} tick {} z {:.1f} pitch {:.0f} roll {:.0f}", to_underlying(w.thrown.phase), w.thrown.ticks, w.thrown.z, w.thrown.pitch, w.thrown.roll);
 	}
 	TileIndex middle = TurnedViewMiddle();
 	if (middle == INVALID_TILE) return out + "\n  (the main view is not turned)";
