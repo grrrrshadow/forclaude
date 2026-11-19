@@ -317,7 +317,17 @@ static int GrfStateStep(const ThreeDVehicleObject *obj, EngineID engine, const V
 		const Vehicle *v;
 		int role; ///< the piece's "clanek" (ThreeDVehicleState::piece), -1 any
 	};
-	std::vector<Source> sources{{engine, v, -1}};
+	/* The lists kept from one vehicle to the next (each thread its own): asked of every vehicle in sight each frame,
+	 * three or four pieces of memory taken and given back each time (the rig's samples of the gathering of the moving
+	 * layer: a tenth of it in that). */
+	struct Scratch {
+		std::vector<Source> sources;
+		std::vector<int> layers;
+		std::vector<uint32_t> ids;
+	};
+	static thread_local Scratch scratch;
+	std::vector<Source> &sources = scratch.sources;
+	sources.assign(1, Source{engine, v, -1});
 	if (v != nullptr && v->engine_type == engine && image_type != EngineImageType::Purchase && image_type != EngineImageType::Preview) {
 		int piece = 0;
 		if (ThreeDVehicleObjectOf(v, &piece) == obj) {
@@ -331,20 +341,23 @@ static int GrfStateStep(const ThreeDVehicleObject *obj, EngineID engine, const V
 			}
 		}
 	}
-	std::vector<int> layers;
-	std::vector<uint32_t> ids;
+	std::vector<int> &layers = scratch.layers;
+	std::vector<uint32_t> &ids = scratch.ids;
+	layers.clear();
 	/* The vehicle's colours of its set (callback 1C1) are those of the piece whose sets it shows, as in 2D each piece
 	 * paints its own picture: the semi-trailer of the Terrno hangs from a piece of its own cargo, the marijuana on its
 	 * first one. */
 	const Source *painted_by = nullptr;
 	const Source *loaded_by = nullptr; ///< the piece whose set names the pieces of a load: its cargo is theirs
+	/* (The states by what picks them alone, ThreeDVehicleObject::StateRanges(): all of them gone through for each layer.) */
+	const std::vector<ThreeDVehicleObject::StateRange> &ranges = obj->StateRanges();
 	for (const Source &src : sources) {
 		ids.clear();
 		GetVehicleSetSpriteLocalIDs(src.engine, src.v, image_type, ids);
 		for (size_t l = 0; l < ids.size(); l++) {
 			int found = 0;
-			for (size_t i = 0; i < obj->states.size() && ids[l] != UINT32_MAX; i++) {
-				const ThreeDVehicleState &s = obj->states[i];
+			for (size_t i = 0; i < ranges.size() && ids[l] != UINT32_MAX; i++) {
+				const ThreeDVehicleObject::StateRange &s = ranges[i];
 				if (src.role >= 0 && s.piece >= 0 && s.piece != src.role) continue;
 				if (static_cast<size_t>(s.layer) == l && ids[l] >= s.first && ids[l] <= s.last) {
 					found = static_cast<int>(i) + 1;
@@ -352,13 +365,13 @@ static int GrfStateStep(const ThreeDVehicleObject *obj, EngineID engine, const V
 				}
 			}
 			if (found != 0 && painted_by == nullptr) painted_by = &src;
-			if (found != 0 && !obj->states[found - 1].load_piece.empty()) loaded_by = &src;
+			if (found != 0 && ranges[found - 1].load_piece) loaded_by = &src;
 			/* (A state its pieces all pick, Sergej's paint, once.) */
 			if (found != 0 && std::ranges::find(layers, found) != layers.end()) found = 0;
 			layers.push_back(found);
 		}
 	}
-	const uint16_t painted = painted_by != nullptr && painted_by->v != nullptr && obj->HasDetails() ? GetVehicleTrueColours(painted_by->v) : colours;
+	const uint16_t painted = painted_by != nullptr && painted_by->v != nullptr && painted_by->v != v && obj->HasDetails() ? GetVehicleTrueColours(painted_by->v) : colours;
 	return obj->ComposeState(layers, painted, LoadCode(obj, layers, loaded_by != nullptr ? loaded_by->v : v, engine));
 }
 
@@ -603,7 +616,7 @@ struct EyeTrail {
 	double since_turn = 0; ///< world units gone since its target last changed
 	uint64_t seen = 0;  ///< the game's tick it was last looked at
 };
-static std::map<VehicleID, EyeTrail> _eye_trails;
+static std::unordered_map<uint32_t, EyeTrail> _eye_trails; ///< by the vehicle's number (looked up for every vehicle in sight each frame)
 
 /** The angle of a direction in the world, radians, 0 along +x, pi / 2 along +y. */
 static inline double DirectionAngle(int d)
@@ -632,7 +645,7 @@ static inline float SqueezeAt(double facing)
 static EyeTrail &TrailOf(const Vehicle *v, double by_direction, bool squeezed)
 {
 	const uint64_t now = TimerGameTick::counter;
-	EyeTrail &e = _eye_trails[v->index];
+	EyeTrail &e = _eye_trails[v->index.base()];
 	const std::pair<int, int> here{v->x_pos, v->y_pos};
 	if (e.count == 0 || std::hypot(here.first - e.at[e.count - 1].first, here.second - e.at[e.count - 1].second) > 2.0 * TILE_SIZE) {
 		/* Seen first, or far from where it was (another vehicle of the number, one out of a depot). */
@@ -657,8 +670,11 @@ static EyeTrail &TrailOf(const Vehicle *v, double by_direction, bool squeezed)
 		e.at[e.count++] = here;
 	}
 	e.seen = now;
-	/* The trails of vehicles gone, now and then (not this one: it was just seen). */
-	if (now % 512 == 0 && _eye_trails.size() > 64) {
+	/* The trails of vehicles gone, now and then (not this one: it was just seen); once in that tick, not for every
+	 * vehicle looked at in it -- all the trails gone through as many times as there are vehicles in sight. */
+	static uint64_t swept = 0;
+	if (now % 512 == 0 && now != swept && _eye_trails.size() > 64) {
+		swept = now;
 		std::erase_if(_eye_trails, [&](const auto &kv) { return now - kv.second.seen > 2048; });
 	}
 	return e;
@@ -881,7 +897,7 @@ int ThreeDVehicleObjectPieceLengthOf(const Vehicle *v, int set_length)
  */
 static double MiddleFromPiece(const ThreeDVehicleObject *obj, const std::vector<int> &lengths, int piece)
 {
-	std::vector<double> pos;
+	static thread_local std::vector<double> pos; // kept from one vehicle to the next: asked of every vehicle in sight each frame
 	double middle = ThreeDChainPositions(obj->type, lengths, pos);
 	if (piece < 0 || static_cast<size_t>(piece) >= pos.size()) return 0.0;
 	if (!obj->grf_lengths.empty() && !lengths.empty()) {
@@ -943,6 +959,32 @@ static std::vector<int> ObjectLengths(const ThreeDVehicleObject *obj, const Vehi
 		if (u != nullptr) lengths[k] = CachedLength(u);
 	}
 	return lengths;
+}
+
+/**
+ * How far along itself an object's origin is from its anchor piece on the map, steps of the chain: MiddleFromPiece() of
+ * its ObjectLengths(), as the view from the eyes and the turned map hang it (EyeOrigin()) -- asked of every vehicle in
+ * sight each frame, so nothing is asked of its set that does not tell (the rig's samples of the gathering of the moving
+ * layer: a tenth of it in the lengths of the pieces, callback 36 of each piece of each vehicle, then thrown away for the
+ * pieces' own): an object of one piece of no lengths of its index hangs from its position, whatever its length; one of
+ * its index's lengths with all its pieces there takes their own.
+ * @param anchor its anchor piece, linked into its vehicle
+ */
+static double MiddleOnMap(const ThreeDVehicleObject *obj, const Vehicle *anchor)
+{
+	const size_t n = obj->pieces.size();
+	if (obj->grf_lengths.empty()) {
+		if (n == 1 && obj->anchor == 0) return 0.0;
+		return MiddleFromPiece(obj, PieceLengths(obj), obj->anchor);
+	}
+	static thread_local std::vector<int> lengths;
+	lengths.resize(n);
+	const Vehicle *u = PieceAway(anchor, -obj->anchor);
+	size_t k = 0;
+	for (; k < n && u != nullptr; k++, u = u->Next()) lengths[k] = CachedLength(u);
+	/* A piece of it not there (never, of a vehicle on the map): as ObjectLengths() has it. */
+	if (k < n) return MiddleFromPiece(obj, ObjectLengths(obj, anchor, obj->anchor), obj->anchor);
+	return MiddleFromPiece(obj, lengths, obj->anchor);
 }
 
 /**
@@ -1008,7 +1050,7 @@ const Vehicle *ThreeDVehicleDrawnOver(const Vehicle *v)
  */
 static void ObjectOriginOnMap(const ThreeDVehicleObject *obj, const Vehicle *anchor, int d, double &x, double &y, int depth = 0)
 {
-	const double along = MiddleFromPiece(obj, ObjectLengths(obj, anchor, obj->anchor), obj->anchor);
+	const double along = MiddleOnMap(obj, anchor);
 	x = anchor->x_pos + along * DIR_DX[d];
 	y = anchor->y_pos + along * DIR_DY[d];
 	const ThreeDVehicleObject *before = nullptr;
@@ -3373,10 +3415,12 @@ static PictureToMake PictureRequest(const ThreeDVehicleObject *obj, float scale,
 	p.world_az = static_cast<float>(world_step);
 	p.along = along_given > 0 ? along_given : (squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f);
 	p.pxm = PXM_16X / (1 << to_underlying(zoom));
-	p.fade = FadeAmount(obj, fade);
-	p.rust_time = RustTime(obj, fade);
+	/* (Its state looked up once: FadeAmount(), RustTime() and PaletteColour() each look it up, under the lock when it is one made of layers.) */
+	const ThreeDVehicleState *of_state = StateOf(obj, fade);
+	p.fade = of_state != nullptr && obj->paint.fades ? of_state->fade : 0.0f;
+	p.rust_time = of_state != nullptr && obj->rust.Any() ? of_state->rust : 0.0f;
 	p.tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
-	p.paint_colour = PaletteColour(obj, fade);
+	p.paint_colour = of_state != nullptr ? of_state->colour : 0;
 	p.stretch = stretch;
 	p.spin = spin_step * 360.0f / SPIN_STEPS;
 	p.pitch = static_cast<float>(pitch);
@@ -3539,14 +3583,16 @@ struct VehicleObjectPlace {
 	int xmin = 0, ymin = 0, zmin = 0, xmax = 0, ymax = 0, zmax = 0; ///< the box of its pieces, for the sorting
 	bool on_card = false;                    ///< drawn by the card, no picture (card; ViewportVehiclesOnCard())
 	std::shared_ptr<const ThreeDGpuStandingVehicle> card; ///< then its shapes, nullptr when it draws nothing so
-	std::vector<ThreeDPictureLight> card_lights; ///< and its lights on at night, as its picture's
+	/** And its lights on at night, as its picture's; nullptr none. Shared with what the card keeps of it (CardVehicleKept):
+	 * a place is copied several times a frame for each vehicle in sight, by night each time with a list of its own. */
+	std::shared_ptr<const std::vector<ThreeDPictureLight>> card_lights;
 	int state = 0;                           ///< its state as it was placed (StateStep()), for ObjectDrawsNothing()
 };
 
 /** A thing of the moving layer as it was given to the card the last time, without its shapes (CardVehicle()). */
 struct CardVehicleKept {
 	std::shared_ptr<const ThreeDGpuStandingVehicle> card;
-	std::vector<ThreeDPictureLight> lights;
+	std::shared_ptr<const std::vector<ThreeDPictureLight>> lights; ///< its lights on, nullptr none (VehicleObjectPlace::card_lights)
 	uint64_t used = 0; ///< the pass it was asked for last
 	bool too_big = false; ///< bigger than the card draws one (CardMade::TooBig); card is nullptr then, as of one not seen at all
 };
@@ -3588,7 +3634,7 @@ enum class CardMade : uint8_t {
  * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
  * @param[out] lights its lights on at night, as its picture's (ThreeDModelPicture::lights)
  */
-static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, std::vector<ThreeDPictureLight> &lights)
+static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, std::shared_ptr<const std::vector<ThreeDPictureLight>> &lights)
 {
 	/* What it looks like, as its picture is kept by (ObjectPictureKey), and of which reading of the objects. */
 	uint64_t key = 14695981039346656037ull;
@@ -3608,7 +3654,7 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 		(one(e), ...);
 	}, p.key);
 	card = nullptr;
-	lights.clear();
+	lights = nullptr;
 	/* The moving layer (ThreeDCardVehiclesAsKept): what the card keeps the picture of by this key is given as it was
 	 * the last time, without its shapes -- the card lays the kept picture and needs none of them (the player's #371:
 	 * the gathering of the layer 30 ms a frame on the phone, the shapes of every vehicle in sight prepared again each
@@ -3730,7 +3776,7 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	}
 	v->pic = std::move(gp.pic);
 	v->held = std::move(gp.held);
-	lights = std::move(gp.lights);
+	if (!gp.lights.empty()) lights = std::make_shared<const std::vector<ThreeDPictureLight>>(std::move(gp.lights));
 	if (_card_vehicles_as_kept) {
 		/* The same without its shapes, for the next time (above): where it is and how near, nothing of the object's. */
 		auto light = std::make_shared<ThreeDGpuStandingVehicle>();
@@ -3773,14 +3819,48 @@ void ThreeDCardVehiclesAsKeptEnd()
 }
 
 /** How many things of the moving layer were given as the card keeps them since asked the last time (the diary). */
+/**
+ * The gathering of the vehicles of the moving layer by its steps, for the diary (TakeThreeDCardThingsPrepared()): where
+ * the time of a piece goes on the player's machine -- the rig's processor tells little of the phone's (the player's
+ * diary of 19. 11.: 87 us a thing there, 5 to 18 here). Every eighth piece is timed, so that the clock is not what is
+ * measured.
+ */
+struct GatherSplit {
+	uint64_t pieces = 0; ///< the pieces gathered
+	uint64_t timed = 0;  ///< those of them timed
+	double ms[5] = {};   ///< of the timed ones: all of it; of that its state of its GRF and its lights, where it is and how it faces, what the card draws of it, its laying
+};
+static GatherSplit _gather_split;
+static bool _gather_timed = false; ///< the piece gathered now is timed
+
+/** A step of a timed piece (GatherSplit::ms): from here to the end of its block. */
+struct GatherStep {
+	int step;
+	std::chrono::steady_clock::time_point from;
+	explicit GatherStep(int step) : step(_gather_timed ? step : -1)
+	{
+		if (this->step >= 0) this->from = std::chrono::steady_clock::now();
+	}
+	~GatherStep()
+	{
+		if (this->step >= 0) _gather_split.ms[this->step] += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
+	}
+	GatherStep(const GatherStep &) = delete;
+	GatherStep &operator=(const GatherStep &) = delete;
+};
+
 /** For the diary: the things the moving layer's passes placed since it was last asked, those prepared anew and the time of that. */
 std::string TakeThreeDCardThingsPrepared()
 {
 	const uint64_t *h = _card_things_prepared_how;
 	const double *hm = _card_things_prepared_how_ms;
 	extern uint64_t _lasting_places_reused;
-	const std::string s = fmt::format("{} veci umisteno (z toho {} jak stalo), {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych",
-			_card_things_placed, _lasting_places_reused, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again);
+	/* The gathering of the vehicles by its steps (GatherSplit): of the pieces gone through every eighth timed, their milliseconds. */
+	const GatherSplit &g = _gather_split;
+	const std::string s = fmt::format("{} veci umisteno (z toho {} jak stalo), {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych; sber vozidel po krocich: {} kusu, {} z nich mereno, ty staly {:.2f} ms (stav z GRF a svetla {:.2f}, poloha a natoceni {:.2f}, co kresli karta {:.2f}, polozeni {:.2f})",
+			_card_things_placed, _lasting_places_reused, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again,
+			g.pieces, g.timed, g.ms[0], g.ms[1], g.ms[2], g.ms[3], g.ms[4]);
+	_gather_split = {};
 	_card_not_yet_skipped = 0;
 	_card_things_missing = _card_things_missing_again = 0;
 	_card_things_missing_keys.clear();
@@ -4048,10 +4128,14 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 		zmax = std::max(zmax, u->z_pos + u->bounds.origin.z + u->bounds.extent.z - 1);
 	}
 
-	const int lights = VehicleObjectLightsOn(obj, front, last, reversed, zoom);
-
-	float scale = ObjectScale(obj);
-	const int state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
+	int lights, state;
+	float scale;
+	{
+		GatherStep step(1);
+		lights = VehicleObjectLightsOn(obj, front, last, reversed, zoom);
+		scale = ObjectScale(obj);
+		state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
+	}
 	/* Kept with the place: asked of every lit vehicle by night (ObjectDrawsNothing(), its lights and those of what it
 	 * pulls), its state was found again each time -- its set's callbacks every time. */
 	place.state = state;
@@ -4061,7 +4145,7 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	if (lasting) {
 		mix(reinterpret_cast<uintptr_t>(obj));
 		mix(static_cast<uint32_t>(state) | static_cast<uint64_t>(static_cast<uint32_t>(lights)) << 32);
-		mix(std::bit_cast<uint32_t>(static_cast<float>(GetViewCameraKey())) | static_cast<uint64_t>(std::bit_cast<uint32_t>(ObjectScale(obj))) << 32);
+		mix(std::bit_cast<uint32_t>(static_cast<float>(GetViewCameraKey())) | static_cast<uint64_t>(std::bit_cast<uint32_t>(scale)) << 32);
 		mix(static_cast<uint64_t>(TimerGameEconomy::date.base()) | static_cast<uint64_t>(ViewportDrawingTurned()) << 40 | static_cast<uint64_t>(ViewportDrawingNorthObjects()) << 41 | static_cast<uint64_t>(ViewportDrawingEye()) << 42);
 		if (auto it = _lasting_places.find(lasting_key); it != _lasting_places.end() && it->second.sig == sig) {
 			place = it->second.place;
@@ -4077,24 +4161,30 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	double ox, oy;
 	float world_az;
 	float along = 0.0f;
-	if (pose != nullptr) {
-		world_az = pose->azimuth + (reversed ? 180.0f : 0.0f);
-		ObjectOriginOnMap(obj, v, d, ox, oy);
-	} else {
-		double facing, rolled, curvature;
-		EyeOrigin(obj, v, ox, oy, facing, rolled, curvature);
-		world_az = std::round((static_cast<float>(facing * 180.0 / M_PI) - 135.0f) / 5.0f) * 5.0f;
-		if (SqueezedType(obj->type)) along = std::round(SqueezeAt(facing) * 20.0f) / 20.0f;
+	int pitch;
+	uint64_t walk;
+	{
+		GatherStep step(2);
+		if (pose != nullptr) {
+			world_az = pose->azimuth + (reversed ? 180.0f : 0.0f);
+			ObjectOriginOnMap(obj, v, d, ox, oy);
+		} else {
+			double facing, rolled, curvature;
+			EyeOrigin(obj, v, ox, oy, facing, rolled, curvature);
+			world_az = std::round((static_cast<float>(facing * 180.0 / M_PI) - 135.0f) / 5.0f) * 5.0f;
+			if (SqueezedType(obj->type)) along = std::round(SqueezeAt(facing) * 20.0f) / 20.0f;
+		}
+		/* Up or down a hill leaning so, in steps of 2 degrees: a few pictures for the slopes of the map. */
+		pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
+		walk = WalkCode(obj, state, WalkedOf(v, obj), scale, v);
 	}
-	/* Up or down a hill leaning so, in steps of 2 degrees: a few pictures for the slopes of the map. */
-	const int pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
-	const uint64_t walk = WalkCode(obj, state, WalkedOf(v, obj), scale, v);
 	bool lasting_drawn = false;
 	/* Drawn by the card from what is made of it (CardVehicle()); while something of it is not made yet, what the card
 	 * drew of it last (CardDrawnBefore()), the vehicle drawn again when it comes -- no picture of it made (the player,
 	 * 31. 10.: "go on with the GPU"; the walking horses of the Special 3D made their pictures on the thread, read back
 	 * from the card, a hundred in five seconds). Bigger than the card draws one, or without the card, its picture. */
 	if (on_card) {
+		GatherStep step(3);
 		const PictureToMake request = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk);
 		const CardMade made = CardVehicle(request, place.card, place.card_lights);
 		place.on_card = made != CardMade::TooBig;
@@ -4157,24 +4247,41 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 		uint64_t pass = UINT64_MAX, tick = UINT64_MAX;
 		float yaw = 0;
 		bool turned = false, north = false, eye = false;
+		int repeat = 0;
 		bool operator==(const Stamp &) const = default;
 	};
+	/* Each kept in its place from one frame to the next, marked with the frame it is of: a list made anew every frame
+	 * took and gave back a piece of memory a vehicle a frame (the rig's samples of the gathering of the moving layer).
+	 * Let go of now and then, so that none holds what a vehicle long gone was drawn from. */
+	struct Kept {
+		uint64_t frame = 0; ///< the frame it was placed in (frame_now)
+		const ThreeDVehicleObject *obj = nullptr;
+		VehicleObjectPlace place;
+	};
 	static Stamp kept_for;
-	static std::map<std::tuple<uint32_t, uint8_t, bool>, std::pair<const ThreeDVehicleObject *, VehicleObjectPlace>> kept;
-	extern int _rig_movers_repeat; // the rig's samples of the gathering: placed every time
-	if (!on_card || _rig_movers_repeat > 1) return PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
-	const Stamp now{_dirty_blocks_pass, TimerGameTick::counter, GetViewCameraKey(), ViewportDrawingTurned(), ViewportDrawingNorthObjects(), ViewportDrawingEye()};
+	static uint64_t frame_now = 0;
+	static std::unordered_map<uint64_t, Kept> kept;
+	extern int _rig_movers_repeat_now; // the rig's samples of the gathering: each of its repeats places as a frame does
+	if (!on_card) return PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
+	const Stamp now{_dirty_blocks_pass, TimerGameTick::counter, GetViewCameraKey(), ViewportDrawingTurned(), ViewportDrawingNorthObjects(), ViewportDrawingEye(), _rig_movers_repeat_now};
 	if (!(now == kept_for)) {
 		kept_for = now;
-		kept.clear();
+		frame_now++;
+		if (frame_now % 512 == 0 || kept.size() > 4096) kept.clear();
 	}
-	const auto key = std::make_tuple(v->index.base(), to_underlying(zoom), pose != nullptr);
-	if (auto it = kept.find(key); it != kept.end()) {
-		place = it->second.second;
-		return it->second.first;
+	const uint64_t key = static_cast<uint64_t>(v->index.base()) << 9 | static_cast<uint64_t>(static_cast<uint8_t>(to_underlying(zoom))) << 1 | (pose != nullptr ? 1 : 0);
+	if (auto it = kept.find(key); it != kept.end() && it->second.frame == frame_now) {
+		place = it->second.place;
+		return it->second.obj;
 	}
 	const ThreeDVehicleObject *obj = PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
-	if (place.on_card && place.pic == nullptr) kept.emplace(key, std::make_pair(obj, place));
+	if (place.on_card && place.pic == nullptr) {
+		/* (Looked up again: placing it may place others -- a train's last car asks what is seen after it -- and the list grows.) */
+		Kept &k = kept[key];
+		k.frame = frame_now;
+		k.obj = obj;
+		k.place = place;
+	}
 	return obj;
 }
 
@@ -4346,14 +4453,29 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 {
 	/* What stands on the turned view's block laid by the card: the vehicle drawn by it, no picture (CardVehicle()). */
 	const bool on_card = ViewportVehiclesOnCard();
-	VehicleObjectPlace place;
-	const ThreeDVehicleObject *obj = PlaceVehicleObject(v, zoom, pose, place, on_card);
+	/* The moving layer's gathering by its steps for the diary (GatherSplit): every eighth piece of it timed. */
+	struct TimedPiece {
+		TimedPiece()
+		{
+			_gather_timed = _card_vehicles_as_kept && (++_gather_split.pieces & 7) == 0;
+			if (_gather_timed) _gather_split.timed++;
+		}
+		~TimedPiece() { _gather_timed = false; }
+	} timed_piece;
+	GatherStep whole_step(0);
+	int piece = 0;
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
 	if (obj == nullptr) return false;
+	/* An object coupled to nothing (most: a car, a bus, a wagon): no article is drawn over another of it, and a piece of
+	 * it that is not its anchor has nothing of its own -- every piece in sight went through all of it below each frame,
+	 * only to find so (the rig's samples of the gathering of the moving layer). */
+	const bool coupled = obj->has_couple_front || obj->has_couple_back;
+	if (!coupled && piece != obj->anchor && (v->type != VehicleType::Ship || obj->boat_figures.empty())) return true;
+	VehicleObjectPlace place;
+	if (PlaceVehicleObject(v, zoom, pose, place, on_card) == nullptr) return false;
 	/* Articles drawn over the ones they are coupled behind (DrawnOverBefore()): one entry with them, the first article's
 	 * picture first, sorted by the box of all their pieces; once in the block, from whichever piece of them comes. */
-	if (pose == nullptr) {
-		int piece = 0;
-		ThreeDVehicleObjectOf(v, &piece);
+	if (pose == nullptr && coupled) {
 		/* Each article as its anchor piece takes it, the object it is drawn as (PlaceVehicleObject()). */
 		const Vehicle *head = PieceAway(v, obj->anchor - piece);
 		const ThreeDVehicleObject *head_obj = ThreeDVehicleObjectOf(head);
@@ -4364,11 +4486,12 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 			head = before_anchor;
 			head_obj = ThreeDVehicleObjectOf(head);
 		}
-		/* The articles from it on, each drawn over the one before. */
-		std::vector<std::pair<const ThreeDVehicleObject *, const Vehicle *>> group;
-		if (head_obj != nullptr) group.emplace_back(head_obj, head);
-		while (!group.empty() && group.size() < 5) {
-			const auto [a_obj, a] = group.back();
+		/* The articles from it on, each drawn over the one before (five at most). */
+		std::array<std::pair<const ThreeDVehicleObject *, const Vehicle *>, 5> group_of;
+		size_t group_count = 0;
+		if (head_obj != nullptr) group_of[group_count++] = {head_obj, head};
+		while (group_count > 0 && group_count < group_of.size()) {
+			const auto [a_obj, a] = group_of[group_count - 1];
 			const Vehicle *last = PieceAway(a, static_cast<int>(a_obj->pieces.size()) - 1 - a_obj->anchor);
 			const Vehicle *next_first = last != nullptr ? last->Next() : nullptr;
 			if (next_first == nullptr) break;
@@ -4379,27 +4502,35 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 			const ThreeDVehicleObject *before = nullptr;
 			const Vehicle *before_anchor = nullptr;
 			if (next_obj == nullptr || !DrawnOverBefore(next_obj, next, before, before_anchor) || before_anchor != a) break;
-			group.emplace_back(next_obj, next);
+			group_of[group_count++] = {next_obj, next};
 		}
+		const std::span<const std::pair<const ThreeDVehicleObject *, const Vehicle *>> group(group_of.data(), group_count);
 		if (group.size() > 1) {
 			extern bool VehicleDrawnFirstInBlock(VehicleID id);
 			if (!VehicleDrawnFirstInBlock(head->index)) return true;
-			std::vector<TurnedVehiclePart> parts;
+			static std::vector<TurnedVehiclePart> parts; // kept from one vehicle to the next (the main thread's): no memory taken for each
+			parts.clear();
 			int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
 			for (const auto &[a_obj, a] : group) {
 				VehicleObjectPlace at;
 				PlaceVehicleObject(a, zoom, nullptr, at, on_card);
 				if (at.on_card ? at.card == nullptr : at.pic == nullptr) continue;
 				parts.push_back({at.pic, at.ax, at.ay, at.az, at.card});
-				if (at.card != nullptr) NoteCardReach(a, at.card.get(), at.ax, at.ay, at.az, zoom);
+				if (at.card != nullptr) {
+					GatherStep step(4);
+					NoteCardReach(a, at.card.get(), at.ax, at.ay, at.az, zoom);
+				}
 				xmin = std::min(xmin, at.xmin); ymin = std::min(ymin, at.ymin); zmin = std::min(zmin, at.zmin);
 				xmax = std::max(xmax, at.xmax); ymax = std::max(ymax, at.ymax); zmax = std::max(zmax, at.zmax);
 			}
+			GatherStep step(4);
 			if (!parts.empty()) AddTurnedVehiclePictures(parts, xmin, ymin, zmin, xmax, ymax, zmax);
+			parts.clear(); // (what the card draws of them held no longer than this)
 			return true;
 		}
 	}
 	if (place.on_card) {
+		GatherStep step(4);
 		NoteCardReach(v, place.card.get(), place.ax, place.ay, place.az, zoom);
 		AddTurnedVehicleOnCard(place.card, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
 	} else if (place.pic != nullptr) {
@@ -4482,7 +4613,7 @@ bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundT
 	VehicleObjectPlace place;
 	PlaceVehicleObject(v, zoom, pose, place, ViewportVehiclesOnCard());
 	if (place.on_card) {
-		lights = std::move(place.card_lights);
+		if (place.card_lights != nullptr) lights = *place.card_lights;
 	} else if (place.pic != nullptr) {
 		lights = place.pic->lights;
 	} else {
@@ -4585,7 +4716,7 @@ static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, dou
 	ObjectEnds(obj, anchor, front, last);
 	facing = EyeFacing(anchor, reversed ? last : front, reversed ? front : last, DirectionAngle(PieceDirection(anchor)), SqueezedType(obj->type), rolled, curvature);
 	/* Hung from the middle of its pieces, as on the map: from the anchor piece that many steps along. */
-	const double along = MiddleFromPiece(obj, ObjectLengths(obj, anchor, obj->anchor), obj->anchor) * ChainStep(facing);
+	const double along = MiddleOnMap(obj, anchor) * ChainStep(facing);
 	x = anchor->x_pos + along * std::cos(facing);
 	y = anchor->y_pos + along * std::sin(facing);
 	const ThreeDVehicleObject *before = nullptr;
@@ -5414,7 +5545,7 @@ void AddThreeDEffectsToViewport(ZoomLevel zoom)
 		/* Drawn by the card with the block's vehicles (CardVehicle()); bigger than it draws one, its picture. */
 		if (ViewportVehiclesOnCard()) {
 			std::shared_ptr<const ThreeDGpuStandingVehicle> card;
-			std::vector<ThreeDPictureLight> lights;
+			std::shared_ptr<const std::vector<ThreeDPictureLight>> lights;
 			const CardMade made = CardVehicle(p, card, lights);
 			if (made == CardMade::Drawn && card != nullptr) AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
 			if (made == CardMade::NotYet) OweCardPlace(x, y, z, height + TILE_SIZE / 2, height);
@@ -5473,7 +5604,7 @@ bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int 
 	/* Drawn by the card with the block's vehicles (CardVehicle()); bigger than it draws one, its picture. */
 	if (ViewportVehiclesOnCard()) {
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
-		std::vector<ThreeDPictureLight> on;
+		std::shared_ptr<const std::vector<ThreeDPictureLight>> on;
 		switch (CardVehicle(p, card, on)) {
 			case CardMade::Drawn:
 				if (card == nullptr) return false;
@@ -5504,9 +5635,11 @@ const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const ThreeDVehicle
 	const PictureToMake p = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, LIGHTS_FRONT | LIGHTS_BACK, 0.0f, 0);
 	/* Drawn by the card (AddThreeDObjectToViewport()): its lights as the card's drawing has them, no picture made. */
 	if (ViewportVehiclesOnCard()) {
-		static std::vector<ThreeDPictureLight> on_card;
+		/* (Held till asked the next time, as the list given is the caller's only till then.) */
+		static std::shared_ptr<const std::vector<ThreeDPictureLight>> on_card;
+		static const std::vector<ThreeDPictureLight> none;
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
-		if (CardVehicle(p, card, on_card) != CardMade::TooBig) return card != nullptr ? &on_card : nullptr;
+		if (CardVehicle(p, card, on_card) != CardMade::TooBig) return card != nullptr ? (on_card != nullptr ? on_card.get() : &none) : nullptr;
 	}
 	const ThreeDModelPicture *pic = ObjectPictureOf(p);
 	return pic != nullptr ? &pic->lights : nullptr;
@@ -5845,7 +5978,7 @@ std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, fl
 		return true;
 	}
 	if (!p.has_value()) return std::nullopt;
-	std::vector<ThreeDPictureLight> lights;
+	std::shared_ptr<const std::vector<ThreeDPictureLight>> lights;
 	return CardVehicle(*p, card, lights) != CardMade::TooBig;
 }
 
@@ -5898,7 +6031,7 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 		}
 		if (!p.has_value()) return false;
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
-		std::vector<ThreeDPictureLight> lights;
+		std::shared_ptr<const std::vector<ThreeDPictureLight>> lights;
 		switch (CardVehicle(*p, card, lights)) {
 			case CardMade::Drawn:
 				if (card == nullptr) return false;
@@ -6023,7 +6156,7 @@ std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, flo
 		return true;
 	}
 	if (!p.has_value()) return std::nullopt;
-	std::vector<ThreeDPictureLight> lights;
+	std::shared_ptr<const std::vector<ThreeDPictureLight>> lights;
 	return CardVehicle(*p, card, lights) != CardMade::TooBig;
 }
 

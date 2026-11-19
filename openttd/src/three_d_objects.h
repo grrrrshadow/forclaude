@@ -1172,6 +1172,17 @@ struct ThreeDVehicleObject {
 	ThreeDVehicleRust rust;         ///< "rez"
 	ThreeDVehicleSize size;         ///< "velikost"
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
+	/** What picks a state of "stavy", as small as it can be (StateRanges()): gone through for every vehicle in sight each frame. */
+	struct StateRange {
+		uint32_t first;  ///< ThreeDVehicleState::first
+		uint32_t last;   ///< ThreeDVehicleState::last
+		int32_t layer;   ///< ThreeDVehicleState::layer
+		int8_t piece;    ///< ThreeDVehicleState::piece
+		bool load_piece; ///< whether it names a piece of a load (ThreeDVehicleState::load_piece)
+	};
+	mutable std::vector<StateRange> state_ranges;     ///< of each of states, in their order; made the first time asked for (StateRanges())
+	mutable ThreeDCopyableState state_ranges_made;    ///< whether they were (not 0)
+	const std::vector<StateRange> &StateRanges() const;
 	bool paint_random = false;      ///< a car of a mod of BeamNG (beamng.h): its states the paints of the mod, one of them each car by its random bits
 	uint8_t paint_years = 1;        ///< and of each paint so many states, one a year of its age, the paint fading (BEAMNG_FADE_YEARS + 1)
 	std::vector<std::string> paint_names; ///< a car of BeamNG whose paint the player chooses in the configurator (BeamngVehicle::body_paints): their names, detail 0; empty by chance
@@ -1354,9 +1365,9 @@ struct ThreeDVehicleObject {
 	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
 	mutable std::vector<std::shared_ptr<const ThreeDBonesFrame>> frame_bones;   ///< the frames of a figure on bones as the card poses them, made as drawn (GetBones())
 	mutable std::deque<ThreeDVehicleState> composed; ///< the states made of the states of layers (ComposeState()), steps after those of "stavy"
-	mutable std::map<std::tuple<std::vector<int>, uint16_t, uint64_t>, int> composed_steps; ///< the step each was made for, by the steps of its layers, the vehicle's colours and its load (ThreeDLoadCode())
+	mutable std::map<std::tuple<std::vector<int>, uint16_t, uint64_t>, int, std::less<>> composed_steps; ///< the step each was made for, by the steps of its layers, the vehicle's colours and its load (ThreeDLoadCode())
 	mutable std::vector<ThreeDWalkingCrew> walking; ///< its crew that walks (WalkingCrew()), found the first time asked for
-	mutable bool walking_found = false;
+	mutable ThreeDCopyableState walking_found; ///< whether it was (not 0): set once it is there, read without the lock (WalkingCrew())
 
 private:
 	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame, const ThreeDParts &parts = ThreeDParts::All()) const;

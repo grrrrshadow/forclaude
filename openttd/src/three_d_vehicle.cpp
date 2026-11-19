@@ -384,9 +384,14 @@ static double PartPositions(VehicleType type, const std::vector<VehiclePart> &pa
 /** For the vehicles drawn as objects: the pieces' positions along a chain of these lengths (PartPositions()), and its middle. */
 double ThreeDChainPositions(VehicleType type, const std::vector<int> &lengths, std::vector<double> &pos)
 {
-	std::vector<VehiclePart> parts;
-	for (int l : lengths) parts.push_back({EngineID::Invalid(), false, false, l});
-	return PartPositions(type, parts, pos);
+	/* (As PartPositions(), from the lengths as they are: asked of every vehicle in sight each frame, no list of parts made for it.) */
+	pos.assign(lengths.size(), 0.0);
+	if (lengths.empty()) return 0.0;
+	for (size_t i = 1; i < lengths.size(); i++) {
+		const int behind = type == VehicleType::Road ? lengths[i - 1] : lengths[i - 1] / 2 + (lengths[i] + 1) / 2;
+		pos[i] = pos[i - 1] - behind;
+	}
+	return (pos.front() + pos.back()) / 2.0;
 }
 
 /** Where a piece ends along the chain, behind its position: a train's half its length (rounded down), a road vehicle's its whole length. */

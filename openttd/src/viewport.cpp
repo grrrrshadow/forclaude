@@ -7438,6 +7438,7 @@ double _turned_moving_ms = 0;             ///< and how long that took on the mai
 double _turned_moving_collect_ms = 0;     ///< of it: gathering the vehicles and figures (AddTurnedMovers())
 std::atomic<bool> _card_vehicles_as_kept_on = true; ///< Rig (test3d jakodrzene 0|1): the moving layer gives what the card keeps without its shapes
 int _rig_movers_repeat = 1;               ///< the rig: the gathering of the moving layer so many times a frame
+int _rig_movers_repeat_now = 0;           ///< the rig: which of those repeats is gathered now
 double _turned_moving_kinds_ms[7] = {};   ///< of the gathering: vehicles, walkers, dragons, animals, witches, ufos, drivers
 double _turned_moving_card_ms = 0;        ///< of it: handing them to the card and waiting for it (ThreeDGpuDrawStanding())
 double _turned_moving_glows_ms = 0;       ///< of it: their lights at night told to the card (TurnedMoverGlows())
@@ -10553,7 +10554,11 @@ static uint32_t TurnedCardLayMoversOnce(bool whole)
 	AddTurnedMovers(vp.zoom, &cdpi, frame);
 	_turned_moving_collect_ms += TurnedNow() - t_collect;
 	/* The rig ('test3d sberaut <n>'): the gathering so many times more, to be looked at with a debugger's samples. */
-	for (int k = 1; k < _rig_movers_repeat; k++) AddTurnedMovers(vp.zoom, &cdpi, frame);
+	for (int k = 1; k < _rig_movers_repeat; k++) {
+		_rig_movers_repeat_now = k;
+		AddTurnedMovers(vp.zoom, &cdpi, frame);
+	}
+	_rig_movers_repeat_now = 0;
 	ThreeDCardVehiclesAsKeptEnd();
 	_vd.dpi = frame;
 	TurnParentSprites(0);

@@ -468,6 +468,21 @@ static std::unordered_map<uint64_t, std::pair<uint32_t, int>> _vehicle_object_pi
  */
 static std::unordered_map<uint64_t, std::vector<std::pair<uint32_t, int>>> _vehicle_object_shared_pieces;
 
+/**
+ * What an engine's piece is of, by the engine's number (GetThreeDVehicleObject(), ThreeDVehicleObjectOf()): looked up
+ * in _vehicle_object_pieces and _vehicle_object_shared_pieces once an engine, not for every piece of every vehicle in
+ * sight several times a frame (the rig's samples of the gathering of the moving layer, a street of 120 lorries and
+ * cars: a fifth of it in these lookups). Kept by the engine's key: an engine that is another now is found again;
+ * forgotten with the objects (ResetThreeDVehicleObjects()). Found where the objects are read: the main thread's.
+ */
+struct EnginePiece {
+	uint64_t key = UINT64_MAX;                ///< the engine's key it was found by (VehiclePieceKey()); UINT64_MAX not looked up yet
+	const ThreeDVehicleObject *obj = nullptr; ///< the object it is a piece of (the first in the indices, of several), nullptr none
+	int piece = 0;                            ///< which of its pieces
+	const std::vector<std::pair<uint32_t, int>> *shared = nullptr; ///< the objects it is a piece of when of several (_vehicle_object_shared_pieces), else nullptr
+};
+static std::vector<EnginePiece> _engine_pieces;
+
 /** The key of an engine of a set in _vehicle_object_pieces. */
 static inline uint64_t VehiclePieceKey(uint32_t grfid, VehicleType type, uint16_t local_id)
 {
@@ -8484,6 +8499,8 @@ static void ReadThreeDVehicleObjects()
 		std::erase_if(it->second, [&package](const std::pair<uint32_t, int> &s) { return _vehicle_objects[s.first].package != package; });
 		it = it->second.size() > 1 ? std::next(it) : _vehicle_object_shared_pieces.erase(it);
 	}
+	/* (What an engine's piece is of, looked up while they were read: found again from the whole of them, EnginePieceOf().) */
+	_engine_pieces.clear();
 	/* An animal on a bed takes the room its record gives it ("rozmer_nakladu"), else its size and some room about it
 	 * (the colleague: "with a gap"). */
 	for (ThreeDLoadPiece &piece : _load_pieces) {
@@ -8712,17 +8729,36 @@ static bool EngineObjectSet(const Engine *e, uint32_t &grfid)
 	return true;
 }
 
+/** An engine's piece (EnginePiece); nullptr an engine of no set. What is given holds till the next one is asked for. */
+static const EnginePiece *EnginePieceOf(EngineID engine)
+{
+	const Engine *e = Engine::GetIfValid(engine);
+	uint32_t grfid;
+	if (!EngineObjectSet(e, grfid)) return nullptr;
+	const uint64_t key = VehiclePieceKey(grfid, e->type, e->grf_prop.local_id);
+	const size_t at = engine.base();
+	if (at >= _engine_pieces.size()) _engine_pieces.resize(at + 256);
+	EnginePiece &p = _engine_pieces[at];
+	if (p.key != key) {
+		p = {};
+		p.key = key;
+		if (auto it = _vehicle_object_pieces.find(key); it != _vehicle_object_pieces.end()) {
+			p.obj = &_vehicle_objects[it->second.first];
+			p.piece = it->second.second;
+			if (auto all = _vehicle_object_shared_pieces.find(key); all != _vehicle_object_shared_pieces.end()) p.shared = &all->second;
+		}
+	}
+	return &p;
+}
+
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	if (_vehicle_object_pieces.empty()) return nullptr;
-	const Engine *e = Engine::GetIfValid(engine);
-	uint32_t grfid;
-	if (!EngineObjectSet(e, grfid)) return nullptr;
-	auto it = _vehicle_object_pieces.find(VehiclePieceKey(grfid, e->type, e->grf_prop.local_id));
-	if (it == _vehicle_object_pieces.end()) return nullptr;
-	if (piece != nullptr) *piece = it->second.second;
-	return &_vehicle_objects[it->second.first];
+	const EnginePiece *p = EnginePieceOf(engine);
+	if (p == nullptr || p->obj == nullptr) return nullptr;
+	if (piece != nullptr) *piece = p->piece;
+	return p->obj;
 }
 
 /**
@@ -8792,13 +8828,18 @@ bool ThreeDTrainCleansTrack(const Vehicle *front)
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece)
 {
 	if (v == nullptr) return nullptr;
-	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, piece);
-	if (obj == nullptr || _vehicle_object_shared_pieces.empty()) return obj;
-	auto all = _vehicle_object_shared_pieces.find(PieceKeyOf(v));
-	if (all == _vehicle_object_shared_pieces.end()) return obj;
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (_vehicle_object_pieces.empty()) return nullptr;
+	const EnginePiece *p = EnginePieceOf(v->engine_type);
+	if (p == nullptr || p->obj == nullptr) return nullptr;
+	const ThreeDVehicleObject *obj = p->obj;
+	if (piece != nullptr) *piece = p->piece;
+	if (p->shared == nullptr) return obj;
+	/* (Taken now: the pieces about it are asked for below, EnginePiece's reference holds only till then.) */
+	const std::vector<std::pair<uint32_t, int>> &all = *p->shared;
 	/* The one whose pieces before and after match the vehicle's the furthest. */
 	int best_score = -1;
-	for (const auto &[index, k] : all->second) {
+	for (const auto &[index, k] : all) {
 		const ThreeDVehicleObject &o = _vehicle_objects[index];
 		int score = 0;
 		const Vehicle *u = v;
@@ -8839,6 +8880,7 @@ void ResetThreeDVehicleObjects()
 	_driving_objects.clear();
 	_vehicle_object_pieces.clear();
 	_vehicle_object_shared_pieces.clear();
+	_engine_pieces.clear();
 	_three_d_theme_trees.clear();
 	_three_d_theme_trees_night.clear();
 	_three_d_theme_undergrowth.clear();
@@ -12618,6 +12660,26 @@ int ThreeDVehicleObject::RustStateOf(int step, uint32_t variant) const
 }
 
 /**
+ * What picks each state of "stavy" (StateRange), the states in their order: the sets of its GRF a state is of, its layer
+ * and its piece, sixteen bytes a state one after another -- what GrfStateStep() of three_d_vehicle_object.cpp goes
+ * through for each layer of each vehicle in sight each frame (the rig's samples of the gathering of the moving layer:
+ * a twelfth of it going through the states themselves, each some hundreds of bytes from the next). Made the first time
+ * asked for, on either thread; again if the states are others since (an object copied as it is read).
+ */
+const std::vector<ThreeDVehicleObject::StateRange> &ThreeDVehicleObject::StateRanges() const
+{
+	if (this->state_ranges_made.value.load(std::memory_order_acquire) != 0 && this->state_ranges.size() == this->states.size()) return this->state_ranges;
+	std::lock_guard lock(_lazy_mutex);
+	if (this->state_ranges_made.value.load() == 0 || this->state_ranges.size() != this->states.size()) {
+		this->state_ranges.clear();
+		this->state_ranges.reserve(this->states.size());
+		for (const ThreeDVehicleState &st : this->states) this->state_ranges.push_back({st.first, st.last, st.layer, st.piece, !st.load_piece.empty()});
+		this->state_ranges_made.value.store(1, std::memory_order_release);
+	}
+	return this->state_ranges;
+}
+
+/**
  * A state by its step (StateStep() of three_d_vehicle_object.cpp): 1 to the count of "stavy" those, after them the
  * states made of the states of layers (ComposeState()); nullptr for 0, none.
  */
@@ -12680,7 +12742,8 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 	}
 	if (count <= 1 && true_colours == 0 && load == 0) return only;
 	std::lock_guard lock(_lazy_mutex);
-	auto it = this->composed_steps.find({layers, true_colours, load});
+	/* (Looked for by the layers as they are, no copy of them made: asked of every vehicle in sight each frame.) */
+	auto it = this->composed_steps.find(std::tie(layers, true_colours, load));
 	if (it != this->composed_steps.end()) return it->second;
 	ThreeDVehicleState made;
 	made.true_colours = true_colours;
@@ -12744,7 +12807,10 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
  */
 const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 {
-	MakeOnce(this, LAZY_WALKING, [this] { return this->walking_found; }, [this] {
+	/* Found already: as it is, without the lock nor the clock of MakeOnce() -- asked three times of every vehicle in
+	 * sight each frame (the rig's samples of the gathering of the moving layer). */
+	if (this->walking_found.value.load(std::memory_order_acquire) != 0) return this->walking;
+	MakeOnce(this, LAZY_WALKING, [this] { return this->walking_found.value.load() != 0; }, [this] {
 		std::vector<ThreeDWalkingCrew> found;
 		auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
 			const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
@@ -12797,7 +12863,7 @@ const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 		return found;
 	}, [this](std::vector<ThreeDWalkingCrew> made) {
 		this->walking = std::move(made);
-		this->walking_found = true;
+		this->walking_found.value.store(1, std::memory_order_release);
 	});
 	return this->walking;
 }
