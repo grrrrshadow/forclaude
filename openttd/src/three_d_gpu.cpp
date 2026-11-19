@@ -944,6 +944,9 @@ struct ViewPictures {
 	/* What stands with the moving things laid over it (ThreeDGpuStanding::moving): its colours and which are lit,
 	 * shown instead while the moving layer is on (ThreeDGpuMovingLayer()). */
 	GLuint moving = 0, moving_lit = 0, moving_fbo = 0;
+	/** The depth of the moving things among themselves, a pass's alone (cleared as it begins): each pixel of each laid
+	 * where it is nearer than those laid before it (DrawStandingOnCard()). */
+	GLuint moving_depth = 0;
 	std::atomic<uint32_t> moving_name = 0, moving_lit_name = 0;
 	std::atomic<bool> moving_on = false;
 	std::atomic<bool> moving_anew = false;              ///< switched on again: all of it copied first
@@ -968,6 +971,8 @@ static void ForgetMovingPictures(ViewPictures &v)
 		gl.glDeleteTextures(1, &v.moving_lit);
 	}
 	v.moving = v.moving_lit = 0;
+	if (v.moving_depth != 0) gl.glDeleteRenderbuffers(1, &v.moving_depth);
+	v.moving_depth = 0;
 	v.moving_whole = true;
 	v.moving_were.clear();
 	v.moving_stood_since.clear();
@@ -5559,10 +5564,15 @@ static bool MovingPicturesOfSize(ViewPictures &v)
 	v.moving = NewGroundTexture(v.w, v.h);
 	v.moving_lit = NewGroundTexture(v.w, v.h);
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	if (v.moving_depth == 0) gl.glGenRenderbuffers(1, &v.moving_depth);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, v.moving_depth);
+	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, v.w, v.h);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	if (v.moving_fbo == 0) gl.glGenFramebuffers(1, &v.moving_fbo);
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, v.moving_fbo);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, v.moving, 0);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, v.moving_lit, 0);
+	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, v.moving_depth);
 	gl.glDrawBuffers(2, STANDING_DRAW_BUFFERS);
 	const bool complete = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -5768,6 +5778,16 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		 * nothing laid on it (the rig: the track built new not drawn, 04cd5b7). */
 		gl.glClearDepth(0.0);
 		gl.glDepthMask(GL_TRUE);
+		if (s.moving) {
+			/* The moving things' depth among themselves, this pass's alone: all of it cleared first, before anything is
+			 * drawn into the picture (no scissor: a clear of the whole every card keeps to). Laid in their order alone,
+			 * far first by the middles of their boxes, a semi-trailer was laid over the cab of its own tractor coming
+			 * towards the viewer (always after it, DrawnOverBefore() of three_d_vehicle_object.cpp: its front lies over
+			 * the fifth wheel) -- the player, 19. 11.: "kreslí návěs který je vzadu přes auto které je vepředu". */
+			gl.glDisable(GL_SCISSOR_TEST);
+			gl.glClear(GL_DEPTH_BUFFER_BIT);
+			gl.glEnable(GL_SCISSOR_TEST);
+		}
 		for (const std::array<int, 4> &c : clips) {
 			if (s.moving) break;
 			gl.glScissor(c[0], c[1], c[2], c[3]);
@@ -5891,19 +5911,15 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	std::vector<float> corners;
 	GLuint drawing = 0;
 	/* What stands laid where it is nearer than what is there, each pixel by its box (STANDING_NEAR_GLSL); the moving
-	 * things by the order kept under them. */
+	 * things by the order kept under them (STANDING_FRAGMENT), and among themselves where nearer too
+	 * (ViewPictures::moving_depth). */
 	auto flush = [&]() {
 		if (corners.empty()) return;
 		/* Lean: only what it changes forgotten (the depth test, unit 0); the masks and patterns of the buildings stay. */
 		if (!_gpu_standing_lean) lean_forget();
 		/* Set whatever was before: a picture put into its atlas meanwhile (StandingPlace()) binds unit 0 too. */
-		if (!s.moving) {
-			gl.glEnable(GL_DEPTH_TEST);
-			lean_depth = 1;
-		} else {
-			gl.glDisable(GL_DEPTH_TEST);
-			lean_depth = 0;
-		}
+		gl.glEnable(GL_DEPTH_TEST);
+		lean_depth = 1;
 		gl.glBindTexture(GL_TEXTURE_2D, drawing);
 		lean_tex0 = drawing;
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
@@ -6476,11 +6492,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform2f(gl.glGetUniformLocation(fp, "u_depth"), s.depth[0], std::max(1e-3f, s.depth[1]));
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, texture);
-		if (!s.moving) {
-			gl.glEnable(GL_DEPTH_TEST);
-		} else {
-			gl.glDisable(GL_DEPTH_TEST);
-		}
+		gl.glEnable(GL_DEPTH_TEST);
 		constexpr size_t N = ThreeDGpuStandingFaces::FLOATS;
 		face_corners.resize(f.corners.size());
 		for (size_t i = 0; i + N - 1 < f.corners.size(); i += N) {
