@@ -7753,6 +7753,51 @@ void ForgetTurnedCardBand()
 
 static uint32_t NightLightOfCard();
 
+/**
+ * The smooth zoom of the turned main view (gui.smooth_zoom; the player, 19. 11.: "make a switch in the settings, smooth
+ * zoom, and we will try it" -- after the fork of OpenTTD with smooth zoom and fly navigation, hra/INSPIRACE.md of
+ * grrrrf): a step of the zoom to the next level is shown as the card's picture of the view growing or shrinking about
+ * the point it is zoomed about, not as a cut. The levels stay the game's. Zooming in, the picture as it is grows to
+ * twice its size, and the level changes then: the finer picture is laid in its place. Zooming out, the level changes
+ * first, and its picture, once laid, shrinks from twice its size to its own. Only the picture the video driver shows is
+ * scaled (ShowTurnedCardGround(), the part of the card's textures shown): the signs and what else the processor
+ * draws over it are of the level the view has.
+ */
+struct SmoothZoom {
+	bool on = false;        ///< a step is being shown
+	bool in = false;        ///< zooming in: the level changes when it ends (SmoothZoomEnd()); else out: it changed already
+	bool to_cursor = false; ///< zooming in about the pointer's place (ZoomInOrOutToCursorWindow()), else about the middle of the view
+	bool waits = false;     ///< zooming out: the picture of the new level is not shown yet, its time starts when it is
+	Point cursor{};         ///< where the pointer was when the step was asked for
+	float ax = 0, ay = 0;   ///< the point of the view the picture grows about, pixels from the view's corner
+	ZoomLevel zoom{};       ///< zooming out: the level it changed to
+	const Viewport *vp = nullptr; ///< the view it is a step of: another the main one meanwhile (a game loaded), it is dropped
+	std::chrono::steady_clock::time_point from{}; ///< since when
+};
+static SmoothZoom _smooth_zoom;
+double _rig_smooth_zoom_ms = -1;                ///< Rig (test3d plynulyzoom cas): the step shown as so long after it began, standing there; negative: by the clock
+static bool _smooth_zoom_doing = false;        ///< its step is being done as the game does it: not taken over again
+static constexpr double SMOOTH_ZOOM_MS = 180.0; ///< how long a step is shown
+static constexpr double SMOOTH_ZOOM_WAIT_MS = 2000.0; ///< how long the picture of the new level is waited for at most
+
+/** How many times its size the picture of a view is shown now (SmoothZoom): 1 as it is, to 2. */
+static float SmoothZoomScale(const TurnedCardGround &g)
+{
+	SmoothZoom &z = _smooth_zoom;
+	if (!z.on || &g != &_turned_card_ground) return 1.0f;
+	const auto now = std::chrono::steady_clock::now();
+	if (z.waits) {
+		/* Zooming out: the picture of the level before is shown as it is, the new one from the first time it is shown. */
+		if (g.zoom != z.zoom) return 1.0f;
+		z.waits = false;
+		z.from = now;
+	}
+	const double ms = _rig_smooth_zoom_ms >= 0 ? _rig_smooth_zoom_ms : std::chrono::duration<double, std::milli>(now - z.from).count();
+	const double t = std::clamp(ms / SMOOTH_ZOOM_MS, 0.0, 1.0);
+	const double eased = t * t * (3.0 - 2.0 * t);
+	return static_cast<float>(std::exp2(z.in ? eased : 1.0 - eased));
+}
+
 /** The picture of the view's ground shown by the video driver (TurnedCardGround), in the night's light when it is night. */
 static void ShowTurnedCardGround()
 {
@@ -7765,7 +7810,12 @@ static void ShowTurnedCardGround()
 	uint32_t over_lit = 0, over_order = 0;
 	const uint32_t over = _turned_card_standing_on ? ThreeDGpuViewStanding(g.view, &over_lit, &over_order) : 0;
 	/* The view in its middle: it reaches past it every way (band). */
-	const std::array<float, 4> part = g.w > 0 && g.h > 0 ? std::array<float, 4>{static_cast<float>(g.band) / g.w, static_cast<float>(g.band) / g.h, static_cast<float>(vp.width) / g.w, static_cast<float>(vp.height) / g.h} : std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f};
+	std::array<float, 4> part = g.w > 0 && g.h > 0 ? std::array<float, 4>{static_cast<float>(g.band) / g.w, static_cast<float>(g.band) / g.h, static_cast<float>(vp.width) / g.w, static_cast<float>(vp.height) / g.h} : std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f};
+	/* A step of the smooth zoom being shown (SmoothZoom): so much less of it, about the point it grows about. */
+	if (const float grown = SmoothZoomScale(g); grown > 1.0f && g.w > 0 && g.h > 0) {
+		const SmoothZoom &z = _smooth_zoom;
+		part = {(g.band + z.ax - z.ax / grown) / g.w, (g.band + z.ay - z.ay / grown) / g.h, vp.width / grown / g.w, vp.height / grown / g.h};
+	}
 	/* The main view under all the other pictures; a small view's in its window's place among the windows. */
 	const bool main = &g == &_turned_card_ground;
 	int z = 0;
@@ -9806,16 +9856,129 @@ static void TurnedCardGlowsShow(const Viewport &vp)
 	std::vector<VideoDriver::ThreeDGlow> glows;
 	glows.reserve(card.glows.size() + card.mover_glows.size());
 	const int ox = vp.left - UnScaleByZoomLower(vp.virtual_left, vp.zoom), oy = vp.top - UnScaleByZoomLower(vp.virtual_top, vp.zoom);
+	/* A step of the smooth zoom being shown (SmoothZoom): the glows with the picture, as much bigger about its point. */
+	const float grown = SmoothZoomScale(card);
+	const float ax = vp.left + _smooth_zoom.ax, ay = vp.top + _smooth_zoom.ay;
 	/* The pools on the ground first, the lamps over them. */
 	for (const std::vector<TurnedCardGlow> *list : {&card.mover_glows, &card.glows}) {
 		for (const TurnedCardGlow &g : *list) {
-			const float x = g.x + ox, y = g.y + oy;
-			if (x + g.rx < vp.left || y + g.ry < vp.top || x - g.rx > vp.left + vp.width || y - g.ry > vp.top + vp.height) continue;
-			glows.push_back({x, y, g.rx, g.ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength, g.order, g.order_down, g.unseen});
+			float x = g.x + ox, y = g.y + oy, rx = g.rx, ry = g.ry;
+			if (grown > 1.0f) {
+				x = ax + (x - ax) * grown;
+				y = ay + (y - ay) * grown;
+				rx *= grown;
+				ry *= grown;
+			}
+			if (x + rx < vp.left || y + ry < vp.top || x - rx > vp.left + vp.width || y - ry > vp.top + vp.height) continue;
+			glows.push_back({x, y, rx, ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength, g.order, g.order_down, g.unseen});
 		}
 	}
 	card.glows_told = !glows.empty();
 	VideoDriver::GetInstance()->SetThreeDGlows(&card, std::move(glows));
+}
+
+/** The step of the smooth zoom being shown ends (SmoothZoom): zooming in, the level changes now, as the game changes it. */
+static void SmoothZoomEnd()
+{
+	const SmoothZoom z = _smooth_zoom;
+	_smooth_zoom = {};
+	Window *main = GetMainWindow();
+	if (main == nullptr || main->viewport == nullptr || main->viewport.get() != z.vp) return;
+	if (z.in) {
+		AutoRestoreBackup doing(_smooth_zoom_doing, true);
+		if (z.to_cursor) {
+			/* About the place the pointer had when the step was asked for, wherever it is now. */
+			AutoRestoreBackup cursor(_cursor.pos, z.cursor);
+			ZoomInOrOutToCursorWindow(true, main);
+		} else {
+			DoZoomInOutWindow(ZOOM_IN, main);
+		}
+		return;
+	}
+	/* Zoomed out: its picture as it is from now. */
+	TurnedCardGround &g = _turned_card_ground;
+	if (g.vp != main->viewport.get() || !g.shown) return;
+	AutoRestoreBackup card(_tcg, &g);
+	AutoRestoreBackup night(_night_windows_now, IsNightNow() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32);
+	ShowTurnedCardGround();
+	TurnedCardGlowsShow(*g.vp);
+}
+
+/**
+ * A step of the zoom of a window asked for by the player (the wheel, the buttons of the toolbar, the keys): taken to be
+ * shown smoothly (SmoothZoom) when it is the main view's, the card showing its picture, and the setting is on.
+ * @param in zooming in
+ * @param to_cursor about the pointer's place (ZoomInOrOutToCursorWindow()), else about the middle of the view
+ * @param w the window
+ * @return true: zooming in, the step is done when its picture has grown -- nothing to do now; false: do it now (zooming
+ *         out it is shown shrinking once its picture is laid; or it is not shown smoothly at all)
+ */
+bool SmoothZoomTakes(bool in, bool to_cursor, Window *w)
+{
+	if (_smooth_zoom_doing) return false;
+	/* One being shown: ended now, the level it waited to change changed. */
+	if (_smooth_zoom.on) SmoothZoomEnd();
+	if (!_settings_client.gui.smooth_zoom || w == nullptr || w != GetMainWindow() || w->viewport == nullptr) return false;
+	const Viewport &vp = *w->viewport;
+	const TurnedCardGround &g = _turned_card_ground;
+	if (g.vp != &vp || !g.shown || g.zoom != vp.zoom) return false;
+	if (in ? vp.zoom <= _settings_client.gui.zoom_min : vp.zoom >= _settings_client.gui.zoom_max) return false;
+	SmoothZoom &z = _smooth_zoom;
+	z = {};
+	z.on = true;
+	z.in = in;
+	z.to_cursor = to_cursor;
+	z.vp = &vp;
+	z.cursor = _cursor.pos;
+	/* The point the picture grows about: the one the step leaves where it is. About the middle of the view; zooming
+	 * about the pointer's place the game first moves the view (ScrollWindowTo() of the place GetTileZoomCenterWindow()
+	 * gives, as ZoomInOrOutToCursorWindow() does) -- by so many pixels of the screen, found as it will find it: the
+	 * place under the pointer itself is kept only to a tile or so, and the picture grown about it ended tens of pixels
+	 * from where the level's own then lay. */
+	z.ax = vp.width / 2.0f;
+	z.ay = vp.height / 2.0f;
+	if (to_cursor) {
+		const Point pt = GetTileZoomCenterWindow(in, w);
+		if (pt.x == -1) {
+			z = {};
+			return false;
+		}
+		const bool on_map = pt.x >= 0 && pt.x <= static_cast<int>(Map::SizeX() * TILE_SIZE) - 1 && pt.y >= 0 && pt.y <= static_cast<int>(Map::SizeY() * TILE_SIZE) - 1;
+		const Point dest = MapXYZToViewport(vp, pt.x, pt.y, on_map ? GetSlopePixelZ(pt.x, pt.y) : TileHeightOutsideMap(pt.x / static_cast<int>(TILE_SIZE), pt.y / static_cast<int>(TILE_SIZE)));
+		const float per_pixel = static_cast<float>(ScaleByZoom(1, vp.zoom));
+		const float moved_x = -(dest.x - vp.virtual_left) / per_pixel, moved_y = -(dest.y - vp.virtual_top) / per_pixel;
+		/* (Zooming in the view moved so is then doubled about its middle; zooming out, halved.) */
+		z.ax += in ? -2.0f * moved_x : moved_x;
+		z.ay += in ? -2.0f * moved_y : moved_y;
+	}
+	z.from = std::chrono::steady_clock::now();
+	if (!in) {
+		z.waits = true;
+		z.zoom = vp.zoom;
+		++z.zoom;
+	}
+	return in;
+}
+
+/** The step of the smooth zoom being shown (SmoothZoom), once a frame before it is drawn (UpdateWindows()): its picture as big as it is now, or its end. */
+void SmoothZoomStep()
+{
+	SmoothZoom &z = _smooth_zoom;
+	if (!z.on) return;
+	const Window *main = GetMainWindow();
+	TurnedCardGround &g = _turned_card_ground;
+	const double ms = _rig_smooth_zoom_ms >= 0 && !z.waits ? _rig_smooth_zoom_ms : std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - z.from).count();
+	/* Its picture shown no more (the card's off, another game): ended at once. So when its time is over; or the picture
+	 * of the level zoomed out to did not come. */
+	if (main == nullptr || main->viewport == nullptr || g.vp != main->viewport.get() || !g.shown || ms >= (z.waits ? SMOOTH_ZOOM_WAIT_MS : SMOOTH_ZOOM_MS)) {
+		SmoothZoomEnd();
+		return;
+	}
+	if (z.waits) return;
+	AutoRestoreBackup card(_tcg, &g);
+	AutoRestoreBackup night(_night_windows_now, IsNightNow() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32);
+	ShowTurnedCardGround();
+	TurnedCardGlowsShow(*g.vp);
 }
 
 static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double unit, const std::function<void(double, double, double, double &, double &)> &project,

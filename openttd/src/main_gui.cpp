@@ -152,6 +152,9 @@ void ZoomInOrOutToCursorWindow(bool in, Window *w)
 	if (_game_mode != GameMode::Menu) {
 		if ((in && w->viewport->zoom <= _settings_client.gui.zoom_min) || (!in && w->viewport->zoom >= _settings_client.gui.zoom_max)) return;
 
+		/* Shown smoothly (gui.smooth_zoom, SmoothZoom of viewport.cpp): zooming in, done when its picture has grown. */
+		if (SmoothZoomTakes(in, true, w)) return;
+
 		Point pt = GetTileZoomCenterWindow(in, w);
 		if (pt.x != -1) {
 			ScrollWindowTo(pt.x, pt.y, -1, w, true);
@@ -484,7 +487,7 @@ struct MainWindow : Window
 
 			/* When following, only change zoom - otherwise zoom to the cursor. */
 			if (this->viewport->follow_vehicle != VehicleID::Invalid()) {
-				DoZoomInOutWindow(in ? ZOOM_IN : ZOOM_OUT, this);
+				if (!SmoothZoomTakes(in, false, this)) DoZoomInOutWindow(in ? ZOOM_IN : ZOOM_OUT, this);
 			} else {
 				ZoomInOrOutToCursorWindow(in, this);
 			}

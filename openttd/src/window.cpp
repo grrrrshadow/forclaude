@@ -3348,6 +3348,10 @@ void UpdateWindows()
 	CallWindowRealtimeTickEvent(delta_ms.count());
 	FrameDiaryWindowsTimers(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - timers_started).count());
 
+	/* A step of the smooth zoom of the main view being shown (viewport.cpp): its picture as big as it is now; at its
+	 * end the level changes, before the frame is drawn. */
+	SmoothZoomStep();
+
 	/* Process invalidations before anything else. */
 	for (Window *w : Window::Iterate()) {
 		w->ProcessScheduledResize();

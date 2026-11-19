@@ -11722,6 +11722,31 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _small_card_dirty_on;
 		if (argv.size() > 3) _small_card_dirty_on = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: male naraz {}", _small_card_dirty_on ? "ano" : "ne");
+	} else if (what == "kolecko" && argv.size() > 2) {
+		/* 'kolecko <1|-1> [x y]': a step of the mouse wheel over the main view, in (1) or out (-1), the pointer at x, y of
+		 * the screen (else where it is) -- as the player's (ZoomInOrOutToCursorWindow(); the smooth zoom, SmoothZoom of
+		 * viewport.cpp); 'kolecko stred <1|-1>': the toolbar's button, about the middle of the view. */
+		Window *mw = GetMainWindow();
+		if (mw == nullptr || mw->viewport == nullptr) return true;
+		if (argv[2] == "stred" && argv.size() > 3) {
+			const bool in = number(3).value_or(1) > 0;
+			if (!SmoothZoomTakes(in, false, mw)) DoZoomInOutWindow(in ? ZOOM_IN : ZOOM_OUT, mw);
+			IConsolePrint(CC_DEFAULT, "test3d: kolecko stred {}, zoom {}", in ? "dovnitr" : "ven", to_underlying(mw->viewport->zoom));
+			return true;
+		}
+		const bool in = number(2).value_or(1) > 0;
+		if (argv.size() > 4) {
+			_cursor.pos.x = number(3).value_or(_cursor.pos.x);
+			_cursor.pos.y = number(4).value_or(_cursor.pos.y);
+		}
+		ZoomInOrOutToCursorWindow(in, mw);
+		IConsolePrint(CC_DEFAULT, "test3d: kolecko {} u {},{}, zoom {}", in ? "dovnitr" : "ven", _cursor.pos.x, _cursor.pos.y, to_underlying(mw->viewport->zoom));
+	} else if (what == "plynulyzoom" && argv.size() > 3 && argv[2] == "cas") {
+		/* 'plynulyzoom cas <ms>': the step of the smooth zoom being shown stands as so long after it began (to be looked
+		 * at); negative, it goes by the clock again. */
+		extern double _rig_smooth_zoom_ms;
+		_rig_smooth_zoom_ms = number(3).value_or(-1);
+		IConsolePrint(CC_DEFAULT, "test3d: plynuly zoom cas {}", _rig_smooth_zoom_ms);
 	} else if (what == "male" && argv.size() > 3 && argv[2] == "vrstva") {
 		/* 'male vrstva 0|1': the things that move in the small views the card draws laid by it over what stands each
 		 * frame (1; their moving layers, TurnedCardLayMovers()), or with what stands (0). */

@@ -925,7 +925,8 @@ static CallBackFunction MenuClickShowAir(int index)
 
 static CallBackFunction ToolbarZoomInClick(Window *w)
 {
-	if (DoZoomInOutWindow(ZOOM_IN, GetMainWindow())) {
+	/* (Shown smoothly, gui.smooth_zoom: zooming in, done when the picture has grown, SmoothZoomTakes().) */
+	if (SmoothZoomTakes(true, false, GetMainWindow()) || DoZoomInOutWindow(ZOOM_IN, GetMainWindow())) {
 		w->HandleButtonClick((_game_mode == GameMode::Editor) ? (WidgetID)WID_TE_ZOOM_IN : (WidgetID)WID_TN_ZOOM_IN);
 	}
 	return CallBackFunction::None;
@@ -935,6 +936,7 @@ static CallBackFunction ToolbarZoomInClick(Window *w)
 
 static CallBackFunction ToolbarZoomOutClick(Window *w)
 {
+	SmoothZoomTakes(false, false, GetMainWindow());
 	if (DoZoomInOutWindow(ZOOM_OUT, GetMainWindow())) {
 		w->HandleButtonClick((_game_mode == GameMode::Editor) ? (WidgetID)WID_TE_ZOOM_OUT : (WidgetID)WID_TN_ZOOM_OUT);
 	}

@@ -1945,6 +1945,8 @@ STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Pohyb v mapě p
 
 STR_CONFIG_SETTING_SMOOTH_SCROLLING                             :Plynulé posouvání po mapě: {STRING}
 STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Ovládá jak se hlavní pohled posouvá na specifické místo na mapě, kliknutím na minimapu nebo spuštěním příkazu na posun na specifický objekt na mapě. Pokud zapnuto, pohled se posouvá plynule, pokud vypnuto, skáče pohled přímo na cílové místo
+STR_CONFIG_SETTING_SMOOTH_ZOOM                                  :Plynulý zoom: {STRING2}
+STR_CONFIG_SETTING_SMOOTH_ZOOM_HELPTEXT                         :Krok přiblížení nebo oddálení hlavního pohledu se ukáže jako plynulé zvětšení nebo zmenšení mapy kolem kurzoru, ne jako střih. Jen tam, kde mapu kreslí grafická karta
 
 STR_CONFIG_SETTING_TOOLBAR_DROPDOWN_AUTOSELECT                  :Tradiční chování výběru lišt: {STRING}
 STR_CONFIG_SETTING_TOOLBAR_DROPDOWN_AUTOSELECT_HELPTEXT         :Vyberte chování výběru lišt. Když je vypnuto, lišty zůstanou otevřené, dokud nedojde k výběru. Když je zapnuto, lišty se aktivují při puštění tlačítka myši.
