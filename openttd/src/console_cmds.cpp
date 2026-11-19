@@ -921,8 +921,8 @@ static bool ConTestLevelCrossing(std::span<std::string_view> argv)
 
 static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 {
-	if (argv.size() != 3 && argv.size() != 5) {
-		IConsolePrint(CC_HELP, "Build an airport and an aircraft in it, with a second airport also flown to. Usage: 'testletadlo <x> <y> [<x2> <y2>]'.");
+	if (argv.size() < 3 || argv.size() > 7) {
+		IConsolePrint(CC_HELP, "Build an airport and an aircraft in it, with a second airport also flown to. Usage: 'testletadlo <x> <y> [<x2> <y2>] [<jmeno> [<typ letiste>]]'.");
 		return true;
 	}
 	auto px = ParseInteger(argv[1]);
@@ -930,11 +930,17 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 	if (!px.has_value() || !py.has_value()) return false;
 	/* A second airport: the aircraft flies between the two, started -- in the air to be flown from its cab. */
 	std::optional<int> qx, qy;
-	if (argv.size() == 5) {
+	size_t more = 3;
+	if (argv.size() >= 5 && ParseInteger(argv[3]).has_value() && ParseInteger(argv[4]).has_value()) {
 		qx = ParseInteger(argv[3]);
 		qy = ParseInteger(argv[4]);
-		if (!qx.has_value() || !qy.has_value()) return false;
+		more = 5;
 	}
+	/* The aircraft whose name holds the text (a set's: 'Buran'), not the first the year offers; the airports of that type
+	 * (0 small, 1 city, 4 international: long runways for the large ones). */
+	const std::string wanted = argv.size() > more ? std::string(argv[more]) : std::string();
+	const uint8_t airport_type = argv.size() > more + 1 ? static_cast<uint8_t>(ParseInteger(argv[more + 1]).value_or(0)) : 0;
+	const uint ground = airport_type == 0 ? 5 : 8;
 
 	TileIndex tile = TileXY((uint)*px, (uint)*py);
 
@@ -959,9 +965,9 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 
 	/* An airport wants flat ground; the rig levels what it was pointed at
 	 * rather than making the player hunt for a spot. */
-	Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY((uint)*px + 5, (uint)*py + 5), tile, false, LevelMode::Level);
+	Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY((uint)*px + ground, (uint)*py + ground), tile, false, LevelMode::Level);
 
-	CommandCost port = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, tile, 0, 0, StationID::Invalid(), true);
+	CommandCost port = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, tile, airport_type, 0, StationID::Invalid(), true);
 	if (port.Failed()) {
 		IConsolePrint(CC_ERROR, "testletadlo: letiste na ({},{}) nejde postavit - {}", *px, *py, RefusalReason(port));
 		return true;
@@ -969,8 +975,8 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 	TileIndex other = INVALID_TILE;
 	if (qx.has_value()) {
 		other = TileXY((uint)*qx, (uint)*qy);
-		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY((uint)*qx + 5, (uint)*qy + 5), other, false, LevelMode::Level);
-		CommandCost second = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, other, 0, 0, StationID::Invalid(), true);
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY((uint)*qx + ground, (uint)*qy + ground), other, false, LevelMode::Level);
+		CommandCost second = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, other, airport_type, 0, StationID::Invalid(), true);
 		if (second.Failed()) {
 			IConsolePrint(CC_ERROR, "testletadlo: druhe letiste na ({},{}) nejde postavit - {}", *qx, *qy, RefusalReason(second));
 			return true;
@@ -980,13 +986,14 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 	/* The first aircraft the year offers; the rig does not care which. The
 	 * hangar is where one is bought, not the airport's own tile. */
 	TileIndex hangar = tile;
-	for (TileIndex t : TileArea(tile, 6, 6)) {
+	for (TileIndex t : TileArea(tile, ground + 1, ground + 1)) {
 		if (IsTileType(t, TileType::Station) && IsHangar(t)) { hangar = t; break; }
 	}
 
 	std::string why = "zadny typ letadla";
 	uint tried = 0;
 	for (const Engine *e : Engine::IterateType(VehicleType::Aircraft)) {
+		if (!wanted.empty() && GetString(STR_ENGINE_NAME, e->index).find(wanted) == std::string::npos) continue;
 		tried++;
 		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, hangar, e->index, true, INVALID_CARGO, ClientID::Invalid);
 		if (cost.Failed()) {
@@ -1013,8 +1020,8 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 			}
 		}
 
-		IConsolePrint(CC_DEFAULT, "testletadlo: letiste na ({},{}), hangar ({},{}), letadlo {} koupeno, rozkazu {}.", *px, *py,
-				TileX(hangar), TileY(hangar), Vehicle::Get(veh)->unitnumber, Vehicle::Get(veh)->GetNumOrders());
+		IConsolePrint(CC_DEFAULT, "testletadlo: letiste na ({},{}), hangar ({},{}), letadlo {} '{}' koupeno, rozkazu {}.", *px, *py,
+				TileX(hangar), TileY(hangar), Vehicle::Get(veh)->unitnumber, GetString(STR_ENGINE_NAME, e->index), Vehicle::Get(veh)->GetNumOrders());
 		return true;
 	}
 	IConsolePrint(CC_ERROR, "testletadlo: letiste stoji, ale zadne z {} letadel nejde koupit - {}", tried, why);
@@ -12507,7 +12514,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		ScrollMainWindowTo(found->x_pos, found->y_pos, found->z_pos, true);
 		UpdateViewportPosition(w, 0);
-		IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} smer {}", found->unitnumber, to_underlying(found->type), found->x_pos, found->y_pos, found->z_pos, to_underlying(found->direction));
+		IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} smer {}{}", found->unitnumber, to_underlying(found->type), found->x_pos, found->y_pos, found->z_pos, to_underlying(found->direction),
+				found->type == VehicleType::Aircraft ? fmt::format(", letadlo stav {} rychlost {}", Aircraft::From(found)->state, found->cur_speed) : std::string());
 	} else if (what == "svah") {
 		/* 'svah [n]': the middle of the view on the n-th vehicle drawn from its object that goes up or down a slope now,
 		 * and how far its front is raised (the eye's figure of it, GetThreeDEyeVehicle()). */
