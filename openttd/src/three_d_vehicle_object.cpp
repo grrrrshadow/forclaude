@@ -35,6 +35,7 @@
 #include "true_colour.h"
 #include "roadveh.h"
 #include "timer/timer_game_calendar.h"
+#include "timer/timer_game_economy.h"
 #include "timer/timer_game_tick.h"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
@@ -59,6 +60,7 @@
 #include <iterator>
 #include <map>
 #include <mutex>
+#include <bit>
 #include <unordered_map>
 #include <utility>
 #include <optional>
@@ -3776,12 +3778,14 @@ std::string TakeThreeDCardThingsPrepared()
 {
 	const uint64_t *h = _card_things_prepared_how;
 	const double *hm = _card_things_prepared_how_ms;
-	const std::string s = fmt::format("{} veci umisteno, {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych",
-			_card_things_placed, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again);
+	extern uint64_t _lasting_places_reused;
+	const std::string s = fmt::format("{} veci umisteno (z toho {} jak stalo), {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych",
+			_card_things_placed, _lasting_places_reused, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again);
 	_card_not_yet_skipped = 0;
 	_card_things_missing = _card_things_missing_again = 0;
 	_card_things_missing_keys.clear();
 	_card_things_placed = _card_things_prepared = 0;
+	_lasting_places_reused = 0;
 	_card_things_prepared_ms = 0;
 	std::fill(std::begin(_card_things_prepared_how), std::end(_card_things_prepared_how), 0);
 	std::fill(std::begin(_card_things_prepared_how_ms), std::end(_card_things_prepared_how_ms), 0.0);
@@ -3986,6 +3990,29 @@ static std::shared_ptr<const ThreeDGpuStandingVehicle> CardDrawnBefore(const Veh
 	return it->second.card;
 }
 
+/**
+ * A vehicle of the moving layer as it was placed the last time (PlaceVehicleObjectNow()), placed so again while nothing
+ * it is placed from changed: its pieces where they were and facing the same, its state of its set and its lights the
+ * same, the view, the zoom and the day the same (the player's diary of 19. 11.: the gathering of the moving layer 19-34
+ * ms a frame on the phone, ~107 us a thing -- every vehicle in sight every frame, those standing in a station or at a
+ * signal too; the player: "1 ano"). Only one the card drew (CardMade::Drawn): one not made yet is placed again till it
+ * is. Not an animal that is a vehicle nor one with crew that walks: they move standing (GaitCode() by the tick).
+ */
+struct LastingPlace {
+	uint64_t sig = 0;
+	VehicleObjectPlace place;
+	uint64_t used = 0; ///< the tick it was placed so last
+};
+static std::unordered_map<uint64_t, LastingPlace> _lasting_places; ///< by the vehicle and the zoom; the main thread's
+uint64_t _lasting_places_reused = 0; ///< the diary: things placed as they were
+bool _lasting_places_on = true;      ///< the rig ('test3d stojici trvale 0'): off, each placed anew as before
+
+/** Whether an object's picture stays as it is while its vehicle stands (LastingPlace): no body of an animal, no crew that walks. */
+static bool StandsStill(const ThreeDVehicleObject *obj)
+{
+	return obj->body.empty() && std::ranges::none_of(obj->WalkingCrew(), [](const ThreeDWalkingCrew &w) { return w.behind || (!w.on_seat && w.figure != nullptr && w.figure->Walks()); });
+}
+
 static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place, bool on_card)
 {
 	int piece = 0;
@@ -4002,9 +4029,17 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	if (front == nullptr) front = v;
 	const Vehicle *last = front;
 	int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
+	/* What it is placed from (LastingPlace): where its pieces are and how they face. */
+	uint64_t sig = 0xCBF29CE484222325ULL;
+	auto mix = [&sig](uint64_t x) { sig = (sig ^ x) * 0x100000001B3ULL; };
 	const Vehicle *u = front;
 	for (size_t k = 0; u != nullptr && k < obj->pieces.size(); k++, u = u->Next()) {
 		last = u;
+		mix(static_cast<uint32_t>(u->x_pos));
+		mix(static_cast<uint32_t>(u->y_pos));
+		mix(static_cast<uint32_t>(u->z_pos));
+		mix(to_underlying(u->direction) | static_cast<uint64_t>(u->progress) << 8 | static_cast<uint64_t>(u->vehstatus.base()) << 16);
+		if (u->cab_free) mix(static_cast<uint64_t>(static_cast<uint32_t>(u->cab_px)) | static_cast<uint64_t>(static_cast<uint32_t>(u->cab_py)) << 32 ^ u->cab_yaw);
 		xmin = std::min(xmin, u->x_pos + u->bounds.origin.x);
 		ymin = std::min(ymin, u->y_pos + u->bounds.origin.y);
 		zmin = std::min(zmin, u->z_pos + u->bounds.origin.z);
@@ -4020,6 +4055,21 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	/* Kept with the place: asked of every lit vehicle by night (ObjectDrawsNothing(), its lights and those of what it
 	 * pulls), its state was found again each time -- its set's callbacks every time. */
 	place.state = state;
+	/* Standing as it stood when it was placed last: placed as then (LastingPlace). */
+	const bool lasting = _lasting_places_on && on_card && pose == nullptr && StandsStill(obj);
+	const uint64_t lasting_key = static_cast<uint64_t>(v->index.base()) << 8 | to_underlying(zoom);
+	if (lasting) {
+		mix(reinterpret_cast<uintptr_t>(obj));
+		mix(static_cast<uint32_t>(state) | static_cast<uint64_t>(static_cast<uint32_t>(lights)) << 32);
+		mix(std::bit_cast<uint32_t>(static_cast<float>(GetViewCameraKey())) | static_cast<uint64_t>(std::bit_cast<uint32_t>(ObjectScale(obj))) << 32);
+		mix(static_cast<uint64_t>(TimerGameEconomy::date.base()) | static_cast<uint64_t>(ViewportDrawingTurned()) << 40 | static_cast<uint64_t>(ViewportDrawingNorthObjects()) << 41 | static_cast<uint64_t>(ViewportDrawingEye()) << 42);
+		if (auto it = _lasting_places.find(lasting_key); it != _lasting_places.end() && it->second.sig == sig) {
+			place = it->second.place;
+			it->second.used = TimerGameTick::counter;
+			_lasting_places_reused++;
+			return obj;
+		}
+	}
 	/* Hung from the middle of its pieces (or where its coupling puts it), facing the way it goes: on a round curve as
 	 * the curve has it; else smoothly as its way turns, as the view from the eyes has it (EyeOrigin(); the player,
 	 * 17. 10.: "why do we turn in 45 degrees as the sprites, they can turn smoothly"), in steps of 5 degrees, its trailer
@@ -4039,6 +4089,7 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	/* Up or down a hill leaning so, in steps of 2 degrees: a few pictures for the slopes of the map. */
 	const int pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
 	const uint64_t walk = WalkCode(obj, state, WalkedOf(v, obj), scale, v);
+	bool lasting_drawn = false;
 	/* Drawn by the card from what is made of it (CardVehicle()); while something of it is not made yet, what the card
 	 * drew of it last (CardDrawnBefore()), the vehicle drawn again when it comes -- no picture of it made (the player,
 	 * 31. 10.: "go on with the GPU"; the walking horses of the Special 3D made their pictures on the thread, read back
@@ -4048,6 +4099,7 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 		const CardMade made = CardVehicle(request, place.card, place.card_lights);
 		place.on_card = made != CardMade::TooBig;
 		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card);
+		if (made == CardMade::Drawn && lasting) lasting_drawn = true;
 		if (made == CardMade::NotYet) {
 			place.card = CardDrawnBefore(v, obj);
 			_vehicles_owed_pictures.insert(v->index);
@@ -4081,6 +4133,13 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	}
 	place.xmin = xmin; place.ymin = ymin; place.zmin = zmin;
 	place.xmax = xmax; place.ymax = ymax; place.zmax = zmax;
+	if (lasting_drawn) {
+		/* Kept to be placed so again (LastingPlace); those of vehicles not placed for a while let go of. */
+		_lasting_places[lasting_key] = {sig, place, TimerGameTick::counter};
+		if (_lasting_places.size() > 4096) std::erase_if(_lasting_places, [](const auto &e) { return TimerGameTick::counter - e.second.used > 1000; });
+	} else if (lasting) {
+		_lasting_places.erase(lasting_key);
+	}
 	return obj;
 }
 

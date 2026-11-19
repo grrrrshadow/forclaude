@@ -11664,6 +11664,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_gpu_standing_lean = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici stav {}", _gpu_standing_lean ? "usporne" : "jako drive");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "trvale") {
+		/* 'stojici trvale 0|1': a vehicle of the moving layer standing as it stood placed as then (1; LastingPlace of
+		 * three_d_vehicle_object.cpp), or placed anew every time (0, as before). */
+		extern bool _lasting_places_on;
+		_lasting_places_on = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici trvale {}", _lasting_places_on ? "ano" : "ne, kazde znovu");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "auta_predem") {
 		/* 'stojici auta_predem 0|1': the vehicles not kept drawn before the view's picture is begun (1), or each as it
 		 * comes while it is laid (0, as before; ThreeDGpuDrawStanding()). */
