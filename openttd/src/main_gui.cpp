@@ -467,6 +467,11 @@ struct MainWindow : Window
 
 	void OnScroll(Point delta) override
 	{
+		/* Under the camera going round a place the place moves, as far as the camera sees the ground go (orbit_view.cpp). */
+		if (OrbitScroll(delta)) {
+			this->refresh_timeout.Reset();
+			return;
+		}
 		this->viewport->scrollpos_x += ScaleByZoom(delta.x, this->viewport->zoom);
 		this->viewport->scrollpos_y += ScaleByZoom(delta.y, this->viewport->zoom);
 		this->viewport->dest_scrollpos_x = this->viewport->scrollpos_x;

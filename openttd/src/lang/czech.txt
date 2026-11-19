@@ -1948,6 +1948,9 @@ STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Ovládá jak se
 STR_CONFIG_SETTING_SMOOTH_ZOOM                                  :Plynulý zoom: {STRING2}
 STR_CONFIG_SETTING_SMOOTH_ZOOM_HELPTEXT                         :Krok přiblížení nebo oddálení hlavního pohledu se ukáže jako plynulé zvětšení nebo zmenšení mapy kolem kurzoru, ne jako střih. Jen tam, kde mapu kreslí grafická karta
 
+STR_CONFIG_SETTING_ORBIT_VIEW                                   :Orbit view (prostřední tlačítko myši): {STRING2}
+STR_CONFIG_SETTING_ORBIT_VIEW_HELPTEXT                          :Vypnuto: prostřední tlačítko myši otáčí a naklání samotnou mapu. Zapnuto: tažením kterýmkoli směrem se mapa hned změní v kameru kroužící kolem místa uprostřed pohledu, do stran i nahoru a dolů; pravé tlačítko posouvá mapu pod ní, kolečko ji přibližuje a oddaluje. Dvojklik prostředním tlačítkem pohled vycentruje a ukáže zase mapu
+
 STR_CONFIG_SETTING_TOOLBAR_DROPDOWN_AUTOSELECT                  :Tradiční chování výběru lišt: {STRING}
 STR_CONFIG_SETTING_TOOLBAR_DROPDOWN_AUTOSELECT_HELPTEXT         :Vyberte chování výběru lišt. Když je vypnuto, lišty zůstanou otevřené, dokud nedojde k výběru. Když je zapnuto, lišty se aktivují při puštění tlačítka myši.
 

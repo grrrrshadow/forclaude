@@ -8963,16 +8963,33 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		UpdateViewportPosition(w, 0);
 	} else if (what == "krouzeni") {
 		/* The camera going round the place in the middle of the map (orbit_view.cpp): 'krouzeni <sklon stupne> [vzdalenost m]',
-		 * 'krouzeni vypnout', 'krouzeni tah <dx> <dy>' (the middle button dragged, dy up), 'krouzeni kolecko <n>', 'krouzeni' as it is.
-		 * Its pictures of the moment, everything read at once (as 'chodec'). */
+		 * 'krouzeni vypnout', 'krouzeni tah <dx> <dy> [n]' (the middle button dragged as the mouse goes: dx to the right, dy
+		 * down; n times over), 'krouzeni posun <dx> <dy> [n]' (the right button: the view moved so), 'krouzeni stred' (the
+		 * view centred, two clicks of the middle button), 'krouzeni kolecko <n>', 'krouzeni volba 0|1' (gui.orbit_view),
+		 * 'krouzeni' as it is. Its pictures of the moment, everything read at once (as 'chodec'). */
 		extern bool _eye_synchronous;
 		_eye_synchronous = true;
 		if (argv.size() > 2 && argv[2] == "vypnout") {
 			OrbitViewSet(false, 0, 0);
 		} else if (argv.size() > 4 && argv[2] == "tah") {
-			const bool did = OrbitTipByDrag(number(3).value_or(0), number(4).value_or(0));
-			OrbitDragEnd();
-			IConsolePrint(CC_DEFAULT, "test3d: krouzeni tah {}", did ? "vzat" : "nic");
+			/* As HandleMouseEvents() of window.cpp passes the middle button's drag on. */
+			bool did = false;
+			for (int k = std::max(1, number(5).value_or(1)); k > 0; k--) {
+				did = _settings_client.gui.orbit_view && OrbitByDrag(-number(3).value_or(0), -number(4).value_or(0));
+				if (!did) {
+					RotateViewByDrag(-number(3).value_or(0));
+					TiltViewByDrag(-number(4).value_or(0));
+				}
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: krouzeni tah {}", did ? "kamera" : "mapa sama");
+		} else if (argv.size() > 4 && argv[2] == "posun") {
+			for (int k = std::max(1, number(5).value_or(1)); k > 0; k--) w->OnScroll({number(3).value_or(0), number(4).value_or(0)});
+			UpdateViewportPosition(w, 0);
+		} else if (argv.size() > 2 && argv[2] == "stred") {
+			ResetViewYaw();
+			UpdateViewportPosition(w, 0);
+		} else if (argv.size() > 3 && argv[2] == "volba") {
+			IConsoleSetSetting("gui.orbit_view", number(3).value_or(0) != 0 ? 1 : 0);
 		} else if (argv.size() > 3 && argv[2] == "kolecko") {
 			if (OrbitViewOn()) OrbitViewWheel(number(3).value_or(0));
 		} else if (argv.size() > 2) {

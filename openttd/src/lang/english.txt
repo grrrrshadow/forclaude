@@ -1840,6 +1840,9 @@ STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Control how the
 STR_CONFIG_SETTING_SMOOTH_ZOOM                                  :Smooth zoom: {STRING2}
 STR_CONFIG_SETTING_SMOOTH_ZOOM_HELPTEXT                         :A step of the zoom of the main view is shown as the map growing or shrinking about the pointer, not as a cut. Only where the graphics card draws the map
 
+STR_CONFIG_SETTING_ORBIT_VIEW                                   :Orbit view (middle mouse button): {STRING2}
+STR_CONFIG_SETTING_ORBIT_VIEW_HELPTEXT                          :Off: the middle mouse button turns and tips the map itself. On: dragged any way, it leaves the map for a camera going round the place in the middle of the view, sideways and up or down; the right button moves the map under it, the wheel brings it nearer or farther. Two clicks of the middle button centre the view and show the map again
+
 STR_CONFIG_SETTING_TOOLBAR_DROPDOWN_AUTOSELECT                  :Traditional toolbar menu selection behaviour: {STRING2}
 STR_CONFIG_SETTING_TOOLBAR_DROPDOWN_AUTOSELECT_HELPTEXT         :Choose selection behaviour of toolbar menus. If off, toolbar menus will stay open until a selection is made. If on, toolbar menus will activate when the mouse button is released.
 

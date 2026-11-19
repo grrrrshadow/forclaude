@@ -3164,6 +3164,11 @@ void HandleMouseEvents()
 			extern bool FirstPersonRoofOrbit(int dx, int dy, bool back);
 			if (FirstPersonRoofOrbit(_cursor.delta.x, _cursor.delta.y, false)) {
 				middle_dragged = true;
+			} else if (_settings_client.gui.orbit_view && OrbitByDrag(-_cursor.delta.x, -_cursor.delta.y)) {
+				/* The camera going round a place chosen in the settings (the player, 19. 11.: "orbit view dej za přepínač
+				 * mezi dnešní kamerou a orbitview; hned z 0 doprava doleva bude orbitview"): any way the button is
+				 * dragged, at once (orbit_view.cpp). */
+				middle_dragged = true;
 			} else {
 				/* Sideways turns the map; up or down tips it a step at a time, the map itself, no camera of its own (the
 				 * player, 11. 11.: away with the camera going round; 18. 11.: "pohled shora otáčení nahoru dolu aspoň
@@ -3180,10 +3185,10 @@ void HandleMouseEvents()
 		} else {
 			auto now = std::chrono::steady_clock::now();
 			if (now - middle_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
-				/* Over the roof of the vehicle ridden: behind it again. On the camera going round a place: the map again, as
-				 * turned; on the map: facing north. */
+				/* Over the roof of the vehicle ridden: behind it again. Else the view centred: the map facing north, the
+				 * camera going round a place off (ResetViewYaw()). */
 				extern bool FirstPersonRoofOrbit(int dx, int dy, bool back);
-				if (!FirstPersonRoofOrbit(0, 0, true) && !OrbitDoubleClick()) ResetViewYaw();
+				if (!FirstPersonRoofOrbit(0, 0, true)) ResetViewYaw();
 				middle_clicked = {};
 			} else {
 				middle_clicked = now;

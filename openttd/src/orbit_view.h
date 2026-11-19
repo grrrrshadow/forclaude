@@ -19,9 +19,8 @@
 struct Window;
 
 bool OrbitViewOn();
-bool OrbitTipByDrag(int dx, int dy);
-void OrbitDragEnd();
-bool OrbitDoubleClick();
+bool OrbitByDrag(int turn, int up);
+bool OrbitScroll(Point delta);
 void OrbitViewWheel(int wheel);
 void OrbitViewTick(Window &main);
 bool DrawOrbitViewInto(const Window &main, const Rect &r);

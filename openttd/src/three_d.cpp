@@ -11,6 +11,7 @@
 
 #include "stdafx.h"
 #include "three_d.h"
+#include "orbit_view.h"
 #include "settings_type.h"
 #include "gfx_func.h"
 #include "landscape.h"
@@ -653,6 +654,8 @@ void TiltViewByDrag(int pixels)
 /** North up again, looking down as the game does: a new game, the setting switched off, two clicks of the middle button. */
 void ResetViewYaw()
 {
+	/* The camera going round a place goes off by centring the view (orbit_view.cpp; the player, 19. 11.). */
+	OrbitViewSet(false, 0, 0);
 	_drag_remainder = 0;
 	_tilt_remainder = 0;
 	if (_view_pitch != THREE_D_PITCH_DEFAULT) SetViewPitch(THREE_D_PITCH_DEFAULT);
@@ -667,5 +670,5 @@ void ResetViewYaw()
  */
 void ThreeDViewForBuilding()
 {
-	if (IsViewTurned()) ResetViewYaw();
+	if (IsViewTurned() || OrbitViewOn()) ResetViewYaw();
 }

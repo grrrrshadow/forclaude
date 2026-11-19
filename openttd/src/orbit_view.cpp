@@ -14,13 +14,19 @@
  * ways offered, "we do it properly, 1").
  *
  * The map, turned or not, is the game's projection, 30 degrees down, and the pictures of the GRFs (buildings, trees,
- * stations) are drawn for that angle only. The button that turns the map dragged up or down leaves the map for the
- * camera going round the place in the middle of it, drawn as the view from the eyes is (DrawOrbitView() of
- * viewport.cpp: our 3D models, the rest standing pictures), its look tipped down for real (CabEye::sp): up, from over
- * the roofs to straight down; down, to the ground from the side. Its place and its turn are the map's: the right button
- * moves the map under it as ever and the place with it, turning the map turns it. The wheel brings it nearer or farther.
- * Dragged back to the map's angle, or the button clicked twice, the map shows again. It is only to look at: a click on
- * it builds and picks nothing. Not in the savegame or the config, as the map's turn.
+ * stations) are drawn for that angle only. This camera is drawn as the view from the eyes is (DrawOrbitView() of
+ * viewport.cpp: our 3D models, the rest standing pictures), its look tipped down for real (CabEye::sp).
+ *
+ * It is one of the two cameras of the view from above, chosen in the settings (gui.orbit_view; the player, 19. 11.:
+ * "orbit view behind a switch between today's camera and the orbit view. From position 0 it is the orbit view not only
+ * up and down, at once from 0 to the right and to the left too. It goes off by centring the view, two clicks of the
+ * middle button. From above the right button moves the map and the middle one turns the camera"). Off, the middle
+ * button turns and tips the map itself (three_d.cpp), as before. On, the middle button dragged any way leaves the map
+ * for this camera at once: sideways it goes round the place in the middle, up over the roofs to straight down, down to
+ * the ground from the side. Its place and its turn are the map's: the right button moves the map under it and the
+ * place with it, turning the map turns it. The wheel brings it nearer or farther. The view centred (two clicks of the
+ * middle button, the key, a construction toolbar opened: ResetViewYaw()) the map shows again, facing north. It is only
+ * to look at: a click on it builds and picks nothing. Not in the savegame or the config, as the map's turn.
  */
 
 #include "stdafx.h"
@@ -40,6 +46,8 @@
 #include "video/video_driver.hpp"
 #include "widgets/main_widget.h"
 
+#include <algorithm>
+#include <cmath>
 #include <numbers>
 
 #include "safeguards.h"
@@ -51,7 +59,8 @@ bool FirstPersonFull();
 static constexpr double ORBIT_MAP_TIP_DEG = 30.0; ///< the map's own look down: the game's projection
 static constexpr double ORBIT_LOWEST_DEG = 2.0;   ///< the camera down to the ground: so far over the level at least
 static constexpr double ORBIT_HIGHEST_DEG = 90.0; ///< and over the roofs: straight down at most
-static constexpr int ORBIT_LEAVE_MAP_PX = 16;     ///< the drag leaves the map after so many pixels more up or down than sideways (not the hand's wobble while turning)
+static constexpr double ORBIT_DRAG_DEG = 1.0 / THREE_D_DRAG_PIXELS_PER_DEG; ///< a pixel of the drag: so far round or up, as the map turns
+static constexpr double ORBIT_SCROLL_LEAST_SIN = 0.25; ///< the right button moving the place along the look: the ground no flatter than this under the pointer (near the ground it would run away)
 static constexpr double ORBIT_NEAREST_M = 10.0;   ///< the camera this near the place at least
 static constexpr double ORBIT_FARTHEST_M = 300.0; ///< and this far at most: farther the view from the eyes draws the far land only
 static constexpr double ORBIT_WHEEL_STEP = 1.2;   ///< a notch of the wheel: so much nearer or farther
@@ -60,11 +69,17 @@ static constexpr double ORBIT_WHEEL_STEP = 1.2;   ///< a notch of the wheel: so 
 struct OrbitView {
 	bool on = false;
 	double tip_deg = ORBIT_MAP_TIP_DEG; ///< how far it looks down
-	int side = 0;                       ///< over the map's angle (1) or under it (-1): back across it, the map shows again
 	double distance_m = 100;            ///< how far it is from the place
-	int drag_y = 0;                     ///< the drag's pixels up or down not turned into degrees yet
-	int drag_x_sum = 0;                 ///< over the map: the drag's pixels sideways so far
-	int drag_y_sum = 0;                 ///< and up or down
+	/**
+	 * The place as this camera put it, exactly, and where it scrolled the map to for it: the view scrolls by whole pixels
+	 * of its zoom, and the place read back from it at every step of a drag would creep and shake. Good while the map is
+	 * where this camera left it (OrbitPlace()); moved by anything else (a vehicle followed, a jump to a place, the keys
+	 * turning it), the place is the map's again.
+	 */
+	bool place_kept = false;
+	double place_x = 0, place_y = 0;
+	int place_scroll_x = 0, place_scroll_y = 0;
+	float place_yaw = 0;
 	CabViewCamera camera;
 	CabViewPicture picture;
 	bool picture_ok = false;
@@ -79,8 +94,15 @@ bool OrbitViewOn()
 }
 
 /** The place in the middle of the main view, on the ground: world units, z the game's units of height. */
-static void OrbitPlace(const Viewport &vp, double &x, double &y, double &z)
+static void OrbitPlace(const ViewportData &vp, double &x, double &y, double &z)
 {
+	if (_orbit.place_kept && vp.dest_scrollpos_x == _orbit.place_scroll_x && vp.dest_scrollpos_y == _orbit.place_scroll_y && GetViewYawSigned() == _orbit.place_yaw) {
+		x = _orbit.place_x;
+		y = _orbit.place_y;
+		z = FirstPersonGroundZ(x, y);
+		return;
+	}
+	_orbit.place_kept = false;
 	const double vx = vp.virtual_left + vp.virtual_width / 2.0, vy = vp.virtual_top + vp.virtual_height / 2.0;
 	x = 0;
 	y = 0;
@@ -91,6 +113,24 @@ static void OrbitPlace(const Viewport &vp, double &x, double &y, double &z)
 		y = std::clamp(y, 0.0, Map::MaxY() * static_cast<double>(TILE_SIZE));
 		z = FirstPersonGroundZ(x, y);
 	}
+}
+
+/** The map scrolled so that a place is in the middle of the main view, and the place kept as it is (OrbitView::place_kept). */
+static void OrbitPutPlace(ViewportData &vp, double x, double y)
+{
+	x = std::clamp(x, 0.0, Map::MaxX() * static_cast<double>(TILE_SIZE));
+	y = std::clamp(y, 0.0, Map::MaxY() * static_cast<double>(TILE_SIZE));
+	double vx, vy;
+	ProjectTurnedF(x, y, FirstPersonGroundZ(x, y), vx, vy);
+	const int mask = ScaleByZoom(-1, vp.zoom);
+	vp.dest_scrollpos_x = vp.scrollpos_x = (static_cast<int>(std::lround(vx)) - vp.virtual_width / 2) & mask;
+	vp.dest_scrollpos_y = vp.scrollpos_y = (static_cast<int>(std::lround(vy)) - vp.virtual_height / 2) & mask;
+	_orbit.place_kept = true;
+	_orbit.place_x = x;
+	_orbit.place_y = y;
+	_orbit.place_scroll_x = vp.dest_scrollpos_x;
+	_orbit.place_scroll_y = vp.dest_scrollpos_y;
+	_orbit.place_yaw = GetViewYawSigned();
 }
 
 /** The level direction the map looks along, radians: up its screen, (-1, -1) facing north, turned with it (TurnWorldPoint()). */
@@ -117,73 +157,81 @@ static bool OrbitAllowed()
 	return _game_mode == GameMode::Normal && ThreeDEnabled() && main != nullptr && main->viewport != nullptr && !FirstPersonFull();
 }
 
-/** The camera on, the map's picture on the card shown no more. */
-static void OrbitStart(int side)
+/** The camera on, as the map shows the place: as far down, as big. The map's picture on the card shown no more. */
+static void OrbitStart()
 {
 	const Window *main = GetMainWindow();
 	_orbit.on = true;
-	_orbit.side = side;
 	_orbit.tip_deg = ORBIT_MAP_TIP_DEG;
-	_orbit.drag_y = 0;
 	_orbit.distance_m = std::clamp(OrbitDistanceOfMap(*main->viewport), ORBIT_NEAREST_M, ORBIT_FARTHEST_M);
+	_orbit.place_kept = false;
 	_orbit.camera = {};
 	_orbit.picture_ok = false;
 	HideTurnedMapOnCard();
 	MarkWholeScreenDirty();
 }
 
-/** The map again: the camera's picture on the card shown no more, its frame dropped. */
+/** The map again: the camera's picture on the card shown no more, its frame dropped. The map turned to a whole degree, as it turns by itself. */
 static void OrbitStop()
 {
 	if (!_orbit.on) return;
 	_orbit.on = false;
+	_orbit.place_kept = false;
 	if (Window *main = GetMainWindow(); main != nullptr) VideoDriver::GetInstance()->HideThreeDPicture(main);
 	DropEyeFrame(&_orbit.camera);
 	_orbit.picture = {};
+	SetViewYaw(std::round(GetViewYawSigned()));
 	MarkWholeScreenDirty();
 }
 
 /**
- * The button turning the map dragged (window.cpp): up or down, over the map it leaves it for the camera, on the camera
- * it goes higher or lower; back across the map's angle the map shows again.
- * @param dx pixels moved sideways
- * @param dy pixels moved up (down negative)
- * @return whether the drag did something here
+ * The middle button dragged with this camera chosen (gui.orbit_view; window.cpp): over the map it leaves it for the
+ * camera at once, whichever way; sideways the camera goes round the place in the middle (the map under it turned so,
+ * the place kept where it is), up or down it goes higher or lower.
+ * @param turn pixels moved sideways, as RotateViewByDrag() takes them
+ * @param up pixels moved up (down negative)
+ * @return whether the drag was this camera's (else the map's own turn)
  */
-bool OrbitTipByDrag(int dx, int dy)
+bool OrbitByDrag(int turn, int up)
 {
 	if (!OrbitAllowed()) {
 		OrbitStop();
 		return false;
 	}
-	if (!_orbit.on) {
-		_orbit.drag_x_sum += std::abs(dx);
-		_orbit.drag_y_sum += dy;
-		if (std::abs(_orbit.drag_y_sum) - _orbit.drag_x_sum < ORBIT_LEAVE_MAP_PX) return false;
-		OrbitStart(_orbit.drag_y_sum > 0 ? 1 : -1);
-		dy = _orbit.drag_y_sum - _orbit.side * ORBIT_LEAVE_MAP_PX;
+	if (turn == 0 && up == 0) return _orbit.on;
+	if (!_orbit.on) OrbitStart();
+	if (turn != 0) {
+		ViewportData &vp = *GetMainWindow()->viewport;
+		double x, y, z;
+		OrbitPlace(vp, x, y, z);
+		SetViewYaw(GetViewYawSigned() + static_cast<float>(turn * ORBIT_DRAG_DEG));
+		OrbitPutPlace(vp, x, y);
 	}
-	_orbit.drag_y += dy;
-	const int degrees = _orbit.drag_y / THREE_D_DRAG_PIXELS_PER_DEG;
-	if (degrees == 0) return true;
-	_orbit.drag_y -= degrees * THREE_D_DRAG_PIXELS_PER_DEG;
-	_orbit.tip_deg = std::clamp(_orbit.tip_deg + degrees, ORBIT_LOWEST_DEG, ORBIT_HIGHEST_DEG);
-	if ((_orbit.tip_deg - ORBIT_MAP_TIP_DEG) * _orbit.side <= 0) OrbitStop();
+	_orbit.tip_deg = std::clamp(_orbit.tip_deg + up * ORBIT_DRAG_DEG, ORBIT_LOWEST_DEG, ORBIT_HIGHEST_DEG);
 	return true;
 }
 
-/** The button let go: the next drag over the map counts from nothing. */
-void OrbitDragEnd()
+/**
+ * The map dragged under the camera (the right button, MainWindow::OnScroll()): the place moves as far as the ground
+ * under the pointer goes at the camera's distance and tip -- the map's own pixels are of its zoom, which the wheel on
+ * the camera leaves as it was.
+ * @param delta pixels of the screen the view moves by, as the map scrolls
+ * @return whether the camera took it (else the map scrolls by itself)
+ */
+bool OrbitScroll(Point delta)
 {
-	_orbit.drag_x_sum = 0;
-	_orbit.drag_y_sum = 0;
-}
-
-/** The button clicked twice: on the camera, the map again (true); over the map nothing here. */
-bool OrbitDoubleClick()
-{
-	if (!_orbit.on) return false;
-	OrbitStop();
+	if (!_orbit.on || !OrbitAllowed()) return false;
+	ViewportData &vp = *GetMainWindow()->viewport;
+	double x, y, z;
+	OrbitPlace(vp, x, y, z);
+	/* 90 degrees across the view (OrbitDistanceOfMap()): a pixel in the middle of it so many units of the world. */
+	const double unit = _orbit.distance_m * OBJECT_UNITS_PER_METRE / (vp.width / 2.0);
+	const double heading = OrbitHeading();
+	const double fx = std::cos(heading), fy = std::sin(heading);
+	const double right = delta.x * unit;
+	const double ahead = -delta.y * unit / std::max(std::sin(_orbit.tip_deg * M_PI / 180.0), ORBIT_SCROLL_LEAST_SIN);
+	/* To the right of the look: (-1, 1) facing north, where the look is (-1, -1). */
+	OrbitPutPlace(vp, x + fy * right + fx * ahead, y - fx * right + fy * ahead);
 	return true;
 }
 
@@ -196,7 +244,7 @@ void OrbitViewWheel(int wheel)
 /** A new picture of the camera, as big as the main view. */
 static void OrbitMakePicture(const Window &main)
 {
-	const Viewport &vp = *main.viewport;
+	const ViewportData &vp = *main.viewport;
 	OrbitPlace(vp, _orbit.x, _orbit.y, _orbit.z);
 	_orbit.heading = OrbitHeading();
 	_orbit.picture_ok = DrawOrbitView(_orbit.x, _orbit.y, _orbit.z, _orbit.heading, _orbit.tip_deg * M_PI / 180.0, _orbit.distance_m * OBJECT_UNITS_PER_METRE,
@@ -239,8 +287,7 @@ void OrbitViewSet(bool on, double tip_deg, double distance_m)
 		return;
 	}
 	if (!OrbitAllowed()) return;
-	if (!_orbit.on) OrbitStart(1);
-	_orbit.side = tip_deg >= ORBIT_MAP_TIP_DEG ? 1 : -1;
+	if (!_orbit.on) OrbitStart();
 	_orbit.tip_deg = std::clamp(tip_deg, ORBIT_LOWEST_DEG, ORBIT_HIGHEST_DEG);
 	if (distance_m > 0) _orbit.distance_m = std::clamp(distance_m, ORBIT_NEAREST_M, ORBIT_FARTHEST_M);
 }
@@ -249,7 +296,7 @@ void OrbitViewSet(bool on, double tip_deg, double distance_m)
 std::string DescribeOrbitView()
 {
 	if (!_orbit.on) return "vypnuto (mapa)";
-	return fmt::format("zapnuto: sklon {:.0f} st. ({}), vzdalenost {:.0f} m, misto {:.0f},{:.0f} vyska {:.0f}, smer {:.0f} st., obraz {}x{}{}", _orbit.tip_deg,
-			_orbit.side > 0 ? "nad mapou" : "pod mapou", _orbit.distance_m, _orbit.x, _orbit.y, _orbit.z, _orbit.heading * 180.0 / M_PI,
-			_orbit.picture.width, _orbit.picture.height, _orbit.picture_ok ? "" : " (zadny)");
+	return fmt::format("zapnuto: sklon {:.2f} st., vzdalenost {:.0f} m, misto {:.2f},{:.2f} vyska {:.0f}, smer {:.2f} st., mapa {:.2f} st., obraz {}x{}{}, {:.1f} ms", _orbit.tip_deg,
+			_orbit.distance_m, _orbit.x, _orbit.y, _orbit.z, _orbit.heading * 180.0 / M_PI, GetViewYawSigned(),
+			_orbit.picture.width, _orbit.picture.height, _orbit.picture_ok ? "" : " (zadny)", _orbit.camera.ms);
 }

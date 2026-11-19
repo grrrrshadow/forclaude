@@ -453,6 +453,13 @@ static void ThreeDChanged(int32_t)
 	MarkWholeScreenDirty();
 }
 
+/** The camera of the view from above chosen (gui.orbit_view): the view centred, whichever camera it was on. */
+static void OrbitViewChanged(int32_t)
+{
+	ResetViewYaw();
+	MarkWholeScreenDirty();
+}
+
 /** A group of the 3D in 3D or the game's, from above or from the eyes (gui.three_d_houses_map and the others, ThreeDGroupShown()), the wheels turning or not (gui.three_d_wheels): every view drawn anew. */
 static void ThreeDHousesChanged(int32_t)
 {
