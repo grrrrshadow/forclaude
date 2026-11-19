@@ -2314,8 +2314,17 @@ static void MarkVehicleLightPoolDirty(const Vehicle *v)
 	const int ahead = v->type == VehicleType::Ship ? 20 : 15, half = 12;
 	const int cx = v->x_pos + dir_dx[d] * ahead, cy = v->y_pos + dir_dy[d] * ahead;
 	const std::array<int, 4> box{cx - half, cy - half, cx + half, cy + half};
-	if (it != _light_pools.end() && it->second != box) MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true, true);
-	MarkWorldBoxDirty(box[0], box[1], box[2], box[3], v->z_pos - 8, v->z_pos + 8, true, true);
+	/* Where it was marked last: nothing of it to draw again (a vehicle standing with its lights on). Moved: where it was
+	 * and where it is as one box when the two meet -- a step of a unit or two, the two boxes nearly the same (the
+	 * player's #381: at night on z1, z2 and z5 11 to 25 thousand marks of the lights in 5 s, each move two). */
+	if (it != _light_pools.end() && it->second == box) return;
+	if (it != _light_pools.end() && it->second[0] <= box[2] && box[0] <= it->second[2] && it->second[1] <= box[3] && box[1] <= it->second[3]) {
+		MarkWorldBoxDirty(std::min(box[0], it->second[0]), std::min(box[1], it->second[1]), std::max(box[2], it->second[2]), std::max(box[3], it->second[3]),
+				v->z_pos - 8, v->z_pos + 8, true, true);
+	} else {
+		if (it != _light_pools.end()) MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true, true);
+		MarkWorldBoxDirty(box[0], box[1], box[2], box[3], v->z_pos - 8, v->z_pos + 8, true, true);
+	}
 	_light_pools[v->index.base()] = box;
 }
 
