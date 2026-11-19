@@ -719,6 +719,7 @@ void QueueGpuJob(GpuJob &job)
 static constexpr int GPU_WAIT_KINDS = 6;
 static std::atomic<double> _gpu_main_wait_ms[GPU_WAIT_KINDS] = {};
 static std::atomic<uint32_t> _gpu_main_waits[GPU_WAIT_KINDS] = {};
+static std::atomic<double> _gpu_main_wait_all_ms = 0; ///< all of it since the game started, never started over (ThreeDGpuMainWaitedMs())
 /** While it lives the main thread's wait on the card is counted as of this kind (GPU_WAIT_KINDS). */
 /* For the watch of a freeze (WatchFreeze()): what the main thread waits on the card for now (-1 nothing), since when. */
 static std::atomic<int> _watch_wait_kind = -1;
@@ -736,10 +737,13 @@ struct GpuMainWait {
 	{
 		if (std::this_thread::get_id() != _gpu_main_thread) return;
 		_watch_wait_kind = -1;
-		_gpu_main_wait_ms[this->kind] = _gpu_main_wait_ms[this->kind] + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
+		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
+		_gpu_main_wait_ms[this->kind] = _gpu_main_wait_ms[this->kind] + ms;
+		_gpu_main_wait_all_ms = _gpu_main_wait_all_ms + ms;
 		_gpu_main_waits[this->kind]++;
 	}
 };
+
 
 bool _gpu_stop = false;
 std::thread _gpu_thread;
@@ -8733,6 +8737,12 @@ bool ThreeDGpuDrawGroundTake()
 	return ok;
 }
 
+/** The rig ('test3d smycka'): how long the main thread has stood waiting for the card since the game started, ms: of a slow frame, how much of it was that. */
+double ThreeDGpuMainWaitedMs()
+{
+	return _gpu_main_wait_all_ms;
+}
+
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics)
 {
 	for (ThreeDGpuPicture *pic : pics) pic->drawn = false;
@@ -9159,6 +9169,7 @@ std::atomic<int> _rig_standing_refuse = 0;
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }
+double ThreeDGpuMainWaitedMs() { return 0; }
 bool ThreeDGpuDrawGround(ThreeDGpuGround &) { return false; }
 bool ThreeDGpuMoveViewGround(const ThreeDGpuGround &) { return false; }
 bool ThreeDGpuTakeViewMoveFailed() { return false; }

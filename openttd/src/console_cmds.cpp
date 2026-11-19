@@ -11722,6 +11722,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _small_card_dirty_on;
 		if (argv.size() > 3) _small_card_dirty_on = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: male naraz {}", _small_card_dirty_on ? "ano" : "ne");
+	} else if (what == "male" && argv.size() > 3 && argv[2] == "vrstva") {
+		/* 'male vrstva 0|1': the things that move in the small views the card draws laid by it over what stands each
+		 * frame (1; their moving layers, TurnedCardLayMovers()), or with what stands (0). */
+		extern bool _small_views_moving_layer_on;
+		_small_views_moving_layer_on = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: male vrstva {}", _small_views_moving_layer_on ? "ano" : "ne");
 	} else if (what == "male") {
 		/* 'male [0|1]': the small views facing north (the extra viewports, the vehicle windows) drawn by the card as the
 		 * main view, each its own pictures on it (1; SmallViewOnCard), or as the game drew them (0); all drawn again. */
@@ -12350,11 +12356,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				FrameDiaryTakeWindowPaints();
 			}
 			const uint64_t px_before = _redrawn_pixels, rects_before = _redrawn_rects;
+			extern double ThreeDGpuMainWaitedMs();
+			const double waited_before = ThreeDGpuMainWaitedMs();
 			const Clock::time_point start = Clock::now();
 			UpdateWindows();
 			times.push_back(std::chrono::duration<double, std::milli>(Clock::now() - start).count());
 			if (i > 0 && times.back() > 20) {
-				slow_frames += fmt::format(" {}:{:.0f}ms/{}px/{} [{} {:.0f}, {} {:.0f}, {} {:.0f}]", i, times.back(), _redrawn_pixels - px_before, _redrawn_rects - rects_before,
+				/* (Of a slow frame: how long, how much of it waiting for the card, the pixels and pieces drawn.) */
+				slow_frames += fmt::format(" {}:{:.0f}ms (karta {:.0f})/{}px/{} [{} {:.0f}, {} {:.0f}, {} {:.0f}]", i, times.back(), ThreeDGpuMainWaitedMs() - waited_before, _redrawn_pixels - px_before, _redrawn_rects - rects_before,
 						_turned_dirty_count[0] - kinds_before[0], _turned_dirty_area[0] - areas_before[0], _turned_dirty_count[1] - kinds_before[1], _turned_dirty_area[1] - areas_before[1],
 						_turned_dirty_count[2] - kinds_before[2], _turned_dirty_area[2] - areas_before[2]);
 			}

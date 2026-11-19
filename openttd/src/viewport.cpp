@@ -2687,11 +2687,11 @@ std::string TakeTurnedTimesForDiary(int frames)
 		extern uint64_t TakeThreeDCardVehiclesAsKept();
 		extern std::string TakeThreeDCardThingsPrepared();
 		extern double _turned_moving_kinds_ms[7];
-		extern uint64_t _turned_moving_lacked_twice;
+		extern uint64_t _turned_moving_lacked_twice, _turned_moving_small_passes;
 		const double *k = _turned_moving_kinds_ms;
-		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), svetla v noci {:.1f} ms, {} veci dano jako drzene bez tvaru, {}; karta nemela ani napodruhe {}", _turned_moving_passes, _turned_moving_ms / n,
+		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), svetla v noci {:.1f} ms, {} veci dano jako drzene bez tvaru, {}; karta nemela ani napodruhe {}; z toho v malych oknech {}x", _turned_moving_passes, _turned_moving_ms / n,
 				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), _turned_moving_glows_ms / n, TakeThreeDCardVehiclesAsKept(), TakeThreeDCardThingsPrepared(),
-				std::exchange(_turned_moving_lacked_twice, 0));
+				std::exchange(_turned_moving_lacked_twice, 0), std::exchange(_turned_moving_small_passes, 0));
 	}
 	_turned_moving_passes = 0;
 	_turned_moving_ms = 0;
@@ -7327,6 +7327,10 @@ struct TurnedCardGround {
 	ZoomLevel glows_zoom = ZoomLevel::Normal; ///< the zoom they are of
 	bool glows_told = false;       ///< the video driver has some of them (VideoDriver::SetThreeDGlows())
 	uint64_t laid_pass = UINT64_MAX; ///< the pass of DrawDirtyBlocks() whose dirty part of the view the card laid at once (TurnedCardLayDirty()); else none
+	/* The view's moving layer (TurnedMovingLayerUpdate(), TurnedCardLayMovers()). */
+	bool moving_layer = false;     ///< on now
+	bool movers_moved = false;     ///< a moving thing on the view told moved since they were last laid
+	bool moving_due = false;       ///< what stands, or the view, changed since: they are laid again
 };
 static TurnedCardGround _turned_card_ground;
 /** The picture on the card of the view being drawn (ViewportDoDraw()): the main view's, or a small view's (SmallViewOnCard). */
@@ -7433,10 +7437,15 @@ bool _standing_vehicles_on_card = true;
  * (MarkViewportDirty(), DirtyPlace::mover). Rig: test3d stojici vrstva.
  */
 bool _turned_moving_layer_on = true;
-static bool _turned_moving_layer = false; ///< on now (TurnedMovingLayerUpdate())
+/**
+ * And of the small views the card draws (SmallViewOnCard; the plan of the card's point G4, "the moving layer in the
+ * small windows too"): a vehicle's window following its car had the card lay the houses and all the vehicles about it
+ * again every frame -- the rig, four such windows over a street: a frame 22 to 25 ms where it is 2 without them, 120
+ * buildings and 400 vehicles laid a frame. Rig: test3d male vrstva.
+ */
+bool _small_views_moving_layer_on = true;
+uint64_t _turned_moving_small_passes = 0; ///< the diary: of the times the moving things were laid, those of the small views
 uint64_t _turned_moving_lacked_twice = 0; ///< the diary: things the card lacked in the pass that gave them whole too (TurnedCardLayMovers()): not laid that frame
-static bool _turned_movers_moved = false; ///< a moving thing on the main view told moved since they were last laid
-static bool _turned_moving_due = false;   ///< what stands, or the view, changed since: they are laid again
 uint64_t _turned_moving_passes = 0;       ///< the diary: times they were laid
 double _turned_moving_ms = 0;             ///< and how long that took on the main thread, the card's part waited for
 double _turned_moving_collect_ms = 0;     ///< of it: gathering the vehicles and figures (AddTurnedMovers())
@@ -7591,7 +7600,7 @@ static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 	const bool same_camera = g.vp == &vp && g.yaw == GetViewCameraKey() && g.pivot_x == px && g.pivot_y == py && g.zoom == zoom &&
 			g.band == band && g.w == vp.width + 2 * band && g.h == vp.height + 2 * band && g.made == made;
 	if (!same_camera) {
-		if (&g == &_turned_card_ground) _turned_moving_due = true;
+		g.moving_due = true;
 		g.vp = &vp;
 		g.yaw = GetViewCameraKey();
 		g.pivot_x = px;
@@ -7613,7 +7622,7 @@ static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 		 * that stay are not drawn again, and while they are laid again (the ground changed meanwhile) it stays where
 		 * it belongs, not where the view was (the player, 28. 10., the drag). */
 		const int dx = g.l - vl, dy = g.t - vt;
-		if (&g == &_turned_card_ground) _turned_moving_due = true;
+		g.moving_due = true;
 		ShiftTurnedCardMap(g.have, g.w, g.h, dx, dy);
 		ShiftTurnedCardMap(g.stood, g.w, g.h, dx, dy);
 		g.l = vl;
@@ -7722,9 +7731,8 @@ static void TurnedCardBandDirty(const Viewport &vp, int left, int top, int right
  * card, what stands there on its picture: a thing that moves there needs nothing of the screen drawn again by day (the
  * moving layer, TurnedCardLayMovers()) -- where the processor drew what stands (the card could not), it is in the screen.
  */
-static bool TurnedCardStoodAll(const Viewport &vp, int left, int top, int right, int bottom)
+static bool TurnedCardStoodAll(const TurnedCardGround &g, const Viewport &vp, int left, int top, int right, int bottom)
 {
-	const TurnedCardGround &g = _turned_card_ground;
 	if (g.vp != &vp || g.stood.size() != static_cast<size_t>(g.w) * g.h) return false;
 	const int x0 = std::max(0, UnScaleByZoomLower(left, vp.zoom) - g.l), y0 = std::max(0, UnScaleByZoomLower(top, vp.zoom) - g.t);
 	const int x1 = std::min(g.w, UnScaleByZoom(right, vp.zoom) + 1 - g.l), y1 = std::min(g.h, UnScaleByZoom(bottom, vp.zoom) + 1 - g.t);
@@ -9501,9 +9509,9 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	}
 	_turned_times.drawn += static_cast<int>(ground_tiles.size());
 
-	/* The things that move: laid over what stands each frame when the card lays it for the main view with the moving
-	 * layer on (TurnedCardLayMovers()), else here with it. */
-	const bool movers_apart = _turned_moving_layer && _tcg == &_turned_card_ground && card_usable && ground_laying.kept != nullptr;
+	/* The things that move: laid over what stands each frame when the card lays it for a view with its moving layer on
+	 * (TurnedCardLayMovers()), else here with it. */
+	const bool movers_apart = _tcg->moving_layer && card_usable && ground_laying.kept != nullptr;
 	if (!movers_apart) AddTurnedMovers(zoom, &cdpi, frame);
 	/* The marijuana the walkers planted (walker_inventory.h). */
 	ForWalkerPlantParts([zoom](std::string_view name, float scale, float stretch, double x, double y, double z, float facing) {
@@ -9586,7 +9594,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 			ShowTurnedCardGround();
 			_night_card_lit = _night_windows_now;
 			/* What stands changed under the moving things: they are laid over it again. */
-			if (_tcg == &_turned_card_ground) _turned_moving_due = true;
+			_tcg->moving_due = true;
 		} else {
 			/* Drawn again by the processor, its glows told again. */
 			_night_glows.resize(glows_before);
@@ -9793,7 +9801,7 @@ static void TurnedCardGlowsShow(const Viewport &vp)
 {
 	TurnedCardGround &card = *_tcg;
 	if (card.vp != &vp || !card.shown || !_night_windows_now || card.glows_zoom != vp.zoom) card.glows.clear();
-	if (card.vp != &vp || !card.shown || !_night_windows_now || !_turned_moving_layer) card.mover_glows.clear();
+	if (card.vp != &vp || !card.shown || !_night_windows_now || !card.moving_layer) card.mover_glows.clear();
 	if (card.glows.empty() && card.mover_glows.empty() && !card.glows_told) return;
 	std::vector<VideoDriver::ThreeDGlow> glows;
 	glows.reserve(card.glows.size() + card.mover_glows.size());
@@ -9820,7 +9828,7 @@ static void NightMoverLights(ZoomLevel zoom, bool turned, int w, int h, double u
  */
 static bool TurnedMoverGlowsOn()
 {
-	return _turned_moving_layer && _tcg == &_turned_card_ground && _night_windows_now;
+	return _tcg->moving_layer && _night_windows_now;
 }
 
 /**
@@ -10463,24 +10471,43 @@ void TurnedCardLayDirty(int left, int top, int right, int bottom)
 	}
 }
 
+static bool SmallViewsOnCardNow();
+
 /**
- * The moving layer on or off for the turned main view (_turned_moving_layer_on), before the dirty blocks are drawn: on
- * while the card lays and shows what stands on it and lays what changed at once. Switched, what stands is laid anew --
- * without the moving things, or with them again.
+ * The moving layer on or off for the turned main view (_turned_moving_layer_on) and for each small view the card draws
+ * (_small_views_moving_layer_on), before the dirty blocks are drawn: on while the card lays and shows what stands on the
+ * view and lays what changed at once. Switched, what stands is laid anew -- without the moving things, or with them
+ * again.
  */
 void TurnedMovingLayerUpdate()
 {
 	const Window *main = GetMainWindow();
 	const Viewport *vp = main != nullptr && main->viewport != nullptr ? main->viewport.get() : nullptr;
-	const TurnedCardGround &g = _turned_card_ground;
-	const bool want = _turned_moving_layer_on && vp != nullptr && IsViewportTurned(*vp) && _turned_card_standing_on && _turned_card_view_on && _turned_card_dirty_on &&
-			_standing_vehicles_on_card && !_screen_disable_anim && g.vp == vp && g.shown && g.band != 0;
-	if (want == _turned_moving_layer) return;
-	_turned_moving_layer = want;
-	ThreeDGpuMovingLayer(g.view, want);
-	_turned_moving_due = want;
-	Debug(misc, 1, "3D: the moving layer of the turned map {}", want ? "on" : "off");
-	MarkWholeScreenDirty();
+	TurnedCardGround &g = _turned_card_ground;
+	const bool card_lays = _turned_moving_layer_on && _turned_card_standing_on && _turned_card_view_on && _turned_card_dirty_on && _standing_vehicles_on_card && !_screen_disable_anim;
+	const bool want = card_lays && vp != nullptr && IsViewportTurned(*vp) && g.vp == vp && g.shown && g.band != 0;
+	if (want != g.moving_layer) {
+		g.moving_layer = want;
+		ThreeDGpuMovingLayer(g.view, want);
+		g.moving_due = want;
+		Debug(misc, 1, "3D: the moving layer of the turned map {}", want ? "on" : "off");
+		MarkWholeScreenDirty();
+	}
+	/* The small views the card draws: each its own, of its own picture on the card. */
+	extern bool _small_card_dirty_on;
+	const bool small_lay = card_lays && _small_views_moving_layer_on && _small_card_dirty_on && !_small_views_on_card.empty() && SmallViewsOnCardNow();
+	for (auto &[view, small] : _small_views_on_card) {
+		TurnedCardGround &c = small->card;
+		const bool small_want = small_lay && c.vp == view && c.shown;
+		if (small_want == c.moving_layer) continue;
+		c.moving_layer = small_want;
+		ThreeDGpuMovingLayer(c.view, small_want);
+		c.moving_due = small_want;
+		Debug(misc, 1, "3D: the moving layer of a small view {}x{} (view {} of the graphics card) {}", view->width, view->height, c.view, small_want ? "on" : "off");
+		/* All that stands on it laid anew, its window drawn again. */
+		std::fill(c.stood.begin(), c.stood.end(), 0);
+		AddDirtyBlock(view->left, view->top, view->left + view->width, view->top + view->height);
+	}
 }
 
 /**
@@ -10490,31 +10517,41 @@ void TurnedMovingLayerUpdate()
  * view as a block is (ViewportDoDrawTurned()), only they. A move of the view after them left the picture of them shown
  * a frame behind the ground and what stands, which the move takes along (MoveViewGround() of three_d_gpu.cpp).
  */
-static uint32_t TurnedCardLayMoversOnce(bool whole);
+static uint32_t TurnedCardLayMoversOnce(bool whole, const Viewport &vp, SmallViewOnCard *small);
 
 void TurnedCardLayMovers()
 {
 	/* The card had no picture of a thing given as kept (never laid, or let go of since): once more, those with their
 	 * shapes (ThreeDCardVehiclesGiveWhole()). */
-	if (TurnedCardLayMoversOnce(false) > 0) _turned_moving_lacked_twice += TurnedCardLayMoversOnce(true);
+	extern bool FirstPersonCoversMap();
+	const Window *main = GetMainWindow();
+	if (main != nullptr && main->viewport != nullptr && !FirstPersonCoversMap()) {
+		const Viewport &vp = *main->viewport;
+		if (TurnedCardLayMoversOnce(false, vp, nullptr) > 0) _turned_moving_lacked_twice += TurnedCardLayMoversOnce(true, vp, nullptr);
+	}
+	/* The small views the card draws, each its own moving things over what stands on its own picture. */
+	for (auto &[view, small] : _small_views_on_card) {
+		if (!small->card.moving_layer) continue;
+		if (TurnedCardLayMoversOnce(false, *view, small.get()) > 0) _turned_moving_lacked_twice += TurnedCardLayMoversOnce(true, *view, small.get());
+	}
 }
 
 /**
  * @param whole every thing with its shapes, none as the card keeps it (ThreeDCardVehiclesAsKeptBegin())
+ * @param vp the view: the main one, or a small view the card draws
+ * @param small that small view's pictures; nullptr the main view
  * @return how many things given as kept the card kept no more: not laid
  */
-static uint32_t TurnedCardLayMoversOnce(bool whole)
+static uint32_t TurnedCardLayMoversOnce(bool whole, const Viewport &vp, SmallViewOnCard *small)
 {
-	if (!_turned_moving_layer || (!whole && !_turned_movers_moved && !_turned_moving_due)) return 0;
-	extern bool FirstPersonCoversMap();
-	if (FirstPersonCoversMap()) return 0;
-	const Window *main = GetMainWindow();
-	if (main == nullptr || main->viewport == nullptr) return 0;
-	const Viewport &vp = *main->viewport;
-	TurnedCardGround &g = _turned_card_ground;
+	TurnedCardGround &g = small != nullptr ? small->card : _turned_card_ground;
+	if (!g.moving_layer || (!whole && !g.movers_moved && !g.moving_due)) return 0;
+	/* A small view faces north as it is drawn (ViewportDoDraw()), whatever the main view's angle. */
+	std::optional<ThreeDNorthCamera> north_camera;
+	if (small != nullptr) north_camera.emplace();
 	AutoRestoreBackup card(_tcg, &g);
-	AutoRestoreBackup kept_ground(_tg, &_turned_ground);
-	AutoRestoreBackup kept_version(_tg_version, &_turned_ground_version);
+	AutoRestoreBackup kept_ground(_tg, small != nullptr ? &small->ground : &_turned_ground);
+	AutoRestoreBackup kept_version(_tg_version, small != nullptr ? &small->version : &_turned_ground_version);
 	if (g.vp != &vp || !g.shown || !TurnedCardGroundFollow(vp, vp.zoom)) return 0;
 	const double t0 = TurnedNow();
 	const int vs = ScaleByZoom(1, vp.zoom), mask = ScaleByZoom(-1, vp.zoom);
@@ -10595,11 +10632,12 @@ static uint32_t TurnedCardLayMoversOnce(bool whole)
 	_vd.parent_sprites_to_sort.clear();
 	_vd.child_screen_sprites_to_draw.clear();
 	if (laid) {
-		_turned_movers_moved = false;
-		_turned_moving_due = false;
+		g.movers_moved = false;
+		g.moving_due = false;
 		/* Shown from now on (ThreeDGpuViewStanding()), the first time instead of what stands. */
 		ShowTurnedCardGround();
 		_turned_moving_passes++;
+		if (small != nullptr) _turned_moving_small_passes++;
 		_turned_times.moving++;
 	}
 	_turned_moving_ms += TurnedNow() - t0;
@@ -10845,6 +10883,8 @@ void ForgetViewportOnCard(const Viewport *vp)
 	if (it == _small_views_on_card.end()) return;
 	const SmallViewOnCard &small = *it->second;
 	if (VideoDriver::GetInstance() != nullptr) VideoDriver::GetInstance()->HideThreeDPicture(&small.card);
+	/* (Its moving layer with it: the next view to take these pictures of the card starts without.) */
+	ThreeDGpuMovingLayer(small.card.view, false);
 	ThreeDGpuForgetView(small.card.view, small.card.ground_key);
 	_small_views_on_card.erase(it);
 }
@@ -11316,12 +11356,20 @@ static bool MarkViewportDirtyTurned(const Viewport &vp, int left, int top, int r
 	/* A thing that moves on the turned main view with its moving layer on: laid over what stands each frame
 	 * (TurnedCardLayMovers()), nothing of what stands laid again; the screen there drawn again only at night, for its
 	 * lights (DrawNight()). */
-	const bool mover = _turned_moving_layer && &vp == _turned_card_ground.vp && DirtyPlaceIsMover();
+	TurnedCardGround *moving = nullptr; // the view's picture on the card, when its moving layer is on and the place a mover's
+	if (DirtyPlaceIsMover()) {
+		if (&vp == _turned_card_ground.vp) {
+			if (_turned_card_ground.moving_layer) moving = &_turned_card_ground;
+		} else if (auto small = _small_views_on_card.find(&vp); small != _small_views_on_card.end() && small->second->card.moving_layer) {
+			moving = &small->second->card;
+		}
+	}
+	const bool mover = moving != nullptr;
 	/* Only the pool of a vehicle's headlights on the turned main view whose moving things' glows the card lays over its
 	 * picture each frame (TurnedMoverGlows()): nothing there to draw again. Marked at every step of every lit vehicle,
 	 * it drew the blocks under it again where the card did not lay what stands (the player's diary of 17. 11.: at night
 	 * 7 000 to 11 000 marks in five seconds, the map's blocks drawn six times as often as by day). */
-	if (mover && DirtyPlaceLightOnly() && _turned_card_ground.shown && IsNightNow()) return true;
+	if (mover && DirtyPlaceLightOnly() && moving->shown && IsNightNow()) return true;
 
 	/* Past the turned main view, on the card about it: laid again when the view comes to it; a sign, the selection of
 	 * tiles facing north (SelectionOverTurned()) only drawn again. */
@@ -11342,10 +11390,10 @@ static bool MarkViewportDirtyTurned(const Viewport &vp, int left, int top, int r
 	if (top >= vp.virtual_height) return false;
 
 	if (mover) {
-		_turned_movers_moved = true;
+		moving->movers_moved = true;
 		/* At night the screen there was drawn again for its lights (DrawNight()): not for one whose lights the card has
 		 * with the moving layer (TurnedMoverGlows(), DirtyPlace::lights_told). */
-		if ((!IsNightNow() || DirtyPlaceLightsTold()) && TurnedCardStoodAll(vp, left + vp.virtual_left, top + vp.virtual_top, right + vp.virtual_left, bottom + vp.virtual_top)) return true;
+		if ((!IsNightNow() || DirtyPlaceLightsTold()) && TurnedCardStoodAll(*moving, vp, left + vp.virtual_left, top + vp.virtual_top, right + vp.virtual_left, bottom + vp.virtual_top)) return true;
 	}
 
 	AddDirtyBlock(
