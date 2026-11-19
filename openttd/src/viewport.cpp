@@ -2304,7 +2304,24 @@ struct TurnedTimes {
 	int drawn = 0;      ///< tiles drawn
 	int moving = 0;        ///< times the moving things were laid over what stands (TurnedCardLayMovers())
 	double moving_ms = 0;  ///< and how long that took, the card waited for
+	/* Of the billboards ("plakaty") the processor's part by what each thing is (AddTurnedStandingThing(), the player's
+	 * diary of 19. 11.: at z5 46-74 ms a frame, the card's 3-9 of it): StandingKind; the depth over them all
+	 * (TurnedStandingNear()) by the blocks. */
+	double standing_kind_ms[6] = {};
+	int standing_kind_n[6] = {};
 };
+
+/** What a thing standing on the turned view laid by the card is (TurnedTimes::standing_kind_ms). */
+enum StandingKind : uint8_t {
+	STANDING_BUILDING,  ///< a building drawn from its object (AddTurnedStandingObject())
+	STANDING_FACES,     ///< a box of faces (AddTurnedStandingFaces())
+	STANDING_LIKENESS,  ///< a vehicle's or a figure's picture (AddTurnedStandingLikeness())
+	STANDING_SPRITE,    ///< the sprites of the game (AddTurnedStandingSprite())
+	STANDING_APART,     ///< drawn apart by the processor (DrawTurnedStandingApart())
+	STANDING_DEPTH,     ///< the depth over all of a block (TurnedStandingNear())
+	STANDING_KINDS,
+};
+static_assert(STANDING_KINDS == std::size(TurnedTimes{}.standing_kind_ms));
 static TurnedTimes _turned_times;
 
 static inline double TurnedNow()
@@ -2318,6 +2335,10 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
+	IConsolePrint(CC_DEFAULT, "test3d: plakaty procesorem: budovy {:.1f} ms {}x, plochy {:.1f} ms {}x, podoby {:.1f} ms {}x, sprity {:.1f} ms {}x, zvlast {:.1f} ms {}x, hloubka {:.1f} ms {}x",
+			t.standing_kind_ms[STANDING_BUILDING], t.standing_kind_n[STANDING_BUILDING], t.standing_kind_ms[STANDING_FACES], t.standing_kind_n[STANDING_FACES],
+			t.standing_kind_ms[STANDING_LIKENESS], t.standing_kind_n[STANDING_LIKENESS], t.standing_kind_ms[STANDING_SPRITE], t.standing_kind_n[STANDING_SPRITE],
+			t.standing_kind_ms[STANDING_APART], t.standing_kind_n[STANDING_APART], t.standing_kind_ms[STANDING_DEPTH], t.standing_kind_n[STANDING_DEPTH]);
 	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, vozidel obrazkem {}, vozidel kartou {}, krabic {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_likeness, t.standing_vehicles, t.standing_faces, t.standing_apart, t.standing_card_ms);
 	if (t.moving > 0) IConsolePrint(CC_DEFAULT, "test3d: vrstva aut {}x, {:.1f} ms", t.moving, t.moving_ms);
 	if (t.small_old > 0) {
@@ -2625,8 +2646,17 @@ std::string TakeTurnedTimesForDiary(int frames)
 	extern uint64_t _turned_card_dirty_parts;
 	extern double _turned_card_dirty_area[2];
 	const uint64_t *why = _turned_card_dirty_why;
-	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 && t.small_old == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek (z toho v malych oknech postaru {:.0f}); zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {} (ne: vypnuto {}, kamera {}, zem {}, mimo {}, beze zmen {}, karta {}, pod oci {}), po kouscich {} ({:.0f} % plochy kusu), v malych oknech {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
-			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, t.models_small / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0], _turned_card_dirty_passes,
+	/* Of "plakaty" the processor's part by the kind of thing (StandingKind), ms and things a frame. */
+	std::string kinds;
+	{
+		static const char *names[STANDING_KINDS] = {"budovy", "plochy", "podoby", "sprity", "zvlast", "hloubka"};
+		for (int k = 0; k < STANDING_KINDS; k++) {
+			if (t.standing_kind_n[k] == 0) continue;
+			kinds += fmt::format("{}{} {:.1f} ms ({:.0f}x)", kinds.empty() ? "; " : ", ", names[k], t.standing_kind_ms[k] / n, t.standing_kind_n[k] / n);
+		}
+	}
+	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 && t.small_old == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}{}), modely {:.0f} ms na snimek (z toho v malych oknech postaru {:.0f}); zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {} (ne: vypnuto {}, kamera {}, zem {}, mimo {}, beze zmen {}, karta {}, pod oci {}), po kouscich {} ({:.0f} % plochy kusu), v malych oknech {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
+			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, kinds, t.models / n, t.models_small / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0], _turned_card_dirty_passes,
 			why[0], why[1], why[2], why[3], why[4], why[5], why[6], _turned_card_dirty_parts,
 			_turned_card_dirty_area[1] > 0 ? 100.0 * _turned_card_dirty_area[0] / _turned_card_dirty_area[1] : 0.0, _small_card_dirty_passes,
 			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
@@ -8696,24 +8726,25 @@ static bool AddTurnedStandingFaces(ThreeDGpuStanding &out, const DrawPixelInfo &
 }
 
 /** A standing thing of the block among what stands on it for the card (ThreeDGpuStanding): its sprites, or a picture the processor drew of it. */
-static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+/** @return what it was (StandingKind), for the diary */
+static StandingKind AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
-	if (ps.box_kind == 7 && AddTurnedStandingObject(out, frame, ps)) return;
+	if (ps.box_kind == 7 && AddTurnedStandingObject(out, frame, ps)) return STANDING_BUILDING;
 	switch (ps.box_kind) {
-		case 4: return;
-		case 5: AddTurnedStandingLikeness(out, frame, ps); return;
+		case 4: return STANDING_SPRITE;
+		case 5: AddTurnedStandingLikeness(out, frame, ps); return STANDING_LIKENESS;
 		case 1: case 2: case 6: case 8: case 9: case 10: case 11: case 12: case 13:
-			if (AddTurnedStandingFaces(out, frame, ps)) return;
+			if (AddTurnedStandingFaces(out, frame, ps)) return STANDING_FACES;
 			[[fallthrough]];
 		case 7: {
 			int x0, y0, w, h;
-			if (!TurnedStandingRect(frame, ps, x0, y0, w, h)) return;
+			if (!TurnedStandingRect(frame, ps, x0, y0, w, h)) return STANDING_APART;
 			std::shared_ptr<ThreeDGpuStandingPicture> pic = DrawTurnedStandingApart(frame, ps, x0, y0, w, h);
 			if (pic != nullptr) {
 				out.items.push_back({x0, y0, 0, std::move(pic)});
 				_turned_times.standing_apart++;
 			}
-			return;
+			return STANDING_APART;
 		}
 		default: break;
 	}
@@ -8728,6 +8759,7 @@ static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &
 			AddTurnedStandingSprite(out, frame, cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
 		}
 	}
+	return STANDING_SPRITE;
 }
 
 /** The signs and the floating texts of a block of the turned view: collected north-up against its north-up box, then each moved to where the ground under it is drawn turned. */
@@ -8853,7 +8885,10 @@ static uint32_t TurnedOrder(double near)
 static void AddTurnedStandingThingInOrder(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const TurnedSprite &s)
 {
 	const size_t from = out.items.size();
-	AddTurnedStandingThing(out, frame, *s.ps);
+	const double t0 = TurnedNow();
+	const StandingKind kind = AddTurnedStandingThing(out, frame, *s.ps);
+	_turned_times.standing_kind_ms[kind] += TurnedNow() - t0;
+	_turned_times.standing_kind_n[kind]++;
 	const uint32_t order = TurnedOrder(s.near);
 	/* Its box, world units from its lowest corner to past its highest (the game's boxes count their last unit in). */
 	const ParentSpriteToDraw &ps = *s.ps;
@@ -9519,7 +9554,10 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		on_card.view = _tcg->view;
 		on_card.view_w = _tcg->w;
 		on_card.view_h = _tcg->h;
+		const double td0 = TurnedNow();
 		TurnedStandingNear(on_card, frame, standing);
+		_turned_times.standing_kind_ms[STANDING_DEPTH] += TurnedNow() - td0;
+		_turned_times.standing_kind_n[STANDING_DEPTH]++;
 		/* Its lit pixels stay on the card: the glows by them are the video driver's (_night_card_lit). */
 		on_card.read_lit = false;
 		/* Only the parts of it that changed, when so laid (TurnedCardLayChanged()): what reaches into them, there. */
