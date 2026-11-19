@@ -70,6 +70,8 @@ static constexpr int CLIMB_OUT_TILES = 4;
 /** The shortest runway for a plane, tiles; a fast one needs more. */
 static constexpr uint RUNWAY_PLANE = 3;
 static constexpr uint RUNWAY_FAST_PLANE = 5;
+/** A plane on its rocket stands on its pad so many steps before it rises (the rocket stood up, the engines lit): an aircraft takes two steps a tick, so some four seconds. */
+static constexpr uint8_t LAUNCH_WAIT_TICKS = 250;
 
 /** Is this station's airport one built tile by tile (and not an old one)? */
 bool IsModularAirportStation(const Station *st)
@@ -144,10 +146,24 @@ static bool LandsVertically(EngineID engine)
 	return (Engine::Get(engine)->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL) == 0;
 }
 
-/** Does an aircraft of the engine rise vertically from its pad (a helicopter), or take off along a runway (a plane)? */
+bool ThreeDEngineStartsVertically(EngineID engine);
+
+/**
+ * Is the engine a plane a rocket carries up from a pad (the player's Buran on the Energia; its set's index says so,
+ * "start": "kolmo", ThreeDEngineStartsVertically())? It lands on a runway as a plane, unloads and loads at a stand, goes
+ * into the hangar and comes out of it on its rocket to a pad, where it stands up and rises (the player, 19. 11.: "with
+ * the rocket, take it through the depot: it unloads at the terminal for planes, goes to the depot and comes out with
+ * the rocket to the heliport").
+ */
+static bool StartsByRocket(EngineID engine)
+{
+	return (Engine::Get(engine)->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL) != 0 && ThreeDEngineStartsVertically(engine);
+}
+
+/** Does an aircraft of the engine rise vertically from its pad (a helicopter, a plane on a rocket), or take off along a runway (a plane)? */
 static bool TakesOffVertically(EngineID engine)
 {
-	return (Engine::Get(engine)->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL) == 0;
+	return (Engine::Get(engine)->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL) == 0 || StartsByRocket(engine);
 }
 
 /** The shortest runway the engine lands on and takes off from, tiles. */
@@ -163,18 +179,26 @@ static bool IsHeliPad(TileIndex t)
 	return kind == ModularAirportKind::Helipad || kind == ModularAirportKind::Heliport || kind == ModularAirportKind::Stand;
 }
 
+/** Is the tile a pad a rocket rises from: a helicopters' pad on the ground or on its deck, not a stand? */
+static bool IsLaunchPad(TileIndex t)
+{
+	const ModularAirportKind kind = GetModularAirportKind(t);
+	return kind == ModularAirportKind::Helipad || kind == ModularAirportKind::Heliport;
+}
+
 /**
  * Can an aircraft of the engine use the modular airport: a runway long enough for a plane, a pad or a stand for a
- * helicopter.
+ * helicopter; for a plane on a rocket a runway and a stand to come to, a hangar and a pad to leave from.
  */
 bool CanAircraftUseModularAirport(EngineID engine, const Station *st)
 {
 	if (!IsModularAirportStation(st)) return false;
-	bool stand = false, pad = false;
+	bool stand = false, pad = false, launch = false;
 	for (TileIndex t : st->modular_airport) {
 		if (!IsStationModularTile(t, st->index)) continue;
 		if (GetModularAirportKind(t) == ModularAirportKind::Stand) stand = true;
 		if (IsHeliPad(t)) pad = true;
+		if (IsLaunchPad(t)) launch = true;
 	}
 	bool runway = false;
 	if (!LandsVertically(engine) || !TakesOffVertically(engine)) {
@@ -184,6 +208,7 @@ bool CanAircraftUseModularAirport(EngineID engine, const Station *st)
 		}
 	}
 	/* Where it comes down, and from where it goes up: a pad or a runway, each by its own way. */
+	if (StartsByRocket(engine)) return runway && stand && launch && ModularAirportHasHangar(st);
 	if (LandsVertically(engine) ? !pad : !(runway && stand)) return false;
 	if (TakesOffVertically(engine) ? !pad : !runway) return false;
 	return true;
@@ -251,6 +276,7 @@ static bool IsGoal(TileIndex t, ModularAircraftGoal goal, uint runway_needed)
 	switch (goal) {
 		case ModularAircraftGoal::Stand: return GetModularAirportKind(t) == ModularAirportKind::Stand;
 		case ModularAircraftGoal::Hangar: return GetModularAirportKind(t) == ModularAirportKind::Hangar;
+		case ModularAircraftGoal::Pad: return IsLaunchPad(t);
 		case ModularAircraftGoal::Runway: {
 			if (GetModularAirportKind(t) != ModularAirportKind::RunwayEnd) return false;
 			/* A runway another aircraft has something of reserved (its other end, waiting there) is not taxied to:
@@ -334,7 +360,9 @@ static std::vector<ModularAircraftStep> SearchWayIn(StationID sid, const std::ve
 		 * (TEMATA 365). Through one only when there is no other way (the second search, through_stands). */
 		if (GetModularAirportKind(next) == ModularAirportKind::Stand && goal != ModularAircraftGoal::Stand && !through_stands) continue;
 		const uint step = IsModularAirportRunway(next) ? 3 : 1;
-		for (Trackdir in : DiagdirReachesTrackdirs(exit) & TrackBitsToTrackdirBits(PathTracks(next))) add(next, in, cost + step, k);
+		/* A pad on its deck has no tracks of its own: a rocket's transporter goes onto it straight from the tile beside it. */
+		const TrackBits next_tracks = goal == ModularAircraftGoal::Pad && GetModularAirportKind(next) == ModularAirportKind::Heliport ? TRACK_BIT_CROSS : PathTracks(next);
+		for (Trackdir in : DiagdirReachesTrackdirs(exit) & TrackBitsToTrackdirBits(next_tracks)) add(next, in, cost + step, k);
 	}
 	return {};
 }
@@ -772,6 +800,17 @@ static void ArriveAtGoal(Aircraft *v)
 			VehicleEnterDepot(v);
 			break;
 
+		case ModularAircraftGoal::Pad:
+			/* On its pad the rocket is stood up; after a while it rises (HandleLaunch()). */
+			SetModularAirportReservedTracks(t, TRACK_BIT_CROSS);
+			v->modular.tile = t;
+			v->modular.state = ModularAircraftState::Launch;
+			v->state = HELITAKEOFF;
+			v->cur_speed = 0;
+			v->turn_counter = LAUNCH_WAIT_TICKS;
+			SetAircraftPosition(v, v->x_pos, v->y_pos, PadZ(t));
+			break;
+
 		case ModularAircraftGoal::Runway: {
 			/* Turned along the runway, it waits for it (HandleHoldShort()). */
 			const ModularRunway r = RunwayOf(t);
@@ -846,7 +885,10 @@ static void HandleAtStand(Aircraft *v)
 			break;
 	}
 	if (go_to_hangar && !ModularAirportHasHangar(st)) go_to_hangar = false;
-	if (TakesOffVertically(v->engine_type)) {
+	/* A plane on a rocket leaves through the hangar, where its rocket is (HandleInHangar()). */
+	const bool rocket = StartsByRocket(v->engine_type);
+	if (rocket && ModularAirportHasHangar(st)) go_to_hangar = true;
+	if (TakesOffVertically(v->engine_type) && !rocket) {
 		if (v->current_order.IsType(OT_NOTHING)) return; // without orders it stays on its pad
 		/* Up from the pad; a helicopter for the hangar comes down onto it (ModularAircraftController()). */
 		v->modular.state = ModularAircraftState::HeliAscend;
@@ -878,7 +920,8 @@ static void HandleInHangar(Aircraft *v)
 	const TileIndex hangar = v->tile;
 	if (!IsValidTile(hangar) || !IsModularAirportTile(hangar) || GetModularAirportKind(hangar) != ModularAirportKind::Hangar) return;
 	const DiagDirection doors = GetModularAirportDirection(hangar);
-	if (TakesOffVertically(v->engine_type)) {
+	const bool rocket = StartsByRocket(v->engine_type);
+	if (TakesOffVertically(v->engine_type) && !rocket) {
 		AircraftLeaveHangar(v, DiagDirToDir(doors));
 		v->modular.state = ModularAircraftState::HeliAscend;
 		v->state = HELITAKEOFF;
@@ -887,7 +930,8 @@ static void HandleInHangar(Aircraft *v)
 	if ((v->tick_counter & 3) != 0) return;
 	if (GetModularAirportReservedTracks(hangar).Any()) return;
 	const bool here = v->current_order.IsType(OT_GOTO_STATION) && v->current_order.GetDestination() == v->targetairport;
-	if (!StartTaxi(v, here ? ModularAircraftGoal::Stand : ModularAircraftGoal::Runway, {{hangar, DiagDirToDiagTrackdir(doors)}})) return;
+	/* To a stand to load here; else to where it leaves from: a plane to a runway, one on a rocket to a pad. */
+	if (!StartTaxi(v, here ? ModularAircraftGoal::Stand : rocket ? ModularAircraftGoal::Pad : ModularAircraftGoal::Runway, {{hangar, DiagDirToDiagTrackdir(doors)}})) return;
 	AircraftLeaveHangar(v, DiagDirToDir(doors));
 }
 
@@ -1014,6 +1058,21 @@ static void HandleHeliDescend(Aircraft *v)
 	if (count > 0) SetAircraftPosition(v, v->x_pos, v->y_pos, v->z_pos > z ? std::max(v->z_pos - count, z) : std::min(v->z_pos + count, z));
 }
 
+/** A plane on its rocket stood up on its pad: after a while it rises as a helicopter does (HandleHeliAscend()), with its engines' roar. */
+static void HandleLaunch(Aircraft *v)
+{
+	if (v->turn_counter > 0) {
+		v->turn_counter--;
+		return;
+	}
+	if (!PlayVehicleSound(v, VSE_START)) {
+		SoundID sfx = AircraftVehInfo(v->engine_type)->sfx;
+		if (sfx < ORIGINAL_SAMPLE_COUNT) SndPlayVehicleFx(sfx, v);
+	}
+	v->modular.state = ModularAircraftState::HeliAscend;
+	v->state = HELITAKEOFF;
+}
+
 /** A helicopter rising from its pad or its hangar (the old code's helicopter raise); in the air the old code flies it on. */
 static void HandleHeliAscend(Aircraft *v)
 {
@@ -1083,6 +1142,7 @@ bool ModularAircraftController(Aircraft *v)
 		case ModularAircraftState::HeliApproach: HandleHeliApproach(v); break;
 		case ModularAircraftState::HeliDescend: HandleHeliDescend(v); break;
 		case ModularAircraftState::HeliAscend: HandleHeliAscend(v); break;
+		case ModularAircraftState::Launch: HandleLaunch(v); break;
 		default:
 			v->modular.state = ModularAircraftState::None;
 			return false;
@@ -1135,6 +1195,7 @@ void ModularAircraftReleaseAll(Aircraft *v)
 		case ModularAircraftState::Taxi:
 		case ModularAircraftState::AtStand:
 		case ModularAircraftState::HoldShort:
+		case ModularAircraftState::Launch:
 			if (IsValidTile(v->tile) && IsModularAirportTile(v->tile)) SetModularAirportReservedTracks(v->tile, {});
 			break;
 		default: break;
@@ -1194,6 +1255,7 @@ void AfterLoadModularAircraft()
 				break;
 			case ModularAircraftState::AtStand:
 			case ModularAircraftState::HoldShort:
+			case ModularAircraftState::Launch:
 				if (here_ok) SetModularAirportReservedTracks(v->tile, TRACK_BIT_CROSS);
 				break;
 			case ModularAircraftState::HeliApproach:

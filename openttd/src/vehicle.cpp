@@ -3934,6 +3934,9 @@ bool CanVehicleUseStation(EngineID engine_type, const Station *st)
 		case VehicleType::Aircraft:
 			/* An airport built tile by tile: a runway long enough for a plane, a pad or a stand for a helicopter. */
 			if (IsModularAirportStation(st)) return CanAircraftUseModularAirport(engine_type, st);
+			/* A plane a rocket carries up from a pad (the Buran on the Energia) needs its hangar and its pad joined by a
+			 * way: an airport built tile by tile only, no old one. */
+			if (ThreeDEngineStartsVertically(engine_type) && (e->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL) != 0) return false;
 			return st->facilities.Test(StationFacility::Airport) &&
 					st->airport.GetFTA()->flags.Test(e->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL ? AirportFTAClass::Flag::Airplanes : AirportFTAClass::Flag::Helicopters);
 

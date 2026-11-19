@@ -96,7 +96,8 @@ enum class ModularAircraftState : uint8_t {
 	Climb = 9, ///< A plane climbing out over the end of the runway.
 	HeliApproach = 10, ///< A helicopter flying to the pad it reserved.
 	HeliDescend = 11, ///< A helicopter coming down onto its pad.
-	HeliAscend = 12, ///< A helicopter rising from its pad or its hangar.
+	HeliAscend = 12, ///< A helicopter rising from its pad or its hangar; a rocket rising from its pad.
+	Launch = 13, ///< An aircraft a rocket carries, on its pad: stood up, waiting to rise.
 	End, ///< End marker.
 };
 
@@ -105,6 +106,7 @@ enum class ModularAircraftGoal : uint8_t {
 	Stand = 0, ///< A free stand (to load).
 	Hangar = 1, ///< A hangar (to the depot).
 	Runway = 2, ///< The end of a runway (to take off).
+	Pad = 3, ///< A helicopters' pad, out of the hangar on its rocket (to rise from).
 	End, ///< End marker.
 };
 

@@ -1158,6 +1158,7 @@ struct ThreeDVehicleObject {
 	float helm[3] = {};             ///< x, y, z, metres
 	float draught_m = 0;            ///< "ponor_m": how deep its hull goes under its waterline (its origin), metres
 	float height_m = 0;             ///< "rozmer_m" z: how high it is from its keel to its top (a boat's mast), metres; 0 not said
+	bool starts_vertically = false; ///< "start": "kolmo": an aircraft a rocket carries up from a pad, landing on a runway as a plane (the Buran on the Energia; aircraft_modular.cpp)
 	float dive_m = 0;               ///< "ponoreni_m": a submarine's, how deep its waterline may go under the surface (ShipDiveM()), metres; 0 it does not dive
 	float floors_over = NAN;        ///< a boat's rooms (ReadBoatRooms()): their floors under its waterline lifted to so many metres over it, NAN as they are
 	std::string interior_figure;    ///< a boat with rooms ("interier", the colleague's sailing yacht): the figure of its whole hull with its cabins, walked on and drawn while the walker is aboard; empty none
@@ -1398,6 +1399,7 @@ struct ThreeDLikenessSolid {
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
+bool ThreeDEngineStartsVertically(EngineID engine);
 std::vector<struct VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine);
 std::vector<struct VehicleConfigAspect> GetThreeDRecordConfigAspects(EngineID engine);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);

@@ -142,6 +142,32 @@ enum TTDPAircraftMovementStates : uint8_t {
  */
 static uint8_t MapAircraftMovementState(const Aircraft *v)
 {
+	/* At an airport built tile by tile (aircraft_modular.cpp) there is no layout of the old ones to read: by what it
+	 * does there. A plane on its rocket out of the hangar to its pad goes "to the runway", on the pad and rising from it
+	 * it "takes off as a helicopter": so its set tells its rocket lying from its rocket standing. */
+	switch (v->modular.state) {
+		case ModularAircraftState::None: break;
+		case ModularAircraftState::Approach: return AMS_TTDP_FLIGHT_APPROACH;
+		case ModularAircraftState::Landing: return AMS_TTDP_FLIGHT_DESCENT;
+		case ModularAircraftState::Rollout: return AMS_TTDP_BRAKING;
+		case ModularAircraftState::Taxi:
+			switch (v->modular.goal) {
+				case ModularAircraftGoal::Hangar: return AMS_TTDP_TO_HANGAR;
+				case ModularAircraftGoal::Stand: return AMS_TTDP_TO_INWAY;
+				default: return AMS_TTDP_TO_OUTWAY;
+			}
+		case ModularAircraftState::AtStand: return AMS_TTDP_TO_PAD1;
+		case ModularAircraftState::InHangar: return AMS_TTDP_HANGAR;
+		case ModularAircraftState::HoldShort: return AMS_TTDP_TO_OUTWAY;
+		case ModularAircraftState::TakeoffRoll: return AMS_TTDP_TAKEOFF;
+		case ModularAircraftState::Climb: return AMS_TTDP_CLIMBING;
+		case ModularAircraftState::HeliApproach: return AMS_TTDP_FLIGHT_TO_TOWER;
+		case ModularAircraftState::HeliDescend: return AMS_TTDP_HELI_LAND_AIRPORT;
+		case ModularAircraftState::HeliAscend:
+		case ModularAircraftState::Launch: return AMS_TTDP_HELI_TAKEOFF_AIRPORT;
+		default: return AMS_TTDP_FLIGHT_TO_TOWER;
+	}
+
 	const Station *st = GetTargetAirportIfValid(v);
 	if (st == nullptr) return AMS_TTDP_FLIGHT_TO_TOWER;
 

@@ -919,6 +919,105 @@ static bool ConTestLevelCrossing(std::span<std::string_view> argv)
 	return true;
 }
 
+/**
+ * The rig: an airport built tile by tile (aircraft_modular.cpp) with all an aircraft needs -- a runway of seven tiles, a
+ * stand, a hangar and a helicopters' pad joined by taxiways --, a second one to fly to, and an aircraft by its name
+ * bought in the first one's hangar with orders to both. 'testmodletiste <x> <y> <x2> <y2> [<jmeno>]'.
+ *
+ *   y      R R R R R R R     the runway, its ends pivots
+ *   y + 1  |           |     taxiways down from both ends
+ *   y + 2  S - - + - + '     the stand, the taxiway along, its branches
+ *   y + 3        H   P       the hangar (its doors up to the taxiway), the pad
+ */
+static bool ConTestModularAirport(std::span<std::string_view> argv)
+{
+	if (argv.size() < 5 || argv.size() > 6) {
+		IConsolePrint(CC_HELP, "Build two modular airports and an aircraft flying between them. Usage: 'testmodletiste <x> <y> <x2> <y2> [<jmeno>]'.");
+		return true;
+	}
+	auto px = ParseInteger(argv[1]), py = ParseInteger(argv[2]), qx = ParseInteger(argv[3]), qy = ParseInteger(argv[4]);
+	if (!px.has_value() || !py.has_value() || !qx.has_value() || !qy.has_value()) return false;
+	const std::string wanted = argv.size() > 5 ? std::string(argv[5]) : std::string();
+	if (!Company::IsValidID(CompanyID::Begin())) {
+		extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+		DoStartupNewCompany(false, CompanyID::Invalid());
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			IConsolePrint(CC_ERROR, "testmodletiste: nejde zalozit firma.");
+			return true;
+		}
+	}
+	if (_local_company == COMPANY_SPECTATOR) SetLocalCompany(CompanyID::Begin());
+	AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+	Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
+	const DoCommandFlags flags{DoCommandFlag::Execute};
+
+	std::string why;
+	auto build = [&](uint x, uint y) -> Station * {
+		Command<Commands::LevelLand>::Do(flags, TileXY(x + 7, y + 4), TileXY(x > 0 ? x - 1 : x, y > 0 ? y - 1 : y), false, LevelMode::Level);
+		CommandCost ret = Command<Commands::BuildAirportRunway>::Do(flags, TileXY(x, y), TileXY(x + 6, y), AirportSurface::Asphalt, NEW_STATION, false);
+		if (ret.Failed()) {
+			why = "draha: " + RefusalReason(ret);
+			return nullptr;
+		}
+		Station *st = Station::GetByTile(TileXY(x, y));
+		if (st == nullptr) return nullptr;
+		auto taxi = [&](uint ax, uint ay, uint bx, uint by, Track track) {
+			CommandCost c = Command<Commands::BuildAirportTaxiway>::Do(flags, TileXY(ax, ay), TileXY(bx, by), track, AirportSurface::Asphalt, st->index, false);
+			if (c.Failed() && why.empty()) why = fmt::format("pojezdovka {},{}: {}", ax, ay, RefusalReason(c));
+		};
+		auto piece = [&](uint ax, uint ay, ModularAirportKind kind, DiagDirection dir) {
+			CommandCost c = Command<Commands::BuildAirportPiece>::Do(flags, TileXY(ax, ay), kind, dir, 0, AirportSurface::Asphalt, st->index, false);
+			if (c.Failed() && why.empty()) why = fmt::format("kus {},{}: {}", ax, ay, RefusalReason(c));
+		};
+		/* Down from both ends of the runway; along to the stand; the turn up to the far end's way. */
+		taxi(x, y + 1, x, y + 1, Track::Y);
+		taxi(x + 6, y + 1, x + 6, y + 1, Track::Y);
+		piece(x, y + 2, ModularAirportKind::Stand, DiagDirection::NW);
+		taxi(x + 1, y + 2, x + 5, y + 2, Track::X);
+		taxi(x + 6, y + 2, x + 6, y + 2, Track::Upper);
+		/* The branches down to the hangar and to the pad, from either side. */
+		for (uint bx : {x + 3, x + 5}) {
+			taxi(bx, y + 2, bx, y + 2, Track::Lower);
+			taxi(bx, y + 2, bx, y + 2, Track::Right);
+		}
+		piece(x + 3, y + 3, ModularAirportKind::Hangar, DiagDirection::NW);
+		piece(x + 5, y + 3, ModularAirportKind::Helipad, DiagDirection::NW);
+		taxi(x + 5, y + 3, x + 5, y + 3, Track::Y);
+		return st;
+	};
+	Station *first = build(static_cast<uint>(*px), static_cast<uint>(*py));
+	Station *second = first != nullptr ? build(static_cast<uint>(*qx), static_cast<uint>(*qy)) : nullptr;
+	if (first == nullptr || second == nullptr || !why.empty()) {
+		IConsolePrint(CC_ERROR, "testmodletiste: letiste nejde postavit - {}", why);
+		return true;
+	}
+	const TileIndex hangar = TileXY(static_cast<uint>(*px) + 3, static_cast<uint>(*py) + 3);
+	uint tried = 0;
+	why = "zadny typ letadla";
+	for (const Engine *e : Engine::IterateType(VehicleType::Aircraft)) {
+		if (!wanted.empty() && GetString(STR_ENGINE_NAME, e->index).find(wanted) == std::string::npos) continue;
+		tried++;
+		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(flags, hangar, e->index, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost.Failed()) {
+			why = RefusalReason(cost);
+			continue;
+		}
+		int n = 0;
+		for (const Station *st : {first, second}) {
+			Order o{};
+			o.MakeGoToStation(st->index);
+			o.SetStopLocation(OrderStopLocation::FarEnd);
+			Command<Commands::InsertOrder>::Do(flags, veh, n++, o);
+		}
+		Command<Commands::StartStopVehicle>::Do(flags, veh, false);
+		IConsolePrint(CC_DEFAULT, "testmodletiste: letiste na ({},{}) a ({},{}), hangar ({},{}), letadlo {} '{}' koupeno, rozkazu {}.", *px, *py, *qx, *qy,
+				TileX(hangar), TileY(hangar), Vehicle::Get(veh)->unitnumber, GetString(STR_ENGINE_NAME, e->index), Vehicle::Get(veh)->GetNumOrders());
+		return true;
+	}
+	IConsolePrint(CC_ERROR, "testmodletiste: letiste stoji, ale zadne z {} letadel nejde koupit - {}", tried, why);
+	return true;
+}
+
 static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3 || argv.size() > 7) {
@@ -12515,7 +12614,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowTo(found->x_pos, found->y_pos, found->z_pos, true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} smer {}{}", found->unitnumber, to_underlying(found->type), found->x_pos, found->y_pos, found->z_pos, to_underlying(found->direction),
-				found->type == VehicleType::Aircraft ? fmt::format(", letadlo stav {} rychlost {}", Aircraft::From(found)->state, found->cur_speed) : std::string());
+				found->type == VehicleType::Aircraft ? fmt::format(", letadlo stav {} modularni {} cil {} rychlost {}", Aircraft::From(found)->state, to_underlying(Aircraft::From(found)->modular.state), to_underlying(Aircraft::From(found)->modular.goal), found->cur_speed) : std::string());
 	} else if (what == "svah") {
 		/* 'svah [n]': the middle of the view on the n-th vehicle drawn from its object that goes up or down a slope now,
 		 * and how far its front is raised (the eye's figure of it, GetThreeDEyeVehicle()). */
@@ -20222,6 +20321,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("miluju",                  ConIndustryHealth);
 	IConsole::CmdRegister("mmm",                     ConFillVehicles);
 	IConsole::CmdRegister("testletadlo",             ConTestBuildAircraft);
+	IConsole::CmdRegister("testmodletiste",          ConTestModularAirport);
 	IConsole::CmdRegister("testlod",                 ConTestBuildShip);
 	IConsole::CmdRegister("testprejezd",             ConTestLevelCrossing);
 	IConsole::CmdRegister("testnalet",               ConTestAirRaid);

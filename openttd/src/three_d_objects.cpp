@@ -7905,6 +7905,8 @@ static void ReadThreeDVehicleObjects()
 					obj.height_m = std::clamp(e.at("rozmer_m")[2].get<float>(), 0.0f, 200.0f);
 				}
 				if (e.contains("ponoreni_m") && e.at("ponoreni_m").is_number()) obj.dive_m = std::clamp(e.at("ponoreni_m").get<float>(), 0.0f, 100.0f);
+				/* An aircraft its carrier takes up from a pad (the colleague's Buran on the Energia, "start": "kolmo"). */
+				if (e.contains("start") && e.at("start").is_string()) obj.starts_vertically = e.at("start").get<std::string>() == "kolmo";
 				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
 				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */
 				if (e.contains("svetla") && e.at("svetla").is_object()) {
@@ -8759,6 +8761,17 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 	if (p == nullptr || p->obj == nullptr) return nullptr;
 	if (piece != nullptr) *piece = p->piece;
 	return p->obj;
+}
+
+/**
+ * Whether an engine's object says a rocket carries it up from a pad ("start": "kolmo"; the player, 17. 11.: "the Buran
+ * will take off vertically from a heliport and land without the rocket on a runway"). The set's index says so, as it
+ * says how deep a submarine dives: with no object of it read, it is a plane as its GRF says.
+ */
+bool ThreeDEngineStartsVertically(EngineID engine)
+{
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine);
+	return obj != nullptr && obj->starts_vertically;
 }
 
 /**
