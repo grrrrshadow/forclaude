@@ -513,6 +513,8 @@ struct GlFunctions {
 	GLsync (THREE_D_GL_API *glFenceSync)(GLenum condition, GLbitfield flags) = nullptr;
 	/* Without, a glDrawArrays() for each range (DrawStandingOnCard()). */
 	void (THREE_D_GL_API *glMultiDrawArrays)(GLenum mode, const GLint *first, const GLsizei *count, GLsizei drawcount) = nullptr;
+	/* OpenGL 4.4: textures on units one after another at once (DrawEyeObjects()); without, each unit made active and bound. */
+	void (THREE_D_GL_API *glBindTextures)(GLuint first, GLsizei count, const GLuint *textures) = nullptr;
 	void (THREE_D_GL_API *glDeleteSync)(GLsync sync) = nullptr;
 	void (THREE_D_GL_API *glFlush)() = nullptr;
 };
@@ -1325,26 +1327,62 @@ const char *const EYE_BUILDING_VERTEX = R"(#version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
 layout(location = 2) in float a_light;
+layout(location = 3) in float a_kind; // its texture * 4 + its side + 1 (BuildingOnCard()), as a float (no whole-number attributes, see ShapeOnCard())
 uniform mat4 u_matrix;
 uniform vec3 u_metres;
 out vec2 v_uv;
 out vec3 v_m;
 flat out float v_light;
+flat out int v_tex;
+flat out int v_facing;
 void main()
 {
 	gl_Position = u_matrix * vec4(a_pos, 1.0);
 	v_uv = a_uv;
 	v_m = a_pos * u_metres;
 	v_light = a_light;
+	int kind = int(a_kind + 0.5);
+	v_tex = kind / 4;
+	v_facing = kind - v_tex * 4 - 1;
 }
 )";
 
 /* The building's first texture painted as it is drawn (ThreeDGpuBuildingPaint; ThreeDObject::Painted() of
  * three_d_objects.cpp paints a copy the same way): each part where its mask is -- the texel's colour to the part's, as
  * bright as the texel is of its start --, then the part's pattern over it, laid by the surface's own place in metres:
- * across it level, up its slope (a level surface along x and y), a picture every so many metres. */
+ * across it level, up its slope (a level surface along x and y), a picture every so many metres.
+ * Its runs of up to EYE_BUILDING_SLOTS textures at once (DrawEyeObjects()): the texture u_base on u_tex, the next on
+ * u_tex1 and so on (the units EYE_BUILDING_FIRST_UNIT on); a side facing away (u_cull, its side not 0) left out as the card's culling left it out: a side 1
+ * drawn when its corners go round clockwise on the picture as the card has it, -1 counter-clockwise. */
 const char *const EYE_BUILDING_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_tex;
+uniform sampler2D u_tex1, u_tex2, u_tex3, u_tex4, u_tex5, u_tex6, u_tex7;
+uniform int u_base;
+uniform int u_cull;
+flat in int v_tex;
+flat in int v_facing;
+ivec2 Size(int s)
+{
+	if (s == 0) return textureSize(u_tex, 0);
+	if (s == 1) return textureSize(u_tex1, 0);
+	if (s == 2) return textureSize(u_tex2, 0);
+	if (s == 3) return textureSize(u_tex3, 0);
+	if (s == 4) return textureSize(u_tex4, 0);
+	if (s == 5) return textureSize(u_tex5, 0);
+	if (s == 6) return textureSize(u_tex6, 0);
+	return textureSize(u_tex7, 0);
+}
+vec4 Fetch(int s, ivec2 p)
+{
+	if (s == 0) return texelFetch(u_tex, p, 0);
+	if (s == 1) return texelFetch(u_tex1, p, 0);
+	if (s == 2) return texelFetch(u_tex2, p, 0);
+	if (s == 3) return texelFetch(u_tex3, p, 0);
+	if (s == 4) return texelFetch(u_tex4, p, 0);
+	if (s == 5) return texelFetch(u_tex5, p, 0);
+	if (s == 6) return texelFetch(u_tex6, p, 0);
+	return texelFetch(u_tex7, p, 0);
+}
 uniform float u_near;
 uniform int u_parts;
 uniform sampler2D u_mask0, u_mask1, u_mask2, u_mask3;
@@ -1381,14 +1419,16 @@ vec3 painted(vec3 c, float m, vec4 colour, vec4 about, sampler2D pattern, vec3 n
 }
 void main()
 {
+	if (u_cull != 0 && v_facing != 0 && (v_facing > 0) == gl_FrontFacing) discard;
 	o_glow = vec4(0.0);
-	ivec2 size = textureSize(u_tex, 0);
+	int slot = v_tex - u_base;
+	ivec2 size = Size(slot);
 	ivec2 at = ivec2(floor(v_uv * vec2(size)));
 	if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) discard;
-	vec4 t = texelFetch(u_tex, at, 0);
+	vec4 t = Fetch(slot, at);
 	if (t == vec4(0.0)) discard;
 	vec3 c = floor(t.rgb * 255.0 + 0.5);
-	if (u_parts > 0) {
+	if (u_parts > 0 && v_tex == 0) {
 		vec3 n = cross(dFdx(v_m), dFdy(v_m));
 		float nl = length(n);
 		if (nl >= 1e-12) n /= nl;
@@ -2912,6 +2952,13 @@ bool LoadGlFunctions(std::string &why)
 	gl.glMultiDrawArrays = reinterpret_cast<decltype(gl.glMultiDrawArrays)>(GetGlProc("glMultiDrawArrays"));
 	gl.glDeleteSync = reinterpret_cast<decltype(gl.glDeleteSync)>(GetGlProc("glDeleteSync"));
 	gl.glFlush = reinterpret_cast<decltype(gl.glFlush)>(GetGlProc("glFlush"));
+	{
+		/* Counted as the others; given only by an OpenGL of 4.4 or later (StartCard()). */
+		using Slot = GlCounted<__COUNTER__, decltype(gl.glBindTextures)>;
+		if constexpr (Slot::index < GL_COUNTED_FUNCTIONS) _gl_function_names[Slot::index] = "glBindTextures";
+		Slot::real = reinterpret_cast<decltype(gl.glBindTextures)>(GetGlProc("glBindTextures"));
+		gl.glBindTextures = Slot::real != nullptr ? &Slot::Call : nullptr;
+	}
 	return true;
 }
 
@@ -3195,6 +3242,11 @@ static constexpr uint32_t FIRST_DRAW_EYE_MESH = 0x100, FIRST_DRAW_EYE_BUILDING =
 /** The textures a group of the triangles of a frame from the eyes draws at once (EYE_TRI_FRAGMENT's u_tex to u_tex5), on these units (1 is the grass's). */
 static constexpr int EYE_TRI_SLOTS = 6;
 static constexpr std::array<GLenum, EYE_TRI_SLOTS> EYE_TRI_UNITS = {0, 2, 3, 4, 5, 6};
+/** The textures of a building from the eyes drawn at once (EYE_BUILDING_FRAGMENT, DrawEyeObjects()) on the units 8 to
+ * 15, one after another (bound at once by glBindTextures() where OpenGL has it); its parts' masks on 0 to 3, their
+ * patterns on 4 to 7 (THREE_D_GPU_BUILDING_PAINTS); the 16 units OpenGL 3.3 has at least. */
+static constexpr int EYE_BUILDING_SLOTS = 8;
+static constexpr GLuint EYE_BUILDING_FIRST_UNIT = 8, EYE_BUILDING_MASK_UNIT = 0, EYE_BUILDING_PATTERN_UNIT = 4;
 
 /**
  * A uniform's location in a program, asked of the card once (the steps of a frame from the eyes asked at every frame:
@@ -3285,6 +3337,8 @@ bool StartCard(std::string &why, std::string &describe)
 		why = fmt::format("OpenGL {} (3.3 needed)", version != nullptr ? version : "?");
 		return false;
 	}
+	/* A context may hand out a function it does not have: glBindTextures() only from its version on. */
+	if (major * 10 + std::min(minor, 9) < 44) gl.glBindTextures = nullptr;
 	Step("preklad programu vozidel (shader)");
 	if (!MakeProgram(_mesh_program, MESH_VERTEX, MESH_FRAGMENT, why)) return false;
 	Step("preklad programu svetel (shader)");
@@ -6686,7 +6740,8 @@ const GpuBuilding *BuildingOnCard(const ThreeDGpuBuilding &b)
 	const size_t corners = b.pos.size() / 3;
 	if (b.uid == 0 || corners == 0 || b.uv.size() < corners * 2) return nullptr;
 	const bool lit = b.light.size() == corners;
-	/* Its triangles by texture and side, in that order. */
+	/* Its triangles by texture and side, in that order; each corner its place, uv, light and its triangle's texture and
+	 * side (EYE_BUILDING_VERTEX). */
 	std::map<std::pair<uint8_t, int8_t>, std::vector<float>> by;
 	for (size_t t = 0; t + 2 < b.tri.size(); t += 3) {
 		const uint32_t ia = b.tri[t], ib = b.tri[t + 1], ic = b.tri[t + 2];
@@ -6695,26 +6750,29 @@ const GpuBuilding *BuildingOnCard(const ThreeDGpuBuilding &b)
 		const int8_t facing = t / 3 < b.facing.size() ? b.facing[t / 3] : 0;
 		const float light = lit ? static_cast<float>((b.light[ia] + b.light[ib] + b.light[ic]) / 3) : 256.0f;
 		std::vector<float> &v = by[{texture, facing}];
-		for (uint32_t i : {ia, ib, ic}) v.insert(v.end(), {b.pos[i * 3], b.pos[i * 3 + 1], b.pos[i * 3 + 2], b.uv[i * 2], b.uv[i * 2 + 1], light});
+		const float kind = static_cast<float>(texture * 4 + facing + 1);
+		for (uint32_t i : {ia, ib, ic}) v.insert(v.end(), {b.pos[i * 3], b.pos[i * 3 + 1], b.pos[i * 3 + 2], b.uv[i * 2], b.uv[i * 2 + 1], light, kind});
 	}
 	GpuBuilding g;
 	std::vector<float> all;
 	for (const auto &[key, v] : by) {
-		g.runs.push_back({static_cast<GLint>(all.size() / 6), static_cast<GLsizei>(v.size() / 6), key.first, key.second, {}});
+		g.runs.push_back({static_cast<GLint>(all.size() / 7), static_cast<GLsizei>(v.size() / 7), key.first, key.second, {}});
 		all.insert(all.end(), v.begin(), v.end());
 	}
-	Step(fmt::format("budova na kartu: {} trojuhelniku", all.size() / 18));
+	Step(fmt::format("budova na kartu: {} trojuhelniku", all.size() / 21));
 	gl.glGenVertexArrays(1, &g.vao);
 	gl.glBindVertexArray(g.vao);
 	gl.glGenBuffers(1, &g.vbo);
 	gl.glBindBuffer(GL_ARRAY_BUFFER, g.vbo);
 	gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(all.size() * sizeof(float)), all.data(), GL_STATIC_DRAW);
-	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), nullptr);
 	gl.glEnableVertexAttribArray(0);
-	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 7 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
-	gl.glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(5 * sizeof(float)));
+	gl.glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float), reinterpret_cast<const void *>(5 * sizeof(float)));
 	gl.glEnableVertexAttribArray(2);
+	gl.glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 7 * sizeof(float), reinterpret_cast<const void *>(6 * sizeof(float)));
+	gl.glEnableVertexAttribArray(3);
 	gl.glBindVertexArray(0);
 	g.bytes = all.size() * sizeof(float);
 	g.used = _card_clock;
@@ -6945,26 +7003,50 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 {
 	const GLuint bp = _eye_building_program.program;
 	gl.glUseProgram(bp);
-	gl.glUniform1i(_eye_building_program.tex, 0);
 	gl.glUniform1f(_eye_building_program.near_plane, near_plane);
-	/* The parts the card paints (EYE_BUILDING_FRAGMENT): their masks on the units 1 to 4, their patterns on 5 to 8. */
-	const GLint u_parts = UniformOf(bp, "u_parts"), u_metres = UniformOf(bp, "u_metres");
+	/* Its textures and the parts the card paints (EYE_BUILDING_FRAGMENT) on their units (EYE_BUILDING_FIRST_UNIT). */
+	gl.glUniform1i(_eye_building_program.tex, static_cast<GLint>(EYE_BUILDING_FIRST_UNIT));
+	for (int k = 1; k < EYE_BUILDING_SLOTS; k++) gl.glUniform1i(UniformOf(bp, fmt::format("u_tex{}", k).c_str()), static_cast<GLint>(EYE_BUILDING_FIRST_UNIT + k));
+	const GLint u_parts = UniformOf(bp, "u_parts"), u_metres = UniformOf(bp, "u_metres"), u_base = UniformOf(bp, "u_base"), u_cull = UniformOf(bp, "u_cull");
 	std::array<GLint, THREE_D_GPU_BUILDING_PAINTS> u_colour, u_about;
 	for (int k = 0; k < static_cast<int>(THREE_D_GPU_BUILDING_PAINTS); k++) {
-		gl.glUniform1i(UniformOf(bp, fmt::format("u_mask{}", k).c_str()), 1 + k);
-		gl.glUniform1i(UniformOf(bp, fmt::format("u_pattern{}", k).c_str()), 5 + k);
+		gl.glUniform1i(UniformOf(bp, fmt::format("u_mask{}", k).c_str()), static_cast<GLint>(EYE_BUILDING_MASK_UNIT + k));
+		gl.glUniform1i(UniformOf(bp, fmt::format("u_pattern{}", k).c_str()), static_cast<GLint>(EYE_BUILDING_PATTERN_UNIT + k));
 		u_colour[k] = UniformOf(bp, fmt::format("u_colour[{}]", k).c_str());
 		u_about[k] = UniformOf(bp, fmt::format("u_about[{}]", k).c_str());
 	}
 	gl.glUniform1i(u_parts, 0);
-	int parts_set = 0;
-	gl.glActiveTexture(GL_TEXTURE0);
-	gl.glCullFace(GL_BACK);
-	/* What the runs set last: set again only what differs (as EyeDrawState); the parts' masks and patterns on their
-	 * units and their colours too (houses alike one after another). */
-	GLuint vao_set = 0, texture_set = 0;
-	int cull_set = -2;
-	std::array<GLuint, 2 * THREE_D_GPU_BUILDING_PAINTS> part_units_set{};
+	gl.glUniform1i(u_base, 0);
+	gl.glUniform1i(u_cull, 0);
+	int parts_set = 0, base_set = 0, cull_set = 0;
+	/* The sides facing away left out by the program (gl_FrontFacing of the corners' order as the card turns them, not
+	 * the card's culling: a building's runs of either side drawn at once). */
+	gl.glDisable(GL_CULL_FACE);
+	gl.glFrontFace(GL_CCW);
+	/* What the runs set last: set again only what differs (as EyeDrawState); the textures on their units, the parts'
+	 * masks and patterns on theirs and their colours too (houses alike one after another). The units from first on
+	 * as want has them: at once (glBindTextures()), else each that differs made active and bound. */
+	GLuint vao_set = 0;
+	GLenum active = GL_TEXTURE0;
+	gl.glActiveTexture(active);
+	std::array<GLuint, 16> unit_set{};
+	auto bind = [&](GLuint first, std::span<const GLuint> want) {
+		const auto held = std::span(unit_set).subspan(first, want.size());
+		if (std::ranges::equal(held, want)) return;
+		if (gl.glBindTextures != nullptr) {
+			gl.glBindTextures(first, static_cast<GLsizei>(want.size()), want.data());
+		} else {
+			for (size_t k = 0; k < want.size(); k++) {
+				if (held[k] == want[k]) continue;
+				if (active != GL_TEXTURE0 + first + k) {
+					active = static_cast<GLenum>(GL_TEXTURE0 + first + k);
+					gl.glActiveTexture(active);
+				}
+				gl.glBindTexture(GL_TEXTURE_2D, want[k]);
+			}
+		}
+		std::ranges::copy(want, held.begin());
+	};
 	std::array<float, 4 * THREE_D_GPU_BUILDING_PAINTS> colours_set, about_set;
 	colours_set.fill(NAN);
 	about_set.fill(NAN);
@@ -6973,7 +7055,7 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 		gl.glUniformMatrix4fv(_eye_building_program.matrix, 1, GL_TRUE, d.eye->matrix.data());
 		if (d.on->vao != vao_set) gl.glBindVertexArray(d.on->vao);
 		vao_set = d.on->vao;
-		/* Its paint: the parts of its first texture, set once for its runs of that texture. */
+		/* Its paint: the parts of its first texture (the program paints only that one's triangles). */
 		const int parts = static_cast<int>(std::min(d.parts.size(), d.eye->building.paints.size()));
 		if (parts > 0) {
 			std::array<float, 4 * THREE_D_GPU_BUILDING_PAINTS> colours{}, about{};
@@ -6986,23 +7068,14 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 				about[k * 4] = d.parts[k].pattern != 0 ? p.pattern_m : 0.0f;
 				about[k * 4 + 1] = p.only_sloped ? 1.0f : 0.0f;
 			}
-			bool active_moved = false;
+			/* The masks and the patterns; a part without a pattern leaves its unit as it is (not read, u_about). */
+			std::array<GLuint, 2 * THREE_D_GPU_BUILDING_PAINTS> want;
+			std::copy_n(unit_set.begin() + EYE_BUILDING_MASK_UNIT, want.size(), want.begin());
 			for (int k = 0; k < parts; k++) {
-				const GLuint mask = d.parts[k].mask, pattern = d.parts[k].pattern != 0 ? d.parts[k].pattern : d.parts[k].mask;
-				if (part_units_set[k] != mask) {
-					gl.glActiveTexture(GL_TEXTURE1 + k);
-					gl.glBindTexture(GL_TEXTURE_2D, mask);
-					part_units_set[k] = mask;
-					active_moved = true;
-				}
-				if (part_units_set[THREE_D_GPU_BUILDING_PAINTS + k] != pattern) {
-					gl.glActiveTexture(GL_TEXTURE5 + k);
-					gl.glBindTexture(GL_TEXTURE_2D, pattern);
-					part_units_set[THREE_D_GPU_BUILDING_PAINTS + k] = pattern;
-					active_moved = true;
-				}
+				want[EYE_BUILDING_MASK_UNIT + k] = d.parts[k].mask;
+				if (d.parts[k].pattern != 0) want[EYE_BUILDING_PATTERN_UNIT + k] = d.parts[k].pattern;
 			}
-			if (active_moved) gl.glActiveTexture(GL_TEXTURE0);
+			bind(EYE_BUILDING_MASK_UNIT, want);
 			for (int k = 0; k < parts; k++) {
 				const auto c = std::span(colours).subspan(k * 4, 4), a = std::span(about).subspan(k * 4, 4);
 				if (!std::ranges::equal(c, std::span(colours_set).subspan(k * 4, 4))) {
@@ -7020,34 +7093,48 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 				metres_set = metres;
 			}
 		}
-		for (const GpuBuilding::Run &r : d.on->runs) {
-			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
-			const int run_parts = r.texture == 0 ? parts : 0;
-			if (run_parts != parts_set) {
-				gl.glUniform1i(u_parts, run_parts);
-				parts_set = run_parts;
+		if (parts != parts_set) {
+			gl.glUniform1i(u_parts, parts);
+			parts_set = parts;
+		}
+		const int cull = d.eye->building.cull ? 1 : 0;
+		if (cull != cull_set) {
+			gl.glUniform1i(u_cull, cull);
+			cull_set = cull;
+		}
+		/* Its runs (by texture, then side; one after another in its corners) in groups drawn at once: as long as the
+		 * textures of a group are no more than EYE_BUILDING_SLOTS one after another and on the card, the order kept (the
+		 * player's #381: some 1 100 draws a frame from the eyes; the rig 5.6 textures a building, up to 29, each a draw;
+		 * the cab of a train 1 258 draws a frame, now 280). */
+		const std::vector<GpuBuilding::Run> &runs = d.on->runs;
+		auto on_card = [&](const GpuBuilding::Run &r) { return r.texture < d.textures.size() && d.textures[r.texture] != 0; };
+		for (size_t r = 0; r < runs.size();) {
+			if (!on_card(runs[r])) {
+				r++;
+				continue;
 			}
-			const bool cull = r.facing != 0 && d.eye->building.cull;
-			const int cull_now = !cull ? 0 : (r.facing > 0 ? 1 : 2);
-			if (cull_now != cull_set) {
-				if (cull_now == 0) {
-					gl.glDisable(GL_CULL_FACE);
-				} else {
-					if (cull_set <= 0) gl.glEnable(GL_CULL_FACE);
-					gl.glFrontFace(cull_now == 1 ? GL_CW : GL_CCW);
-				}
-				cull_set = cull_now;
+			const int base = runs[r].texture;
+			const GLint first = runs[r].first;
+			GLsizei count = 0;
+			int last = base;
+			for (; r < runs.size() && on_card(runs[r]) && runs[r].texture - base < EYE_BUILDING_SLOTS && runs[r].first == first + count; r++) {
+				count += runs[r].count;
+				last = runs[r].texture;
 			}
-			if (d.textures[r.texture] != texture_set) gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
-			texture_set = d.textures[r.texture];
-			const bool first = FirstDrawOf(FIRST_DRAW_EYE_BUILDING | cull_now, [&] { return fmt::format("budovy z oci, strany {}", cull ? (r.facing > 0 ? "cw" : "ccw") : "obe"); });
-			gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
-			FirstDrawDone(first);
-			_gpu_eye_triangles += r.count / 3;
+			/* Its textures base to last (one between with no runs of its own: 0, nothing drawn of it). */
+			bind(EYE_BUILDING_FIRST_UNIT, std::span(d.textures).subspan(base, last - base + 1));
+			if (base != base_set) {
+				gl.glUniform1i(u_base, base);
+				base_set = base;
+			}
+			const bool first_draw = FirstDrawOf(FIRST_DRAW_EYE_BUILDING, [] { return std::string("budovy z oci"); });
+			gl.glDrawArrays(GL_TRIANGLES, first, count);
+			FirstDrawDone(first_draw);
+			_gpu_eye_triangles += count / 3;
 			_gpu_eye_calls++;
 		}
 	}
-	gl.glDisable(GL_CULL_FACE);
+	if (active != GL_TEXTURE0) gl.glActiveTexture(GL_TEXTURE0);
 	DrawEyeMeshes(o, near_plane, false);
 }
 
