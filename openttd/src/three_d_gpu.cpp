@@ -2490,16 +2490,19 @@ void main()
 }
 )";
 
-/* A picture of its own laid in where it is and nearer (a tunnel seen through its portal, CabDrawTunnelSeenIn()). */
+/* A picture of its own laid in where it is and nearer (a tunnel seen through its portal, CabDrawTunnelSeenIn()): of
+ * the rectangle of the picture from u_lay_at on, as big as it is. */
 const char *const EYE_LAY_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_lay;
 uniform sampler2D u_lay_z;
+uniform ivec2 u_lay_at;
 uniform float u_near;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_glow;
 void main()
 {
-	ivec2 p = ivec2(gl_FragCoord.xy);
+	ivec2 p = ivec2(gl_FragCoord.xy) - u_lay_at;
+	if (any(lessThan(p, ivec2(0))) || any(greaterThanEqual(p, textureSize(u_lay, 0)))) discard;
 	vec4 c = texelFetch(u_lay, p, 0);
 	float z = texelFetch(u_lay_z, p, 0).r;
 	if (z <= 0.0 || c == vec4(0.0)) discard;
@@ -8041,24 +8044,32 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				noted = true;
 				break;
 			case Kind::Lay: {
-				if (s.lay_px.size() < static_cast<size_t>(w) * h || s.lay_z.size() < static_cast<size_t>(w) * h) break;
+				/* Only its rectangle given, drawn into (the scissor) and laid: a portal's opening of a few hundred pixels
+				 * was two pictures the size of the whole put on the card, five portals a frame (the rig, a walker). */
+				const auto [lx, ly, lw, lh] = s.lay_rect;
+				if (lw <= 0 || lh <= 0 || lx < 0 || ly < 0 || lx + lw > w || ly + lh > h) break;
+				if (s.lay_px.size() < static_cast<size_t>(lw) * lh || s.lay_z.size() < static_cast<size_t>(lw) * lh) break;
 				gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, _frame_lay);
-				gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, s.lay_px.data());
+				gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, lw, lh, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, s.lay_px.data());
 				gl.glActiveTexture(GL_TEXTURE3);
 				gl.glBindTexture(GL_TEXTURE_2D, _frame_lay_z);
-				gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, w, h, 0, GL_RED, GL_FLOAT, s.lay_z.data());
+				gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, lw, lh, 0, GL_RED, GL_FLOAT, s.lay_z.data());
 				geometry();
 				gl.glDepthFunc(GL_GEQUAL);
 				gl.glUseProgram(_frame_lay_program.program);
 				gl.glUniform1i(UniformOf(_frame_lay_program.program, "u_lay"), 2);
 				gl.glUniform1i(UniformOf(_frame_lay_program.program, "u_lay_z"), 3);
+				gl.glUniform2i(UniformOf(_frame_lay_program.program, "u_lay_at"), lx, ly);
 				gl.glUniform1f(UniformOf(_frame_lay_program.program, "u_near"), depth_scale);
 				gl.glBindVertexArray(_frame_empty_vao);
+				gl.glEnable(GL_SCISSOR_TEST);
+				gl.glScissor(lx, ly, lw, lh);
 				const bool first = FirstDraw("snimku z oci: polozeny obraz (tunel)");
 				gl.glDrawArrays(GL_TRIANGLES, 0, 3);
 				FirstDrawDone(first);
+				gl.glDisable(GL_SCISSOR_TEST);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);

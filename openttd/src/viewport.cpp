@@ -158,6 +158,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include <stack>
 #include <deque>
 #include <memory>
+#include <limits>
 
 #include "widgets/vehicle_widget.h"
 
@@ -15553,7 +15554,40 @@ static void CabDrawTunnelSeenIn(const CabCanvas &cv, const CabEye &eye, const Ca
 	double s = into_low ? base : base + TILE_SIZE;
 	double s_eye = t.axis == Axis::X ? eye.x : eye.y;
 	if (into_low ? s_eye <= s : s_eye >= s) return; // not in front of this portal
-	const size_t n = static_cast<size_t>(cv.w) * cv.h;
+	/* The opening, and the rectangle of the picture it is seen in: what is seen through it is drawn there only, into
+	 * canvases of that size, the eye's middle moved by its corner (the rig, a walker in a town: 5 portals a frame of
+	 * some 300 pixels each, their canvases the size of the picture each, 8.5 ms of the 14 the frame was collected in;
+	 * the card given the picture twice over the whole of it each). Not on the picture: nothing. */
+	std::vector<CabPoint> hole;
+	for (const auto &p : _cab_tunnel_profile) {
+		auto w = CabTunnelPoint(t, s, p[0], p[1]);
+		hole.push_back(CabToEye(eye, w[0], w[1], w[2], 0.5, 0.5));
+	}
+	int rx0, ry0, rx1, ry1;
+	{
+		std::vector<CabPoint> seen = hole;
+		CabClipNear(seen);
+		if (seen.size() < 3) return;
+		double x0 = std::numeric_limits<double>::infinity(), y0 = x0, x1 = -x0, y1 = -x0;
+		for (const CabPoint &p : seen) {
+			const CabVertex v = CabProject(eye, p);
+			x0 = std::min(x0, v.sx);
+			y0 = std::min(y0, v.sy);
+			x1 = std::max(x1, v.sx);
+			y1 = std::max(y1, v.sy);
+		}
+		/* A pixel or two more each way than its corners reach. */
+		rx0 = static_cast<int>(std::clamp(std::floor(x0) - 2, 0.0, static_cast<double>(cv.w)));
+		ry0 = static_cast<int>(std::clamp(std::floor(y0) - 2, 0.0, static_cast<double>(cv.h)));
+		rx1 = static_cast<int>(std::clamp(std::ceil(x1) + 2, 0.0, static_cast<double>(cv.w)));
+		ry1 = static_cast<int>(std::clamp(std::ceil(y1) + 2, 0.0, static_cast<double>(cv.h)));
+		if (rx1 <= rx0 || ry1 <= ry0) return;
+	}
+	const int rw = rx1 - rx0, rh = ry1 - ry0;
+	const size_t n = static_cast<size_t>(rw) * rh;
+	CabEye in = eye;
+	in.cx -= rx0;
+	in.cy -= ry0;
 	/* Its own canvases, drawn now, not into the frame (of the frame while one is collected, so that two portals seen
 	 * do not share them); what is seen through the opening is laid over the picture at its place in the frame. */
 	static EyeCanvas scratch_tube, scratch_open;
@@ -15567,45 +15601,45 @@ static void CabDrawTunnelSeenIn(const CabCanvas &cv, const CabEye &eye, const Ca
 		open_canvas.px.assign(n, 0);
 		open_canvas.z.assign(n, 0.0f);
 		/* The opening: where it is seen, and how near. */
-		const CabCanvas open{open_canvas.px.data(), open_canvas.z.data(), cv.w, cv.h};
-		std::vector<CabPoint> hole;
-		for (const auto &p : _cab_tunnel_profile) {
-			auto w = CabTunnelPoint(t, s, p[0], p[1]);
-			hole.push_back(CabToEye(eye, w[0], w[1], w[2], 0.5, 0.5));
-		}
+		const CabCanvas open{open_canvas.px.data(), open_canvas.z.data(), rw, rh};
 		uint32_t one = 1;
-		CabDrawPolygon(open.dst, open.zb, open.w, open.h, &one, 1, 1, hole, eye, false);
+		CabDrawPolygon(open.dst, open.zb, open.w, open.h, &one, 1, 1, hole, in, false);
 		/* The tube, as far as the view reaches, and the daylight in the far portal. */
-		const CabCanvas tube{tube_canvas.px.data(), tube_canvas.z.data(), cv.w, cv.h};
+		const CabCanvas tube{tube_canvas.px.data(), tube_canvas.z.data(), rw, rh};
 		double reach = CAB_RANGE_TILES * TILE_SIZE;
 		double far = into_low ? t.s_lo : t.s_hi;
 		if (into_low) {
-			CabDrawTube(tube, eye, t, std::max(t.s_lo, s - reach), s);
+			CabDrawTube(tube, in, t, std::max(t.s_lo, s - reach), s);
 		} else {
-			CabDrawTube(tube, eye, t, s, std::min(t.s_hi, s + reach));
+			CabDrawTube(tube, in, t, s, std::min(t.s_hi, s + reach));
 		}
 		if (std::abs(far - s) <= reach) {
 			std::vector<CabPoint> light;
 			for (const auto &p : _cab_tunnel_profile) {
 				auto w = CabTunnelPoint(t, far, p[0], p[1]);
-				light.push_back(CabToEye(eye, w[0], w[1], w[2], 0.5, 0.5));
+				light.push_back(CabToEye(in, w[0], w[1], w[2], 0.5, 0.5));
 			}
 			uint32_t day = Colour(205, 225, 240).data;
-			CabDrawPolygon(tube.dst, tube.zb, tube.w, tube.h, &day, 1, 1, light, eye, false);
+			CabDrawPolygon(tube.dst, tube.zb, tube.w, tube.h, &day, 1, 1, light, in, false);
 		}
 	}
-	auto lay = [&tube_canvas, &open_canvas, n](uint32_t *dst, float *zb) {
-		for (size_t i = 0; i < n; i++) {
-			if (open_canvas.z[i] <= 0.0f || open_canvas.z[i] < zb[i] || tube_canvas.px[i] == 0) continue;
-			dst[i] = tube_canvas.px[i];
-			zb[i] = open_canvas.z[i];
+	const int pw = cv.w;
+	auto lay = [&tube_canvas, &open_canvas, rx0, ry0, rw, rh, pw](uint32_t *dst, float *zb) {
+		for (int y = 0; y < rh; y++) {
+			for (int x = 0; x < rw; x++) {
+				const size_t k = static_cast<size_t>(y) * rw + x, i = static_cast<size_t>(ry0 + y) * pw + rx0 + x;
+				if (open_canvas.z[k] <= 0.0f || open_canvas.z[k] < zb[i] || tube_canvas.px[k] == 0) continue;
+				dst[i] = tube_canvas.px[k];
+				zb[i] = open_canvas.z[k];
+			}
 		}
 	};
 	if (frame != nullptr) {
-		frame->Job(lay, [&tube_canvas, &open_canvas](EyeCard &card) {
+		frame->Job(lay, [&tube_canvas, &open_canvas, rx0, ry0, rw, rh](EyeCard &card) {
 			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Lay);
 			st.lay_px = tube_canvas.px;
 			st.lay_z = open_canvas.z;
+			st.lay_rect = {rx0, ry0, rw, rh};
 			return true;
 		});
 	} else {

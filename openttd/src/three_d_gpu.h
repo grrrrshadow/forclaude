@@ -364,7 +364,7 @@ struct ThreeDGpuEyeStep {
 		Background,     ///< the sky down to the horizon (horizon), the ground under it
 		Triangles,      ///< runs first_run to first_run + runs
 		Objects,        ///< the buildings and the figures by their triangles (objects); their glass after the triangles that follow
-		Lay,            ///< a picture of its own laid in where it is and nearer (a tunnel seen through its portal): lay_px, lay_z
+		Lay,            ///< a picture of its own laid in where it is and nearer (a tunnel seen through its portal): lay_px, lay_z over lay_rect
 		Haze,           ///< the far fading into colour from from on, over depth (the haze job of CollectEyeFrame())
 		FarHaze,        ///< the haze far off: from from to to, the ground under the horizon all of it
 		Shadows,        ///< the sun's shadows of the buildings (DrawEyeShadows()): shadow_map
@@ -380,6 +380,7 @@ struct ThreeDGpuEyeStep {
 	std::shared_ptr<ThreeDGpuEyePicture> objects;
 	std::vector<uint32_t> lay_px;
 	std::vector<float> lay_z;
+	std::array<int, 4> lay_rect{}; ///< Lay: where on the picture lay_px and lay_z are, x, y (rows from the top), width, height
 	std::array<float, 3> colour{};
 	std::array<float, 3> absorb{}; ///< FarHaze under the water: how much of red, green and blue the water takes a world unit past from, 0 the haze from from to to
 	float from = 0, to = 0, depth = 0, horizon = 0;
