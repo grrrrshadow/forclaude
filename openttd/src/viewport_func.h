@@ -156,6 +156,15 @@ struct DirtyWhyScope {
 	explicit DirtyWhyScope(DirtyWhy why);
 	~DirtyWhyScope();
 };
+/**
+ * The life of the land going on while it lasts (RunTileLoop(): grass, trees, houses, fields): on the turned main view far
+ * out its changes are laid at most every so often, with the animations (DirtyIsAmbient() of viewport.cpp).
+ */
+struct DirtyAmbientScope {
+	bool before;
+	DirtyAmbientScope();
+	~DirtyAmbientScope();
+};
 
 Point GetViewportStationMiddle(const Viewport &vp, const Station *st);
 

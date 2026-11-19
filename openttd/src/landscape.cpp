@@ -848,6 +848,8 @@ TileIndex _cur_tileloop_tile;
 void RunTileLoop()
 {
 	PerformanceAccumulator framerate(PerformanceElement::GameLoopLandscape);
+	/* What it changes the turned main view far out lays at most every so often (viewport.cpp). */
+	const DirtyAmbientScope ambient;
 
 	/* The pseudorandom sequence of tiles is generated using a Galois linear feedback
 	 * shift register (LFSR). This allows a deterministic pseudorandom ordering, but

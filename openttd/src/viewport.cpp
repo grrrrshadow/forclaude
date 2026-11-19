@@ -2667,6 +2667,10 @@ std::string TakeTurnedTimesForDiary(int frames)
 	/* What marked places to be drawn again (TakeDirtyMarksForDiary()). */
 	extern std::string TakeDirtyMarksForDiary();
 	if (const std::string marks = TakeDirtyMarksForDiary(); marks != "-") s = (s == "-" ? std::string() : s + "; ") + "oznaceno k prekresleni: " + marks;
+	/* The animations' changes far out that waited (DeferAmbientDirty()): how many, laid how many times at once. */
+	extern uint64_t _ambient_dirty_marks, _ambient_dirty_flushes;
+	if (_ambient_dirty_marks > 0) s = (s == "-" ? std::string() : s + "; ") + fmt::format("animace z dalky pockaly {}x, polozeny naraz {}x", _ambient_dirty_marks, _ambient_dirty_flushes);
+	_ambient_dirty_marks = _ambient_dirty_flushes = 0;
 	/* The small views with their pictures on the card, and how many gave theirs up to another (SmallViewOnCardOf()). */
 	extern size_t SmallViewsOnCardCount();
 	extern uint64_t _small_views_given_up;
@@ -11174,6 +11178,105 @@ void UpdateViewportPosition(Window *w, uint32_t delta_ms)
 	}
 }
 
+/** What is marking places of the map to be drawn again (DirtyWhyScope): for the diary, and the animations far out. */
+static thread_local DirtyWhy _dirty_why = DirtyWhy::Other;
+/** The life of the land going on (DirtyAmbientScope). */
+static thread_local bool _dirty_ambient = false;
+
+DirtyAmbientScope::DirtyAmbientScope() : before(_dirty_ambient)
+{
+	_dirty_ambient = true;
+}
+
+DirtyAmbientScope::~DirtyAmbientScope()
+{
+	_dirty_ambient = this->before;
+}
+
+/**
+ * Whether what is marked now only goes on of itself: the game's animated tiles, a figure's frame, the life of the land
+ * (grass, trees, houses growing) -- not something the player did. Far out on the turned main view laid at most every so
+ * often (DeferAmbientDirty()).
+ */
+static bool DirtyIsAmbient()
+{
+	return _dirty_ambient || _dirty_why == DirtyWhy::Animated || _dirty_why == DirtyWhy::Figures;
+}
+
+/** From this zoom out the animations' changes of the turned main view wait (DeferAmbientDirty()): the diary's z4 (the normal zoom of this build's levels) and out. */
+static constexpr ZoomLevel AMBIENT_FAR_ZOOM = ZoomLevel::Normal;
+
+/** How long they wait at a zoom far out, at most: a second from the diary's z5 (2x out) on, half of it at z4. */
+static std::chrono::milliseconds AmbientWait(ZoomLevel zoom)
+{
+	return zoom >= ZoomLevel::Out2x ? std::chrono::milliseconds(1000) : std::chrono::milliseconds(500);
+}
+
+/** A part of the turned main view changed by the animations, waiting (DeferAmbientDirty()): virtual pixels, turned already. */
+struct AmbientDirty {
+	int left, top, right, bottom;
+};
+static std::mutex _ambient_dirty_mutex;
+static std::vector<AmbientDirty> _ambient_dirty;
+static const Viewport *_ambient_dirty_vp = nullptr;
+static std::chrono::steady_clock::time_point _ambient_dirty_since;
+uint64_t _ambient_dirty_marks = 0;   ///< the diary: marks that waited
+uint64_t _ambient_dirty_flushes = 0; ///< and how many times they were laid at once
+
+static bool MarkViewportDirtyTurned(const Viewport &vp, int left, int top, int right, int bottom);
+
+/**
+ * Far out on the turned main view (the diary's z4 and z5: the normal zoom and 2x out) what the animations change waits and is laid all at once at most every half
+ * a second or second (the player's diary of 19. 11.: at z5 the parts changed laid again five times a second, 90-125 ms
+ * each, more than half of the time -- the tiles' animations, the figures, the grass; the player: "2 ano"). What the
+ * player builds is not of them: at once as before. Nearer (z3 and in) at once too.
+ * @return whether it waits
+ */
+static bool DeferAmbientDirty(const Viewport &vp, int left, int top, int right, int bottom)
+{
+	if (vp.zoom < AMBIENT_FAR_ZOOM || &vp != _turned_card_ground.vp || !IsViewportTurned(vp) || DirtyPlaceIsMover() || !DirtyIsAmbient()) return false;
+	std::lock_guard lock(_ambient_dirty_mutex);
+	if (_ambient_dirty.empty() || _ambient_dirty_vp != &vp) {
+		_ambient_dirty.clear();
+		_ambient_dirty_since = std::chrono::steady_clock::now();
+		_ambient_dirty_vp = &vp;
+	}
+	_ambient_dirty.push_back({left, top, right, bottom});
+	_ambient_dirty_marks++;
+	return true;
+}
+
+/**
+ * The animations' changes that waited laid now when their time came (DeferAmbientDirty()), or at once when the view
+ * came nearer or is another; dropped when the main view is gone.
+ */
+static void FlushAmbientDirty()
+{
+	std::vector<AmbientDirty> parts;
+	const Viewport *vp = nullptr;
+	{
+		std::lock_guard lock(_ambient_dirty_mutex);
+		if (_ambient_dirty.empty()) return;
+		const Window *main = GetMainWindow();
+		const Viewport *now = main != nullptr && main->viewport != nullptr ? &*main->viewport : nullptr;
+		if (now != _ambient_dirty_vp) {
+			_ambient_dirty.clear();
+			return;
+		}
+		const bool due = now->zoom < AMBIENT_FAR_ZOOM || !IsViewportTurned(*now) || std::chrono::steady_clock::now() - _ambient_dirty_since >= AmbientWait(now->zoom);
+		if (!due) return;
+		parts.swap(_ambient_dirty);
+		vp = now;
+		_ambient_dirty_flushes++;
+	}
+	for (const AmbientDirty &p : parts) MarkViewportDirtyTurned(*vp, p.left, p.top, p.right, p.bottom);
+}
+
+/** Every tenth of a second: the animations' changes laid when their time came (FlushAmbientDirty()). */
+static const IntervalTimer<TimerWindow> _ambient_dirty_timer(std::chrono::milliseconds(100), [](auto) {
+	FlushAmbientDirty();
+});
+
 /**
  * Marks a viewport as dirty for repaint if it displays (a part of) the area the needs to be repainted.
  * @param vp     The viewport to mark as dirty
@@ -11188,7 +11291,14 @@ static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, 
 {
 	/* Turned (three_d.h), the place is drawn elsewhere on the screen. */
 	if (IsViewportTurnedAway(vp)) TurnDirtyRect(left, top, right, bottom);
+	/* An animation's change far out: laid with the others in a while. */
+	if (DeferAmbientDirty(vp, left, top, right, bottom)) return true;
+	return MarkViewportDirtyTurned(vp, left, top, right, bottom);
+}
 
+/** MarkViewportDirty() of a place where the view draws it (turned already). */
+static bool MarkViewportDirtyTurned(const Viewport &vp, int left, int top, int right, int bottom)
+{
 	/* Rounding wrt. zoom-out level */
 	right += (1 << to_underlying(vp.zoom)) - 1;
 	bottom += (1 << to_underlying(vp.zoom)) - 1;
@@ -11281,7 +11391,6 @@ void ConstrainAllViewportsZoom()
  * @param tile_height_override Height of the tile (#TileHeight).
  * @ingroup dirty
  */
-static thread_local DirtyWhy _dirty_why = DirtyWhy::Other;
 /** The places marked since the diary last asked: by what told why (DirtyWhy), then moving things, boxes, tiles by their kind. */
 static constexpr size_t DIRTY_MARKS_MOVERS = to_underlying(DirtyWhy::End), DIRTY_MARKS_BOXES = DIRTY_MARKS_MOVERS + 1, DIRTY_MARKS_LIGHTS = DIRTY_MARKS_BOXES + 1, DIRTY_MARKS_TILES = DIRTY_MARKS_LIGHTS + 1;
 static std::atomic<uint32_t> _dirty_marks[DIRTY_MARKS_TILES + to_underlying(TileType::End)] = {};
