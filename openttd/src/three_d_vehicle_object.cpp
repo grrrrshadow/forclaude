@@ -3616,6 +3616,29 @@ static constexpr uint64_t CARD_NOT_YET_RETRY = 8;
 /** For the diary: the things given as not made yet without being prepared again (_card_not_yet). */
 static std::atomic<uint64_t> _card_not_yet_skipped = 0;
 
+/**
+ * For the diary: how many times each thing was prepared and found not made yet since it was last prepared whole
+ * (CardVehicle()), and the one found so the most times with what it waited for -- a thing never made stays undrawn
+ * (the rig, the game paused: a lorry not there, "jeste neudelane" at every pass).
+ */
+static std::unordered_map<uint64_t, uint32_t> _card_not_yet_times;
+static uint32_t _card_not_yet_most = 0;
+static std::string _card_not_yet_most_what;
+
+/**
+ * The things given whole to every one that asks for them in the pass that follows the one the card lacked them in
+ * (ThreeDCardVehiclesGiveWhole()), by their key: what was made of each the first time it was asked for, for the
+ * others of the same look (lorries of a kind going the same way are one picture). Only the first asked for was given
+ * whole, the others as kept: with the first beside the view -- never sent to the card -- those in sight were lacked
+ * again at every pass and not laid while that lasted (the rig, the game paused: a lorry not there; "karta nemela ani
+ * napodruhe" 2 to 3 in every run).
+ */
+struct CardWhole {
+	std::shared_ptr<const ThreeDGpuStandingVehicle> card;          ///< nullptr not asked for yet in the pass
+	std::shared_ptr<const std::vector<ThreeDPictureLight>> lights;
+};
+static std::unordered_map<uint64_t, CardWhole> _card_keys_whole;
+
 /** What the card makes of a thing of the map it draws (CardVehicle()). */
 enum class CardMade : uint8_t {
 	Drawn,  ///< its shapes for the card (nullptr: not a pixel of it seen)
@@ -3660,7 +3683,15 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	 * the gathering of the layer 30 ms a frame on the phone, the shapes of every vehicle in sight prepared again each
 	 * frame for a picture drawn long ago). */
 	if (_card_vehicles_as_kept) {
-		auto it = _card_vehicles_kept.find(key);
+		/* Lacked by the card in the pass before (ThreeDCardVehiclesGiveWhole()): whole, every one of this look -- what was
+		 * made of the first for the others (_card_keys_whole). */
+		const auto whole = _card_keys_whole.find(key);
+		if (whole != _card_keys_whole.end() && whole->second.card != nullptr) {
+			card = whole->second.card;
+			lights = whole->second.lights;
+			return CardMade::Drawn;
+		}
+		auto it = whole != _card_keys_whole.end() ? _card_vehicles_kept.end() : _card_vehicles_kept.find(key);
 		/* Given as the main thread keeps it, whether the card has its picture or not: a thing beside the view is never
 		 * sent to the card, so the card never has it -- asked of the card first, such a thing was prepared with its
 		 * shapes again every frame (the rig on the player's save: 13 of them a pass, half of the gathering). The card
@@ -3726,8 +3757,15 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 			prepare_timed.how = 2;
 			if (_card_not_yet.size() > 4096) _card_not_yet.clear();
 			_card_not_yet[key] = {made_now, _dirty_blocks_pass};
+			/* The diary: the thing found not made yet the most times, and what it waits for (ThreeDLazyMissedWhat()). */
+			if (_card_not_yet_times.size() > 4096) _card_not_yet_times.clear();
+			if (const uint32_t times = ++_card_not_yet_times[key]; times > _card_not_yet_most) {
+				_card_not_yet_most = times;
+				_card_not_yet_most_what = fmt::format("{} {}x, ceka na: {}", p.obj->name, times, ThreeDLazyMissedWhat());
+			}
 			return CardMade::NotYet;
 		}
+		_card_not_yet_times.erase(key);
 	}
 	/* Not a pixel of it seen, or bigger than the card draws one: remembered by its key as the drawn ones are, or it was
 	 * prepared with all its shapes again every frame only to learn the same (the player's diary of 17. 11.: at the
@@ -3792,6 +3830,7 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 		_card_vehicles_kept[key] = {std::move(light), lights, _card_vehicles_kept_pass, false};
 	}
 	card = std::move(v);
+	if (auto whole = _card_keys_whole.find(key); whole != _card_keys_whole.end()) whole->second = {card, lights};
 	return CardMade::Drawn;
 }
 
@@ -3813,12 +3852,13 @@ void ThreeDCardVehiclesAsKeptBegin(bool whole)
 void ThreeDCardVehiclesAsKeptEnd()
 {
 	_card_vehicles_as_kept = false;
+	/* (Those the card lacked before it were given whole in it: as kept again from now.) */
+	_card_keys_whole.clear();
 	if (_card_vehicles_kept.size() > 4096) {
 		std::erase_if(_card_vehicles_kept, [](const auto &e) { return e.second.used + 120 < _card_vehicles_kept_pass; });
 	}
 }
 
-/** How many things of the moving layer were given as the card keeps them since asked the last time (the diary). */
 /**
  * The gathering of the vehicles of the moving layer by its steps, for the diary (TakeThreeDCardThingsPrepared()): where
  * the time of a piece goes on the player's machine -- the rig's processor tells little of the phone's (the player's
@@ -3857,10 +3897,12 @@ std::string TakeThreeDCardThingsPrepared()
 	extern uint64_t _lasting_places_reused;
 	/* The gathering of the vehicles by its steps (GatherSplit): of the pieces gone through every eighth timed, their milliseconds. */
 	const GatherSplit &g = _gather_split;
-	const std::string s = fmt::format("{} veci umisteno (z toho {} jak stalo), {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych; sber vozidel po krocich: {} kusu, {} z nich mereno, ty staly {:.2f} ms (stav z GRF a svetla {:.2f}, poloha a natoceni {:.2f}, co kresli karta {:.2f}, polozeni {:.2f})",
+	const std::string s = fmt::format("{} veci umisteno (z toho {} jak stalo), {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych; sber vozidel po krocich: {} kusu, {} z nich mereno, ty staly {:.2f} ms (stav z GRF a svetla {:.2f}, poloha a natoceni {:.2f}, co kresli karta {:.2f}, polozeni {:.2f}); nejvickrat neudelane: {}",
 			_card_things_placed, _lasting_places_reused, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again,
-			g.pieces, g.timed, g.ms[0], g.ms[1], g.ms[2], g.ms[3], g.ms[4]);
+			g.pieces, g.timed, g.ms[0], g.ms[1], g.ms[2], g.ms[3], g.ms[4], _card_not_yet_most_what.empty() ? std::string("-") : _card_not_yet_most_what);
 	_gather_split = {};
+	_card_not_yet_most = 0;
+	_card_not_yet_most_what.clear();
 	_card_not_yet_skipped = 0;
 	_card_things_missing = _card_things_missing_again = 0;
 	_card_things_missing_keys.clear();
@@ -3872,14 +3914,26 @@ std::string TakeThreeDCardThingsPrepared()
 	return s;
 }
 
-/** The card had no pictures of these things given as kept (ThreeDGpuStanding::missing_keys): with their shapes the next time. */
+static void ForgetPlacesOf(std::span<const uint64_t> keys);
+
+/**
+ * The card had no pictures of these things given as kept (ThreeDGpuStanding::missing_keys): with their shapes the next
+ * time -- the pass that follows at once (TurnedCardLayMovers() of viewport.cpp). So nothing may give them as they were
+ * placed before: not the places kept for the frame (PlaceVehicleObject()), not those of the vehicles that stand as they
+ * stood (LastingPlace). Both did, the pass that followed gave them without their shapes again and the card lacked them
+ * again: the vehicle not laid that frame, the second pass for nothing (the player's diary of 19. 11.: "karta nemela 94,
+ * z toho opakovane 47 ruznych" -- each lacked twice, every time); and the game paused, when no frame follows, not laid
+ * while the pause lasted (the rig, a view come to a lorry: its semi-trailer or all of it missing, one run in six).
+ */
 void ThreeDCardVehiclesGiveWhole(std::span<const uint64_t> keys)
 {
 	for (uint64_t key : keys) {
 		_card_vehicles_kept.erase(key);
+		_card_keys_whole.try_emplace(key);
 		_card_things_missing++;
 		if (++_card_things_missing_keys[key] == 2) _card_things_missing_again++;
 	}
+	ForgetPlacesOf(keys);
 }
 
 uint64_t TakeThreeDCardVehiclesAsKept()
@@ -4087,6 +4141,39 @@ static std::unordered_map<uint64_t, LastingPlace> _lasting_places; ///< by the v
 uint64_t _lasting_places_reused = 0; ///< the diary: things placed as they were
 bool _lasting_places_on = true;      ///< the rig ('test3d stojici trvale 0'): off, each placed anew as before
 
+/**
+ * The places kept for the frame (PlaceVehicleObject()), by the vehicle, the zoom and whether on a round curve. Each kept
+ * in its place from one frame to the next, marked with the frame it is of: a list made anew every frame took and gave
+ * back a piece of memory a vehicle a frame (the rig's samples of the gathering of the moving layer). Let go of now and
+ * then, so that none holds what a vehicle long gone was drawn from.
+ */
+struct FramePlace {
+	uint64_t frame = 0; ///< the frame it was placed in
+	const ThreeDVehicleObject *obj = nullptr;
+	VehicleObjectPlace place;
+};
+static std::unordered_map<uint64_t, FramePlace> _frame_places; ///< the main thread's
+
+/**
+ * The vehicles the card had no pictures of (ThreeDCardVehiclesGiveWhole()) placed anew the next time they are asked for,
+ * with their shapes: not as the frame placed them (_frame_places) nor as they stood (_lasting_places), nor standing in
+ * for their look now (_cards_drawn_of).
+ */
+static void ForgetPlacesOf(std::span<const uint64_t> keys)
+{
+	if (keys.empty()) return;
+	std::vector<uint64_t> sorted(keys.begin(), keys.end());
+	std::ranges::sort(sorted);
+	auto lacked = [&sorted](const VehicleObjectPlace &place) { return place.card != nullptr && std::ranges::binary_search(sorted, place.card->key); };
+	std::erase_if(_frame_places, [&lacked](const auto &e) { return lacked(e.second.place); });
+	std::erase_if(_lasting_places, [&lacked](const auto &e) { return lacked(e.second.place); });
+	/* What stands in for a vehicle whose look now is not made yet (CardDrawnBefore()) and the card has no picture of
+	 * -- drawn last beside the view, so never laid: no stand-in then. Given again and again it was lacked at every
+	 * pass, each followed by a pass giving all whole that lacked it too (the rig's diary: "karta nemela ani napodruhe
+	 * 2" to 3 in every run): the layer gathered and laid twice a frame while the vehicle waited. */
+	std::erase_if(_cards_drawn_of, [&sorted](const auto &e) { return e.second.card != nullptr && std::ranges::binary_search(sorted, e.second.card->key); });
+}
+
 /** Whether an object's picture stays as it is while its vehicle stands (LastingPlace): no body of an animal, no crew that walks. */
 static bool StandsStill(const ThreeDVehicleObject *obj)
 {
@@ -4250,17 +4337,9 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 		int repeat = 0;
 		bool operator==(const Stamp &) const = default;
 	};
-	/* Each kept in its place from one frame to the next, marked with the frame it is of: a list made anew every frame
-	 * took and gave back a piece of memory a vehicle a frame (the rig's samples of the gathering of the moving layer).
-	 * Let go of now and then, so that none holds what a vehicle long gone was drawn from. */
-	struct Kept {
-		uint64_t frame = 0; ///< the frame it was placed in (frame_now)
-		const ThreeDVehicleObject *obj = nullptr;
-		VehicleObjectPlace place;
-	};
 	static Stamp kept_for;
 	static uint64_t frame_now = 0;
-	static std::unordered_map<uint64_t, Kept> kept;
+	std::unordered_map<uint64_t, FramePlace> &kept = _frame_places;
 	extern int _rig_movers_repeat_now; // the rig's samples of the gathering: each of its repeats places as a frame does
 	if (!on_card) return PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
 	const Stamp now{_dirty_blocks_pass, TimerGameTick::counter, GetViewCameraKey(), ViewportDrawingTurned(), ViewportDrawingNorthObjects(), ViewportDrawingEye(), _rig_movers_repeat_now};
@@ -4277,7 +4356,7 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	const ThreeDVehicleObject *obj = PlaceVehicleObjectNow(v, zoom, pose, place, on_card);
 	if (place.on_card && place.pic == nullptr) {
 		/* (Looked up again: placing it may place others -- a train's last car asks what is seen after it -- and the list grows.) */
-		Kept &k = kept[key];
+		FramePlace &k = kept[key];
 		k.frame = frame_now;
 		k.obj = obj;
 		k.place = place;

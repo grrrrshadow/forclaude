@@ -9228,6 +9228,8 @@ uint64_t ThreeDLazyMadeCount()
 /** How many ThreeDLazyNoWait stand on this thread, and whether a getter missed something since the first did. */
 static thread_local int _lazy_no_wait = 0;
 static thread_local bool _lazy_missed = false;
+static thread_local int _lazy_missed_thing = 0;  ///< the thing last found not made yet (MakeOnce()), for the diary
+static thread_local uint8_t _lazy_missed_how = 0; ///< and how it was left: 1 another thread is making it, 2 asked for already, 3 asked for now
 
 ThreeDLazyNoWait::ThreeDLazyNoWait()
 {
@@ -9286,6 +9288,16 @@ std::string TakeThreeDMainKinds()
 	return s.empty() ? std::string("-") : s;
 }
 
+/**
+ * The thing last found not made yet on this thread (a ThreeDLazyNoWait that missed), for the diary: what kind and how
+ * it was left -- what the card waits for longest tells what is never made (CardVehicle() of three_d_vehicle_object.cpp).
+ */
+std::string ThreeDLazyMissedWhat()
+{
+	static constexpr std::string_view HOW[] = {"?", "dela ji jine vlakno", "uz pozadano drive", "pozadano ted"};
+	return fmt::format("{} ({})", LazyKindName(_lazy_missed_thing), HOW[_lazy_missed_how < 4 ? _lazy_missed_how : 0]);
+}
+
 template <typename Made, typename Make, typename Store>
 static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store &&store)
 {
@@ -9314,7 +9326,16 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
 			std::lock_guard lock(_lazy_mutex);
 			if (made()) return;
 			_lazy_missed = true;
-			if (_lazy_making.contains(key) || !_lazy_asked.insert(key).second) return;
+			_lazy_missed_thing = thing;
+			if (_lazy_making.contains(key)) {
+				_lazy_missed_how = 1;
+				return;
+			}
+			if (!_lazy_asked.insert(key).second) {
+				_lazy_missed_how = 2;
+				return;
+			}
+			_lazy_missed_how = 3;
 		}
 		ThreeDLoadInBackground([of, thing, made = std::decay_t<Made>(made), make = std::decay_t<Make>(make), store = std::decay_t<Store>(store)]() mutable {
 			MakeOnce(of, thing, made, make, store);

@@ -159,6 +159,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include <deque>
 #include <memory>
 #include <limits>
+#include <utility>
 
 #include "widgets/vehicle_widget.h"
 
@@ -2686,9 +2687,11 @@ std::string TakeTurnedTimesForDiary(int frames)
 		extern uint64_t TakeThreeDCardVehiclesAsKept();
 		extern std::string TakeThreeDCardThingsPrepared();
 		extern double _turned_moving_kinds_ms[7];
+		extern uint64_t _turned_moving_lacked_twice;
 		const double *k = _turned_moving_kinds_ms;
-		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), svetla v noci {:.1f} ms, {} veci dano jako drzene bez tvaru, {}", _turned_moving_passes, _turned_moving_ms / n,
-				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), _turned_moving_glows_ms / n, TakeThreeDCardVehiclesAsKept(), TakeThreeDCardThingsPrepared());
+		s = (s == "-" ? std::string() : s + "; ") + fmt::format("vrstva aut {}x {:.0f} ms na snimek, z toho sber {:.0f} ms (vozidla {:.1f}, chodci {:.1f}, draci {:.1f}, zvirata {:.1f}, carodejnice {:.1f}, ufa {:.1f}, ridici {:.1f}) a cekani na kartu {:.0f} ms (karta {}), svetla v noci {:.1f} ms, {} veci dano jako drzene bez tvaru, {}; karta nemela ani napodruhe {}", _turned_moving_passes, _turned_moving_ms / n,
+				_turned_moving_collect_ms / n, k[0] / n, k[1] / n, k[2] / n, k[3] / n, k[4] / n, k[5] / n, k[6] / n, _turned_moving_card_ms / n, ThreeDGpuMovingTimes(), _turned_moving_glows_ms / n, TakeThreeDCardVehiclesAsKept(), TakeThreeDCardThingsPrepared(),
+				std::exchange(_turned_moving_lacked_twice, 0));
 	}
 	_turned_moving_passes = 0;
 	_turned_moving_ms = 0;
@@ -7431,6 +7434,7 @@ bool _standing_vehicles_on_card = true;
  */
 bool _turned_moving_layer_on = true;
 static bool _turned_moving_layer = false; ///< on now (TurnedMovingLayerUpdate())
+uint64_t _turned_moving_lacked_twice = 0; ///< the diary: things the card lacked in the pass that gave them whole too (TurnedCardLayMovers()): not laid that frame
 static bool _turned_movers_moved = false; ///< a moving thing on the main view told moved since they were last laid
 static bool _turned_moving_due = false;   ///< what stands, or the view, changed since: they are laid again
 uint64_t _turned_moving_passes = 0;       ///< the diary: times they were laid
@@ -10492,7 +10496,7 @@ void TurnedCardLayMovers()
 {
 	/* The card had no picture of a thing given as kept (never laid, or let go of since): once more, those with their
 	 * shapes (ThreeDCardVehiclesGiveWhole()). */
-	if (TurnedCardLayMoversOnce(false) > 0) TurnedCardLayMoversOnce(true);
+	if (TurnedCardLayMoversOnce(false) > 0) _turned_moving_lacked_twice += TurnedCardLayMoversOnce(true);
 }
 
 /**

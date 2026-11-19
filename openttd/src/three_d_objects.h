@@ -1919,6 +1919,7 @@ public:
 	~ThreeDLazyNoWait();
 	bool Missed() const;
 };
+std::string ThreeDLazyMissedWhat();
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night = false);
 std::span<const std::string> GetThreeDThemeGuestTrees(uint8_t theme, bool plants);
 std::span<const std::string> GetThreeDThemeUndergrowth(uint8_t theme);

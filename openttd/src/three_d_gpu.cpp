@@ -6335,10 +6335,20 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (s.items[k].vehicle == nullptr || vehicle_at[k][0] != -1 || in_some[k] == 0) continue;
 			/* Kept already, or drawn in this one before: laid from that. */
 			const uint64_t key = s.items[k].vehicle->key | STANDING_VEHICLE_KEY;
-			if (_standing_places.contains(key) || !keys.insert(key).second) continue;
+			if (_standing_places.contains(key)) continue;
+			/* Given without its shapes (as the main thread keeps it): another of the same look given whole draws the
+			 * picture, wherever it comes in the order -- one given so before it took the look for itself, the whole one
+			 * after it was passed over as "drawn in this one before", and this one was not laid: two lorries of a kind going
+			 * the same way, the nearer one missing a frame and the layer laid twice (the player's diary of 19. 11.: "karta
+			 * nemela 94, z toho opakovane 47 ruznych"). */
+			if (s.items[k].vehicle->kept_only) {
+				vehicle_at[k] = {-2, -2};
+				continue;
+			}
+			if (!keys.insert(key).second) continue;
 			const ThreeDGpuPicture &pic = s.items[k].vehicle->pic;
 			std::vector<MeshOnCard> draws;
-			if (s.items[k].vehicle->kept_only || pic.width <= 0 || pic.height <= 0 || pic.width > frame_w || pic.height > _max_target || !PictureOnCard(pic, draws)) {
+			if (pic.width <= 0 || pic.height <= 0 || pic.width > frame_w || pic.height > _max_target || !PictureOnCard(pic, draws)) {
 				vehicle_at[k] = {-2, -2};
 				continue;
 			}
@@ -6527,6 +6537,31 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				const uint64_t key = v.key | STANDING_VEHICLE_KEY;
 				std::array<int, 2> place;
 				auto kept = _standing_places.find(key);
+				if (kept == _standing_places.end() && v.kept_only && !s.held_only) {
+					/* Given without its shapes and the card has no picture of it -- but one of the same look given whole
+					 * comes after it in this job (two lorries of a kind going the same way: the first asked for is given
+					 * whole, and it may be laid after this one): the pictures of the vehicles from here on drawn now, as
+					 * when the whole one is come to, and this one laid from that. Else it was told lacked, and all the
+					 * layer gathered and laid once more for it (every frame while the map turns: each look new). */
+					bool whole_after = false;
+					for (size_t j = k + 1; j < s.items.size() && !whole_after; j++) {
+						const auto &other = s.items[j].vehicle;
+						whole_after = other != nullptr && !other->kept_only && other->key == v.key && in_some[j] != 0;
+					}
+					if (whole_after) {
+						flush();
+						const uint64_t vehicle_calls = _gl_calls;
+						_gl_counting_vehicles = true;
+						batch_shrink_calls = 0;
+						draw_vehicles(k);
+						if (const uint64_t after = _gl_calls; after >= vehicle_calls + batch_shrink_calls) _gl_calls_vehicles_draw += after - vehicle_calls - batch_shrink_calls;
+						if (const uint64_t after = _gl_calls; after >= vehicle_calls) _gl_calls_vehicles += after - vehicle_calls;
+						_gl_counting_vehicles = false;
+						use_pictures();
+						drawing = 0;
+						kept = _standing_places.find(key);
+					}
+				}
 				if (kept != _standing_places.end()) {
 					place = kept->second;
 					StandingPlaceUsed(key);
