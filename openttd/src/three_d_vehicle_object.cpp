@@ -5393,15 +5393,16 @@ static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::
 /**
  * A vehicle object of no vehicle on the turned map (a car of the game's own driving about, three_d_walkers.h): at a
  * place, facing a way (degrees, 0 along +x), sorted by a box about it as long as it is.
+ * @param state its state drawn (its record's "stavy", ThreeDVehicleObject::StateNamed()), 0 as it is
  */
-bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit)
+bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit, int state)
 {
 	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
 	if (shape == nullptr) return false;
 	float world_az = facing - 135.0f;
 	/* At night (lit) with its lights on, front and back, when its model has them. */
 	const int lights = lit && shape->HasLights() ? LIGHTS_FRONT | LIGHTS_BACK : 0;
-	const PictureToMake p = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, lights, 0.0f, 0);
+	const PictureToMake p = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, state, 0, -1, 1.0f, 0, 0, 0, lights, 0.0f, 0);
 	int half = std::max(1, static_cast<int>(std::lround(std::max(shape->x1 - shape->x0, shape->y1 - shape->y0) * scale * OBJECT_UNITS_PER_METRE / 2)));
 	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	/* Drawn by the card with the block's vehicles (CardVehicle()); bigger than it draws one, its picture. */

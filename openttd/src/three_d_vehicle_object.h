@@ -125,7 +125,7 @@ std::string DescribeThreeDVehicleWear(const Vehicle *v);
 std::string DescribeThreeDObjectWear(std::string_view name);
 void QueueThreeDFireworks(TileIndex hut_front);
 void AddThreeDEffectsToViewport(ZoomLevel zoom);
-bool AddThreeDObjectToViewport(const struct ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit = false);
+bool AddThreeDObjectToViewport(const struct ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit = false, int state = 0);
 const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const struct ThreeDVehicleObject *obj, float scale, float facing, ZoomLevel zoom);
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile = INVALID_TILE, uint32_t phase = 0, int frame = -1, int state = 0);
 bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state, const std::array<int, 6> *box, float along = 0.0f);

@@ -900,7 +900,9 @@ void AddThreeDDriversToViewport(ZoomLevel zoom)
 	const float scale = WalkerScale();
 	for (const Driver &d : _drivers) {
 		if (d.path.empty() || d.tile == INVALID_TILE) continue;
-		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, IsNightNow());
+		/* In its state "jizda" when its record has one (its beacon off, the Tatra 613 VB as the one bought; the player,
+		 * 18. 11.: "how is it not the same as the Tatra from the depot"), else as it is. */
+		AddThreeDObjectToViewport(d.car, scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, IsNightNow(), d.car->StateNamed("jizda"));
 	}
 }
 
@@ -910,7 +912,7 @@ void AddThreeDDriversToEye()
 	const float scale = WalkerScale();
 	for (const Driver &d : _drivers) {
 		if (d.path.empty() || d.tile == INVALID_TILE) continue;
-		AddCabCar(d.car, scale, d.x, d.y, d.zf, d.facing, IsNightNow());
+		AddCabCar(d.car, scale, d.x, d.y, d.zf, d.facing, IsNightNow(), d.car->StateNamed("jizda"));
 	}
 }
 

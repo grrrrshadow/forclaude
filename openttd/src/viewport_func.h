@@ -88,7 +88,7 @@ void AddCabMissile(std::string_view name, double x, double y, double z, float fa
 void AddCabWaterFigure(std::string_view name, float size, double x, double y, double z, double base, float facing, int frame, int state, bool glows, float pitch = 0);
 void AddFirstPersonMissilesToEye();
 struct ThreeDVehicleObject;
-void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, double z, float facing, bool lit);
+void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, double z, float facing, bool lit, int state = 0);
 bool AddVehicleHullToDraw(int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int ax, int ay, int az, Point anchor, const Rect &screen);
 void AddChildSpriteScreen(SpriteID image, PaletteID pal, int x, int y, bool transparent = false, const SubSprite *sub = nullptr, bool scale = true, bool relative = true);
 std::string *ViewportAddString(const DrawPixelInfo *dpi, const ViewportSign *sign, ViewportStringFlags flags, Colours colour);

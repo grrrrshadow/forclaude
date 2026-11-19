@@ -15727,7 +15727,7 @@ static void AddCabLikeness(const ThreeDEyeLikeness &el, double z)
 }
 
 /** A car of the game's own driving about (three_d_walkers.h) in the view from the eyes. */
-void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, double z, float facing, bool lit)
+void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, double z, float facing, bool lit, int state)
 {
 	/* Its shape if it is read; else read in the background, the car there the next frame. */
 	const ThreeDVehicleShape *shape = obj != nullptr ? obj->TryGetShape() : nullptr;
@@ -15739,6 +15739,7 @@ void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, 
 	ev.y = y;
 	ev.z = z;
 	ev.facing = facing;
+	ev.state = state;
 	ev.lights = lit && shape->HasLights() ? 3 : 0;
 	AddCabVehicle(ev, true);
 }
