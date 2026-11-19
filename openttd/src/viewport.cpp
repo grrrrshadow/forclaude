@@ -2571,7 +2571,17 @@ void TurnedGround::ChangedForCard(const GroundRect &r)
 }
 static constexpr int TURNED_GROUND_CELL = 64; ///< pixels of a cell's side
 static constexpr size_t TURNED_GROUND_PIXELS = static_cast<size_t>(24) << 20; ///< at most so many pixels (96 MB); a block needing more is drawn as before
+/**
+ * Placed anew, the kept picture of the ground reaches at least so many pixels past what is needed every way: a view
+ * moving a few pixels a frame uncovers a strip, and half of a strip's width more was a place anew every few frames, the
+ * whole picture copied each time (the rig zoomed in all the way, the view moved 5 pixels a frame: placed 17 times in
+ * 150 frames, 54 million pixels of ground drawn again).
+ */
+static constexpr int TURNED_GROUND_MARGIN = 512;
+/** The ground of the tiles reaching within so many pixels of a block is drawn into its picture (ViewportDoDrawTurned()). */
+static constexpr int TURNED_GROUND_REACH = 96;
 bool _turned_ground_kept = true; ///< Rig: the ground kept (test3d zem); else drawn anew for every block as before
+bool _turned_ground_tight = true; ///< Rig: of the tiles' ground only what a block needs (test3d zem tesne; TURNED_GROUND_REACH); else all of every tile within a tile of it as before
 bool _turned_ground_card = true; ///< Rig: the ground laid by the card where it can (test3d zem karta); else by the processor
 bool _turned_ground_check = false; ///< Rig: laid by both, the pixels where they differ counted (test3d zem kontrola)
 
@@ -2582,6 +2592,8 @@ static struct {
 	int rects = 0;         ///< rects drawn again
 	size_t pixels = 0;     ///< their pixels
 	int placed = 0;        ///< times placed anew
+	int refused = 0;       ///< times a block needed more than it may have (drawn without it)
+	int need_w = 0, need_h = 0; ///< the biggest it was asked for
 	int card_blocks = 0;   ///< blocks whose ground the card laid
 	int processor_blocks = 0; ///< and the processor
 	int view_blocks = 0;   ///< blocks that took it from what the view kept (TurnedGroundOfView)
@@ -2625,8 +2637,8 @@ std::string DescribeTurnedGround()
 /** Rig: what the kept picture of the ground drew again since the last report, and start over (TurnedTimingsPrint()). */
 void TurnedGroundTimingsPrint()
 {
-	IConsolePrint(CC_DEFAULT, "test3d: {}; znovu dlazdic {} (z toho jinak {}), obdelniku {}, px {}, polozena {}x; polozila karta {}, procesor {}, z pohledu {}{}", DescribeTurnedGround(), _turned_ground_times.tiles_changed,
-			_turned_ground_times.tiles_replaced, _turned_ground_times.rects, _turned_ground_times.pixels, _turned_ground_times.placed, _turned_ground_times.card_blocks,
+	IConsolePrint(CC_DEFAULT, "test3d: {}; znovu dlazdic {} (z toho jinak {}), obdelniku {}, px {}, polozena {}x, nevesla se {}x, nejvic chteno {}x{}; polozila karta {}, procesor {}, z pohledu {}{}", DescribeTurnedGround(), _turned_ground_times.tiles_changed,
+			_turned_ground_times.tiles_replaced, _turned_ground_times.rects, _turned_ground_times.pixels, _turned_ground_times.placed, _turned_ground_times.refused, _turned_ground_times.need_w, _turned_ground_times.need_h, _turned_ground_times.card_blocks,
 			_turned_ground_times.processor_blocks, _turned_ground_times.view_blocks, _turned_ground_times.checked > 0 ? fmt::format(", kontrola {} px, jinak {}", _turned_ground_times.checked, _turned_ground_times.differ) : std::string());
 	_turned_ground_times = {};
 }
@@ -2731,8 +2743,17 @@ static void ForTurnedGroundCells(const TurnedGround &g, const GroundRect &r, F f
 }
 
 /**
- * Place the kept picture of the ground over the pixels \a need at a zoom: as it is when it has them, else anew over
- * them and half as much more every way, with what it had where the two meet.
+ * Place the kept picture of the ground over the pixels \a need at a zoom: as it is when it has them. Else anew: with
+ * nothing kept, over them and TURNED_GROUND_MARGIN (half as much, when that is more) more every way; with something
+ * kept, over that too and further the way the need left it, where it may be so big, else a picture as big slid no
+ * further than it must to hold the need and a lead that way -- what it had about the need stays.
+ *
+ * (It was placed over the need and half of it more every way, joined with what it had while the two together were
+ * under the limit, and over the need alone past it. A move of the view asks for the strip it uncovers: half of a
+ * strip more was a place anew every few frames, the whole picture copied each time, and at the limit all of it was
+ * dropped for the strip, the whole view drawn again and grown strip by strip to the limit again -- the rig zoomed in
+ * all the way, the view moved 5 pixels a frame: placed 17 times in 150 frames, 54 million pixels drawn again; the
+ * player's diary of 19. 11.: 569 MB of ground put on the card in 5 s, a frame or two a second.)
  * @param max_pixels,max_side how big it may be (the view from the eyes': a texture the phone's card holds)
  * @return whether it is placed; not when the block needs more than it may have
  */
@@ -2740,17 +2761,61 @@ static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect 
 {
 	const size_t need_px = need.Pixels();
 	const int nw = need.r - need.l, nh = need.b - need.t;
-	if (need_px == 0 || need_px > max_pixels || nw > max_side || nh > max_side) return false;
+	if (&g == &_turned_ground && need_px > static_cast<size_t>(_turned_ground_times.need_w) * _turned_ground_times.need_h) {
+		_turned_ground_times.need_w = nw;
+		_turned_ground_times.need_h = nh;
+	}
+	if (need_px == 0 || need_px > max_pixels || nw > max_side || nh > max_side) {
+		if (&g == &_turned_ground) _turned_ground_times.refused++;
+		return false;
+	}
 	const bool keep = g.valid && g.zoom == zoom;
 	if (keep && need.Inside(g.at)) return true;
 
-	double grow = 0.5;
-	if (static_cast<double>(need_px) * (1 + 2 * grow) * (1 + 2 * grow) > max_pixels) grow = (std::sqrt(static_cast<double>(max_pixels) / need_px) - 1) / 2;
-	grow = std::min({grow, (static_cast<double>(max_side) / nw - 1) / 2, (static_cast<double>(max_side) / nh - 1) / 2});
-	const int mx = static_cast<int>(nw * grow), my = static_cast<int>(nh * grow);
-	GroundRect at{need.l - mx, need.t - my, need.r + mx, need.b + my};
-	const GroundRect both = keep ? at.With(g.at) : at;
-	if (keep && both.Pixels() <= max_pixels && both.r - both.l <= max_side && both.b - both.t <= max_side) at = both;
+	auto fits = [&](const GroundRect &r) {
+		return r.Pixels() <= max_pixels && r.r - r.l <= max_side && r.b - r.t <= max_side;
+	};
+	/* A rect grown towards another by a share of the way, the biggest share that fits (the first must fit). */
+	auto towards = [&](const GroundRect &from, const GroundRect &to) {
+		auto part = [&](double f) {
+			return GroundRect{from.l + static_cast<int>((to.l - from.l) * f), from.t + static_cast<int>((to.t - from.t) * f),
+					from.r + static_cast<int>((to.r - from.r) * f), from.b + static_cast<int>((to.b - from.b) * f)};
+		};
+		if (fits(to)) return to;
+		double lo = 0, hi = 1;
+		for (int k = 0; k < 24; k++) {
+			const double f = (lo + hi) / 2;
+			(fits(part(f)) ? lo : hi) = f;
+		}
+		return part(lo);
+	};
+	const int mx = std::max(nw / 2, TURNED_GROUND_MARGIN), my = std::max(nh / 2, TURNED_GROUND_MARGIN);
+	GroundRect at;
+	if (!keep) {
+		at = towards(need, {need.l - mx, need.t - my, need.r + mx, need.b + my});
+	} else if (const GroundRect both = need.With(g.at); fits(both)) {
+		/* Both, and a lead the way the need left what it had. */
+		GroundRect lead = both;
+		if (need.l < g.at.l) lead.l -= mx;
+		if (need.r > g.at.r) lead.r += mx;
+		if (need.t < g.at.t) lead.t -= my;
+		if (need.b > g.at.b) lead.b += my;
+		at = towards(both, lead);
+	} else {
+		/* As big as it was (as the need, where that is bigger; smaller, where that is more than it may be), slid to hold
+		 * the need, with as much of a lead as the room past the need lets it have. */
+		GroundRect size = towards({0, 0, nw, nh}, {0, 0, std::max(g.Width(), nw), std::max(g.Height(), nh)});
+		const int w = size.r, h = size.b;
+		auto slide = [](int old_l, int old_r, int need_l, int need_r, int side, int margin) {
+			const int room = side - (need_r - need_l);
+			int l = old_l;
+			if (need_l < old_l) l = need_l - std::min(margin, room / 2);
+			if (need_r > old_r) l = need_r + std::min(margin, room / 2) - side;
+			return std::clamp(l, need_r - side, need_l);
+		};
+		const int l = slide(g.at.l, g.at.r, need.l, need.r, w, mx), t = slide(g.at.t, g.at.b, need.t, need.b, h, my);
+		at = {l, t, l + w, t + h};
+	}
 
 	TurnedGround n;
 	n.valid = true;
@@ -9384,7 +9449,10 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	 * billboards, as DrawTurnedTileGround() does with what it draws. */
 	std::vector<TurnedTile> ground_tiles;
 	{
-		const double m = 64.0 * ZOOM_BASE;
+		/* A tile's width about the block; zoomed in, no more than TURNED_GROUND_REACH pixels of the screen: a tile is up
+		 * to 1024 of them wide there, and a strip of the view 200 by 20 drawn again took the ground of every tile within
+		 * one about it, a picture of nine million pixels to keep (the rig; the player's diary of 19. 11.). */
+		const double m = _turned_ground_tight ? std::min(64.0 * ZOOM_BASE, static_cast<double>(TURNED_GROUND_REACH) * ScaleByZoom(1, zoom)) : 64.0 * ZOOM_BASE;
 		const double fl = frame.left - m, fr = frame.left + frame.width + m, ft = frame.top - m, fb = frame.top + frame.height + m;
 		for (const TurnedTile &t : tiles) {
 			double l = 1e18, r = -1e18, top = 1e18, bottom = -1e18;
@@ -9425,7 +9493,18 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 				ct = std::min(ct, hi.y); cb = std::max(cb, lo.y);
 			}
 		}
-		if (cl <= cr) {
+		if (cl <= cr && !IsViewTurned() && _turned_ground_tight) {
+			/* Facing north its picture is the screen's own: of the tiles' ground only what is under the block and
+			 * TURNED_GROUND_REACH pixels about it is needed, not all of every tile reaching in -- zoomed in all the way
+			 * a tile is 1024 pixels wide, and a strip of the view 200 by 20 drawn again asked for a picture of nine
+			 * million pixels (the rig; turned, the tiles' ground lies elsewhere in it than on the screen). */
+			const int reach = TURNED_GROUND_REACH * ScaleByZoom(1, zoom);
+			cl = std::max(cl, frame.left - reach);
+			cr = std::min(cr, frame.left + frame.width + reach);
+			ct = std::max(ct, frame.top - reach);
+			cb = std::min(cb, frame.top + frame.height + reach);
+		}
+		if (cl <= cr && ct <= cb) {
 			const int margin = TILE_HEIGHT * ZOOM_BASE;
 			bigdpi.left = (cl - margin) & mask;
 			bigdpi.top = (ct - margin) & mask;
@@ -9440,7 +9519,8 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	const int vs = ScaleByZoom(1, zoom);
 	const bool small_view = _tg != &_turned_ground;
 	if (bw > 0 && bh > 0 && _turned_ground_kept &&
-			PlaceTurnedGround(*_tg, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh}, small_view ? SMALL_VIEW_GROUND_PIXELS : TURNED_GROUND_PIXELS, small_view ? 4096 : INT32_MAX)) {
+			PlaceTurnedGround(*_tg, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh},
+					small_view ? SMALL_VIEW_GROUND_PIXELS : TURNED_GROUND_PIXELS, small_view ? 4096 : INT32_MAX)) {
 		if (!_turned_big.empty()) {
 			_turned_big.clear();
 			_turned_big.shrink_to_fit();

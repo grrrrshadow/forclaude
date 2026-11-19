@@ -11909,6 +11909,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * view's ground laid by the card into its picture of the view and shown straight from it (1), or read back (0). */
 		extern bool _turned_ground_kept, _turned_ground_card, _turned_ground_check, _turned_view_ground_on, _turned_card_ground_on;
 		extern std::string DescribeTurnedGround();
+		if (argv.size() > 3 && argv[2] == "tesne") {
+			/* 'zem tesne 0|1': of the tiles' ground only what a block needs is drawn into the kept picture (1), or all of
+			 * every tile within a tile of the block as before (0); what is kept forgotten. */
+			extern bool _turned_ground_tight;
+			_turned_ground_tight = number(3).value_or(1) != 0;
+			ResetTurnedGround();
+			MarkWholeScreenDirty();
+			IConsolePrint(CC_DEFAULT, "test3d: zem tesne {}", _turned_ground_tight ? "ano" : "ne");
+			return true;
+		}
 		if (argv.size() > 2 && argv[2] == "oci") {
 			/* 'zem oci [0|1]': the ground of the view from the eyes kept from frame to frame, only the tiles whose
 			 * ground changed or came new drawn into it and only that sent to the card (1), or drawn anew for every
@@ -12469,15 +12479,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		TurnedTimingsPrint();
 		return true;
 	} else if (what == "smycka" && argv.size() > 2) {
-		/* 'smycka <frames> [okno] [mys]': the game as the player has it, frame by frame: a tick of the game, the
-		 * input, the windows drawn (only what is dirty), a frame every 27 ms; with the sandbox window open ("okno"),
-		 * the pointer going over the map ("mys"). How long the drawing of each frame took. */
+		/* 'smycka <frames> [okno] [mys] [posun <dx> <dy>]': the game as the player has it, frame by frame: a tick of the
+		 * game, the input, the windows drawn (only what is dirty), a frame every 27 ms; with the sandbox window open
+		 * ("okno"), the pointer going over the map ("mys"), the main view moved so many pixels each frame ("posun": a
+		 * vehicle followed, the map dragged). How long the drawing of each frame took. */
 		auto frames = number(2);
 		if (!frames.has_value()) return true;
 		bool window = false, mouse = false;
+		Point scroll{0, 0};
 		for (size_t i = 3; i < argv.size(); i++) {
 			if (argv[i] == "okno") window = true;
 			if (argv[i] == "mys") mouse = true;
+			if (argv[i] == "posun" && i + 2 < argv.size()) scroll = {number(i + 1).value_or(0), number(i + 2).value_or(0)};
 		}
 		CloseWindowByClass(WindowClass::ModalProgress);
 		CloseWindowByClass(WindowClass::ErrorMessage);
@@ -12506,6 +12519,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			StateGameLoop();
 			if (i > 0) ticks.push_back(std::chrono::duration<double, std::milli>(Clock::now() - tick_start).count());
 			if (mouse) _cursor.UpdateCursorPosition(vp->left + (i * 13) % vp->width, vp->top + vp->height / 3 + (i * 7) % (vp->height / 3));
+			if (scroll.x != 0 || scroll.y != 0) w->OnScroll(scroll);
 			InputLoop();
 			if (i == 1) {
 				extern uint64_t _turned_dirty_count[3];
