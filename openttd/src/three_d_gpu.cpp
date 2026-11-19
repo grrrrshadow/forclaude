@@ -36,6 +36,7 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <tuple>
 #include <thread>
 #include <functional>
 #include <unordered_map>
@@ -3975,6 +3976,7 @@ struct PictureBatch {
 	std::array<float, 4> glow_set{NAN, NAN, NAN, NAN};
 	int texel_alpha_set = -1, glass_set = -1, cull_set = -2, bone_row_set = INT_MIN;
 	GLuint texture_set = 0, vao_set = 0, ibo_set = 0;
+	bool night_set = false; ///< the program of the lights at night in use, its corners' array bound (PicturePass::Night)
 };
 
 /** After the last picture of a batch (DrawPictureAt()): left as a picture drawn alone leaves it. */
@@ -4194,31 +4196,22 @@ bool PictureOnCard(const ThreeDGpuPicture &pic, std::vector<MeshOnCard> &draws)
 	return true;
 }
 
+/** What of a picture is drawn (DrawPicturePass()): its body, its glass over it, the glass of its lights on at night over all. */
+enum class PicturePass : uint8_t { Opaque, Glass, Night };
+
 /**
- * Draw a picture into the frame bound, its corner at x, y (DrawPicturesOnCard()): the frame cleared, its depths its own
- * -- the pictures beside it are not where it is.
+ * A part of a picture drawn into the frame bound, its corner at x, y (DrawPictureAt(), DrawPictureBatch()): the frame
+ * cleared, its depths its own -- the pictures beside it are not where it is. Its glass after its body, the lights of the
+ * night after its glass; in a batch each part of all its pictures one after another (the depth and the blend set once).
  */
-void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &draws, int x, int y, PictureBatch *batch)
+static void DrawPicturePass(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &draws, int x, int y, PictureBatch *batch, PicturePass pass)
 {
 	const int w = pic.width, h = pic.height;
 	gl.glViewport(x, y, w, h);
 	/* What this picture's runs set last (PaintSet; the player, 17. 11.: "zoom out je slabý a cuká"): set again only when
 	 * another -- in a batch what the pictures before set too. Rig 'test3d stojici stav 0' sets all every run as before. */
 	const bool lean = _gpu_standing_lean;
-	if (!lean) batch = nullptr;
-	PictureBatch alone;
-	PictureBatch &b = batch != nullptr ? *batch : alone;
-	if (!b.begun) {
-		gl.glDisable(GL_BLEND);
-		gl.glEnable(GL_DEPTH_TEST);
-		gl.glDepthFunc(GL_LESS);
-		gl.glDepthMask(GL_TRUE);
-		gl.glUseProgram(_mesh_program.program);
-		PaintUnits(_mesh_program);
-		b.bone_row_set = -1;
-		gl.glActiveTexture(GL_TEXTURE0);
-		b.begun = true;
-	}
+	PictureBatch &b = *batch;
 	/* The picture's pixels and depths to the card's: a pixel x, y of the picture is the card's pixel x, y of its place,
 	 * its rows from the bottom -- so the rows read back are the picture's from the top. */
 	const float dn = pic.depth_near, df = pic.depth_far;
@@ -4229,6 +4222,41 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 		0, 0, dz, -1 - dn * dz,
 		0, 0, 0, 1,
 	};
+	if (pass == PicturePass::Night) {
+		/* The glass of the lights on at night, over the body and its glass: by its own program, bound once for the
+		 * pictures of a batch one after another (the mesh program's begun again after). */
+		if (pic.night.empty()) return;
+		std::vector<float> corners;
+		corners.reserve(pic.night.size() * 18);
+		for (const ThreeDGpuNightTriangle &t : pic.night) {
+			const Colour c(t.colour);
+			for (int k = 0; k < 3; k++) corners.insert(corners.end(), {t.x[k], t.y[k], t.depth[k], c.r / 255.0f, c.g / 255.0f, c.b / 255.0f});
+		}
+		if (!lean || !b.night_set) {
+			gl.glUseProgram(_night_program.program);
+			gl.glBindVertexArray(_night_vao);
+			gl.glBindBuffer(GL_ARRAY_BUFFER, _night_vbo);
+			b.night_set = true;
+		}
+		gl.glUniformMatrix4fv(_night_program.matrix, 1, GL_TRUE, to_card.data());
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(pic.night.size() * 3));
+		b.begun = false;
+		b.vao_set = b.ibo_set = 0;
+		return;
+	}
+	if (!b.begun) {
+		gl.glDisable(GL_BLEND);
+		gl.glEnable(GL_DEPTH_TEST);
+		gl.glDepthFunc(GL_LESS);
+		gl.glDepthMask(GL_TRUE);
+		gl.glUseProgram(_mesh_program.program);
+		PaintUnits(_mesh_program);
+		b.bone_row_set = -1;
+		gl.glActiveTexture(GL_TEXTURE0);
+		b.begun = true;
+		b.night_set = false;
+	}
 	if (!lean || b.glass_alpha_set != pic.glass_alpha) gl.glUniform1f(_mesh_program.glass_alpha, pic.glass_alpha);
 	b.glass_alpha_set = pic.glass_alpha;
 	auto draw_runs = [&](const MeshOnCard &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
@@ -4281,40 +4309,102 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 			gl.glFrontFace(GL_CCW);
 		}
 	};
-	for (const MeshOnCard &d : draws) draw_runs(d, d.mesh->triangles->opaque, false);
-	/* The glass after all else, over what is behind it, hiding nothing (no depth written); lit only where it has a light
-	 * of its own (its lit 1 with alpha 1 over what is there, else 0 with alpha 0 leaving it). A picture without glass
-	 * none of it. */
-	const bool any_glass = std::ranges::any_of(draws, [](const MeshOnCard &d) { return !d.mesh->triangles->glass.empty(); });
-	if (any_glass || !lean) {
-		gl.glDepthMask(GL_FALSE);
-		gl.glEnable(GL_BLEND);
-		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	if (pass == PicturePass::Opaque) {
+		for (const MeshOnCard &d : draws) draw_runs(d, d.mesh->triangles->opaque, false);
+		return;
+	}
+	/* The glass after all else, over what is behind it, hiding nothing (no depth written: the depth mask and the blend
+	 * the caller's, DrawPictureGlassBegin()); lit only where it has a light of its own (its lit 1 with alpha 1 over what
+	 * is there, else 0 with alpha 0 leaving it). */
+	if (pass == PicturePass::Glass) {
 		for (const MeshOnCard &d : draws) {
 			if (!d.mesh->triangles->glass.empty()) draw_runs(d, d.mesh->triangles->glass, true);
 		}
-		gl.glDisable(GL_BLEND);
-		gl.glDepthMask(GL_TRUE);
+		return;
 	}
-	/* The glass of the lights on at night, over the body: by its own program (the batch's set again after). */
-	if (!pic.night.empty()) {
-		std::vector<float> corners;
-		corners.reserve(pic.night.size() * 18);
-		for (const ThreeDGpuNightTriangle &t : pic.night) {
-			const Colour c(t.colour);
-			for (int k = 0; k < 3; k++) corners.insert(corners.end(), {t.x[k], t.y[k], t.depth[k], c.r / 255.0f, c.g / 255.0f, c.b / 255.0f});
-		}
-		gl.glUseProgram(_night_program.program);
-		gl.glUniformMatrix4fv(_night_program.matrix, 1, GL_TRUE, to_card.data());
-		gl.glBindVertexArray(_night_vao);
-		gl.glBindBuffer(GL_ARRAY_BUFFER, _night_vbo);
-		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(pic.night.size() * 3));
-		b.begun = false;
-		b.vao_set = b.ibo_set = 0;
+}
+
+/** Whether a picture has glass (PicturePass::Glass). */
+static bool PictureHasGlass(const std::vector<MeshOnCard> &draws)
+{
+	return std::ranges::any_of(draws, [](const MeshOnCard &d) { return !d.mesh->triangles->glass.empty(); });
+}
+
+/** The depth kept and the glass blended over what is there (PicturePass::Glass); DrawPictureGlassEnd() back. */
+static void DrawPictureGlassBegin()
+{
+	gl.glDepthMask(GL_FALSE);
+	gl.glEnable(GL_BLEND);
+	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+static void DrawPictureGlassEnd()
+{
+	gl.glDisable(GL_BLEND);
+	gl.glDepthMask(GL_TRUE);
+}
+
+/**
+ * Draw a picture into the frame bound, its corner at x, y (DrawPicturesOnCard()): its body, its glass, its lights at
+ * night (DrawPicturePass()). Alone (batch nullptr) left as it was before it.
+ */
+void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &draws, int x, int y, PictureBatch *batch)
+{
+	PictureBatch alone;
+	PictureBatch &b = batch != nullptr && _gpu_standing_lean ? *batch : alone;
+	DrawPicturePass(pic, draws, x, y, &b, PicturePass::Opaque);
+	if (PictureHasGlass(draws) || !_gpu_standing_lean) {
+		DrawPictureGlassBegin();
+		DrawPicturePass(pic, draws, x, y, &b, PicturePass::Glass);
+		DrawPictureGlassEnd();
 	}
+	if (!pic.night.empty()) DrawPicturePass(pic, draws, x, y, &b, PicturePass::Night);
 	/* Alone: left as it was before this picture, no side left out, the front counter-clockwise. */
-	if (batch == nullptr) EndPictureBatch(b);
+	if (&b == &alone) EndPictureBatch(b);
+}
+
+/**
+ * Pictures of a batch drawn into the frame bound (draw_vehicles of ThreeDGpuDrawStanding(), DrawPicturesOnCard()): the
+ * body of each, then the glass of each, then the lights at night of each -- each picture its own rectangle and depths,
+ * so not a pixel otherwise than one by one (the player's diary of 19. 11.: a vehicle of the turned map 29-44 calls, its
+ * glass set the depth and the blend on and off, at night its lights the program and its samplers again -- of a vehicle
+ * Uniform1i 7.8). Rig 'test3d stojici stav 0': one by one as before.
+ * @param at the picture n of the batch, its meshes and its corner
+ */
+template <typename At>
+static void DrawPictureBatch(size_t n, At &&at)
+{
+	PictureBatch batch;
+	if (!_gpu_standing_lean) {
+		for (size_t k = 0; k < n; k++) {
+			auto [pic, draws, x, y] = at(k);
+			DrawPictureAt(*pic, *draws, x, y, &batch);
+		}
+		if (batch.begun || batch.cull_set != -2) EndPictureBatch(batch);
+		return;
+	}
+	bool glass = false, night = false;
+	for (size_t k = 0; k < n; k++) {
+		auto [pic, draws, x, y] = at(k);
+		DrawPicturePass(*pic, *draws, x, y, &batch, PicturePass::Opaque);
+		glass = glass || PictureHasGlass(*draws);
+		night = night || !pic->night.empty();
+	}
+	if (glass) {
+		DrawPictureGlassBegin();
+		for (size_t k = 0; k < n; k++) {
+			auto [pic, draws, x, y] = at(k);
+			if (PictureHasGlass(*draws)) DrawPicturePass(*pic, *draws, x, y, &batch, PicturePass::Glass);
+		}
+		DrawPictureGlassEnd();
+	}
+	if (night) {
+		for (size_t k = 0; k < n; k++) {
+			auto [pic, draws, x, y] = at(k);
+			if (!pic->night.empty()) DrawPicturePass(*pic, *draws, x, y, &batch, PicturePass::Night);
+		}
+	}
+	if (batch.begun || batch.cull_set != -2) EndPictureBatch(batch);
 }
 
 /**
@@ -4387,9 +4477,10 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 		std::vector<const Placed *> order;
 		for (size_t k = at; k < end; k++) order.push_back(&placed[k]);
 		if (_gpu_standing_lean) std::ranges::stable_sort(order, [](const Placed *a, const Placed *b) { return PictureKind(a->draws) < PictureKind(b->draws); });
-		PictureBatch batch;
-		for (const Placed *p : order) DrawPictureAt(*p->pic, p->draws, p->x, p->y, &batch);
-		if (batch.begun || batch.cull_set != -2) EndPictureBatch(batch);
+		DrawPictureBatch(order.size(), [&](size_t k) {
+			const Placed *p = order[k];
+			return std::tuple<const ThreeDGpuPicture *, const std::vector<MeshOnCard> *, int, int>{p->pic, &p->draws, p->x, p->y};
+		});
 		/* Read back once, each picture's rows out of it. */
 		Step(fmt::format("cteni obrazku {}-{} zpet (glReadPixels), {}x{}, {}", _gpu_pictures + 1 + at, _gpu_pictures + end, frame_w, frame_h, MemoryNow()));
 		colours.resize(static_cast<size_t>(frame_w) * frame_h);
@@ -6191,9 +6282,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			order.reserve(placed.size());
 			for (const Placed &p : placed) order.push_back(&p);
 			if (_gpu_standing_lean) std::ranges::stable_sort(order, [](const Placed *a, const Placed *b) { return PictureKind(a->draws) < PictureKind(b->draws); });
-			PictureBatch batch;
-			for (const Placed *p : order) DrawPictureAt(s.items[p->item].vehicle->pic, p->draws, vehicle_at[p->item][0], vehicle_at[p->item][1], &batch);
-			if (batch.begun || batch.cull_set != -2) EndPictureBatch(batch);
+			DrawPictureBatch(order.size(), [&](size_t k) {
+				const Placed *p = order[k];
+				return std::tuple<const ThreeDGpuPicture *, const std::vector<MeshOnCard> *, int, int>{&s.items[p->item].vehicle->pic, &p->draws, vehicle_at[p->item][0], vehicle_at[p->item][1]};
+			});
 		}
 		/* Each of them shrunk into the kept pictures at once, their places kept: laid from there as each comes (the
 		 * main loop finds them kept). One whose place the atlas let go of meanwhile (emptied for a later one,
