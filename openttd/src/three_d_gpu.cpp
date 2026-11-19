@@ -27,6 +27,7 @@
 #include "tile_type.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cfloat>
 #include <chrono>
@@ -36,6 +37,8 @@
 #include <memory>
 #include <mutex>
 #include <set>
+#include <span>
+#include <string_view>
 #include <tuple>
 #include <thread>
 #include <functional>
@@ -1960,16 +1963,19 @@ layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
 layout(location = 2) in vec4 a_rect;
 layout(location = 3) in vec3 a_how;
+layout(location = 4) in float a_slot; // which of the step's textures (EYE_TRI_SLOTS), as a float (no whole-number attributes, see ShapeOnCard())
 uniform vec2 u_size;
 out vec2 v_uv;
 flat out vec4 v_rect;
 flat out float v_light;
 noperspective out float v_corner_light;
 flat out vec2 v_how;
+flat out int v_slot;
 void main()
 {
 	float w = 1.0 / a_pos.z;
 	gl_Position = vec4((2.0 * a_pos.x / u_size.x - 1.0) * w, (2.0 * a_pos.y / u_size.y - 1.0) * w, 0.0, w);
+	v_slot = int(a_slot + 0.5);
 	v_uv = a_uv;
 	v_rect = a_rect;
 	v_light = a_how.x;
@@ -1979,7 +1985,23 @@ void main()
 )";
 
 const char *const EYE_TRI_FRAGMENT = R"(#version 330 core
+/* The step's textures (EYE_TRI_SLOTS): a run of triangles of each in the order drawn, at once (DrawEyeFrameOnCard()). */
 uniform sampler2D u_tex;
+uniform sampler2D u_tex1;
+uniform sampler2D u_tex2;
+uniform sampler2D u_tex3;
+uniform sampler2D u_tex4;
+uniform sampler2D u_tex5;
+flat in int v_slot;
+vec4 Fetch(ivec2 p, int level)
+{
+	if (v_slot == 0) return texelFetch(u_tex, p, level);
+	if (v_slot == 1) return texelFetch(u_tex1, p, level);
+	if (v_slot == 2) return texelFetch(u_tex2, p, level);
+	if (v_slot == 3) return texelFetch(u_tex3, p, level);
+	if (v_slot == 4) return texelFetch(u_tex4, p, level);
+	return texelFetch(u_tex5, p, level);
+}
 uniform float u_near;
 uniform sampler2D u_grass;
 uniform float u_grass_units; // world units its picture runs over each way; 0 none
@@ -2015,12 +2037,12 @@ void main()
 	} else if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) {
 		discard;
 	}
-	vec4 t = texelFetch(u_tex, origin + at, 0);
+	vec4 t = Fetch(origin + at, 0);
 	if (t == vec4(0.0) && (how & 1) != 0) {
 		for (int k = 0; k < 24; k++) {
 			ivec2 n = at + NEAR[k];
 			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
-			t = texelFetch(u_tex, origin + n, 0);
+			t = Fetch(origin + n, 0);
 			if (t != vec4(0.0)) break;
 		}
 	}
@@ -2037,7 +2059,7 @@ void main()
 		bool plain = true;
 		ivec2 b0 = ivec2(floor(v_uv - 0.5));
 		for (int k = 0; k < 4; k++) {
-			vec4 q = texelFetch(u_tex, origin + clamp(b0 + ivec2(k & 1, k >> 1), ivec2(0), size - 1), 0);
+			vec4 q = Fetch(origin + clamp(b0 + ivec2(k & 1, k >> 1), ivec2(0), size - 1), 0);
 			if (q == vec4(0.0)) continue;
 			int qa = int(q.a * 255.0 + 0.5);
 			if (qa < 252) plain = false;
@@ -2052,7 +2074,7 @@ void main()
 				float wu = fu - float(bu);
 				for (int k = 0; k < 4; k++) {
 					ivec2 o = ivec2(k & 1, k >> 1);
-					vec4 q = texelFetch(u_tex, origin + clamp(ivec2(bu, bv) + o, ivec2(0), size - 1), 0);
+					vec4 q = Fetch(origin + clamp(ivec2(bu, bv) + o, ivec2(0), size - 1), 0);
 					if (q == vec4(0.0)) continue;
 					int qa = int(q.a * 255.0 + 0.5);
 					if (qa < 252) plain = false;
@@ -2092,7 +2114,7 @@ void main()
 			float m = 0.0, r = 0.0;
 			for (int k = 0; k < 4; k++) {
 				ivec2 o = ivec2(k & 1, k >> 1);
-				vec4 q = texelFetch(u_tex, origin + clamp(b + o, ivec2(0), size - 1), 0);
+				vec4 q = Fetch(origin + clamp(b + o, ivec2(0), size - 1), 0);
 				int qa = int(q.a * 255.0 + 0.5);
 				float wk = (o.x == 1 ? w.x : 1.0 - w.x) * (o.y == 1 ? w.y : 1.0 - w.y);
 				if (qa == 254) {
@@ -2113,7 +2135,7 @@ void main()
 			float r = 0.0;
 			for (int k = 0; k < 4; k++) {
 				ivec2 o = ivec2(k & 1, k >> 1);
-				vec4 q = texelFetch(u_tex, origin + clamp(b + o, ivec2(0), size - 1), 0);
+				vec4 q = Fetch(origin + clamp(b + o, ivec2(0), size - 1), 0);
 				if (int(q.a * 255.0 + 0.5) != 251) continue;
 				float wk = (o.x == 1 ? w.x : 1.0 - w.x) * (o.y == 1 ? w.y : 1.0 - w.y);
 				sum += wk * q.rgb;
@@ -3170,6 +3192,9 @@ static bool FirstDrawOf(uint32_t key, F words)
 	return FirstDraw(words());
 }
 static constexpr uint32_t FIRST_DRAW_EYE_MESH = 0x100, FIRST_DRAW_EYE_BUILDING = 0x200, FIRST_DRAW_EYE_TRIANGLES = 0x300;
+/** The textures a group of the triangles of a frame from the eyes draws at once (EYE_TRI_FRAGMENT's u_tex to u_tex5), on these units (1 is the grass's). */
+static constexpr int EYE_TRI_SLOTS = 6;
+static constexpr std::array<GLenum, EYE_TRI_SLOTS> EYE_TRI_UNITS = {0, 2, 3, 4, 5, 6};
 
 /**
  * A uniform's location in a program, asked of the card once (the steps of a frame from the eyes asked at every frame:
@@ -6935,9 +6960,15 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 	int parts_set = 0;
 	gl.glActiveTexture(GL_TEXTURE0);
 	gl.glCullFace(GL_BACK);
-	/* What the runs set last: set again only what differs (as EyeDrawState). */
+	/* What the runs set last: set again only what differs (as EyeDrawState); the parts' masks and patterns on their
+	 * units and their colours too (houses alike one after another). */
 	GLuint vao_set = 0, texture_set = 0;
 	int cull_set = -2;
+	std::array<GLuint, 2 * THREE_D_GPU_BUILDING_PAINTS> part_units_set{};
+	std::array<float, 4 * THREE_D_GPU_BUILDING_PAINTS> colours_set, about_set;
+	colours_set.fill(NAN);
+	about_set.fill(NAN);
+	std::array<float, 3> metres_set{NAN, NAN, NAN};
 	for (const EyeObjectDraws::Draw &d : o.draws) {
 		gl.glUniformMatrix4fv(_eye_building_program.matrix, 1, GL_TRUE, d.eye->matrix.data());
 		if (d.on->vao != vao_set) gl.glBindVertexArray(d.on->vao);
@@ -6954,17 +6985,40 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 				colours[k * 4 + 3] = std::max(1.0f, p.start);
 				about[k * 4] = d.parts[k].pattern != 0 ? p.pattern_m : 0.0f;
 				about[k * 4 + 1] = p.only_sloped ? 1.0f : 0.0f;
-				gl.glActiveTexture(GL_TEXTURE1 + k);
-				gl.glBindTexture(GL_TEXTURE_2D, d.parts[k].mask);
-				gl.glActiveTexture(GL_TEXTURE5 + k);
-				gl.glBindTexture(GL_TEXTURE_2D, d.parts[k].pattern != 0 ? d.parts[k].pattern : d.parts[k].mask);
 			}
-			gl.glActiveTexture(GL_TEXTURE0);
+			bool active_moved = false;
 			for (int k = 0; k < parts; k++) {
-				gl.glUniform4f(u_colour[k], colours[k * 4], colours[k * 4 + 1], colours[k * 4 + 2], colours[k * 4 + 3]);
-				gl.glUniform4f(u_about[k], about[k * 4], about[k * 4 + 1], about[k * 4 + 2], about[k * 4 + 3]);
+				const GLuint mask = d.parts[k].mask, pattern = d.parts[k].pattern != 0 ? d.parts[k].pattern : d.parts[k].mask;
+				if (part_units_set[k] != mask) {
+					gl.glActiveTexture(GL_TEXTURE1 + k);
+					gl.glBindTexture(GL_TEXTURE_2D, mask);
+					part_units_set[k] = mask;
+					active_moved = true;
+				}
+				if (part_units_set[THREE_D_GPU_BUILDING_PAINTS + k] != pattern) {
+					gl.glActiveTexture(GL_TEXTURE5 + k);
+					gl.glBindTexture(GL_TEXTURE_2D, pattern);
+					part_units_set[THREE_D_GPU_BUILDING_PAINTS + k] = pattern;
+					active_moved = true;
+				}
 			}
-			gl.glUniform3f(u_metres, d.eye->building.to_metres[0], d.eye->building.to_metres[1], d.eye->building.to_metres[2]);
+			if (active_moved) gl.glActiveTexture(GL_TEXTURE0);
+			for (int k = 0; k < parts; k++) {
+				const auto c = std::span(colours).subspan(k * 4, 4), a = std::span(about).subspan(k * 4, 4);
+				if (!std::ranges::equal(c, std::span(colours_set).subspan(k * 4, 4))) {
+					gl.glUniform4f(u_colour[k], c[0], c[1], c[2], c[3]);
+					std::ranges::copy(c, colours_set.begin() + k * 4);
+				}
+				if (!std::ranges::equal(a, std::span(about_set).subspan(k * 4, 4))) {
+					gl.glUniform4f(u_about[k], a[0], a[1], a[2], a[3]);
+					std::ranges::copy(a, about_set.begin() + k * 4);
+				}
+			}
+			const std::array<float, 3> metres{d.eye->building.to_metres[0], d.eye->building.to_metres[1], d.eye->building.to_metres[2]};
+			if (metres != metres_set) {
+				gl.glUniform3f(u_metres, metres[0], metres[1], metres[2]);
+				metres_set = metres;
+			}
 		}
 		for (const GpuBuilding::Run &r : d.on->runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
@@ -7397,13 +7451,14 @@ void StartEyeFrame()
 	gl.glGenBuffers(1, &_frame_vbo);
 	gl.glBindVertexArray(_frame_vao);
 	gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_vbo);
-	/* A corner: sx, sy, iw; u, v; its texture's place x, y, w, h; light, alpha, how. */
-	const GLsizei stride = 12 * sizeof(float);
+	/* A corner: sx, sy, iw; u, v; its texture's place x, y, w, h; light, alpha, how; its texture's slot (EYE_TRI_SLOTS). */
+	const GLsizei stride = 13 * sizeof(float);
 	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, nullptr);
 	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void *>(3 * sizeof(float)));
 	gl.glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void *>(5 * sizeof(float)));
 	gl.glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void *>(9 * sizeof(float)));
-	for (GLuint a = 0; a < 4; a++) gl.glEnableVertexAttribArray(a);
+	gl.glVertexAttribPointer(4, 1, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void *>(12 * sizeof(float)));
+	for (GLuint a = 0; a < 5; a++) gl.glEnableVertexAttribArray(a);
 	gl.glGenVertexArrays(1, &_frame_empty_vao);
 	gl.glGenVertexArrays(1, &_frame_glow_vao);
 	gl.glGenBuffers(1, &_frame_glow_vbo);
@@ -7638,19 +7693,67 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		if (f.steps[i].kind == ThreeDGpuEyeStep::Kind::Objects && f.steps[i].objects != nullptr && !PrepareEyeObjects(*f.steps[i].objects, objects[i])) return false;
 	}
 	if (!EyeFrameTargetOfSize(w, h)) return false;
+	/* The runs of triangles of a step in groups drawn at once, in their order: one after another as long as the group
+	 * has no more than EYE_TRI_SLOTS textures and the same glass, each run's texture a slot of its group's (the player's
+	 * #381: some 190 to 260 runs a step of 2 to 16 textures, a draw and a texture each; the order kept, as the depth
+	 * needs it: of two as near the first drawn stays). */
+	struct TriGroup {
+		uint32_t first = 0, count = 0;   ///< its corners
+		std::array<GLuint, EYE_TRI_SLOTS> textures{};
+		int slots = 0;
+		bool glass = false;
+	};
+	std::vector<std::vector<TriGroup>> tri_groups(f.steps.size());
+	std::vector<uint8_t> slot_of_run(f.runs.size(), 0);
+	for (size_t i = 0; i < f.steps.size(); i++) {
+		const ThreeDGpuEyeStep &st = f.steps[i];
+		if (st.kind != ThreeDGpuEyeStep::Kind::Triangles) continue;
+		std::vector<TriGroup> &groups = tri_groups[i];
+		for (size_t r = st.first_run; r < st.first_run + st.runs && r < f.runs.size(); r++) {
+			const ThreeDGpuEyeRun &run = f.runs[r];
+			const GLuint name = names[run.texture];
+			TriGroup *g = groups.empty() ? nullptr : &groups.back();
+			int slot = -1;
+			if (g != nullptr && g->glass == run.glass && g->first + g->count == run.first) {
+				for (int k = 0; k < g->slots && slot < 0; k++) {
+					if (g->textures[k] == name) slot = k;
+				}
+				if (slot < 0 && g->slots < EYE_TRI_SLOTS) {
+					slot = g->slots;
+					g->textures[g->slots++] = name;
+				}
+			}
+			if (slot < 0) {
+				g = &groups.emplace_back();
+				g->first = run.first;
+				g->glass = run.glass;
+				g->textures[0] = name;
+				g->slots = 1;
+				slot = 0;
+			}
+			g->count += run.count;
+			slot_of_run[r] = static_cast<uint8_t>(slot);
+		}
+	}
 	/* The corners of all the triangles at once. */
 	{
 		std::vector<float> corners;
-		corners.reserve(f.corners.size() * 12);
+		corners.reserve(f.corners.size() * 13);
 		std::vector<uint32_t> texture_of(f.corners.size(), 0);
-		for (const ThreeDGpuEyeRun &r : f.runs) {
-			for (uint32_t k = r.first; k < r.first + r.count && k < f.corners.size(); k++) texture_of[k] = r.texture;
+		std::vector<uint8_t> slot_of(f.corners.size(), 0);
+		for (size_t r = 0; r < f.runs.size(); r++) {
+			const ThreeDGpuEyeRun &run = f.runs[r];
+			for (uint32_t k = run.first; k < run.first + run.count && k < f.corners.size(); k++) {
+				texture_of[k] = run.texture;
+				slot_of[k] = slot_of_run[r];
+			}
 		}
 		for (size_t k = 0; k < f.corners.size(); k++) {
 			const ThreeDGpuEyeCorner &c = f.corners[k];
 			const uint32_t t = texture_of[k];
 			const ThreeDGpuEyeTexture &tex = f.textures[t];
-			corners.insert(corners.end(), {c.sx, c.sy, c.iw, c.u, c.v, static_cast<float>(place[t][0]), static_cast<float>(place[t][1]), static_cast<float>(tex.w), static_cast<float>(tex.h), c.light, c.alpha, c.how});
+			corners.insert(corners.end(), {c.sx, c.sy, c.iw, c.u, c.v, static_cast<float>(place[t][0]), static_cast<float>(place[t][1]), static_cast<float>(tex.w), static_cast<float>(tex.h), c.light, c.alpha, c.how,
+					static_cast<float>(slot_of[k])});
 		}
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_vbo);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.empty() ? nullptr : corners.data(), GL_STREAM_DRAW);
@@ -7791,38 +7894,51 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				gl.glBindTexture(GL_TEXTURE_2D, grass ? names[f.grass_texture] : 0);
 				gl.glActiveTexture(GL_TEXTURE0);
 				gl.glBindVertexArray(_frame_vao);
-				/* The texture and the blend set again only when they differ from the run before (as EyeDrawState). */
-				GLuint texture_set = 0;
+				/* Its groups of runs (tri_groups), each at once: their textures on their units, set again only when they
+				 * differ from the group before, as the blend. */
+				for (int k = 1; k < EYE_TRI_SLOTS; k++) gl.glUniform1i(UniformOf(_frame_tri_program.program, fmt::format("u_tex{}", k)), static_cast<GLint>(EYE_TRI_UNITS[k]));
+				std::array<GLuint, EYE_TRI_SLOTS> bound{};
+				bound[0] = UINT32_MAX;
 				bool glass_set = false;
 				gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-				for (size_t r = s.first_run; r < s.first_run + s.runs && r < f.runs.size(); r++) {
-					/* Those after it of the same texture at once. */
-					const ThreeDGpuEyeRun &run = f.runs[r];
-					uint32_t count = run.count;
-					while (r + 1 < s.first_run + s.runs && r + 1 < f.runs.size() && names[f.runs[r + 1].texture] == names[run.texture] && f.runs[r + 1].glass == run.glass && f.runs[r + 1].first == run.first + count) {
-						count += f.runs[++r].count;
-					}
-					if (run.glass != glass_set) {
-						if (run.glass) {
+				for (const TriGroup &g : tri_groups[i]) {
+					if (g.glass != glass_set) {
+						if (g.glass) {
 							gl.glEnable(GL_BLEND);
 							gl.glDepthMask(GL_FALSE);
 						} else {
 							gl.glDisable(GL_BLEND);
 							gl.glDepthMask(GL_TRUE);
 						}
-						glass_set = run.glass;
+						glass_set = g.glass;
 					}
-					if (names[run.texture] != texture_set) gl.glBindTexture(GL_TEXTURE_2D, names[run.texture]);
-					texture_set = names[run.texture];
-					const bool first = FirstDrawOf(FIRST_DRAW_EYE_TRIANGLES | (run.glass ? 1 : 0) | (grass ? 2 : 0),
-							[&] { return fmt::format("snimku z oci: trojuhelniky{}{}", run.glass ? ", sklo" : "", grass ? ", trava" : ""); });
-					gl.glDrawArrays(GL_TRIANGLES, static_cast<GLint>(run.first), static_cast<GLsizei>(count));
+					bool active_moved = false;
+					for (int k = 0; k < g.slots; k++) {
+						if (bound[k] == g.textures[k]) continue;
+						if (k > 0 || active_moved) {
+							gl.glActiveTexture(GL_TEXTURE0 + EYE_TRI_UNITS[k]);
+							active_moved = k > 0;
+						}
+						gl.glBindTexture(GL_TEXTURE_2D, g.textures[k]);
+						bound[k] = g.textures[k];
+					}
+					if (active_moved) gl.glActiveTexture(GL_TEXTURE0);
+					const bool first = FirstDrawOf(FIRST_DRAW_EYE_TRIANGLES | (g.glass ? 1 : 0) | (grass ? 2 : 0),
+							[&] { return fmt::format("snimku z oci: trojuhelniky{}{}", g.glass ? ", sklo" : "", grass ? ", trava" : ""); });
+					gl.glDrawArrays(GL_TRIANGLES, static_cast<GLint>(g.first), static_cast<GLsizei>(g.count));
 					FirstDrawDone(first);
 				}
 				if (glass_set) {
 					gl.glDisable(GL_BLEND);
 					gl.glDepthMask(GL_TRUE);
 				}
+				/* The units of the slots left empty, as before. */
+				for (int k = 1; k < EYE_TRI_SLOTS; k++) {
+					if (bound[k] == 0) continue;
+					gl.glActiveTexture(GL_TEXTURE0 + EYE_TRI_UNITS[k]);
+					gl.glBindTexture(GL_TEXTURE_2D, 0);
+				}
+				gl.glActiveTexture(GL_TEXTURE0);
 				gl.glBindVertexArray(0);
 				gl.glActiveTexture(GL_TEXTURE1);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
