@@ -10,6 +10,7 @@
 /** @file three_d_objects.cpp Reading buildings as real 3D objects (three_d_objects.h): the index, the .glb files, their textures. */
 
 #include "stdafx.h"
+#include "aircraft.h"
 #include "three_d_objects.h"
 #include "three_d_witches.h"
 #include "object_base.h"
@@ -8841,6 +8842,9 @@ bool ThreeDTrainCleansTrack(const Vehicle *front)
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece)
 {
 	if (v == nullptr) return nullptr;
+	/* An aircraft's shadow and a helicopter's rotor are vehicles of its engine too: the object is the aircraft's alone
+	 * (the Buran's shadow was drawn as a second Buran on the ground under it, in the look of one flying). */
+	if (v->type == VehicleType::Aircraft && !Aircraft::From(v)->IsNormalAircraft()) return nullptr;
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	if (_vehicle_object_pieces.empty()) return nullptr;
 	const EnginePiece *p = EnginePieceOf(v->engine_type);
