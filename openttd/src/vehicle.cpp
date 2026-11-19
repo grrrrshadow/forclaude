@@ -1053,7 +1053,12 @@ static void RunEconomyVehicleDayProc()
 				 * Note: MarkDirty also invalidates the palette, which is the meaning of bit 1. So, nothing special there. */
 				if (callback != 0) v->First()->MarkDirty();
 
-				if (callback & ~3) ErrorUnknownCallbackResult(v->GetGRFID(), CBID_VEHICLE_32DAY_CALLBACK, callback);
+				if (callback & ~3) {
+					/* Which vehicle (as GetRoadVehLength() says of its length). */
+					Debug(grf, 0, "vehicle {} type {} (engine {} '{}', cargo {} subtype {}): its 32-day callback returned 0x{:X}", v->First()->unitnumber, to_underlying(v->type),
+							v->engine_type.base(), StrMakeValid(GetString(STR_ENGINE_NAME, v->engine_type)), v->cargo_type, v->cargo_subtype, callback);
+					ErrorUnknownCallbackResult(v->GetGRFID(), CBID_VEHICLE_32DAY_CALLBACK, callback);
+				}
 			}
 		}
 
