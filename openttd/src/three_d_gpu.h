@@ -622,6 +622,7 @@ enum class ThreeDGpuStandingWait : uint8_t {
 };
 
 bool ThreeDGpuAvailable(bool wait = false);
+void ThreeDGpuWatchFrame();
 std::unique_lock<std::mutex> ThreeDGpuTexturesLock();
 bool ThreeDGpuHoldsTextureLocked(uint64_t uid);
 bool ThreeDGpuHoldsTexture(uint64_t uid);

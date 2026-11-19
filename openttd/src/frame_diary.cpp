@@ -294,6 +294,7 @@ void FrameDiaryEyeCard(bool on_card, double prepare_ms, double card_ms, size_t c
 /** A frame of the drawing done (the main thread): its parts. */
 void FrameDiaryDraw(const FrameDiaryParts &parts)
 {
+	ThreeDGpuWatchFrame(); // (a frame drawn: the watch of a freeze, zamrznuti.log)
 	const auto now = std::chrono::steady_clock::now();
 	if (_since == std::chrono::steady_clock::time_point{}) _since = now;
 	_frames++;

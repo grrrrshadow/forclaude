@@ -41,6 +41,7 @@
 #include <string_view>
 #include <tuple>
 #include <thread>
+#include <ctime>
 #include <functional>
 #include <unordered_map>
 #include <unordered_set>
@@ -155,9 +156,23 @@ static std::string DiaryPath(bool last)
 	if (keep) _diary_tail = ftell(*_diary);
 }
 
+/* The watch of a freeze (WatchFreeze()): the step the card's thread took last and when, steady milliseconds. */
+static std::mutex _watch_step_mutex;
+static std::string _watch_step;
+static std::atomic<int64_t> _watch_step_at = 0;
+static int64_t WatchNow()
+{
+	return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+
 /** A step with the card about to be taken: kept while the start and the first pictures are written step by step. */
 [[maybe_unused]] static void Step(std::string_view what)
 {
+	{
+		std::lock_guard lock(_watch_step_mutex);
+		_watch_step = what;
+	}
+	_watch_step_at = WatchNow();
 	Diary(fmt::format("krok {}", what), _diary_pictures < DIARY_PICTURES);
 }
 
@@ -705,13 +720,22 @@ static constexpr int GPU_WAIT_KINDS = 6;
 static std::atomic<double> _gpu_main_wait_ms[GPU_WAIT_KINDS] = {};
 static std::atomic<uint32_t> _gpu_main_waits[GPU_WAIT_KINDS] = {};
 /** While it lives the main thread's wait on the card is counted as of this kind (GPU_WAIT_KINDS). */
+/* For the watch of a freeze (WatchFreeze()): what the main thread waits on the card for now (-1 nothing), since when. */
+static std::atomic<int> _watch_wait_kind = -1;
+static std::atomic<int64_t> _watch_wait_from = 0;
 struct GpuMainWait {
 	int kind;
 	std::chrono::steady_clock::time_point from = std::chrono::steady_clock::now();
-	explicit GpuMainWait(int kind) : kind(kind) {}
+	explicit GpuMainWait(int kind) : kind(kind)
+	{
+		if (std::this_thread::get_id() != _gpu_main_thread) return;
+		_watch_wait_from = WatchNow();
+		_watch_wait_kind = kind;
+	}
 	~GpuMainWait()
 	{
 		if (std::this_thread::get_id() != _gpu_main_thread) return;
+		_watch_wait_kind = -1;
 		_gpu_main_wait_ms[this->kind] = _gpu_main_wait_ms[this->kind] + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->from).count();
 		_gpu_main_waits[this->kind]++;
 	}
@@ -8854,10 +8878,70 @@ void RigThreeDGpuAtlas(int px)
 	_rig_standing_atlas_size = px;
 }
 
+/** What the main thread waits on the card for (GpuMainWait), by its kind. */
+static const char *const GPU_WAIT_NAMES[GPU_WAIT_KINDS] = {"posun pohledu", "zem bloku", "co stoji", "zem predem dana", "vrstva aut", "co stoji dane bez cekani"};
+
+/**
+ * The watch of a freeze (the player, 19. 11., #382: "zamrzlo to při pohledu shora při maximálním oddálení při posunu
+ * mapy" -- the card's diary ended at a step of the ground's texture, the frames' diary five seconds before; who
+ * waited on whom, and whether for ever, nothing said). The main thread calls this as it draws a frame; a frame not
+ * drawn for 8, 30 and 120 seconds is written into zamrznuti.log: what the main thread waits on the card for and how
+ * long, the step the card's thread took last and when, the game's last marks (CrashTrace()) -- and that the game went
+ * on, when it did. Nothing is ended: the diary only.
+ */
+void ThreeDGpuWatchFrame()
+{
+	static std::atomic<int64_t> frame_at = 0;
+	static std::atomic<bool> started = false;
+	frame_at = WatchNow();
+	if (started.exchange(true)) return;
+	std::thread([] {
+		static constexpr int64_t LEVELS[] = {8000, 30000, 120000};
+		auto line = [](std::string_view text) {
+			auto f = FileHandle::Open(FioDiaryPath("zamrznuti.log"), "a");
+			if (!f.has_value()) return;
+			const std::time_t tt = std::time(nullptr);
+			std::tm tm{};
+#if defined(_WIN32)
+			localtime_s(&tm, &tt);
+#else
+			localtime_r(&tt, &tm);
+#endif
+			fmt::print(*f, "{:02}:{:02}:{:02} {}\n", tm.tm_hour, tm.tm_min, tm.tm_sec, text);
+			fflush(*f);
+		};
+		size_t told = 0;      ///< how many of the levels of this stall were written
+		int64_t told_at = 0;  ///< the frame the stall written began after
+		for (;;) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(500));
+			const int64_t now = WatchNow(), at = frame_at.load();
+			if (told > 0 && at != told_at) {
+				line(fmt::format("hra pokracuje: dalsi snimek po {:.1f} s", (at - told_at) / 1000.0));
+				told = 0;
+			}
+			if (told >= std::size(LEVELS) || now - at < LEVELS[told]) continue;
+			told_at = at;
+			told++;
+			std::string step;
+			{
+				std::lock_guard lock(_watch_step_mutex);
+				step = _watch_step;
+			}
+			const int kind = _watch_wait_kind.load();
+			line(fmt::format("ZAMRZLO? hlavni vlakno nenakreslilo snimek {:.0f} s; {}; karta: posledni krok \"{}\" pred {:.1f} s; posledni znacky hry:",
+					(now - at) / 1000.0,
+					kind >= 0 && kind < GPU_WAIT_KINDS ? fmt::format("ceka na kartu ({}) {:.1f} s", GPU_WAIT_NAMES[kind], (now - _watch_wait_from.load()) / 1000.0) : std::string("na kartu neceka"),
+					step, (now - _watch_step_at.load()) / 1000.0));
+			const std::vector<std::string> marks = GetCrashTrace();
+			for (size_t i = marks.size() > 16 ? marks.size() - 16 : 0; i < marks.size(); i++) line("  " + marks[i]);
+		}
+	}).detach();
+}
+
 /** For the diary: the main thread's waits on the card since asked last (GpuMainWait), by what it waited for. */
 std::string ThreeDGpuMainWaits()
 {
-	static const char *names[GPU_WAIT_KINDS] = {"posun pohledu", "zem bloku", "co stoji", "zem predem dana", "vrstva aut", "co stoji dane bez cekani"};
+	const char *const *names = GPU_WAIT_NAMES;
 	std::string s;
 	for (int k = 0; k < GPU_WAIT_KINDS; k++) {
 		const uint32_t n = _gpu_main_waits[k].exchange(0);
