@@ -169,6 +169,12 @@ struct ThreeDGpuBuilding {
 	std::span<const uint32_t> tri;
 	std::span<const int8_t> facing;       ///< each triangle's side facing out (1 its corners' order, -1 the other, 0 both); empty: both
 	std::span<const uint8_t> tri_tex;     ///< each triangle's texture; empty: all the first
+	/* Its lit glass of the night, kept on the card with its shape (the turned map, ThreeDGpuStandingBuilding::night_held):
+	 * corners as pos, their u, v, three corners a triangle, each triangle's texture (empty: all the first). */
+	std::span<const float> night_pos;
+	std::span<const float> night_uv;
+	std::span<const uint32_t> night_tri;
+	std::span<const uint8_t> night_tex;
 	std::vector<const ThreeDObjectTexture *> textures;
 	std::vector<ThreeDGpuBuildingPaint> paints; ///< its first texture painted by the card (the view from the eyes); empty: as it is
 	std::array<float, 3> to_metres{1.0f, 1.0f, 1.0f}; ///< its corners' units to metres along x, y and up (the patterns' size)
@@ -470,6 +476,11 @@ struct ThreeDGpuStandingBuilding {
 	 * matrix's), u, v of its texture (0-1), 256 --, drawn as they are where they are nearer, marked lit. */
 	std::vector<float> night;
 	std::vector<uint8_t> night_texture;   ///< each such triangle's texture (ThreeDGpuBuilding::textures)
+	/** At night its lit glass as the card holds it with its shape (ThreeDGpuBuilding::night_pos), laid through the
+	 * matrix as its walls, nearer by night_nearer of the depth 0-1: no corner of it placed by the processor -- by night
+	 * that was half of what a building cost the main thread each time it was laid (the rig, the player's save). */
+	bool night_held = false;
+	float night_nearer = 0;
 	/** Given without waiting (ThreeDGpuStanding::held_only): the numbers of its textures (0 none) and of its paints'
 	 * masks and patterns as the card holds them, taken when it was given -- the pointers of the building not read on
 	 * the card's thread then, what they point to may go meanwhile. */

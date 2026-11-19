@@ -11756,6 +11756,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_standing_faces_on_card = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici krabice {}", _standing_faces_on_card ? "kartou" : "procesorem");
+	} else if (what == "urovnedomu" && argv.size() > 2) {
+		/* 'urovnedomu 0|1': of a building's texture read, only the level asked for, the one finer and the coarser ones
+		 * kept (1), or all its levels till the next trimming (0). */
+		extern bool _house_levels_asked_only;
+		_house_levels_asked_only = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: urovne textur domu {}", _house_levels_asked_only ? "jen chtene" : "vsechny");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "okna") {
+		/* 'stojici okna 0|1': the lit glass of the buildings by night laid by the card of what it holds with their
+		 * shapes (1), or placed corner by corner by the processor (0). */
+		extern bool _standing_night_glass_held;
+		_standing_night_glass_held = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici okna {}", _standing_night_glass_held ? "kartou" : "procesorem");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "hloubka") {
 		/* 'stojici hloubka 0|1': the vehicles the card draws laid each pixel by its own depth (1;
 		 * ThreeDGpuStandingVehicle::near_span), or by their boxes (0). */

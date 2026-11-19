@@ -2337,6 +2337,9 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
+	extern double _rig_bldg_ms[6];
+	IConsolePrint(CC_DEFAULT, "test3d: budova po castech: tvar {:.1f}, postavy a obdelnik {:.1f}, textury {:.1f}, matice a svetla oken {:.1f}, postavy na kartu {:.1f} ms", _rig_bldg_ms[0], _rig_bldg_ms[1], _rig_bldg_ms[2], _rig_bldg_ms[3], _rig_bldg_ms[4]);
+	std::fill(std::begin(_rig_bldg_ms), std::end(_rig_bldg_ms), 0.0);
 	IConsolePrint(CC_DEFAULT, "test3d: plakaty procesorem: budovy {:.1f} ms {}x, plochy {:.1f} ms {}x, podoby {:.1f} ms {}x, sprity {:.1f} ms {}x, zvlast {:.1f} ms {}x, hloubka {:.1f} ms {}x",
 			t.standing_kind_ms[STANDING_BUILDING], t.standing_kind_n[STANDING_BUILDING], t.standing_kind_ms[STANDING_FACES], t.standing_kind_n[STANDING_FACES],
 			t.standing_kind_ms[STANDING_LIKENESS], t.standing_kind_n[STANDING_LIKENESS], t.standing_kind_ms[STANDING_SPRITE], t.standing_kind_n[STANDING_SPRITE],
@@ -8544,8 +8547,19 @@ bool _standing_vehicles_own_near = true;
  * "finish the move to the GPU").
  * @return false: the card cannot draw it so (the processor draws it apart)
  */
+/** The rig ('test3d stojici okna 0|1'): the lit glass of the buildings of the turned map laid by the card of what it holds with their shapes (1; ThreeDGpuStandingBuilding::night_held), or each corner placed by the processor (0, as before 20. 11.). */
+bool _standing_night_glass_held = true;
+
+/** The rig ('test3d denik', "budova po castech"): where the main thread's time of the buildings given to the card goes (AddTurnedStandingObject()), ms: 0 its shape, 1 its figures and plants and its rectangle, 2 its textures, 3 its matrix and its lit glass, 4 its figures given. */
+double _rig_bldg_ms[6] = {};
 static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
+	double rig_t = TurnedNow();
+	auto rig_lap = [&rig_t](int k) {
+		const double n = TurnedNow();
+		_rig_bldg_ms[k] += n - rig_t;
+		rig_t = n;
+	};
 	if (_north_house_objects_now) return false;
 	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_objects.size()) return true;
 	const TurnedObject &to = _turned_objects[ps.box_dx];
@@ -8587,6 +8601,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 	}
 	const uint64_t stood_in = ThreeDStandInsGiven();
 	const uint64_t textures_stood_in = ThreeDTexturesStoodIn();
+	rig_lap(0);
 	for (size_t at = 0; at < parts.size();) {
 		size_t end = at + 1;
 		while (end < parts.size() && !parts[end].own_depth) end++;
@@ -8650,6 +8665,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 		const double offset = (2.0 * oz - out.depth[0]) * scale;
 		auto depth_of = [&](double d) { return static_cast<float>(std::clamp(d * scale + offset, 0.0, 1.0)); };
 		bool cleared = false;
+		rig_lap(1);
 		for (size_t k = at; k < end; k++) {
 			Part &p = parts[k];
 			if (!p.shape.tri.empty()) {
@@ -8663,6 +8679,11 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				b.tri = p.shape.tri;
 				b.facing = p.shape.facing;
 				b.tri_tex = p.shape.tri_tex;
+				/* Its lit glass with it, by day too: the card keeps it with the shape from the first time it is put on. */
+				b.night_pos = p.o->night_pos;
+				b.night_uv = p.o->night_uv;
+				b.night_tri = p.o->night_tri;
+				b.night_tex = p.o->night_tex;
 				b.cull = _turned_cull;
 				/* Its textures as DrawObjectInto() has them: its own painted, its add-ons' each in its colour at this place --
 				 * of another zoom while this one's are painted, the drawing waiting for no painting (DrawnTexture()). */
@@ -8692,6 +8713,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 					if (addon_paint == 0) for_card.emplace();
 					b.textures.push_back(p.o->DrawnTextureOf(t, to_underlying(lay.zoom), addon_paint));
 				}
+				rig_lap(2);
 				/* A corner to the block: affine, so where its origin and unit steps go. */
 				double o0[3], e[3][3];
 				place(0, 0, 0, o0[0], o0[1], o0[2]);
@@ -8716,7 +8738,11 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				sb.clear_h = static_cast<int>(std::ceil(ry1)) + 2 - sb.clear_y;
 				cleared = true;
 				/* At night its lit glass, where it is as near as what is there by a hair (DrawTexturedTriangle()). */
-				if (_night_windows_now && !p.o->night_tri.empty()) {
+				if (_night_windows_now && !p.o->night_tri.empty() && _standing_night_glass_held) {
+					/* Laid by the card of what it holds, through the matrix: no corner placed here. */
+					sb.night_held = true;
+					sb.night_nearer = static_cast<float>(0.05 * scale);
+				} else if (_night_windows_now && !p.o->night_tri.empty()) {
 					const size_t corners = p.o->night_pos.size() / 3;
 					for (size_t t = 0; t + 2 < p.o->night_tri.size(); t += 3) {
 						const uint8_t tex = p.o->NightTexture(t);
@@ -8733,6 +8759,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				ThreeDGpuStandingItem &item = out.items.emplace_back();
 				item.building = static_cast<int>(index);
 				_turned_times.standing_triangles += p.shape.tri.size() / 3;
+				rig_lap(3);
 			}
 			/* Its figures far first, in its depth when it has one: hidden behind its walls nearer than their middle. */
 			std::ranges::sort(p.figures, {}, &Part::Figure::near);
@@ -8764,6 +8791,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 			if (_night_windows_now && p.o != nullptr) {
 				for (size_t i = 0; i + 2 < p.o->lights.size(); i += 3) _night_glows.push_back({ox + p.o->lights[i], oy + p.o->lights[i + 1], oz + p.o->lights[i + 2], ThreeDGlowShare(p.o->lights, i)});
 			}
+			rig_lap(4);
 		}
 		at = end;
 	}

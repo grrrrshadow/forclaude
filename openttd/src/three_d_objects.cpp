@@ -15855,6 +15855,9 @@ static void DropPaintedTextures()
 /** The pixels of the buildings' textures let go of as the card holds them (TrimThreeDHouseLevels()), bytes; under _lazy_mutex. */
 static size_t _house_bytes_on_card_only = 0;
 
+/** The rig ('test3d urovnedomu 0|1'): of a building's texture read, only the level asked for, the one finer and the coarser ones kept (1; MakeHouseLevels()), or all of them till the next trimming (0, as before 20. 11.). */
+bool _house_levels_asked_only = true;
+
 /** The building's texture at all its levels of detail, read from its PNG the first time (on either thread, MakeOnce()). */
 /**
  * Whether a building's texture has the pixels of a level: its levels finer than any drawn are let go of between the
@@ -15875,16 +15878,25 @@ static bool HouseLevelHeld(const ThreeDObject &o, int level)
  */
 static void MakeHouseLevels(const ThreeDObject &o, int level)
 {
-	MakeOnce(&o, LAZY_HOUSE_LEVELS, [&o, level] { return HouseLevelHeld(o, level); }, [&o] {
+	/* Of what is read, the level asked for, the one finer and the coarser ones kept; the finer ones let go of at once,
+	 * here where it is read, their sizes kept -- as they are let go of between the frames (TrimThreeDHouseLevels()).
+	 * The first time a building was seen it kept all its levels till then, a quarter of a minute: the far map moved
+	 * over a town held 870 MB of the buildings' textures, 43 MB after (the rig, the player's save; the player's diary
+	 * of 19. 11., the far zoom by night: the buildings' textures 218, 387, 527 MB in 15 s, a pub seen from afar 86 MB,
+	 * the game 3.7 GB, 5 to 7 frames a second). */
+	const int finest = std::max(level - 1, 0);
+	MakeOnce(&o, LAZY_HOUSE_LEVELS, [&o, level] { return HouseLevelHeld(o, level); }, [&o, finest] {
 		std::vector<ThreeDObjectTexture> made;
 		DecodeTextureLevels(o.png, made);
+		if (_house_levels_asked_only && !made.empty()) DropFinerLevels(made, std::min(finest, static_cast<int>(made.size()) - 1));
 		return made;
-	}, [&o, level](std::vector<ThreeDObjectTexture> made) {
+	}, [&o, finest](std::vector<ThreeDObjectTexture> made) {
 		if (o.levels.empty()) {
 			o.levels = std::move(made);
 			return;
 		}
-		for (size_t i = std::clamp<int>(level, 0, static_cast<int>(o.levels.size()) - 1); i < o.levels.size() && i < made.size(); i++) {
+		for (size_t i = std::clamp<int>(finest, 0, static_cast<int>(o.levels.size()) - 1); i < o.levels.size() && i < made.size(); i++) {
+			if (made[i].px.empty()) continue;
 			if (!o.levels[i].px.empty()) continue;
 			o.levels[i].px = std::move(made[i].px);
 			if (o.levels[i].card_only) {

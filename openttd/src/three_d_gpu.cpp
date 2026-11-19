@@ -842,6 +842,7 @@ struct GpuBuilding {
 		std::vector<Cell> cells; ///< its triangles cell by cell; none: not cut into cells
 	};
 	std::vector<Run> runs;
+	std::vector<Run> night_runs;             ///< its lit glass of the night after them, by texture (ThreeDGpuBuilding::night_pos)
 	std::vector<std::array<float, 6>> boxes; ///< each cell's box: the least and most x, y, z of its triangles' corners
 	size_t bytes = 0;
 	uint64_t used = 0;
@@ -4720,6 +4721,24 @@ const GpuBuilding *MapBuildingOnCard(const ThreeDGpuBuilding &b)
 		}
 		g.runs.push_back(std::move(run));
 	}
+	/* Its lit glass of the night after them, by texture, as bright as it is: drawn through the building's matrix as
+	 * its walls are (DrawStandingOnCard()). */
+	if (const size_t night_corners = b.night_pos.size() / 3; night_corners > 0 && b.night_uv.size() >= night_corners * 2) {
+		std::map<uint8_t, std::vector<uint32_t>> glass;
+		for (size_t t = 0; t + 2 < b.night_tri.size(); t += 3) {
+			if (std::max({b.night_tri[t], b.night_tri[t + 1], b.night_tri[t + 2]}) >= night_corners) continue;
+			glass[t / 3 < b.night_tex.size() ? b.night_tex[t / 3] : 0].push_back(static_cast<uint32_t>(t));
+		}
+		for (const auto &[texture, tris] : glass) {
+			GpuBuilding::Run run{static_cast<GLint>(all.size() / 6), static_cast<GLsizei>(tris.size() * 3), texture, 0, {}};
+			for (uint32_t at : tris) {
+				for (uint32_t i : {b.night_tri[at], b.night_tri[at + 1], b.night_tri[at + 2]}) {
+					all.insert(all.end(), {b.night_pos[i * 3], b.night_pos[i * 3 + 1], b.night_pos[i * 3 + 2], b.night_uv[i * 2], b.night_uv[i * 2 + 1], 256.0f});
+				}
+			}
+			g.night_runs.push_back(std::move(run));
+		}
+	}
 	Step(fmt::format("budova plochy na kartu: {} trojuhelniku v {} kostkach", all.size() / 18, g.boxes.size()));
 	gl.glGenVertexArrays(1, &g.vao);
 	gl.glBindVertexArray(g.vao);
@@ -6010,7 +6029,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 		}
 		/* None of it in the part: nothing drawn. */
-		if (b.night.empty() && std::ranges::none_of(cell_in, [](uint8_t in) { return in != 0; })) return true;
+		const bool night_held = b.night_held && !on->night_runs.empty();
+		if (b.night.empty() && !night_held && std::ranges::none_of(cell_in, [](uint8_t in) { return in != 0; })) return true;
 		const GpuProgram &bp = _standing_building_program;
 		if (!_gpu_standing_lean || !lean_program) gl.glUseProgram(bp.program);
 		lean_program = true;
@@ -6156,9 +6176,28 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		}
 		if (!lean) {
 			gl.glDisable(GL_CULL_FACE);
-		} else if (lean_cull != 0 && !b.night.empty()) {
+		} else if (lean_cull != 0 && (!b.night.empty() || night_held)) {
 			gl.glDisable(GL_CULL_FACE);
 			lean_cull = 0;
+		}
+		if (night_held) {
+			/* Its lit glass as the card holds it after its walls' corners, through its matrix, nearer by a hair: lit
+			 * (u_night), unpainted, both sides. */
+			ThreeDGpuMatrix glass = m;
+			glass[11] += 2.0f * b.night_nearer;
+			gl.glUniform1i(night_at, 1);
+			night_was_set = true;
+			gl.glUniform1i(u_parts, 0);
+			lean_u_parts = 0;
+			gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, glass.data());
+			for (const GpuBuilding::Run &r : on->night_runs) {
+				if (r.texture >= textures.size() || textures[r.texture] == 0) continue;
+				if (!lean || lean_tex0 != textures[r.texture]) {
+					gl.glBindTexture(GL_TEXTURE_2D, textures[r.texture]);
+					lean_tex0 = textures[r.texture];
+				}
+				gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
+			}
 		}
 		if (!b.night.empty()) {
 			lean_forget();
