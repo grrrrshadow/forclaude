@@ -1371,6 +1371,14 @@ static void DoDrawVehicle(const Vehicle *v)
 	/* Check whether the vehicle shall be transparent due to the game state */
 	bool shadowed = v->vehstatus.Test(VehState::Shadow);
 
+	/* The shadow of an aircraft drawn from its 3D object (and a helicopter's rotor of one): its sprite is the set's
+	 * stand-in, and the shadow the processor draws from it -- the ground under it darkened -- is laid over the card's
+	 * picture of the aircraft, the ground and all (the player, 19. 11., of the An-225's hull cut through: "check the
+	 * shadows, that they are not drawn over the aircraft with the background of the map"). Not drawn; a shadow of the
+	 * object itself, under it, is to be the card's. */
+	if (v->type == VehicleType::Aircraft && !Aircraft::From(v)->IsNormalAircraft() && ThreeDEnabled() &&
+			BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && GetThreeDVehicleObject(v->engine_type) != nullptr) return;
+
 	if (v->type == VehicleType::Effect) {
 		/* Check whether the vehicle shall be transparent/invisible due to GUI settings.
 		 * However, transparent smoke and bubbles look weird, so always hide them. */
