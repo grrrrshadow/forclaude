@@ -4503,8 +4503,11 @@ static bool ClickTile_Station(TileIndex tile)
 	if (bst->facilities.Test(StationFacility::Waypoint)) {
 		ShowWaypointWindow(Waypoint::From(bst));
 	} else if (IsHangar(tile)) {
+		/* A hangar of an airport built tile by tile is its own tile (air_map.h); an old airport's is one of its layout's,
+		 * which such an airport has none of (the player's crash of 19. 11., a click on a modular airport's hangar:
+		 * NOT_REACHED in Airport::GetHangarDataByTile()). */
 		const Station *st = Station::From(bst);
-		ShowDepotWindow(st->airport.GetHangarTile(st->airport.GetHangarNum(tile)), VehicleType::Aircraft);
+		ShowDepotWindow(IsModularAirport(tile) ? tile : st->airport.GetHangarTile(st->airport.GetHangarNum(tile)), VehicleType::Aircraft);
 	} else {
 		ShowStationViewWindow(bst->index);
 	}

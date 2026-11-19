@@ -9514,6 +9514,21 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else {
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", argv[4], *x, *y);
 		}
+	} else if (what == "klikni" && argv.size() > 3) {
+		/* 'klikni <x> <y> [nakup]': a click on the tile as the player's (ClickTile(): a station's window, a depot's, a
+		 * hangar's); with "nakup" the purchase window of the depot or hangar there after it. */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		const TileIndex tile = TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY()));
+		if (_local_company == COMPANY_SPECTATOR && Company::IsValidID(CompanyID::Begin())) SetLocalCompany(CompanyID::Begin());
+		const bool taken = ClickTile(tile);
+		if (argv.size() > 4 && argv[4] == "nakup" && IsDepotTile(tile)) ShowBuildVehicleWindow(tile, GetDepotVehicleType(tile));
+		int depots = 0, buys = 0;
+		for (const Window *win : Window::Iterate()) {
+			if (win->window_class == WindowClass::VehicleDepot) depots++;
+			if (win->window_class == WindowClass::BuildVehicle) buys++;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: klikni {},{} {}: oken dep {}, oken nakupu {}", *x, *y, taken ? "vzato" : "nic", depots, buys);
 	} else if (what == "okno" && argv.size() > 2) {
 		/* Open a window with a 3D preview beside it: 'okno nakup <vlak|auto|lod|letadlo>', 'okno prumysl <x> <y>'; or
 		 * 'okno vystavba', the construction toolbar of rails, which puts the view back to north (ThreeDViewForBuilding()). */
