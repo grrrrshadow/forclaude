@@ -532,6 +532,16 @@ static std::atomic<bool> _gl_count_by_function = true;
 static std::atomic<uint64_t> _gl_vehicle_batches = 0;
 static thread_local bool _gl_counting_vehicles = false;
 static std::array<std::atomic<uint64_t>, GL_COUNTED_FUNCTIONS> _gl_function_calls{};
+/* The same of the view from the eyes (the player's #381: some 17 thousand calls a frame from the eyes for 1 100 draws,
+ * the card 83 ms a frame at night): counted while a picture or a frame from the eyes is drawn (CountingEyeCalls). */
+static thread_local bool _gl_counting_eye = false;
+static std::array<std::atomic<uint64_t>, GL_COUNTED_FUNCTIONS> _gl_eye_function_calls{};
+static std::atomic<uint64_t> _gl_eye_frames = 0; ///< frames and pictures from the eyes drawn since the rig started counting
+/** While it lives the calls of the thread are those of drawing the view from the eyes. */
+struct CountingEyeCalls {
+	CountingEyeCalls() { _gl_counting_eye = true; _gl_eye_frames.fetch_add(1, std::memory_order_relaxed); }
+	~CountingEyeCalls() { _gl_counting_eye = false; }
+};
 static std::array<const char *, GL_COUNTED_FUNCTIONS> _gl_function_names{};
 template <int I, typename F> struct GlCounted;
 template <int I, typename R, typename... A> struct GlCounted<I, R (THREE_D_GL_API *)(A...)> {
@@ -541,7 +551,9 @@ template <int I, typename R, typename... A> struct GlCounted<I, R (THREE_D_GL_AP
 	{
 		_gl_calls.fetch_add(1, std::memory_order_relaxed);
 		if constexpr (I < GL_COUNTED_FUNCTIONS) {
-			if (_gl_counting_vehicles && _gl_count_by_function.load(std::memory_order_relaxed)) _gl_function_calls[I].fetch_add(1, std::memory_order_relaxed);
+			if ((_gl_counting_vehicles || _gl_counting_eye) && _gl_count_by_function.load(std::memory_order_relaxed)) {
+				(_gl_counting_eye ? _gl_eye_function_calls : _gl_function_calls)[I].fetch_add(1, std::memory_order_relaxed);
+			}
 		}
 		return real(a...);
 	}
@@ -551,35 +563,40 @@ template <int I, typename R, typename... A> struct GlCounted<I, R (THREE_D_GL_AP
  * The rig ('test3d gpu volani [0|1]'): counting the calls of drawing the turned map's vehicles by the function on or
  * off, and what was counted so far, the most first.
  */
-static std::string CallsByFunction(int on)
+static std::string CallsByFunction(int on, bool eye)
 {
+	auto &calls = eye ? _gl_eye_function_calls : _gl_function_calls;
 	std::vector<std::pair<uint64_t, const char *>> all;
 	uint64_t sum = 0;
 	for (int i = 0; i < GL_COUNTED_FUNCTIONS; i++) {
-		const uint64_t n = _gl_function_calls[i].load(std::memory_order_relaxed);
+		const uint64_t n = calls[i].load(std::memory_order_relaxed);
 		if (n == 0) continue;
 		all.emplace_back(n, _gl_function_names[i] != nullptr ? _gl_function_names[i] : "?");
 		sum += n;
 	}
 	std::ranges::sort(all, std::greater<>{});
-	std::string s = fmt::format("{} volani vozidel", sum);
+	const uint64_t frames = _gl_eye_frames.load(std::memory_order_relaxed);
+	std::string s = eye ? fmt::format("{} volani z oci za {} snimku ({} na snimek)", sum, frames, frames > 0 ? sum / frames : 0) : fmt::format("{} volani vozidel", sum);
 	for (const auto &[n, name] : all) s += fmt::format(", {} {}", name, n);
 	if (on >= 0) {
-		for (auto &c : _gl_function_calls) c.store(0, std::memory_order_relaxed);
+		for (auto &c : calls) c.store(0, std::memory_order_relaxed);
+		if (eye) _gl_eye_frames = 0;
 		_gl_count_by_function = on != 0;
 	}
 	return s;
 }
 
-/** The diary: the calls of drawing the turned map's vehicles since its last line, the most of them by the function. */
-static std::string VehicleCallsForDiary()
+/** The diary: the calls of drawing the turned map's vehicles (or the view from the eyes) since its last line, the most of them by the function. */
+static std::string VehicleCallsForDiary(bool eye = false)
 {
 	/* What the counts were at its last line: they are not started again here, the rig's 'test3d gpu volani' counts
 	 * across the diary's lines (started again there, a count below what was seen is all new). */
-	static std::array<uint64_t, GL_COUNTED_FUNCTIONS> seen{};
+	static std::array<uint64_t, GL_COUNTED_FUNCTIONS> seen_vehicles{}, seen_eye{};
+	auto &seen = eye ? seen_eye : seen_vehicles;
+	auto &calls = eye ? _gl_eye_function_calls : _gl_function_calls;
 	std::vector<std::pair<uint64_t, const char *>> all;
 	for (int i = 0; i < GL_COUNTED_FUNCTIONS; i++) {
-		const uint64_t now = _gl_function_calls[i].load(std::memory_order_relaxed);
+		const uint64_t now = calls[i].load(std::memory_order_relaxed);
 		const uint64_t n = now >= seen[i] ? now - seen[i] : now;
 		seen[i] = now;
 		if (n > 0) all.emplace_back(n, _gl_function_names[i] != nullptr ? _gl_function_names[i] : "?");
@@ -753,6 +770,8 @@ uint64_t _gpu_grounds_failed = 0;   ///< and how many it could not lay (the proc
  * textures; let go of the longest not drawn when it holds more than GPU_BYTES_KEPT. Only the card's thread uses these. */
 struct GpuShape {
 	GLuint vao = 0, pos = 0, nrm = 0, uv = 0, wheel = 0, joints = 0, weights = 0;
+	/** Its corners with the instances' matrices and lights as attributes 4-8 (InstancedVao()), made at its first batch from the eyes. */
+	mutable GLuint vao_instanced = 0;
 	bool has_nrm = false;
 	bool has_wheel = false; ///< each corner's turning wheel (ThreeDVehicleShape::corner_wheel) as attribute 3
 	bool has_bones = false; ///< a figure on bones at rest: each corner's joints as attribute 9, their weights as 10 (ThreeDVehicleShape::corner_joints)
@@ -3136,8 +3155,41 @@ static void FirstDrawDone(bool first)
 	if (first) gl.glFinish();
 }
 
+/**
+ * FirstDraw() of a kind told by a number (the draws from the eyes, some thousand a frame): its words made and looked up
+ * only the first time -- before, a fmt::format() and a lookup of the set at every draw.
+ * @param key the kind (FIRST_DRAW_* and its bits)
+ * @param words what makes its words for FirstDraw()
+ */
+template <typename F>
+static bool FirstDrawOf(uint32_t key, F words)
+{
+	static std::set<uint32_t> seen;
+	if (seen.contains(key)) return false;
+	seen.insert(key);
+	return FirstDraw(words());
+}
+static constexpr uint32_t FIRST_DRAW_EYE_MESH = 0x100, FIRST_DRAW_EYE_BUILDING = 0x200, FIRST_DRAW_EYE_TRIANGLES = 0x300;
+
+/**
+ * A uniform's location in a program, asked of the card once (the steps of a frame from the eyes asked at every frame:
+ * some 220 calls a frame of the player's #381); forgotten when a program is made (MakeProgram()), its name may be an
+ * old one's.
+ */
+static std::map<std::pair<GLuint, std::string>, GLint, std::less<>> _uniforms_known;
+static GLint UniformOf(GLuint program, std::string_view name)
+{
+	auto key = std::make_pair(program, std::string(name));
+	auto it = _uniforms_known.find(key);
+	if (it != _uniforms_known.end()) return it->second;
+	const GLint at = gl.glGetUniformLocation(program, key.second.c_str());
+	_uniforms_known.emplace(std::move(key), at);
+	return at;
+}
+
 bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::string &why)
 {
+	_uniforms_known.clear();
 	GLuint vs = CompileShader(GL_VERTEX_SHADER, vertex, why);
 	if (vs == 0) return false;
 	GLuint fs = CompileShader(GL_FRAGMENT_SHADER, fragment, why);
@@ -3382,6 +3434,7 @@ void ForgetCard()
 	Step("vse z karty pryc");
 	for (auto &[uid, s] : _card_shapes) {
 		gl.glDeleteVertexArrays(1, &s.vao);
+		if (s.vao_instanced != 0) gl.glDeleteVertexArrays(1, &s.vao_instanced);
 		const GLuint buffers[] = {s.pos, s.nrm, s.uv, s.wheel};
 		for (GLuint b : buffers) if (b != 0) gl.glDeleteBuffers(1, &b);
 	}
@@ -3531,6 +3584,7 @@ void TrimCard()
 		if (h.kind == 0) {
 			GpuShape &s = _card_shapes[h.uid];
 			gl.glDeleteVertexArrays(1, &s.vao);
+			if (s.vao_instanced != 0) gl.glDeleteVertexArrays(1, &s.vao_instanced);
 			const GLuint buffers[] = {s.pos, s.nrm, s.uv, s.wheel, s.joints, s.weights};
 			for (GLuint b : buffers) if (b != 0) gl.glDeleteBuffers(1, &b);
 			_card_bytes -= s.bytes;
@@ -4107,11 +4161,6 @@ static int BonesOnCard(const ThreeDBonesFrame &b)
 	return row;
 }
 
-/** The row of a mesh's joints for the program drawing it next (u_bone_row): -1, not a figure on bones (its shape as it is). */
-static void SetBones(const GpuProgram &program, const ThreeDGpuMesh &m, const GpuShape &shape)
-{
-	gl.glUniform1i(program.bone_row, m.bones != nullptr && shape.has_bones ? BonesOnCard(*m.bones) : -1);
-}
 
 /** A program's samplers of the paint's masks to units 1 to 5 (SetPaint()), its texture's to 0, its joints' to BONE_UNIT. */
 static void PaintUnits(const GpuProgram &program)
@@ -6874,21 +6923,25 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 	gl.glUniform1i(_eye_building_program.tex, 0);
 	gl.glUniform1f(_eye_building_program.near_plane, near_plane);
 	/* The parts the card paints (EYE_BUILDING_FRAGMENT): their masks on the units 1 to 4, their patterns on 5 to 8. */
-	const GLint u_parts = gl.glGetUniformLocation(bp, "u_parts"), u_metres = gl.glGetUniformLocation(bp, "u_metres");
+	const GLint u_parts = UniformOf(bp, "u_parts"), u_metres = UniformOf(bp, "u_metres");
 	std::array<GLint, THREE_D_GPU_BUILDING_PAINTS> u_colour, u_about;
 	for (int k = 0; k < static_cast<int>(THREE_D_GPU_BUILDING_PAINTS); k++) {
-		gl.glUniform1i(gl.glGetUniformLocation(bp, fmt::format("u_mask{}", k).c_str()), 1 + k);
-		gl.glUniform1i(gl.glGetUniformLocation(bp, fmt::format("u_pattern{}", k).c_str()), 5 + k);
-		u_colour[k] = gl.glGetUniformLocation(bp, fmt::format("u_colour[{}]", k).c_str());
-		u_about[k] = gl.glGetUniformLocation(bp, fmt::format("u_about[{}]", k).c_str());
+		gl.glUniform1i(UniformOf(bp, fmt::format("u_mask{}", k).c_str()), 1 + k);
+		gl.glUniform1i(UniformOf(bp, fmt::format("u_pattern{}", k).c_str()), 5 + k);
+		u_colour[k] = UniformOf(bp, fmt::format("u_colour[{}]", k).c_str());
+		u_about[k] = UniformOf(bp, fmt::format("u_about[{}]", k).c_str());
 	}
 	gl.glUniform1i(u_parts, 0);
 	int parts_set = 0;
 	gl.glActiveTexture(GL_TEXTURE0);
 	gl.glCullFace(GL_BACK);
+	/* What the runs set last: set again only what differs (as EyeDrawState). */
+	GLuint vao_set = 0, texture_set = 0;
+	int cull_set = -2;
 	for (const EyeObjectDraws::Draw &d : o.draws) {
 		gl.glUniformMatrix4fv(_eye_building_program.matrix, 1, GL_TRUE, d.eye->matrix.data());
-		gl.glBindVertexArray(d.on->vao);
+		if (d.on->vao != vao_set) gl.glBindVertexArray(d.on->vao);
+		vao_set = d.on->vao;
 		/* Its paint: the parts of its first texture, set once for its runs of that texture. */
 		const int parts = static_cast<int>(std::min(d.parts.size(), d.eye->building.paints.size()));
 		if (parts > 0) {
@@ -6921,14 +6974,19 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 				parts_set = run_parts;
 			}
 			const bool cull = r.facing != 0 && d.eye->building.cull;
-			if (!cull) {
-				gl.glDisable(GL_CULL_FACE);
-			} else {
-				gl.glEnable(GL_CULL_FACE);
-				gl.glFrontFace(r.facing > 0 ? GL_CW : GL_CCW);
+			const int cull_now = !cull ? 0 : (r.facing > 0 ? 1 : 2);
+			if (cull_now != cull_set) {
+				if (cull_now == 0) {
+					gl.glDisable(GL_CULL_FACE);
+				} else {
+					if (cull_set <= 0) gl.glEnable(GL_CULL_FACE);
+					gl.glFrontFace(cull_now == 1 ? GL_CW : GL_CCW);
+				}
+				cull_set = cull_now;
 			}
-			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
-			const bool first = FirstDraw(fmt::format("budovy z oci, strany {}", cull ? (r.facing > 0 ? "cw" : "ccw") : "obe"));
+			if (d.textures[r.texture] != texture_set) gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
+			texture_set = d.textures[r.texture];
+			const bool first = FirstDrawOf(FIRST_DRAW_EYE_BUILDING | cull_now, [&] { return fmt::format("budovy z oci, strany {}", cull ? (r.facing > 0 ? "cw" : "ccw") : "obe"); });
 			gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
 			FirstDrawDone(first);
 			_gpu_eye_triangles += r.count / 3;
@@ -6943,48 +7001,184 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
  * The figures of the view from the eyes, as DrawOnCard() draws their pictures: opaque, or their glass over what is
  * behind it (laid over by its alpha, its colour multiplied in), its depth written.
  */
+/**
+ * The shape's VAO for the batches of the view from the eyes (EyeObjectDraws::Batch): its corners as its own VAO has them,
+ * and the instances' matrices and lights as attributes 4-8 from _eye_instance_vbo, one of each an instance -- set once,
+ * not at every batch (the player's #381: 25 calls a batch to set them and take them off again, some 85 batches a frame).
+ */
+static GLuint InstancedVao(const GpuShape &s)
+{
+	if (s.vao_instanced != 0) return s.vao_instanced;
+	if (_eye_instance_vbo == 0) gl.glGenBuffers(1, &_eye_instance_vbo);
+	gl.glGenVertexArrays(1, &s.vao_instanced);
+	gl.glBindVertexArray(s.vao_instanced);
+	auto attribute = [](GLuint buffer, GLuint index, GLint size) {
+		gl.glBindBuffer(GL_ARRAY_BUFFER, buffer);
+		gl.glVertexAttribPointer(index, size, GL_FLOAT, GL_FALSE, 0, nullptr);
+		gl.glEnableVertexAttribArray(index);
+	};
+	attribute(s.pos, 0, 3);
+	if (s.has_nrm) attribute(s.nrm, 1, 3);
+	attribute(s.uv, 2, 2);
+	if (s.has_wheel) attribute(s.wheel, 3, 1);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _eye_instance_vbo);
+	for (GLuint a = 4; a <= 8; a++) {
+		gl.glVertexAttribPointer(a, 4, GL_FLOAT, GL_FALSE, 20 * sizeof(float), reinterpret_cast<const void *>((a - 4) * 4 * sizeof(float)));
+		gl.glEnableVertexAttribArray(a);
+		gl.glVertexAttribDivisor(a, 1);
+	}
+	gl.glBindVertexArray(0);
+	return s.vao_instanced;
+}
+
+/**
+ * What the draws from the eyes (DrawEyeMeshes(), DrawEyeObjects()) set last: set again only what differs (the player's
+ * #381: some 15 calls a draw, 17 thousand a frame from the eyes, the card 83 ms a frame at night).
+ */
+struct EyeDrawState {
+	PaintSet paint;
+	std::array<float, 4> glow{NAN, NAN, NAN, NAN}, light{NAN, NAN, NAN, NAN};
+	float glass_alpha = NAN;
+	int texel_alpha = -1, wheel_count = -1, bone_row = INT_MIN;
+	int cull = -2;           ///< -2 not known, 0 off, 1 the front clockwise, 2 anticlockwise
+	GLuint vao = 0, ibo = 0, texture = 0;
+
+	/** The VAO, and with another one its element buffer not known. */
+	void Vao(GLuint v)
+	{
+		if (v == this->vao) return;
+		gl.glBindVertexArray(v);
+		this->vao = v;
+		this->ibo = 0;
+	}
+	void Ibo(GLuint i)
+	{
+		if (i == this->ibo) return;
+		gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, i);
+		this->ibo = i;
+	}
+	/** The texture of unit 0 (the paint's masks are on 1 to 5, the joints on BONE_UNIT, each leaving unit 0 active). */
+	void Texture(GLuint t)
+	{
+		if (t == this->texture) return;
+		gl.glBindTexture(GL_TEXTURE_2D, t);
+		this->texture = t;
+	}
+	/** As CullVehicleRun(): a side left out, or none. */
+	void Cull(int8_t facing, double determinant)
+	{
+		const int want = (facing == 0 || determinant == 0) ? 0 : (facing * determinant < 0 ? 2 : 1);
+		if (want == this->cull) return;
+		if (want == 0) {
+			gl.glDisable(GL_CULL_FACE);
+		} else {
+			if (this->cull <= 0) {
+				gl.glEnable(GL_CULL_FACE);
+				gl.glCullFace(GL_BACK);
+			}
+			gl.glFrontFace(want == 2 ? GL_CCW : GL_CW);
+		}
+		this->cull = want;
+	}
+	void Glow(const GpuProgram &p, uint32_t glow)
+	{
+		const Colour e(glow);
+		const std::array<float, 4> now{static_cast<float>(e.r), static_cast<float>(e.g), static_cast<float>(e.b), glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f)};
+		if (now == this->glow) return;
+		gl.glUniform4f(p.glow, now[0], now[1], now[2], now[3]);
+		this->glow = now;
+	}
+	void Light(const GpuProgram &p, const ThreeDGpuMesh &mesh, const GpuShape &shape)
+	{
+		const std::array<float, 4> now{mesh.light[0], mesh.light[1], mesh.light[2], mesh.lit && shape.has_nrm ? 1.0f : 0.0f};
+		if (now == this->light) return;
+		gl.glUniform4f(p.light, now[0], now[1], now[2], now[3]);
+		this->light = now;
+	}
+	void GlassAlpha(const GpuProgram &p, float a)
+	{
+		if (a == this->glass_alpha) return;
+		gl.glUniform1f(p.glass_alpha, a);
+		this->glass_alpha = a;
+	}
+	void TexelAlpha(const GpuProgram &p, int t)
+	{
+		if (t == this->texel_alpha) return;
+		gl.glUniform1i(p.texel_alpha, t);
+		this->texel_alpha = t;
+	}
+	void BoneRow(const GpuProgram &p, int row)
+	{
+		if (row == this->bone_row) return;
+		gl.glUniform1i(p.bone_row, row);
+		this->bone_row = row;
+	}
+	void WheelCount(const GpuProgram &p, int n)
+	{
+		if (n == this->wheel_count) return;
+		gl.glUniform1i(p.wheel_count, n);
+		this->wheel_count = n;
+	}
+};
+
+/** The key of a kind of draw from the eyes for FirstDrawOf() (the words of MeshDrawKind()). */
+static uint32_t MeshDrawKey(bool glass, bool instanced, const GpuShape &shape, bool bones, int8_t facing, double determinant)
+{
+	const uint32_t sides = facing == 0 || determinant == 0 ? 0 : (facing * determinant < 0 ? 1 : 2);
+	return FIRST_DRAW_EYE_MESH | (glass ? 1 : 0) | (instanced ? 2 : 0) | (shape.has_nrm ? 4 : 0) | (shape.has_wheel ? 8 : 0) | (bones && shape.has_bones ? 16 : 0) | sides << 5;
+}
+
+/**
+ * The figures of the view from the eyes, as DrawOnCard() draws their pictures: opaque, or their glass over what is
+ * behind it (laid over by its alpha, its colour multiplied in), its depth written. Each state set only when it differs
+ * from the draw before (EyeDrawState); the meshes alike at once by instances, their attributes in the shape's VAO for
+ * them (InstancedVao()).
+ */
 void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 {
-	gl.glUseProgram(_eye_mesh_program.program);
-	PaintUnits(_eye_mesh_program);
+	const GpuProgram &p = _eye_mesh_program;
+	gl.glUseProgram(p.program);
+	PaintUnits(p);
 	ClearPaintUnits();
-	gl.glUniform1f(_eye_mesh_program.near_plane, near_plane);
-	gl.glUniform1i(_eye_mesh_program.instanced, 0);
+	gl.glUniform1f(p.near_plane, near_plane);
+	gl.glUniform1i(p.instanced, 0);
+	gl.glUniform1i(p.glass, glass ? 1 : 0);
 	gl.glActiveTexture(GL_TEXTURE0);
+	/* The attributes a shape has not (the normal, the turning wheel): their values the same for all. */
+	gl.glVertexAttrib3f(1, 0, 0, 1);
+	gl.glVertexAttrib3f(3, 0, 0, 0);
 	if (glass) {
 		gl.glEnable(GL_BLEND);
 		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 	}
+	EyeDrawState st;
+	st.bone_row = -1;                                   // PaintUnits()
+	st.texture = 0;
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
 	for (const EyeObjectDraws::MeshDraw &d : o.mesh_draws) {
 		const std::vector<ThreeDGpuTriangles::Run> &runs = glass ? d.mesh->triangles->glass : d.mesh->triangles->opaque;
 		if (runs.empty()) continue;
 		if (!glass) _gpu_eye_single++;
-		gl.glUniformMatrix4fv(_eye_mesh_program.matrix, 1, GL_TRUE, d.mesh->matrix.data());
+		gl.glUniformMatrix4fv(p.matrix, 1, GL_TRUE, d.mesh->matrix.data());
 		const double determinant = Determinant(d.mesh->matrix);
-		SetLight(_eye_mesh_program, *d.mesh, *d.shape);
-		gl.glUniform1i(_eye_mesh_program.glass, glass ? 1 : 0);
-		SetBones(_eye_mesh_program, *d.mesh, *d.shape);
-		gl.glBindVertexArray(d.shape->vao);
-		gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, d.indices->ibo);
-		if (!d.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
-		if (!d.shape->has_wheel) gl.glVertexAttrib3f(3, 0, 0, 0);
+		st.Light(p, *d.mesh, *d.shape);
+		st.BoneRow(p, d.mesh->bones != nullptr && d.shape->has_bones ? BonesOnCard(*d.mesh->bones) : -1);
+		st.Vao(d.shape->vao);
+		st.Ibo(d.indices->ibo);
 		const size_t wheels = d.shape->has_wheel ? std::min(d.mesh->wheels.size(), THREE_D_GPU_EYE_WHEELS) : 0;
-		gl.glUniform1i(_eye_mesh_program.wheel_count, static_cast<GLint>(wheels));
-		if (wheels > 0) gl.glUniformMatrix4fv(_eye_mesh_program.wheels, static_cast<GLsizei>(wheels), GL_TRUE, d.mesh->wheels[0].data());
+		st.WheelCount(p, static_cast<int>(wheels));
+		if (wheels > 0) gl.glUniformMatrix4fv(p.wheels, static_cast<GLsizei>(wheels), GL_TRUE, d.mesh->wheels[0].data());
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
-			const uint32_t glow = d.mesh->Glow(r.texture);
-			const Colour e(glow);
-			gl.glUniform4f(_eye_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
-			if (glass) {
-				const uint8_t alpha = d.mesh->shape->Alpha(r.texture);
-				gl.glUniform1f(_eye_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
-			}
-			gl.glUniform1i(_eye_mesh_program.texel_alpha, glass && d.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
-			SetPaint(_eye_mesh_program, r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
-			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
-			CullVehicleRun(r.facing, -determinant);
-			const bool first = FirstDraw(MeshDrawKind(glass, false, *d.shape, d.mesh->bones != nullptr, r.facing, -determinant));
+			st.Glow(p, d.mesh->Glow(r.texture));
+			const uint8_t alpha = d.mesh->shape->Alpha(r.texture);
+			if (glass) st.GlassAlpha(p, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
+			st.TexelAlpha(p, glass && alpha < 255 ? 1 : 0);
+			SetPaint(p, r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture], &st.paint);
+			st.Texture(d.textures[r.texture]);
+			st.Cull(r.facing, -determinant);
+			const bool first = FirstDrawOf(MeshDrawKey(glass, false, *d.shape, d.mesh->bones != nullptr, r.facing, -determinant),
+					[&] { return MeshDrawKind(glass, false, *d.shape, d.mesh->bones != nullptr, r.facing, -determinant); });
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 			FirstDrawDone(first);
 			_gpu_eye_triangles += r.count / 3;
@@ -6992,59 +7186,46 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		}
 	}
 	/* The batches of meshes alike (EyeObjectDraws::Batch): the shape's triangles once for all its instances, their
-	 * matrices and lights in attributes 4-8 of its VAO from the instances' buffer, one of each an instance. */
+	 * matrices and lights in attributes 4-8 of its VAO for instances from the instances' buffer, one of each an instance. */
 	if (!o.batches.empty()) {
-		if (_eye_instance_vbo == 0) gl.glGenBuffers(1, &_eye_instance_vbo);
-		gl.glUniform1i(_eye_mesh_program.instanced, 1);
-		gl.glUniform1i(_eye_mesh_program.wheel_count, 0);
-		gl.glUniform1i(_eye_mesh_program.bone_row, -1);
-		gl.glUniform1i(_eye_mesh_program.glass, glass ? 1 : 0);
+		gl.glUniform1i(p.instanced, 1);
+		st.WheelCount(p, 0);
+		st.BoneRow(p, -1);
+		bool buffer_bound = false;
 		for (const EyeObjectDraws::Batch &b : o.batches) {
 			const std::vector<ThreeDGpuTriangles::Run> &runs = glass ? b.mesh->triangles->glass : b.mesh->triangles->opaque;
 			if (runs.empty()) continue;
 			const GLsizei count = static_cast<GLsizei>(b.instances.size() / 20);
-			gl.glBindVertexArray(b.shape->vao);
-			gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, b.indices->ibo);
-			if (!b.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
-			if (!b.shape->has_wheel) gl.glVertexAttrib3f(3, 0, 0, 0);
-			gl.glBindBuffer(GL_ARRAY_BUFFER, _eye_instance_vbo);
-			gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(b.instances.size() * sizeof(float)), b.instances.data(), GL_STREAM_DRAW);
-			for (GLuint a = 4; a <= 8; a++) {
-				gl.glVertexAttribPointer(a, 4, GL_FLOAT, GL_FALSE, 20 * sizeof(float), reinterpret_cast<const void *>((a - 4) * 4 * sizeof(float)));
-				gl.glEnableVertexAttribArray(a);
-				gl.glVertexAttribDivisor(a, 1);
+			st.Vao(InstancedVao(*b.shape));
+			st.Ibo(b.indices->ibo);
+			if (!buffer_bound) {
+				gl.glBindBuffer(GL_ARRAY_BUFFER, _eye_instance_vbo);
+				buffer_bound = true;
 			}
+			gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(b.instances.size() * sizeof(float)), b.instances.data(), GL_STREAM_DRAW);
 			for (const ThreeDGpuTriangles::Run &r : runs) {
 				if (r.texture >= b.textures.size() || b.textures[r.texture] == 0) continue;
-				const uint32_t glow = b.mesh->Glow(r.texture);
-				const Colour e(glow);
-				gl.glUniform4f(_eye_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
-				if (glass) {
-					const uint8_t alpha = b.mesh->shape->Alpha(r.texture);
-					gl.glUniform1f(_eye_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
-				}
-				gl.glUniform1i(_eye_mesh_program.texel_alpha, glass && b.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
-				SetPaint(_eye_mesh_program, r.texture < b.mesh->paints.size() ? &b.mesh->paints[r.texture] : nullptr, &b.paints[r.texture]);
-				gl.glBindTexture(GL_TEXTURE_2D, b.textures[r.texture]);
-				CullVehicleRun(r.facing, -b.mirrored);
-				const bool first = FirstDraw(MeshDrawKind(glass, true, *b.shape, false, r.facing, -b.mirrored));
+				st.Glow(p, b.mesh->Glow(r.texture));
+				const uint8_t alpha = b.mesh->shape->Alpha(r.texture);
+				if (glass) st.GlassAlpha(p, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
+				st.TexelAlpha(p, glass && alpha < 255 ? 1 : 0);
+				SetPaint(p, r.texture < b.mesh->paints.size() ? &b.mesh->paints[r.texture] : nullptr, &b.paints[r.texture], &st.paint);
+				st.Texture(b.textures[r.texture]);
+				st.Cull(r.facing, -b.mirrored);
+				const bool first = FirstDrawOf(MeshDrawKey(glass, true, *b.shape, false, r.facing, -b.mirrored),
+						[&] { return MeshDrawKind(glass, true, *b.shape, false, r.facing, -b.mirrored); });
 				gl.glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)), count);
 				FirstDrawDone(first);
 				_gpu_eye_triangles += static_cast<uint64_t>(r.count / 3) * count;
 				_gpu_eye_calls++;
-			}
-			/* The shape's VAO as it was: its own attributes alone. */
-			for (GLuint a = 4; a <= 8; a++) {
-				gl.glDisableVertexAttribArray(a);
-				gl.glVertexAttribDivisor(a, 0);
 			}
 			if (!glass) {
 				_gpu_eye_batches++;
 				_gpu_eye_instances += count;
 			}
 		}
-		gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
-		gl.glUniform1i(_eye_mesh_program.instanced, 0);
+		if (buffer_bound) gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
+		gl.glUniform1i(p.instanced, 0);
 	}
 	gl.glDisable(GL_CULL_FACE);
 	gl.glFrontFace(GL_CCW);
@@ -7107,6 +7288,7 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 {
 	const int w = pic.width, h = pic.height;
 	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target || pic.near_plane <= 0) return false;
+	CountingEyeCalls counting;
 	_card_clock++;
 	Step(fmt::format("pohled z oci {}: {}x{}, {} budov, {} siti", _gpu_pictures + 1, w, h, pic.buildings.size(), pic.meshes.size()));
 	EyeObjectDraws objects;
@@ -7422,6 +7604,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 {
 	const int w = f.width, h = f.height;
 	if (!_frame_programs || w <= 0 || h <= 0 || w > _max_target || h > _max_target || f.near_plane <= 0) return false;
+	CountingEyeCalls counting;
 	_card_clock++;
 	Step(fmt::format("snimek z oci {}: {}x{}, {} kroku, {} trojuhelniku, {} textur", _gpu_pictures + 1, w, h, f.steps.size(), f.corners.size() / 3, f.textures.size()));
 	/* The depth on the card: near / 64 / how far ahead, so that what is nearer than the near plane (a thing in the
@@ -7507,13 +7690,13 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glBindTexture(GL_TEXTURE_2D, _frame_colour[now]);
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, _frame_depth);
-		gl.glUniform1i(gl.glGetUniformLocation(p.program, "u_colour"), 0);
-		gl.glUniform1i(gl.glGetUniformLocation(p.program, "u_depth"), 1);
-		gl.glUniform1f(gl.glGetUniformLocation(p.program, "u_near"), depth_scale);
-		gl.glUniform4f(gl.glGetUniformLocation(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
-		gl.glUniform3f(gl.glGetUniformLocation(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
-		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_eye_tip"), f.eye[10], f.eye[11]);
-		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
+		gl.glUniform1i(UniformOf(p.program, "u_colour"), 0);
+		gl.glUniform1i(UniformOf(p.program, "u_depth"), 1);
+		gl.glUniform1f(UniformOf(p.program, "u_near"), depth_scale);
+		gl.glUniform4f(UniformOf(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
+		gl.glUniform3f(UniformOf(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+		gl.glUniform2f(UniformOf(p.program, "u_eye_tip"), f.eye[10], f.eye[11]);
+		gl.glUniform2f(UniformOf(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
 	};
 	auto done = [&]() {
 		gl.glBindVertexArray(_frame_empty_vao);
@@ -7536,12 +7719,12 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glBindTexture(GL_TEXTURE_2D, _frame_depth);
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
-		gl.glUniform1i(gl.glGetUniformLocation(p.program, "u_depth"), 1);
-		gl.glUniform1f(gl.glGetUniformLocation(p.program, "u_near"), depth_scale);
-		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
-		gl.glUniform4f(gl.glGetUniformLocation(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
-		gl.glUniform3f(gl.glGetUniformLocation(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
-		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_eye_tip"), f.eye[10], f.eye[11]);
+		gl.glUniform1i(UniformOf(p.program, "u_depth"), 1);
+		gl.glUniform1f(UniformOf(p.program, "u_near"), depth_scale);
+		gl.glUniform2f(UniformOf(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
+		gl.glUniform4f(UniformOf(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
+		gl.glUniform3f(UniformOf(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+		gl.glUniform2f(UniformOf(p.program, "u_eye_tip"), f.eye[10], f.eye[11]);
 	};
 	auto glows = [&](const std::vector<ThreeDGpuEyeGlow> &list) {
 		if (list.empty()) return;
@@ -7583,31 +7766,35 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		switch (s.kind) {
 			case Kind::Background:
 				job(_frame_background_program, "obloha");
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_background_program.program, "u_horizon"), s.horizon);
+				gl.glUniform1f(UniformOf(_frame_background_program.program, "u_horizon"), s.horizon);
 				done();
 				break;
 			case Kind::Triangles: {
 				geometry();
 				gl.glUseProgram(_frame_tri_program.program);
-				gl.glUniform1i(gl.glGetUniformLocation(_frame_tri_program.program, "u_tex"), 0);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_tri_program.program, "u_near"), depth_scale);
-				gl.glUniform2f(gl.glGetUniformLocation(_frame_tri_program.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
+				gl.glUniform1i(UniformOf(_frame_tri_program.program, "u_tex"), 0);
+				gl.glUniform1f(UniformOf(_frame_tri_program.program, "u_near"), depth_scale);
+				gl.glUniform2f(UniformOf(_frame_tri_program.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
 				/* Our grass of the ground (THREE_D_GPU_EYE_GRASS): its picture beside the texture, where the eye is. */
 				const bool grass = f.grass_texture >= 0 && static_cast<size_t>(f.grass_texture) < names.size() && f.grass_units > 0;
-				gl.glUniform1i(gl.glGetUniformLocation(_frame_tri_program.program, "u_grass"), 1);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_tri_program.program, "u_grass_units"), grass ? f.grass_units : 0.0f);
-				gl.glUniform2f(gl.glGetUniformLocation(_frame_tri_program.program, "u_grass_eye"), f.grass_eye[0], f.grass_eye[1]);
+				gl.glUniform1i(UniformOf(_frame_tri_program.program, "u_grass"), 1);
+				gl.glUniform1f(UniformOf(_frame_tri_program.program, "u_grass_units"), grass ? f.grass_units : 0.0f);
+				gl.glUniform2f(UniformOf(_frame_tri_program.program, "u_grass_eye"), f.grass_eye[0], f.grass_eye[1]);
 				for (int k = 0; k < THREE_D_GPU_GRASS_KINDS; k++) {
 					const std::string name = fmt::format("u_grass_tint[{}]", k);
-					gl.glUniform3f(gl.glGetUniformLocation(_frame_tri_program.program, name.c_str()), f.grass_tint[k * 3], f.grass_tint[k * 3 + 1], f.grass_tint[k * 3 + 2]);
+					gl.glUniform3f(UniformOf(_frame_tri_program.program, name.c_str()), f.grass_tint[k * 3], f.grass_tint[k * 3 + 1], f.grass_tint[k * 3 + 2]);
 				}
-				gl.glUniform4f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
-				gl.glUniform3f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
-				gl.glUniform2f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_tip"), f.eye[10], f.eye[11]);
+				gl.glUniform4f(UniformOf(_frame_tri_program.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
+				gl.glUniform3f(UniformOf(_frame_tri_program.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+				gl.glUniform2f(UniformOf(_frame_tri_program.program, "u_eye_tip"), f.eye[10], f.eye[11]);
 				gl.glActiveTexture(GL_TEXTURE1);
 				gl.glBindTexture(GL_TEXTURE_2D, grass ? names[f.grass_texture] : 0);
 				gl.glActiveTexture(GL_TEXTURE0);
 				gl.glBindVertexArray(_frame_vao);
+				/* The texture and the blend set again only when they differ from the run before (as EyeDrawState). */
+				GLuint texture_set = 0;
+				bool glass_set = false;
+				gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 				for (size_t r = s.first_run; r < s.first_run + s.runs && r < f.runs.size(); r++) {
 					/* Those after it of the same texture at once. */
 					const ThreeDGpuEyeRun &run = f.runs[r];
@@ -7615,19 +7802,26 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 					while (r + 1 < s.first_run + s.runs && r + 1 < f.runs.size() && names[f.runs[r + 1].texture] == names[run.texture] && f.runs[r + 1].glass == run.glass && f.runs[r + 1].first == run.first + count) {
 						count += f.runs[++r].count;
 					}
-					if (run.glass) {
-						gl.glEnable(GL_BLEND);
-						gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-						gl.glDepthMask(GL_FALSE);
+					if (run.glass != glass_set) {
+						if (run.glass) {
+							gl.glEnable(GL_BLEND);
+							gl.glDepthMask(GL_FALSE);
+						} else {
+							gl.glDisable(GL_BLEND);
+							gl.glDepthMask(GL_TRUE);
+						}
+						glass_set = run.glass;
 					}
-					gl.glBindTexture(GL_TEXTURE_2D, names[run.texture]);
-					const bool first = FirstDraw(fmt::format("snimku z oci: trojuhelniky{}{}", run.glass ? ", sklo" : "", grass ? ", trava" : ""));
+					if (names[run.texture] != texture_set) gl.glBindTexture(GL_TEXTURE_2D, names[run.texture]);
+					texture_set = names[run.texture];
+					const bool first = FirstDrawOf(FIRST_DRAW_EYE_TRIANGLES | (run.glass ? 1 : 0) | (grass ? 2 : 0),
+							[&] { return fmt::format("snimku z oci: trojuhelniky{}{}", run.glass ? ", sklo" : "", grass ? ", trava" : ""); });
 					gl.glDrawArrays(GL_TRIANGLES, static_cast<GLint>(run.first), static_cast<GLsizei>(count));
 					FirstDrawDone(first);
-					if (run.glass) {
-						gl.glDisable(GL_BLEND);
-						gl.glDepthMask(GL_TRUE);
-					}
+				}
+				if (glass_set) {
+					gl.glDisable(GL_BLEND);
+					gl.glDepthMask(GL_TRUE);
 				}
 				gl.glBindVertexArray(0);
 				gl.glActiveTexture(GL_TEXTURE1);
@@ -7655,9 +7849,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				geometry();
 				gl.glDepthFunc(GL_GEQUAL);
 				gl.glUseProgram(_frame_lay_program.program);
-				gl.glUniform1i(gl.glGetUniformLocation(_frame_lay_program.program, "u_lay"), 2);
-				gl.glUniform1i(gl.glGetUniformLocation(_frame_lay_program.program, "u_lay_z"), 3);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_lay_program.program, "u_near"), depth_scale);
+				gl.glUniform1i(UniformOf(_frame_lay_program.program, "u_lay"), 2);
+				gl.glUniform1i(UniformOf(_frame_lay_program.program, "u_lay_z"), 3);
+				gl.glUniform1f(UniformOf(_frame_lay_program.program, "u_near"), depth_scale);
 				gl.glBindVertexArray(_frame_empty_vao);
 				const bool first = FirstDraw("snimku z oci: polozeny obraz (tunel)");
 				gl.glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -7670,18 +7864,18 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 			}
 			case Kind::Haze:
 				job(_frame_haze_program, "mlha");
-				gl.glUniform3f(gl.glGetUniformLocation(_frame_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_haze_program.program, "u_from"), s.from);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_haze_program.program, "u_reach"), s.depth);
+				gl.glUniform3f(UniformOf(_frame_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
+				gl.glUniform1f(UniformOf(_frame_haze_program.program, "u_from"), s.from);
+				gl.glUniform1f(UniformOf(_frame_haze_program.program, "u_reach"), s.depth);
 				done();
 				break;
 			case Kind::FarHaze:
 				job(_frame_far_haze_program, "mlha v dali");
-				gl.glUniform3f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_from"), s.from);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_to"), s.to);
-				gl.glUniform3f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_absorb"), s.absorb[0], s.absorb[1], s.absorb[2]);
-				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_horizon"), s.horizon);
+				gl.glUniform3f(UniformOf(_frame_far_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
+				gl.glUniform1f(UniformOf(_frame_far_haze_program.program, "u_from"), s.from);
+				gl.glUniform1f(UniformOf(_frame_far_haze_program.program, "u_to"), s.to);
+				gl.glUniform3f(UniformOf(_frame_far_haze_program.program, "u_absorb"), s.absorb[0], s.absorb[1], s.absorb[2]);
+				gl.glUniform1f(UniformOf(_frame_far_haze_program.program, "u_horizon"), s.horizon);
 				done();
 				break;
 			case Kind::Shadows: {
@@ -7697,12 +7891,12 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				}
 				job(_frame_shadow_program, "stiny");
 				const GLuint p = _frame_shadow_program.program;
-				gl.glUniform1i(gl.glGetUniformLocation(p, "u_map"), 2);
-				gl.glUniform3f(gl.glGetUniformLocation(p, "u_sun"), m.sun[0], m.sun[1], m.sun[2]);
-				gl.glUniform3f(gl.glGetUniformLocation(p, "u_a"), m.a[0], m.a[1], m.a[2]);
-				gl.glUniform3f(gl.glGetUniformLocation(p, "u_b"), m.b[0], m.b[1], m.b[2]);
-				gl.glUniform4f(gl.glGetUniformLocation(p, "u_map_place"), m.u0, m.v0, m.texel, m.bias);
-				gl.glUniform1f(gl.glGetUniformLocation(p, "u_sun0"), m.sun0);
+				gl.glUniform1i(UniformOf(p, "u_map"), 2);
+				gl.glUniform3f(UniformOf(p, "u_sun"), m.sun[0], m.sun[1], m.sun[2]);
+				gl.glUniform3f(UniformOf(p, "u_a"), m.a[0], m.a[1], m.a[2]);
+				gl.glUniform3f(UniformOf(p, "u_b"), m.b[0], m.b[1], m.b[2]);
+				gl.glUniform4f(UniformOf(p, "u_map_place"), m.u0, m.v0, m.texel, m.bias);
+				gl.glUniform1f(UniformOf(p, "u_sun0"), m.sun0);
 				done();
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
@@ -7711,7 +7905,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 			}
 			case Kind::Night:
 				job(_frame_night_program, "noc");
-				gl.glUniform3f(gl.glGetUniformLocation(_frame_night_program.program, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
+				gl.glUniform3f(UniformOf(_frame_night_program.program, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
 				done();
 				glows(s.glows);
 				break;
@@ -7722,7 +7916,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				job(_frame_glow_after_program, "svetla po noci");
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, _frame_glow);
-				gl.glUniform1i(gl.glGetUniformLocation(_frame_glow_after_program.program, "u_glow"), 2);
+				gl.glUniform1i(UniformOf(_frame_glow_after_program.program, "u_glow"), 2);
 				done();
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
@@ -7739,13 +7933,13 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				EyeFrameList(list);
 				job(_frame_lamps_program, "lampy");
 				const GLuint p = _frame_lamps_program.program;
-				gl.glUniform1i(gl.glGetUniformLocation(p, "u_lights"), 2);
-				gl.glUniform1i(gl.glGetUniformLocation(p, "u_count"), static_cast<GLint>(s.lights.size()));
-				gl.glUniform3f(gl.glGetUniformLocation(p, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
-				gl.glUniform1f(gl.glGetUniformLocation(p, "u_zu_per_unit"), s.depth);
-				gl.glUniform4f(gl.glGetUniformLocation(p, "u_tube"), s.tube[0], s.tube[1], s.tube[2], s.tube[3]);
-				gl.glUniform1i(gl.glGetUniformLocation(p, "u_tube_axis"), s.tube_axis);
-				gl.glUniform1i(gl.glGetUniformLocation(p, "u_tube_day"), s.tube_day ? 1 : 0);
+				gl.glUniform1i(UniformOf(p, "u_lights"), 2);
+				gl.glUniform1i(UniformOf(p, "u_count"), static_cast<GLint>(s.lights.size()));
+				gl.glUniform3f(UniformOf(p, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
+				gl.glUniform1f(UniformOf(p, "u_zu_per_unit"), s.depth);
+				gl.glUniform4f(UniformOf(p, "u_tube"), s.tube[0], s.tube[1], s.tube[2], s.tube[3]);
+				gl.glUniform1i(UniformOf(p, "u_tube_axis"), s.tube_axis);
+				gl.glUniform1i(UniformOf(p, "u_tube_day"), s.tube_day ? 1 : 0);
 				done();
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
@@ -7759,8 +7953,8 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				gl.glActiveTexture(GL_TEXTURE2);
 				EyeFrameList(list);
 				job(_frame_blasts_program, "kour a vybuchy");
-				gl.glUniform1i(gl.glGetUniformLocation(_frame_blasts_program.program, "u_blasts"), 2);
-				gl.glUniform1i(gl.glGetUniformLocation(_frame_blasts_program.program, "u_count"), static_cast<GLint>(s.blasts.size()));
+				gl.glUniform1i(UniformOf(_frame_blasts_program.program, "u_blasts"), 2);
+				gl.glUniform1i(UniformOf(_frame_blasts_program.program, "u_count"), static_cast<GLint>(s.blasts.size()));
 				done();
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
@@ -7784,7 +7978,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				}
 				if (!stars.empty()) {
 					over(_frame_star_program);
-					gl.glUniform1f(gl.glGetUniformLocation(_frame_star_program.program, "u_horizon"), s.horizon);
+					gl.glUniform1f(UniformOf(_frame_star_program.program, "u_horizon"), s.horizon);
 					gl.glEnable(GL_BLEND);
 					gl.glBlendFunc(GL_ONE, GL_ONE);
 					gl.glBindVertexArray(_frame_star_vao);
@@ -7802,10 +7996,10 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 					for (int glow = 0; glow < 2; glow++) {
 						over(_frame_moon_program);
 						const GLuint p = _frame_moon_program.program;
-						gl.glUniform3f(gl.glGetUniformLocation(p, "u_moon"), s.moon[0], s.moon[1], s.moon[2]);
-						gl.glUniform4f(gl.glGetUniformLocation(p, "u_box"), box[0], box[1], box[2], box[3]);
-						gl.glUniform1f(gl.glGetUniformLocation(p, "u_horizon"), s.horizon);
-						gl.glUniform1i(gl.glGetUniformLocation(p, "u_glow"), glow);
+						gl.glUniform3f(UniformOf(p, "u_moon"), s.moon[0], s.moon[1], s.moon[2]);
+						gl.glUniform4f(UniformOf(p, "u_box"), box[0], box[1], box[2], box[3]);
+						gl.glUniform1f(UniformOf(p, "u_horizon"), s.horizon);
+						gl.glUniform1i(UniformOf(p, "u_glow"), glow);
 						if (glow == 1) {
 							gl.glEnable(GL_BLEND);
 							gl.glBlendFunc(GL_ONE, GL_ONE);
@@ -7857,7 +8051,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glUseProgram(_frame_copy_program.program);
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, _frame_colour[now]);
-		gl.glUniform1i(gl.glGetUniformLocation(_frame_copy_program.program, "u_colour"), 0);
+		gl.glUniform1i(UniformOf(_frame_copy_program.program, "u_colour"), 0);
 		gl.glBindVertexArray(_frame_empty_vao);
 		const bool first = FirstDraw("snimku z oci: kopie k ukazani");
 		gl.glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -8706,7 +8900,8 @@ std::string ThreeDGpuTimes()
 	if (_gpu_grounds > 0) s += fmt::format("; the ground and what stands of {} blocks in {:.1f} ms (the ground alone {} in {:.1f} ms){}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_only, _gpu_ground_only_ms,
 			_gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
-	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single);
+	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own, the calls by the function {}", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single,
+			_gl_count_by_function ? VehicleCallsForDiary(true) : std::string("-"));
 	if (const uint64_t later = _gpu_eye_later.exchange(0); later > 0) s += fmt::format(", {} new left for a later picture", later);
 	{
 		/* A picture from the eyes as the card drew it: its triangles and draw calls, the batches' objects, the most drawn. */
@@ -8751,15 +8946,15 @@ std::string ThreeDGpuTimes()
 	return s;
 }
 
-/** The rig ('test3d gpu volani'): CallsByFunction(). */
-std::string ThreeDGpuCallsByFunction(int on)
+/** The rig ('test3d gpu volani [oci]'): CallsByFunction() of the turned map's vehicles or of the view from the eyes. */
+std::string ThreeDGpuCallsByFunction(int on, bool eye)
 {
-	return CallsByFunction(on);
+	return CallsByFunction(on, eye);
 }
 
 #else /* no card */
 
-std::string ThreeDGpuCallsByFunction(int) { return "bez karty"; }
+std::string ThreeDGpuCallsByFunction(int, bool) { return "bez karty"; }
 bool ThreeDGpuAvailable(bool) { return false; }
 bool ThreeDGpuPosesBones() { return false; }
 bool ThreeDGpuSmoothsRoads() { return false; }
