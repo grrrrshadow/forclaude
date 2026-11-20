@@ -1384,6 +1384,12 @@ static void DoDrawVehicle(const Vehicle *v)
 	if (v->type == VehicleType::Aircraft && !Aircraft::From(v)->IsNormalAircraft() && ThreeDEnabled() &&
 			BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && GetThreeDVehicleObject(v->engine_type) != nullptr) return;
 
+	/* No aircraft's shadow at all in the 3D game, a sprite aircraft's neither (the player, 20. 11., after his aircraft
+	 * of the game stood on the airport hidden under its own shadow: "the shadows of aircraft need not be at all, the
+	 * shadows do not matter, there is only trouble with them"). A helicopter's rotor stays; without 3D (the game as it
+	 * was) the shadow is drawn as ever. */
+	if (shadowed && v->type == VehicleType::Aircraft && v->subtype == AIR_SHADOW && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32) return;
+
 	if (v->type == VehicleType::Effect) {
 		/* Check whether the vehicle shall be transparent/invisible due to GUI settings.
 		 * However, transparent smoke and bubbles look weird, so always hide them. */
