@@ -27,6 +27,7 @@
 #include "tile_type.h"
 
 #include <algorithm>
+#include <optional>
 #include <array>
 #include <atomic>
 #include <cfloat>
@@ -126,6 +127,10 @@ static std::atomic<int> _standing_atlas_size_now = 0;
 
 std::atomic<bool> _three_d_gpu_off = true;
 std::atomic<bool> _three_d_gpu_show = true;
+/** The rig ('test3d ocidomy 0|1'): the buildings of a picture from the eyes drawn those alike one after the other, their runs side by side (1; DrawEyeObjects()), or as they were gathered (0, as before 20. 11.). */
+bool _eye_buildings_by_kind = true;
+/** The rig ('test3d ocidavky 0|1'): the runs of the triangles of a picture from the eyes drawn texture by texture, each texture's by one call (1; DrawEyeOnCard()), or in the order they were gathered (0, as before 20. 11.). */
+bool _eye_runs_by_texture = true;
 
 /*
  * The card's diary, 3d_karta.log in the player's folder. The player's build #285, the first with the card, brought the
@@ -550,6 +555,21 @@ GlFunctions gl;
  * (GlCounted), the real one behind it.
  */
 static std::atomic<uint64_t> _gl_calls = 0;
+/** The card's calls of the pictures from the eyes by what they drew: 0 the triangles' runs (the ground, the billboards), 1 the buildings, 2 the vehicles and figures, 3 their glass, for the diary. */
+std::atomic<uint64_t> _gpu_eye_calls_of[4] = {};
+/** The card's calls from now till it goes counted to a kind of _gpu_eye_calls_of. */
+struct EyeCallsOf {
+	int kind;
+	uint64_t from;
+	explicit EyeCallsOf(int kind);
+	~EyeCallsOf();
+};
+EyeCallsOf::EyeCallsOf(int kind) : kind(kind), from(_gl_calls.load(std::memory_order_relaxed)) {}
+EyeCallsOf::~EyeCallsOf()
+{
+	const uint64_t now = _gl_calls.load(std::memory_order_relaxed);
+	if (now >= this->from) _gpu_eye_calls_of[this->kind] += now - this->from;
+}
 static std::atomic<uint64_t> _gl_calls_standing = 0, _gl_calls_ground = 0, _gl_jobs_standing = 0, _gl_jobs_ground = 0, _gl_buildings = 0, _gl_calls_buildings = 0, _gl_vehicles = 0, _gl_calls_vehicles = 0, _gl_calls_vehicles_draw = 0;
 /* The calls of drawing the turned map's vehicles counted by the function, to see which of a vehicle's calls are what
  * (the player's diary of 18. 11.: 107 calls a vehicle, z5 6 frames a second; #379: 32, the rig 8 -- few vehicles a
@@ -7072,6 +7092,7 @@ static std::string MeshDrawKind(bool glass, bool instanced, const GpuShape &shap
 
 void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 {
+	std::optional<EyeCallsOf> calls_of(std::in_place, 1);
 	const GLuint bp = _eye_building_program.program;
 	gl.glUseProgram(bp);
 	gl.glUniform1i(_eye_building_program.tex, 0);
@@ -7098,13 +7119,45 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 	colours_set.fill(NAN);
 	about_set.fill(NAN);
 	std::array<float, 3> metres_set{NAN, NAN, NAN};
-	for (const EyeObjectDraws::Draw &d : o.draws) {
+	/* The buildings alike one after the other (their shape, their textures, their paint's masks and patterns), and
+	 * their runs side by side: those drawn with both sides first, then those with one, then the other -- each building
+	 * as it came, tile by tile, bound its shape, its masks and its textures anew and switched the side left out at
+	 * nearly every run, 23 calls a building (the rig, a street from the eyes: 2 800 of a picture's 4 600 calls the
+	 * buildings'; the player's diary of 20. 11., #385: the card's calls are what a picture costs on the phone). All of
+	 * it solid, each pixel by its depth: the order shows nowhere. The rig: 'test3d ocidomy 0|1'. */
+	static std::vector<const EyeObjectDraws::Draw *> in_order;
+	in_order.clear();
+	for (const EyeObjectDraws::Draw &d : o.draws) in_order.push_back(&d);
+	const bool by_kind = _eye_buildings_by_kind;
+	if (by_kind) {
+		std::stable_sort(in_order.begin(), in_order.end(), [](const EyeObjectDraws::Draw *a, const EyeObjectDraws::Draw *b) {
+			if (a->on->vao != b->on->vao) return a->on->vao < b->on->vao;
+			if (a->textures != b->textures) return a->textures < b->textures;
+			for (size_t k = 0; k < a->parts.size() && k < b->parts.size(); k++) {
+				if (a->parts[k].mask != b->parts[k].mask) return a->parts[k].mask < b->parts[k].mask;
+				if (a->parts[k].pattern != b->parts[k].pattern) return a->parts[k].pattern < b->parts[k].pattern;
+			}
+			return a->parts.size() < b->parts.size();
+		});
+	}
+	auto side_of = [](const EyeObjectDraws::Draw &d, const GpuBuilding::Run &r) { return !(r.facing != 0 && d.eye->building.cull) ? 0 : (r.facing > 0 ? 1 : 2); };
+	for (int side = 0; side < (by_kind ? 3 : 1); side++) {
+	for (const EyeObjectDraws::Draw *draw : in_order) {
+		const EyeObjectDraws::Draw &d = *draw;
+		/* Which of its runs are drawn now: all, or those of this side; with its paint only when one of them is of its first texture. */
+		bool any = false, painted = false;
+		for (const GpuBuilding::Run &r : d.on->runs) {
+			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0 || (by_kind && side_of(d, r) != side)) continue;
+			any = true;
+			painted = painted || r.texture == 0;
+		}
+		if (!any) continue;
 		gl.glUniformMatrix4fv(_eye_building_program.matrix, 1, GL_TRUE, d.eye->matrix.data());
 		if (d.on->vao != vao_set) gl.glBindVertexArray(d.on->vao);
 		vao_set = d.on->vao;
 		/* Its paint: the parts of its first texture, set once for its runs of that texture. */
 		const int parts = static_cast<int>(std::min(d.parts.size(), d.eye->building.paints.size()));
-		if (parts > 0) {
+		if (parts > 0 && painted) {
 			std::array<float, 4 * THREE_D_GPU_BUILDING_PAINTS> colours{}, about{};
 			for (int k = 0; k < parts; k++) {
 				const ThreeDGpuBuildingPaint &p = d.eye->building.paints[k];
@@ -7151,6 +7204,7 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 		}
 		for (const GpuBuilding::Run &r : d.on->runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
+			if (by_kind && side_of(d, r) != side) continue;
 			const int run_parts = r.texture == 0 ? parts : 0;
 			if (run_parts != parts_set) {
 				gl.glUniform1i(u_parts, run_parts);
@@ -7176,7 +7230,9 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 			_gpu_eye_calls++;
 		}
 	}
+	}
 	gl.glDisable(GL_CULL_FACE);
+	calls_of.reset();
 	DrawEyeMeshes(o, near_plane, false);
 }
 
@@ -7319,6 +7375,7 @@ static uint32_t MeshDrawKey(bool glass, bool instanced, const GpuShape &shape, b
  */
 void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 {
+	const EyeCallsOf calls_of(glass ? 3 : 2);
 	const GpuProgram &p = _eye_mesh_program;
 	gl.glUseProgram(p.program);
 	PaintUnits(p);
@@ -7953,6 +8010,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				done();
 				break;
 			case Kind::Triangles: {
+				const EyeCallsOf calls_of(0);
 				geometry();
 				gl.glUseProgram(_frame_tri_program.program);
 				gl.glUniform1i(UniformOf(_frame_tri_program.program, "u_tex"), 0);
@@ -7978,12 +8036,44 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				GLuint texture_set = 0;
 				bool glass_set = false;
 				gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-				for (size_t r = s.first_run; r < s.first_run + s.runs && r < f.runs.size(); r++) {
-					/* Those after it of the same texture at once. */
-					const ThreeDGpuEyeRun &run = f.runs[r];
-					uint32_t count = run.count;
-					while (r + 1 < s.first_run + s.runs && r + 1 < f.runs.size() && names[f.runs[r + 1].texture] == names[run.texture] && f.runs[r + 1].glass == run.glass && f.runs[r + 1].first == run.first + count) {
-						count += f.runs[++r].count;
+				/* The order its runs are drawn in. The solid ones first, those of a texture together whatever lies between
+				 * them as they were gathered (their order among themselves kept), each texture bound once and all its runs
+				 * drawn by one call; the see-through after them, in their order. Each run is a billboard or a face with a
+				 * texture of its own -- a tree's sprite, a sign, a wall --, gathered tile by tile, so a row of trees of three
+				 * kinds was a texture bound and a call for every tree (the player's diary of 20. 11., #385, from the eyes:
+				 * 818 of these calls and as many textures bound a picture, of 8000 calls; the card's calls are what a
+				 * picture costs there). What is solid keeps its depth, so its order shows only where two faces lie in
+				 * each other exactly. */
+				static std::vector<size_t> order;
+				static std::vector<GLint> firsts;
+				static std::vector<GLsizei> counts;
+				order.clear();
+				const size_t runs_end = std::min(s.first_run + s.runs, f.runs.size());
+				for (size_t r = s.first_run; r < runs_end; r++) {
+					if (!_eye_runs_by_texture || !f.runs[r].glass) order.push_back(r);
+				}
+				if (_eye_runs_by_texture) {
+					std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) { return names[f.runs[a].texture] < names[f.runs[b].texture]; });
+					for (size_t r = s.first_run; r < runs_end; r++) {
+						if (f.runs[r].glass) order.push_back(r);
+					}
+				}
+				for (size_t k = 0; k < order.size();) {
+					const ThreeDGpuEyeRun &run = f.runs[order[k]];
+					/* Those after it of the same texture at once: one range where they lie one after the other. */
+					firsts.assign(1, static_cast<GLint>(run.first));
+					counts.assign(1, static_cast<GLsizei>(run.count));
+					for (k++; k < order.size(); k++) {
+						const ThreeDGpuEyeRun &next = f.runs[order[k]];
+						if (names[next.texture] != names[run.texture] || next.glass != run.glass) break;
+						if (static_cast<uint32_t>(firsts.back() + counts.back()) == next.first) {
+							counts.back() += static_cast<GLsizei>(next.count);
+						} else if (_eye_runs_by_texture) {
+							firsts.push_back(static_cast<GLint>(next.first));
+							counts.push_back(static_cast<GLsizei>(next.count));
+						} else {
+							break;
+						}
 					}
 					if (run.glass != glass_set) {
 						if (run.glass) {
@@ -7999,7 +8089,11 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 					texture_set = names[run.texture];
 					const bool first = FirstDrawOf(FIRST_DRAW_EYE_TRIANGLES | (run.glass ? 1 : 0) | (grass ? 2 : 0),
 							[&] { return fmt::format("snimku z oci: trojuhelniky{}{}", run.glass ? ", sklo" : "", grass ? ", trava" : ""); });
-					gl.glDrawArrays(GL_TRIANGLES, static_cast<GLint>(run.first), static_cast<GLsizei>(count));
+					if (firsts.size() > 1 && gl.glMultiDrawArrays != nullptr) {
+						gl.glMultiDrawArrays(GL_TRIANGLES, firsts.data(), counts.data(), static_cast<GLsizei>(firsts.size()));
+					} else {
+						for (size_t j = 0; j < firsts.size(); j++) gl.glDrawArrays(GL_TRIANGLES, firsts[j], counts[j]);
+					}
 					FirstDrawDone(first);
 				}
 				if (glass_set) {
@@ -9168,6 +9262,8 @@ std::string ThreeDGpuTimes()
 			const double f = static_cast<double>(_gpu_eye_frames);
 			s += fmt::format("; a picture from the eyes {:.0f} thousand pixels, {:.0f} thousand triangles in {:.0f} draw calls, {:.1f} steps of objects, batches of {:.0f} objects in {:.0f}",
 					_gpu_eye_pixels / f / 1000.0, _gpu_eye_triangles / f / 1000.0, _gpu_eye_calls / f, _gpu_eye_steps / f, _gpu_eye_kinds / f, _gpu_eye_batches / f);
+			s += fmt::format(", the card's calls a picture: triangles' runs {:.0f}, buildings {:.0f}, vehicles and figures {:.0f}, their glass {:.0f}",
+					_gpu_eye_calls_of[0].exchange(0) / f, _gpu_eye_calls_of[1].exchange(0) / f, _gpu_eye_calls_of[2].exchange(0) / f, _gpu_eye_calls_of[3].exchange(0) / f);
 			std::vector<std::pair<uint64_t, const std::string *>> most;
 			for (const auto &[name, d] : _gpu_eye_most) most.emplace_back(d.first, &name);
 			const size_t shown = std::min<size_t>(5, most.size());

@@ -11762,6 +11762,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _house_levels_asked_only;
 		_house_levels_asked_only = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: urovne textur domu {}", _house_levels_asked_only ? "jen chtene" : "vsechny");
+	} else if (what == "ocidomy" && argv.size() > 2) {
+		/* 'ocidomy 0|1': the buildings of a picture from the eyes drawn those alike one after the other, their runs side
+		 * by side (1), or as they were gathered (0). */
+		extern bool _eye_buildings_by_kind;
+		_eye_buildings_by_kind = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: ocidomy {}", _eye_buildings_by_kind ? "stejne za sebou" : "jak byly sebrany");
+	} else if (what == "ocidavky" && argv.size() > 2) {
+		/* 'ocidavky 0|1': the triangles' runs of a picture from the eyes drawn texture by texture, each by one call (1),
+		 * or in the order they were gathered (0). */
+		extern bool _eye_runs_by_texture;
+		_eye_runs_by_texture = number(2).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: ocidavky {}", _eye_runs_by_texture ? "po texturach" : "jak byly sebrany");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "ptatse") {
 		/* 'stojici ptatse 0|1': the card asked whether it keeps a moving thing's picture before the thing is given as
 		 * kept (1), or given as the main thread keeps it, the card telling which it lacks (0). */
