@@ -939,13 +939,15 @@ vlak123 on" 12000 -g $S/new1.sav
 run_scene zalozsmerdlouho "testpauza
 vlak123 on" 27000 -g $S/new1.sav
 # Player's save: the tow fetches a breakdown, is turned round on the way home
-# (a tick-timed testotoc, after the coupling) and backs into the depot wagons
+# (a tick-timed testotoc, after the coupling; at 2800 since breakdowns come
+# mostly about stations, 23. 9. -- the casualty's second breakdown is later and
+# 2450 turned the tow before it had coupled, 21. 11.) and backs into the depot wagons
 # first; autoreplace at the depot must leave the joined train alone and the
 # casualty must be put down and replaced on its own (TEMATA 4.24). No assert.
 run_scene odtahotoc "testpauza
 vlak123 on
 testza 10 testbrzda 5
-testzatik 2450 testotoc 5" 6000 -g $S/obmenaporucha.sav
+testzatik 2800 testotoc 5" 6000 -g $S/obmenaporucha.sav
 # Player's save, the tow let off the brake at once (the casualty gives up
 # waiting ten days in): the casualty stands with its tail on the points at the
 # platform throat, the tow straightens it across the platform, couples snug,
@@ -1102,6 +1104,39 @@ testza 8000 testbrzda 89
 testza 8000 testklon 89 3" 30000 -g $S/rig.sav
 run_scene rigDB "vlak123 on
 testpauza
+testza 10 testbrzda 77
+testza 10 testbrzda 78
+testza 10 testbrzda 79
+testza 10 testbrzda 80
+testza 8000 testbrzda 81
+testza 8000 testklon 81 3" 30000 -g $S/rig.sav
+# The same two with rescue engines on call, as the player plays the polygon:
+# the lone engines 5 (depot 0, west) and 21 (depot 1, east) made tows and let
+# off the brake. Breakdowns about the stations are fetched (six tows each).
+# Found with them (21. 11.): a collector that broke down touching its partner
+# booked a road from the partner's ground on through it, then coupled and left
+# the other way -- the platform throat held by nobody for good (vehicle.cpp,
+# the road booked again after a breakdown); and a tow's road given back stopped
+# at the red path signal it had booked past. Open: a tow dragging a casualty
+# out of a depot doorway leaves the doorway booked (rigDBo, depot (86,18)).
+run_scene rigDAo "vlak123 on
+testpauza
+testodtahovka 5
+testodtahovka 21
+testza 10 testbrzda 5
+testza 10 testbrzda 21
+testza 10 testbrzda 85
+testza 10 testbrzda 86
+testza 10 testbrzda 87
+testza 10 testbrzda 88
+testza 8000 testbrzda 89
+testza 8000 testklon 89 3" 30000 -g $S/rig.sav
+run_scene rigDBo "vlak123 on
+testpauza
+testodtahovka 5
+testodtahovka 21
+testza 10 testbrzda 5
+testza 10 testbrzda 21
 testza 10 testbrzda 77
 testza 10 testbrzda 78
 testza 10 testbrzda 79

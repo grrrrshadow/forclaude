@@ -12333,8 +12333,14 @@ void FreeTrainTrackReservation(const Train *consist, TileIndex from_tile, Trackd
 			}
 			if (HasPbsSignalOnTrackdir(tile, td)) {
 				if (GetSignalStateByTrackdir(tile, td) == SignalState::Red) {
-					/* Red PBS signal? Can't be our reservation, would be green then. */
-					break;
+					/* Red PBS signal? Can't be our reservation, would be green then -- unless this is a rescue
+					 * engine: it books on past a red path signal to the casualty standing in the block beyond, and
+					 * the signal stays red. Stopping here left that block booked by nobody for good, the casualty's
+					 * stopping place with it, and a rescue engine the player turned round on its way out could never
+					 * book its road again (the player's save obmenaporucha, a tow turned before it had coupled,
+					 * 21. 11.: (148,167) and the junction (147,167) held for the rest of the game). The walk still
+					 * ends at the casualty itself: ground another train stands on is that train's, above. */
+					if (!IsFetchingCasualty(consist)) break;
 				} else {
 					/* Turn the signal back to red. */
 					SetSignalStateByTrackdir(tile, td, SignalState::Red);

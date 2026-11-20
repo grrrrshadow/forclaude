@@ -1864,7 +1864,14 @@ bool Vehicle::HandleBreakdown()
 							 * road that cannot be booked leaves it stuck and
 							 * standing, and it asks again the way every stuck
 							 * train does. */
-							if (gave_up_road && head->IsFrontEngine()) TryPathReserve(head, true);
+							/* Unless it is touching what it came to couple to: it couples there on its next
+							 * step and books its road after that, as every coupling does. Asked from where it
+							 * stands, the search began on the partner's own ground and booked on through the
+							 * partner and beyond; the coupling turned the train round and it left the other
+							 * way, and that road stayed booked by nobody for good (the player's polygon, depot
+							 * B with the tows on: collector 81 broke down against 80 at platform 17, and the
+							 * platform throat with all of platform 19 was held for the rest of the game). */
+							if (gave_up_road && head->IsFrontEngine() && GetTrainCouplePartner(head) == nullptr) TryPathReserve(head, true);
 						}
 					}
 					this->MarkDirty();

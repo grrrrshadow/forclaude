@@ -101,7 +101,7 @@ zaloz: spojeno=7 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 aut
 zalozsmerperon: spojeno=6 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 zalozsmer: spojeno=10 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
 zalozsmerdlouho: spojeno=25 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
-odtahotoc: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+odtahotoc: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
 odtahvyhybka: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 mezera: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 depoodpoj: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
@@ -116,6 +116,8 @@ rigD5: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=17 au
 rigD4: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 rigDA: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=6 auto=0 odmitnuto=0
 rigDB: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=11 auto=0 odmitnuto=0
+rigDAo: spojeno=10 odtazeno=6 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+rigDBo: spojeno=10 odtazeno=5 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=9 auto=0 odmitnuto=0
 cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
