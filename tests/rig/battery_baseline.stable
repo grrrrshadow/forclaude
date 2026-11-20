@@ -117,7 +117,7 @@ rigD4: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 aut
 rigDA: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=6 auto=0 odmitnuto=0
 rigDB: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=11 auto=0 odmitnuto=0
 rigDAo: spojeno=10 odtazeno=6 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
-rigDBo: spojeno=10 odtazeno=5 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=9 auto=0 odmitnuto=0
+rigDBo: spojeno=9 odtazeno=5 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=8 auto=0 odmitnuto=0
 cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0

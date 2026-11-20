@@ -8974,6 +8974,29 @@ static CommandCost CoupleTrainTo(DoCommandFlags flags, Train *v, Train *partner,
 	 * dead-end platform onto the curve, with three tiles of platform for
 	 * seven wagons, and the tow stood against it refusing until it gave up. */
 	if (!ends_clean && tow != nullptr && ends_rail_connected && AreCoupleEndsAdjacentOnRail(l_end, t_end)) ends_clean = true;
+	/* Nor is it clean where the body of one train stands nearer the other's meeting end than its own end does. Two
+	 * tracks run together into one, and an engine come up the other leg stands against the side of the train on the
+	 * first: that train's end lies beyond, past its own vehicles, and no rail leads to it but through them. Spliced
+	 * there the list says the end follows the engine while the ground has a vehicle between the two (the player's
+	 * polygon, 21. 11.: a tow out of the shed next door met a casualty stopped in the points before its own shed's door
+	 * at its middle wagon; the record wrote SPOJENI ROZHAZENE and a broken step, the train was dragged off bent, and the
+	 * shed's door and the tow's road home stayed booked by nobody). Measured, and of both trains alike: no end is
+	 * named. A collector so met stands and is the player's to move; a tow straightens its case where it can
+	 * (LayCasualtyAlongTow()) and gives it up where it cannot. */
+	auto body_nearer_than_end = [](const Train *end, const Train *other_end) {
+		const int64_t reach = DistanceSquaredBetweenVehicles(end, other_end);
+		for (const Train *u = other_end->First(); u != nullptr; u = u->Next()) {
+			if (u != other_end && DistanceSquaredBetweenVehicles(end, u) < reach) return true;
+		}
+		return false;
+	};
+	if (ends_clean && (body_nearer_than_end(l_end, t_end) || body_nearer_than_end(t_end, l_end))) {
+		ends_clean = false;
+		if (_show_train_orientation) {
+			SayOnChange(leading, fmt::format("Vlak {}: konce spoje nejsou ciste - u konce ({},{}) stoji bliz jiny vuz tehoz vlaku nez jeho konec (prijezd z boku)",
+					(collector != nullptr ? collector : leading)->unitnumber, TileX(l_end->tile), TileY(l_end->tile)));
+		}
+	}
 	if (!ends_clean && _show_train_orientation) {
 		IConsolePrint(CC_INFO, "Vlak {}: konce spoje nejsou ciste - navaznost {}, konec A ({},{}) kolej {:#x}, konec B ({},{}) kolej {:#x}",
 				(collector != nullptr ? collector : leading)->unitnumber, ends_rail_connected ? "ano" : "ne",

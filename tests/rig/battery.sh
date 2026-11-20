@@ -1117,8 +1117,12 @@ testza 8000 testklon 81 3" 30000 -g $S/rig.sav
 # booked a road from the partner's ground on through it, then coupled and left
 # the other way -- the platform throat held by nobody for good (vehicle.cpp,
 # the road booked again after a breakdown); and a tow's road given back stopped
-# at the red path signal it had booked past. Open: a tow dragging a casualty
-# out of a depot doorway leaves the doorway booked (rigDBo, depot (86,18)).
+# at the red path signal it had booked past. And in rigDBo the tow from depot
+# (86,17) meets casualty 81, stopped in the points before the door of depot
+# (86,18), up the other leg of the points at its middle wagon: that coupling
+# is not clean (CoupleTrainTo(): a body nearer than its end), the tow cannot
+# straighten it into the depot and gives the case up -- before, the splice was
+# made from the side, the record wrote SPOJENI ROZHAZENE and a broken step.
 run_scene rigDAo "vlak123 on
 testpauza
 testodtahovka 5
