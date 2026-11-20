@@ -16534,13 +16534,16 @@ static void DrawEyeWallPiece(const CabCanvas &cv, const CabEye &eye, const Three
 		nx /= nl;
 		ny /= nl;
 		nz /= nl;
-		std::vector<CabPoint> poly;
+		/* Its corners into a list kept for the thread: one made for every triangle of every wall was an allocation of
+		 * memory each, dear under Wine and box64. */
+		thread_local std::vector<CabPoint> poly;
+		poly.clear();
 		for (int c = 0; c < 3; c++) {
 			const uint32_t i = shape.tri[t + c];
 			poly.push_back(CabToEye(eye, w[c][0], w[c][1], w[c][2], shape.uv[i * 2] * tex->w, shape.uv[i * 2 + 1] * tex->h));
 		}
 		if (_eye_frame != nullptr) _eye_frame->kept[tex->px.data()] = tex->uid.value;
-		CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex->px.data(), tex->w, tex->h, std::move(poly), eye, CAB_REPEAT, ThreeDLightOfNormal(nx, ny, nz));
+		CabDrawPolygonIn(cv.dst, cv.zb, cv.w, cv.h, tex->px.data(), tex->w, tex->h, poly, eye, CAB_REPEAT, ThreeDLightOfNormal(nx, ny, nz));
 	}
 }
 
@@ -20972,7 +20975,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						out_list.push_back({dst, zb, width, height, tt->px.data(), tt->w, tt->h, a, b, c, false, light});
 						continue;
 					}
-					std::vector<CabPoint> poly = {pts[ia], pts[ib], pts[ic]};
+					thread_local std::vector<CabPoint> poly;
+					poly.assign({pts[ia], pts[ib], pts[ic]});
 					CabClipNear(poly, near);
 					if (poly.size() < 3) continue;
 					const CabVertex v0 = CabProject(eye, poly[0]);

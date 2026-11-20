@@ -5424,7 +5424,9 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 	if (shape == nullptr) return false;
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	textures.assign(count, nullptr);
-	std::vector<int> levels(count, level);
+	/* (Kept for the thread: a list made for every figure every frame, an allocation of memory dear under Wine and box64.) */
+	thread_local std::vector<int> levels;
+	levels.assign(count, level);
 	for (size_t i = 0; i < textures.size(); i++) {
 		if (used != nullptr && (i >= used->size() || !(*used)[i])) continue;
 		if (i != 0 && drawn != nullptr) levels[i] = EyeTextureLevel(obj, drawn, pixels_per_metre, static_cast<int>(i));

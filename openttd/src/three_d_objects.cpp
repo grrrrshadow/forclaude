@@ -9237,8 +9237,10 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 	static size_t found_count = 0;
 	static uint64_t found_reading = 0;
 	const uint64_t reading = _figure_objects_reading;
-	std::string asked;
-	asked.reserve(package.size() + 1 + name.size());
+	/* The key put together in a string kept for the thread: a new one each time was an allocation of memory for every
+	 * figure asked for by a longer name, every frame (dear under Wine and box64). */
+	thread_local std::string asked;
+	asked.clear();
 	asked.append(package).push_back('\n');
 	asked.append(name);
 	{
@@ -9277,7 +9279,7 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 		}
 	}
 	std::lock_guard lock(found_mutex);
-	if (found_of == _figure_objects.data() && found_count == _figure_objects.size() && found_reading == reading) found.emplace(std::move(asked), figure);
+	if (found_of == _figure_objects.data() && found_count == _figure_objects.size() && found_reading == reading) found.emplace(asked, figure);
 	return figure;
 }
 
@@ -9544,8 +9546,8 @@ void ThreeDLazyForgetAsked()
 	_lazy_made_count++;
 }
 
-template <typename Made>
-static bool MadeOrAsked(const void *of, int thing, Made &&made, std::function<void()> make)
+template <typename Made, typename Make>
+static bool MadeOrAsked(const void *of, int thing, Made &&made, Make &&make)
 {
 	const std::pair<const void *, int> key(of, thing);
 	{
@@ -9553,7 +9555,10 @@ static bool MadeOrAsked(const void *of, int thing, Made &&made, std::function<vo
 		if (made()) return true;
 		if (!_lazy_asked.insert(key).second) return false; // asked already
 	}
-	ThreeDLoadInBackground(std::move(make));
+	/* Its job made only now it is asked for: made each time as a std::function from what it holds, it was an
+	 * allocation of memory every time a shape made long ago was looked up (the rig, gdb, 21. 11.: a fifth of what a
+	 * picture from the eyes still allocated; dear under Wine and box64). */
+	ThreeDLoadInBackground(std::function<void()>(std::forward<Make>(make)));
 	if (!_three_d_load_at_once) return false;
 	/* The rig: made now, so it is there. */
 	std::lock_guard lock(_lazy_mutex);
