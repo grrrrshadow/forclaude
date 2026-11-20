@@ -6407,10 +6407,15 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	auto draw_vehicles = [&](size_t from, bool back = true) {
 		/* Its pictures use the units 1 to 6 (their paint and bones): the buildings' masks and patterns there not known after. */
 		lean_forget();
-		/* The picture is drawn anew: those drawn into it before and not shrunk yet (after this one, which comes
-		 * again: its kept picture went as the kept pictures filled up) are not there any more -- drawn again too, or
-		 * they were shrunk from nothing (Mat and the trees of a town went missing with the figures on the card). */
-		for (size_t k = from; k < s.items.size(); k++) {
+		/* The picture is drawn anew: those drawn into it before are not there any more -- all of them, not only those
+		 * after this one. Drawn again too when they come (after this one, which comes again: its kept picture went as
+		 * the kept pictures filled up), or they were shrunk from nothing (Mat and the trees of a town went missing with
+		 * the figures on the card). One before it comes again in the block's next part (clips): its kept picture
+		 * forgotten meanwhile, it was shrunk again from where it had been drawn -- where others were drawn since: a
+		 * plane kept as a few trees about it, a lorry as pieces of another, another thing as the plane (the player's
+		 * test12, 20. 11.: "on the map the vehicle broken, scattered, and one more shuttle by a building", trees about
+		 * the plane and the sailboat; kept so by its key, the same each time the map came back to that zoom). */
+		for (size_t k = 0; k < s.items.size(); k++) {
 			if (vehicle_at[k][0] >= 0) vehicle_at[k] = {-1, -1};
 		}
 		struct Placed {
