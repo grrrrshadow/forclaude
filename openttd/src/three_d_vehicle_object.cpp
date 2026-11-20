@@ -3661,6 +3661,26 @@ enum class CardMade : uint8_t {
  * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
  * @param[out] lights its lights on at night, as its picture's (ThreeDModelPicture::lights)
  */
+/**
+ * A thing's card without its shapes: where it is and how near, its key -- nothing of its object's (no shape, no
+ * triangles, no texture of it named). What is kept of a thing from one frame to the next is this: the card lays its
+ * kept picture by the key; its shapes and textures may be made anew or let go of meanwhile (a finer level after a zoom).
+ */
+static std::shared_ptr<const ThreeDGpuStandingVehicle> CardWithoutShapes(const ThreeDGpuStandingVehicle &v)
+{
+	auto light = std::make_shared<ThreeDGpuStandingVehicle>();
+	light->key = v.key;
+	light->supersample = v.supersample;
+	light->left = v.left; light->top = v.top; light->width = v.width; light->height = v.height;
+	light->near_osy = v.near_osy; light->near_od = v.near_od; light->near_top = v.near_top; light->near_min = v.near_min; light->near_span = v.near_span;
+	light->pic.width = v.pic.width; light->pic.height = v.pic.height;
+	light->pic.depth_near = v.pic.depth_near; light->pic.depth_far = v.pic.depth_far;
+	light->pic.glass_alpha = v.pic.glass_alpha;
+	light->pic.read_lit = v.pic.read_lit;
+	light->kept_only = true;
+	return light;
+}
+
 static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, std::shared_ptr<const std::vector<ThreeDPictureLight>> &lights)
 {
 	/* What it looks like, as its picture is kept by (ObjectPictureKey), and of which reading of the objects. */
@@ -3822,17 +3842,7 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	if (!gp.lights.empty()) lights = std::make_shared<const std::vector<ThreeDPictureLight>>(std::move(gp.lights));
 	if (_card_vehicles_as_kept) {
 		/* The same without its shapes, for the next time (above): where it is and how near, nothing of the object's. */
-		auto light = std::make_shared<ThreeDGpuStandingVehicle>();
-		light->key = v->key;
-		light->supersample = v->supersample;
-		light->left = v->left; light->top = v->top; light->width = v->width; light->height = v->height;
-		light->near_osy = v->near_osy; light->near_od = v->near_od; light->near_top = v->near_top; light->near_min = v->near_min; light->near_span = v->near_span;
-		light->pic.width = v->pic.width; light->pic.height = v->pic.height;
-		light->pic.depth_near = v->pic.depth_near; light->pic.depth_far = v->pic.depth_far;
-		light->pic.glass_alpha = v->pic.glass_alpha;
-		light->pic.read_lit = v->pic.read_lit;
-		light->kept_only = true;
-		_card_vehicles_kept[key] = {std::move(light), lights, _card_vehicles_kept_pass, false};
+		_card_vehicles_kept[key] = {CardWithoutShapes(*v), lights, _card_vehicles_kept_pass, false};
 	}
 	card = std::move(v);
 	if (auto whole = _card_keys_whole.find(key); whole != _card_keys_whole.end()) whole->second = {card, lights};
@@ -4265,10 +4275,14 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 		mix(std::bit_cast<uint32_t>(static_cast<float>(GetViewCameraKey())) | static_cast<uint64_t>(std::bit_cast<uint32_t>(scale)) << 32);
 		mix(static_cast<uint64_t>(TimerGameEconomy::date.base()) | static_cast<uint64_t>(ViewportDrawingTurned()) << 40 | static_cast<uint64_t>(ViewportDrawingNorthObjects()) << 41 | static_cast<uint64_t>(ViewportDrawingEye()) << 42);
 		if (auto it = _lasting_places.find(lasting_key); it != _lasting_places.end() && it->second.sig == sig) {
-			place = it->second.place;
-			it->second.used = TimerGameTick::counter;
-			_lasting_places_reused++;
-			return obj;
+			/* (Its picture reaching into the view and the card keeping it no more: prepared anew below, with its shapes.) */
+			const VehicleObjectPlace &was = it->second.place;
+			if (was.card == nullptr || !CardKeptGone(*was.card, was.ax, was.ay, was.az)) {
+				place = was;
+				it->second.used = TimerGameTick::counter;
+				_lasting_places_reused++;
+				return obj;
+			}
 		}
 	}
 	/* Hung from the middle of its pieces (or where its coupling puts it), facing the way it goes: on a round curve as
@@ -4345,8 +4359,19 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	place.xmin = xmin; place.ymin = ymin; place.zmin = zmin;
 	place.xmax = xmax; place.ymax = ymax; place.zmax = zmax;
 	if (lasting_drawn) {
-		/* Kept to be placed so again (LastingPlace); those of vehicles not placed for a while let go of. */
-		_lasting_places[lasting_key] = {sig, place, TimerGameTick::counter};
+		/* Kept to be placed so again (LastingPlace); those of vehicles not placed for a while let go of. Its card without
+		 * its shapes (CardWithoutShapes()): kept with them, its meshes named shapes and textures of its object from the
+		 * frame it was prepared in -- made anew since (a finer level of a texture after a zoom) and let go of, and when
+		 * the card kept its picture no more (all the kept pictures forgotten as they filled, zooming) it drew the thing
+		 * again from them (the player's test12, build #386, 20. 11.: the game fell zooming in on the paused map,
+		 * reading through a pointer of memory given to a sprite since; the rig with AddressSanitizer: TextureOnCard()
+		 * of a texture freed, from the vehicles' pictures drawn first, only with these places kept). */
+		VehicleObjectPlace kept = place;
+		if (kept.card != nullptr && !kept.card->kept_only) {
+			const auto light = _card_vehicles_kept.find(kept.card->key);
+			kept.card = light != _card_vehicles_kept.end() && light->second.card != nullptr ? light->second.card : CardWithoutShapes(*kept.card);
+		}
+		_lasting_places[lasting_key] = {sig, std::move(kept), TimerGameTick::counter};
 		if (_lasting_places.size() > 4096) std::erase_if(_lasting_places, [](const auto &e) { return TimerGameTick::counter - e.second.used > 1000; });
 	} else if (lasting) {
 		_lasting_places.erase(lasting_key);
