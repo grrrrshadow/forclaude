@@ -216,6 +216,41 @@ bool CanAircraftUseModularAirport(EngineID engine, const Station *st)
 	return true;
 }
 
+/** @copydoc StartsByRocket() */
+bool AircraftStartsByRocket(EngineID engine)
+{
+	return StartsByRocket(engine);
+}
+
+/**
+ * What an airport lacks for a plane a rocket carries up (CanVehicleUseStation() says only no): the list of what a hangar
+ * builds left such a plane out without a word where the airport could not send it up (the player, 21. 11.: "I have
+ * only the Buran with the Mrija there, the Buran with the Energia rocket is not"). It is listed at every hangar now,
+ * and buying it, or sending it there, tells what is missing: the airport built tile by tile, its runway, its stand,
+ * its hangar, its pad.
+ * @return the reason, INVALID_STRING_ID when it can use the airport
+ */
+StringID GetRocketAircraftCannotUseReason(EngineID engine, const Station *st)
+{
+	if (!IsModularAirportStation(st)) return STR_ERROR_ROCKET_PLANE_NEEDS_MODULAR_AIRPORT;
+	bool stand = false, launch = false;
+	for (TileIndex t : st->modular_airport) {
+		if (!IsStationModularTile(t, st->index)) continue;
+		if (GetModularAirportKind(t) == ModularAirportKind::Stand) stand = true;
+		if (IsLaunchPad(t)) launch = true;
+	}
+	const uint need = RunwayNeeded(engine);
+	bool runway = false;
+	for (const ModularRunway &r : RunwaysOf(st)) {
+		if (r.tiles.size() >= need) runway = true;
+	}
+	if (!runway) return need > RUNWAY_PLANE ? STR_ERROR_ROCKET_PLANE_NEEDS_LONG_RUNWAY : STR_ERROR_ROCKET_PLANE_NEEDS_RUNWAY;
+	if (!stand) return STR_ERROR_ROCKET_PLANE_NEEDS_STAND;
+	if (!ModularAirportHasHangar(st)) return STR_ERROR_ROCKET_PLANE_NEEDS_HANGAR;
+	if (!launch) return STR_ERROR_ROCKET_PLANE_NEEDS_PAD;
+	return INVALID_STRING_ID;
+}
+
 /** Has the modular airport a hangar? */
 bool ModularAirportHasHangar(const Station *st)
 {

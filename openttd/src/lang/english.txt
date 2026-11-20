@@ -6025,6 +6025,12 @@ STR_ERROR_MUST_DEMOLISH_DOCK_FIRST                              :must demolish d
 STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :must demolish airport first
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_STRAIGHT                       :a runway goes straight along one axis
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_TOO_SHORT                      :a runway needs at least 3 tiles
+STR_ERROR_ROCKET_PLANE_NEEDS_MODULAR_AIRPORT                    :a plane on a rocket starts only from an airport built tile by tile, with a runway, a stand, a hangar and a helipad or a heliport
+STR_ERROR_ROCKET_PLANE_NEEDS_RUNWAY                             :this airport has no runway of at least 3 tiles for it to land on
+STR_ERROR_ROCKET_PLANE_NEEDS_LONG_RUNWAY                        :this airport has no runway of at least 5 tiles for it to land on
+STR_ERROR_ROCKET_PLANE_NEEDS_STAND                              :this airport has no stand for it to unload and load at
+STR_ERROR_ROCKET_PLANE_NEEDS_HANGAR                             :this airport has no hangar for it to take its rocket in
+STR_ERROR_ROCKET_PLANE_NEEDS_PAD                                :this airport has neither a helipad nor a heliport for the rocket to rise from
 
 # Waypoint related errors
 STR_ERROR_WAYPOINT_ADJOINS_MORE_THAN_ONE_EXISTING               :adjoins more than one existing waypoint

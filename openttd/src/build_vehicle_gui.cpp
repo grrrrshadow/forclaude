@@ -16,6 +16,7 @@
 #include "station_base.h"
 #include "network/network.h"
 #include "articulated_vehicles.h"
+#include "aircraft.h"
 #include "textbuf_gui.h"
 #include "command_func.h"
 #include "company_func.h"
@@ -1743,7 +1744,9 @@ struct BuildVehicleWindow : Window {
 			EngineID eid = e->index;
 			if (!IsEngineBuildable(eid, VehicleType::Aircraft, _local_company)) continue;
 			/* First VEH_END window_numbers are fake to allow a window open for all different types at once */
-			if (!this->listview_mode && !CanVehicleUseStation(eid, st)) continue;
+			/* A plane a rocket carries up is listed at every hangar: left out where the airport cannot send it up, it was
+			 * not there and nothing said why; buying it tells what the airport lacks (CmdBuildAircraft()). */
+			if (!this->listview_mode && !CanVehicleUseStation(eid, st) && !AircraftStartsByRocket(eid)) continue;
 			if (!bdf.Filter(e->badges)) continue;
 
 			/* Filter by name or NewGRF extra text */

@@ -303,8 +303,9 @@ CommandCost CmdBuildAircraft(DoCommandFlags flags, TileIndex tile, const Engine 
 	const AircraftVehicleInfo *avi = &e->VehInfo<AircraftVehicleInfo>();
 	const Station *st = Station::GetByTile(tile);
 
-	/* Prevent building aircraft types at places which can't handle them */
-	if (!CanVehicleUseStation(e->index, st)) return CMD_ERROR;
+	/* Prevent building aircraft types at places which can't handle them; a plane on a rocket, listed at every hangar,
+	 * with what the airport lacks (GetRocketAircraftCannotUseReason()). */
+	if (!CanVehicleUseStation(e->index, st)) return AircraftStartsByRocket(e->index) ? CommandCost(GetRocketAircraftCannotUseReason(e->index, st)) : CMD_ERROR;
 
 	/* Make sure all aircraft end up in the first tile of the hangar; a modular airport's hangar is one tile. */
 	const bool modular = IsModularAirportTile(tile);

@@ -223,6 +223,8 @@ Station *GetTargetAirportIfValid(const Aircraft *v);
 /* The modular airports (aircraft_modular.cpp). */
 bool IsModularAirportStation(const Station *st);
 bool CanAircraftUseModularAirport(EngineID engine, const Station *st);
+bool AircraftStartsByRocket(EngineID engine);
+StringID GetRocketAircraftCannotUseReason(EngineID engine, const Station *st);
 bool ModularAirportHasHangar(const Station *st);
 TileIndex GetModularAirportHangar(const Station *st);
 bool ModularAircraftController(Aircraft *v);

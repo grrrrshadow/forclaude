@@ -6139,6 +6139,12 @@ STR_ERROR_MUST_DEMOLISH_DOCK_FIRST                              :{WHITE}Je nutn�
 STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :je nutné nejprve zničit letiště
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_STRAIGHT                       :dráha musí vést rovně v jedné ose
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_TOO_SHORT                      :dráha musí mít aspoň 3 dlaždice
+STR_ERROR_ROCKET_PLANE_NEEDS_MODULAR_AIRPORT                    :letadlo na raketě startuje jen z letiště stavěného po dlaždicích, s dráhou, stáním, hangárem a helipadem nebo heliportem
+STR_ERROR_ROCKET_PLANE_NEEDS_RUNWAY                             :letiště nemá dráhu aspoň 3 dlaždice dlouhou, na které přistane
+STR_ERROR_ROCKET_PLANE_NEEDS_LONG_RUNWAY                        :letiště nemá dráhu aspoň 5 dlaždic dlouhou, na které přistane
+STR_ERROR_ROCKET_PLANE_NEEDS_STAND                              :letiště nemá stání, kde vyloží a naloží
+STR_ERROR_ROCKET_PLANE_NEEDS_HANGAR                             :letiště nemá hangár, kde dostane raketu
+STR_ERROR_ROCKET_PLANE_NEEDS_PAD                                :letiště nemá helipad ani heliport, ze kterého raketa odstartuje
 
 # Waypoint related errors
 STR_ERROR_WAYPOINT_ADJOINS_MORE_THAN_ONE_EXISTING               :{WHITE}Sousedí s více než jedním existujícím bodem na trase

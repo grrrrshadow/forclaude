@@ -4018,6 +4018,10 @@ StringID GetVehicleCannotUseStationReason(const Vehicle *v, const Station *st)
 
 		case VehicleType::Aircraft:
 			if (!st->facilities.Any({StationFacility::Airport, StationFacility::ModularAirport})) return STR_ERROR_NO_AIRPORT;
+			/* A plane a rocket carries up: what the airport lacks for it. */
+			if (AircraftStartsByRocket(v->engine_type)) {
+				if (const StringID reason = GetRocketAircraftCannotUseReason(v->engine_type, st); reason != INVALID_STRING_ID) return reason;
+			}
 			if (v->GetEngine()->VehInfo<AircraftVehicleInfo>().subtype & AIR_CTOL) {
 				return STR_ERROR_AIRPORT_NO_PLANES;
 			} else {

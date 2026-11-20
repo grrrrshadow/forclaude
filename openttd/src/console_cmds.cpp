@@ -931,10 +931,12 @@ static bool ConTestLevelCrossing(std::span<std::string_view> argv)
  */
 static bool ConTestModularAirport(std::span<std::string_view> argv)
 {
-	if (argv.size() < 5 || argv.size() > 6) {
-		IConsolePrint(CC_HELP, "Build two modular airports and an aircraft flying between them. Usage: 'testmodletiste <x> <y> <x2> <y2> [<jmeno>]'.");
+	if (argv.size() < 5 || argv.size() > 7) {
+		IConsolePrint(CC_HELP, "Build two modular airports and an aircraft flying between them. Usage: 'testmodletiste <x> <y> <x2> <y2> [<jmeno> [bezpadu]]'.");
 		return true;
 	}
+	/* 'bezpadu': the airports without their helipad -- what a plane on a rocket is told there (GetRocketAircraftCannotUseReason()). */
+	const bool no_pad = argv.size() > 6 && argv[6] == "bezpadu";
 	auto px = ParseInteger(argv[1]), py = ParseInteger(argv[2]), qx = ParseInteger(argv[3]), qy = ParseInteger(argv[4]);
 	if (!px.has_value() || !py.has_value() || !qx.has_value() || !qy.has_value()) return false;
 	const std::string wanted = argv.size() > 5 ? std::string(argv[5]) : std::string();
@@ -981,8 +983,10 @@ static bool ConTestModularAirport(std::span<std::string_view> argv)
 			taxi(bx, y + 2, bx, y + 2, Track::Right);
 		}
 		piece(x + 3, y + 3, ModularAirportKind::Hangar, DiagDirection::NW);
-		piece(x + 5, y + 3, ModularAirportKind::Helipad, DiagDirection::NW);
-		taxi(x + 5, y + 3, x + 5, y + 3, Track::Y);
+		if (!no_pad) {
+			piece(x + 5, y + 3, ModularAirportKind::Helipad, DiagDirection::NW);
+			taxi(x + 5, y + 3, x + 5, y + 3, Track::Y);
+		}
 		return st;
 	};
 	Station *first = build(static_cast<uint>(*px), static_cast<uint>(*py));
@@ -9515,14 +9519,25 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", argv[4], *x, *y);
 		}
 	} else if (what == "klikni" && argv.size() > 3) {
-		/* 'klikni <x> <y> [nakup]': a click on the tile as the player's (ClickTile(): a station's window, a depot's, a
+		/* 'klikni <x> <y> [nakup [text]]': a click on the tile as the player's (ClickTile(): a station's window, a depot's, a
 		 * hangar's); with "nakup" the purchase window of the depot or hangar there after it. */
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value()) return true;
 		const TileIndex tile = TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY()));
 		if (_local_company == COMPANY_SPECTATOR && Company::IsValidID(CompanyID::Begin())) SetLocalCompany(CompanyID::Begin());
 		const bool taken = ClickTile(tile);
-		if (argv.size() > 4 && argv[4] == "nakup" && IsDepotTile(tile)) ShowBuildVehicleWindow(tile, GetDepotVehicleType(tile));
+		if (argv.size() > 4 && argv[4] == "nakup" && IsDepotTile(tile)) {
+			ShowBuildVehicleWindow(tile, GetDepotVehicleType(tile));
+			/* 'klikni <x> <y> nakup <text>': its list filtered by the name, as typed into its box. */
+			if (argv.size() > 5) {
+				Window *bw = FindWindowById(WindowClass::BuildVehicle, tile.base());
+				QueryString *box = bw != nullptr ? bw->GetQueryString(WID_BV_FILTER) : nullptr;
+				if (box != nullptr) {
+					box->text.Assign(argv[5]);
+					bw->OnEditboxChanged(WID_BV_FILTER);
+				}
+			}
+		}
 		int depots = 0, buys = 0;
 		for (const Window *win : Window::Iterate()) {
 			if (win->window_class == WindowClass::VehicleDepot) depots++;
