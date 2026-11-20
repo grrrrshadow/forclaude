@@ -127,6 +127,14 @@ Times _eye_window;     ///< and the canvas of the view from the eyes (its window
 Times _ground_waits;   ///< waits for the card laying the ground of the turned map (FinishTurnedGround())
 Times _eye_collected; ///< the view from the eyes collected (the main thread)
 static int _eye_collected_alongside = 0; ///< of them, while the card drew the frame before (EyeView() of viewport.cpp)
+/* Of the collecting, its stages (CabViewCamera::stage) and the time the main thread itself worked in it
+ * (FrameDiaryThreadCpuMs()): the rest of it the thread waited -- for a lock, or for a core. On the phone a collecting
+ * takes 50 to 100 ms where the rig's takes 3 to 6 (the player's diary of 20. 11., #385), and nothing told which. */
+static constexpr int EYE_STAGES = 7;
+static double _eye_stage_ms[EYE_STAGES] = {};
+static int _eye_stages_n = 0;
+static double _eye_cpu_ms = 0;
+static int _eye_cpu_n = 0;
 
 /** The view from the eyes collected since the last time (_eye_collected), and how many of them alongside the card; started again. */
 static std::string EyeCollectedTaken()
@@ -134,6 +142,17 @@ static std::string EyeCollectedTaken()
 	std::string out = _eye_collected.Take();
 	if (_eye_collected_alongside > 0) out += fmt::format(" (soubezne {}x)", _eye_collected_alongside);
 	_eye_collected_alongside = 0;
+	if (_eye_stages_n > 0) {
+		const double n = _eye_stages_n;
+		const double *s = _eye_stage_ms;
+		out += fmt::format(" po castech ms: dlazdice {:.1f}, sber {:.1f}, textura zeme {:.1f}, zem {:.1f}, mosty a objekty {:.1f}, plakaty a postavy {:.1f}, mlha a noc {:.1f}",
+				s[0] / n, s[1] / n, s[2] / n, s[3] / n, s[4] / n, s[5] / n, s[6] / n);
+	}
+	if (_eye_cpu_n > 0) out += fmt::format(", z toho pracoval procesor {:.0f} ms", _eye_cpu_ms / _eye_cpu_n);
+	std::fill(std::begin(_eye_stage_ms), std::end(_eye_stage_ms), 0.0);
+	_eye_stages_n = 0;
+	_eye_cpu_ms = 0;
+	_eye_cpu_n = 0;
 	return out;
 }
 Times _eye_drawn;     ///< and drawn (its thread)
@@ -378,10 +397,34 @@ std::string FrameDiaryEyeTaken()
  * The view from the eyes collected (the main thread), milliseconds.
  * @param alongside while the card drew the frame before
  */
-void FrameDiaryEyeCollected(double ms, bool alongside)
+void FrameDiaryEyeCollected(double ms, bool alongside, const double *stages, double cpu_ms)
 {
 	_eye_collected.Add(ms);
 	if (alongside) _eye_collected_alongside++;
+	if (stages != nullptr) {
+		for (int i = 0; i < EYE_STAGES; i++) _eye_stage_ms[i] += stages[i];
+		_eye_stages_n++;
+	}
+	if (cpu_ms >= 0) {
+		_eye_cpu_ms += cpu_ms;
+		_eye_cpu_n++;
+	}
+}
+
+/** How long the calling thread itself has run so far (not waited), milliseconds; coarse, for sums of many. */
+double FrameDiaryThreadCpuMs()
+{
+#if defined(_WIN32)
+	FILETIME created, exited, kernel, user;
+	if (!GetThreadTimes(GetCurrentThread(), &created, &exited, &kernel, &user)) return 0;
+	const uint64_t k = (static_cast<uint64_t>(kernel.dwHighDateTime) << 32) | kernel.dwLowDateTime;
+	const uint64_t u = (static_cast<uint64_t>(user.dwHighDateTime) << 32) | user.dwLowDateTime;
+	return static_cast<double>(k + u) / 10000.0;
+#else
+	timespec ts;
+	if (clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts) != 0) return 0;
+	return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+#endif
 }
 
 /** And drawn (its thread), milliseconds. */

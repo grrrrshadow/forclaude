@@ -11762,6 +11762,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _house_levels_asked_only;
 		_house_levels_asked_only = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: urovne textur domu {}", _house_levels_asked_only ? "jen chtene" : "vsechny");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "ptatse") {
+		/* 'stojici ptatse 0|1': the card asked whether it keeps a moving thing's picture before the thing is given as
+		 * kept (1), or given as the main thread keeps it, the card telling which it lacks (0). */
+		extern bool _card_kept_asked;
+		_card_kept_asked = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici ptatse {}", _card_kept_asked ? "ano" : "ne");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "pruh") {
+		/* 'stojici pruh 0|1': a vehicle beside the view told by where the card drew it last (1), or by the biggest
+		 * vehicle there can be (0). */
+		extern bool _movers_beside_by_reach;
+		_movers_beside_by_reach = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici pruh {}", _movers_beside_by_reach ? "podle posledniho obrazku" : "podle nejvetsiho vozidla");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "stin") {
 		/* 'stojici stin 0|1': a shadow among the moving things laid under every one of them (1), or by its box (0). */
 		extern bool _mover_shadows_under;

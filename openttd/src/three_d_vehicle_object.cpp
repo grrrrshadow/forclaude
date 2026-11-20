@@ -3605,6 +3605,10 @@ static double _card_things_prepared_ms = 0;
 /** Of those prepared anew, how they came out: nothing of it seen, bigger than the card draws one, not made yet, drawn; and the time of each, ms. */
 /** The things the card had no picture of when given as kept (ThreeDCardVehiclesGiveWhole()), and those of them it lacked more than once since the diary asked. */
 static uint64_t _card_things_missing = 0, _card_things_missing_again = 0;
+/** For the diary: the things kept here that the card, asked, kept no more: given with their shapes (CardVehicle()). */
+static uint64_t _card_things_kept_gone = 0;
+/** The rig ('test3d stojici ptatse 0|1'): the card asked whether it keeps a thing's picture before the thing is given as kept (1; CardVehicle()), or given as the main thread keeps it and the card tells which it lacks (0, as before 20. 11.). */
+bool _card_kept_asked = true;
 static std::unordered_map<uint64_t, int> _card_things_missing_keys;
 static uint64_t _card_things_prepared_how[4] = {};
 static double _card_things_prepared_how_ms[4] = {};
@@ -3695,7 +3699,8 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 		/* Given as the main thread keeps it, whether the card has its picture or not: a thing beside the view is never
 		 * sent to the card, so the card never has it -- asked of the card first, such a thing was prepared with its
 		 * shapes again every frame (the rig on the player's save: 13 of them a pass, half of the gathering). The card
-		 * tells which it lacks when it comes to lay one (ThreeDCardVehiclesGiveWhole()). */
+		 * tells which it lacks when it comes to lay one (ThreeDCardVehiclesGiveWhole()).
+		 * (A vehicle whose picture reaches into the view is asked of the card by who places it, CardKeptGone().) */
 		if (it != _card_vehicles_kept.end()) {
 			it->second.used = _card_vehicles_kept_pass;
 			card = it->second.card;
@@ -3897,14 +3902,15 @@ std::string TakeThreeDCardThingsPrepared()
 	extern uint64_t _lasting_places_reused;
 	/* The gathering of the vehicles by its steps (GatherSplit): of the pieces gone through every eighth timed, their milliseconds. */
 	const GatherSplit &g = _gather_split;
-	const std::string s = fmt::format("{} veci umisteno (z toho {} jak stalo), {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych; sber vozidel po krocich: {} kusu, {} z nich mereno, ty staly {:.2f} ms (stav z GRF a svetla {:.2f}, poloha a natoceni {:.2f}, co kresli karta {:.2f}, polozeni {:.2f}); nejvickrat neudelane: {}",
-			_card_things_placed, _lasting_places_reused, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again,
+	const std::string s = fmt::format("{} veci umisteno (z toho {} jak stalo), {} pripraveno znovu za {:.0f} ms (nic videt {} za {:.0f}, moc velke {} za {:.0f}, jeste neudelane {} za {:.0f}, nakreslene {} za {:.0f}); jeste neudelane bez pripravy {}; karta nemela {}, z toho opakovane {} ruznych, na dotaz uz nedrzela {}; sber vozidel po krocich: {} kusu, {} z nich mereno, ty staly {:.2f} ms (stav z GRF a svetla {:.2f}, poloha a natoceni {:.2f}, co kresli karta {:.2f}, polozeni {:.2f}); nejvickrat neudelane: {}",
+			_card_things_placed, _lasting_places_reused, _card_things_prepared, _card_things_prepared_ms, h[0], hm[0], h[1], hm[1], h[2], hm[2], h[3], hm[3], _card_not_yet_skipped.load(), _card_things_missing, _card_things_missing_again, _card_things_kept_gone,
 			g.pieces, g.timed, g.ms[0], g.ms[1], g.ms[2], g.ms[3], g.ms[4], _card_not_yet_most_what.empty() ? std::string("-") : _card_not_yet_most_what);
 	_gather_split = {};
 	_card_not_yet_most = 0;
 	_card_not_yet_most_what.clear();
 	_card_not_yet_skipped = 0;
 	_card_things_missing = _card_things_missing_again = 0;
+	_card_things_kept_gone = 0;
 	_card_things_missing_keys.clear();
 	_card_things_placed = _card_things_prepared = 0;
 	_lasting_places_reused = 0;
@@ -4114,6 +4120,26 @@ static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, cons
 }
 
 /**
+ * Whether a vehicle of the moving layer given as kept (CardVehicle()) is to be given with its shapes after all: its
+ * picture reaches into the view and the card, asked, keeps that picture no more (ThreeDGpuStandingKeeps()) -- forgotten
+ * here then, so the next asking prepares it. The card's kept pictures are few when the vehicles are big (the map zoomed
+ * in): a place not laid from for a second is given to another, and a vehicle turning into a pose so let go of, or one
+ * kept here from beside the view and never laid, was lacked -- all the moving things gathered and laid a second time
+ * in the frame (the player's diary of 20. 11., #385, the map at 2x and 4x: "karta nemela" 200 to 480 in 5 s, places
+ * given anew 460 times, the layer laid 199 times in 110 frames). Only one reaching into the view is asked: one beside
+ * it the card lays nothing of, kept or not.
+ */
+static bool CardKeptGone(const ThreeDGpuStandingVehicle &card, double x, double y, int z)
+{
+	if (!_card_kept_asked || !_card_vehicles_as_kept) return false;
+	extern bool TurnedMoverReachesFrame(double x, double y, int z, int left, int top, int width, int height);
+	if (!TurnedMoverReachesFrame(x, y, z, card.left, card.top, card.width, card.height) || ThreeDGpuStandingKeeps(card.key)) return false;
+	_card_vehicles_kept.erase(card.key);
+	_card_things_kept_gone++;
+	return true;
+}
+
+/**
  * What the card drew of a vehicle last, to stand in while its look now is not made yet (CardMade::NotYet: a frame of a
  * horse's walk, a finer texture after a zoom): laid by its key as the card keeps it, nothing drawn when the card does
  * not keep it any more -- no shapes, so nothing of the object is touched; nullptr when the card drew none of it.
@@ -4277,7 +4303,11 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	if (on_card) {
 		GatherStep step(3);
 		const PictureToMake request = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk);
-		const CardMade made = CardVehicle(request, place.card, place.card_lights);
+		CardMade made = CardVehicle(request, place.card, place.card_lights);
+		/* Given as kept, its picture reaching into the view, and the card keeps that picture no more: with its shapes. */
+		if (made == CardMade::Drawn && place.card != nullptr && place.card->kept_only && CardKeptGone(*place.card, ox, oy, v->z_pos)) {
+			made = CardVehicle(request, place.card, place.card_lights);
+		}
 		place.on_card = made != CardMade::TooBig;
 		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card, zoom);
 		if (made == CardMade::Drawn && lasting) lasting_drawn = true;

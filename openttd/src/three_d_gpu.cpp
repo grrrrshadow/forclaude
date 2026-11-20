@@ -6677,8 +6677,12 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					if (const uint64_t after = _gl_calls; after >= vehicle_calls) _gl_calls_vehicles += after - vehicle_calls;
 					_gl_counting_vehicles = false;
 					if (!shrunk) {
-						if (_standing_failed_keys.size() > 4096) _standing_failed_keys.clear();
-						_standing_failed_keys.insert(v.key);
+						{
+							/* (Read by the main thread too, ThreeDGpuStandingKeeps().) */
+							std::lock_guard failed_lock(_standing_kept_mutex);
+							if (_standing_failed_keys.size() > 4096) _standing_failed_keys.clear();
+							_standing_failed_keys.insert(v.key);
+						}
 					}
 					if (s.moving) {
 						_gpu_moving_drawn++;
@@ -8580,7 +8584,8 @@ void ThreeDGpuViewPicturesWait(void (*wait)(void *fence))
 bool ThreeDGpuStandingKeeps(uint64_t key)
 {
 	std::lock_guard lock(_standing_kept_mutex);
-	return _standing_kept_keys.contains(key);
+	/* (One whose picture the card could not make it keeps as nothing: not to be given with its shapes again.) */
+	return _standing_kept_keys.contains(key) || _standing_failed_keys.contains(key);
 }
 
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing)

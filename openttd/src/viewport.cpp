@@ -9124,8 +9124,43 @@ static const DrawPixelInfo *_turned_movers_frame = nullptr;
  * card all the same, which then laid nothing of it (the player's diary of 17. 11.: at the nearest zoom 68 things placed
  * a frame and one laid, the gathering 17 ms of the frame; on the whole map a third of the time in the layer).
  */
+/**
+ * Whether the picture of a moving thing gathered for the turned view (AddTurnedMovers()) reaches into the piece drawn,
+ * as AddTurnedStandingLikeness() lays it: its point of the world, its picture's corner from it and its size, pixels of
+ * the zoom. A little about it counts (its place on the rails, on a round curve); not gathering for a piece: yes.
+ */
+bool TurnedMoverReachesFrame(double x, double y, int z, int left, int top, int width, int height)
+{
+	if (_turned_movers_frame == nullptr) return true;
+	const DrawPixelInfo &f = *_turned_movers_frame;
+	double vx, vy;
+	ProjectTurnedF(x, y, z, vx, vy);
+	const double scale = 1.0 / (1 << to_underlying(f.zoom));
+	const int fw = UnScaleByZoom(f.width, f.zoom), fh = UnScaleByZoom(f.height, f.zoom);
+	const int px = static_cast<int>(std::lround((vx - f.left) * scale)) + left, py = static_cast<int>(std::lround((vy - f.top) * scale)) + top;
+	static constexpr int ABOUT = 24;
+	return px < fw + ABOUT && py < fh + ABOUT && px + width > -ABOUT && py + height > -ABOUT;
+}
+
+/** The rig ('test3d stojici pruh 0|1'): a vehicle beside the piece told by where the card drew it last (1; TurnedVehicleBesideFrame()), or by the biggest vehicle there can be (0, as before 20. 11.). */
+bool _movers_beside_by_reach = true;
+
 bool TurnedVehicleBesideFrame(const Vehicle *v)
 {
+	/* By where the card drew it the last time (CardReachOf(): its picture's rectangle from its own point), and as much
+	 * again about it for its turning: the distance of the biggest vehicle there can be is four and a half tiles
+	 * whatever the zoom -- zoomed in, many times the view, and every vehicle within it was placed and prepared for
+	 * nothing, then kept here as if the card had its picture (the player's diary of 20. 11., #385: the card lacked
+	 * 200 to 480 of them in 5 s at 2x and 4x). One not drawn yet by the biggest. */
+	extern bool CardReachOf(VehicleID id, Rect &reach);
+	Rect reach;
+	if (_movers_beside_by_reach && _turned_movers_frame != nullptr && CardReachOf(v->index, reach)) {
+		const DrawPixelInfo &f = *_turned_movers_frame;
+		double vx, vy;
+		ProjectTurnedF(v->x_pos, v->y_pos, v->z_pos, vx, vy);
+		const int about = std::max({reach.right - reach.left, reach.bottom - reach.top, static_cast<int>(TILE_PIXELS * ZOOM_BASE)});
+		return vx + reach.right + about < f.left || vy + reach.bottom + about < f.top || vx + reach.left - about > f.left + f.width || vy + reach.top - about > f.top + f.height;
+	}
 	extern bool TurnedMoverBesideFrame(int x, int y, int z);
 	return TurnedMoverBesideFrame(v->x_pos, v->y_pos, v->z_pos);
 }
@@ -22213,8 +22248,10 @@ static bool EyeView(const Vehicle *v, const FirstPersonEye *walker, int width, i
 		}
 		std::unique_ptr<EyeFrame> f = NewEyeFrame(&camera);
 		const auto collecting = std::chrono::steady_clock::now();
+		const double cpu_before = FrameDiaryThreadCpuMs();
+		std::fill(std::begin(camera.stage), std::end(camera.stage), 0.0);
 		const bool collected = CollectEyeFrame(v, walker, width, height, camera, *f);
-		FrameDiaryEyeCollected(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - collecting).count(), alongside);
+		FrameDiaryEyeCollected(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - collecting).count(), alongside, camera.stage, FrameDiaryThreadCpuMs() - cpu_before);
 		if (alongside) {
 			{
 				std::lock_guard lock(_eye_mutex);

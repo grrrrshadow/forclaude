@@ -36,7 +36,8 @@ struct FrameDiaryParts {
 
 void FrameDiaryDraw(const FrameDiaryParts &parts);
 void FrameDiaryGameTick(double ms);
-void FrameDiaryEyeCollected(double ms, bool alongside = false);
+void FrameDiaryEyeCollected(double ms, bool alongside = false, const double *stages = nullptr, double cpu_ms = -1.0);
+double FrameDiaryThreadCpuMs();
 void FrameDiaryEyeDrawn(double ms);
 void FrameDiaryEyeCard(bool on_card, double prepare_ms, double card_ms, size_t corners);
 void FrameDiaryWindowsTimers(double ms);
