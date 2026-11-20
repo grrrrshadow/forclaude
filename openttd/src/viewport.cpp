@@ -151,6 +151,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include <mutex>
 #include <condition_variable>
 #include <map>
+#include <set>
 #include <unordered_map>
 #include <tuple>
 #include <atomic>
@@ -14239,7 +14240,8 @@ struct EyeFrame {
 	std::vector<uint32_t> pixels;
 	std::vector<float> depth;                 ///< 1/depth of every pixel: the bigger the nearer, 0 nothing
 	std::vector<EyePass> passes;              ///< in the order they are drawn
-	std::deque<std::vector<uint32_t>> colours; ///< textures of this frame alone the triangles point to (a colour, the far land's)
+	std::deque<std::vector<uint32_t>> colours; ///< textures of this frame alone the triangles point to (the far land's)
+	std::deque<uint32_t> single_colours;      ///< textures of one colour of this frame alone (EyeColour()): no heap block each (the phone's Wine, 20. 11.)
 	std::deque<CabTexture> sprites;           ///< sprites painted for this frame alone (a bridge's, a foundation's)
 	std::deque<EyeCanvas> canvases;           ///< pictures of its own drawn while collecting (a tunnel seen in)
 	std::vector<uint32_t> ground;             ///< the north-up texture of the ground ahead, drawn for it alone (else a kept one, _eye_grounds)
@@ -14378,7 +14380,7 @@ bool _eye_frame_on_card = true;
 static const uint32_t *EyeColour(uint32_t &colour)
 {
 	if (_eye_frame == nullptr) return &colour;
-	return &_eye_frame->colours.emplace_back(1, colour).front();
+	return &_eye_frame->single_colours.emplace_back(colour);
 }
 
 /** A sprite texture of this frame alone (not kept for the next, CabSpriteTexture()): the frame's while one is collected, else the scratch given. */
@@ -14845,9 +14847,10 @@ static void CabDrawSolid(const CabCanvas &cv, const CabEye &eye, std::initialize
 {
 	uint32_t px = colour.data;
 	const uint32_t *tex = EyeColour(px);
-	std::vector<CabPoint> poly;
+	thread_local std::vector<CabPoint> poly;
+	poly.clear();
 	for (const auto &p : pts) poly.push_back(CabToEye(eye, p[0], p[1], p[2], 0.5, 0.5));
-	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex, 1, 1, std::move(poly), eye, false);
+	CabDrawPolygonIn(cv.dst, cv.zb, cv.w, cv.h, tex, 1, 1, poly, eye, false, 256);
 }
 
 /** A colour darker or lighter: each part times the factor. */
@@ -14953,13 +14956,14 @@ static void CabDrawDressed(const CabCanvas &cv, const CabEye &eye, const CabText
 {
 	if (tex.w <= 0 || tex.h <= 0) return;
 	const double scale = 1.0 / ZOOM_BASE;
-	std::vector<CabPoint> poly;
+	thread_local std::vector<CabPoint> poly;
+	poly.clear();
 	for (const auto &p : pts) {
 		double cx, cy;
 		RemapCoordsF(p[3], p[4], p[5], cx, cy);
 		poly.push_back(CabToEye(eye, p[0], p[1], p[2], (cx - tex.ox) * scale, (cy - tex.oy) * scale));
 	}
-	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex.px.data(), tex.w, tex.h, std::move(poly), eye, fill_holes);
+	CabDrawPolygonIn(cv.dst, cv.zb, cv.w, cv.h, tex.px.data(), tex.w, tex.h, poly, eye, fill_holes, 256);
 }
 
 /** How thick the deck of a bridge is, in units of height below the track: thin, as a vehicle passes a level under it. */
@@ -15742,9 +15746,10 @@ static const CabTexture &CabStoneTexture()
 static void CabDrawStone(const CabCanvas &cv, const CabEye &eye, std::initializer_list<std::array<double, 5>> pts)
 {
 	const CabTexture &stone = CabStoneTexture();
-	std::vector<CabPoint> poly;
+	thread_local std::vector<CabPoint> poly;
+	poly.clear();
 	for (const auto &p : pts) poly.push_back(CabToEye(eye, p[0], p[1], p[2], std::clamp(p[3], 0.0, stone.w - 0.01), std::clamp(p[4], 0.0, stone.h - 0.01)));
-	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, stone.px.data(), stone.w, stone.h, std::move(poly), eye, false);
+	CabDrawPolygonIn(cv.dst, cv.zb, cv.w, cv.h, stone.px.data(), stone.w, stone.h, poly, eye, false, 256);
 }
 
 /** How high a level of the land is from the eyes, metres (5 m, EYE_LEVEL_STRETCH). */
@@ -15775,9 +15780,10 @@ static void CabDrawConcrete(const CabCanvas &cv, const CabEye &eye, std::initial
 	const uint32_t *px = textured ? tex->px.data() : EyeColour(flat);
 	const int tw = textured ? tex->w : 1, th = textured ? tex->h : 1;
 	if (textured && _eye_frame != nullptr) _eye_frame->kept[px] = tex->uid.value;
-	std::vector<CabPoint> poly;
+	thread_local std::vector<CabPoint> poly;
+	poly.clear();
 	for (const auto &p : pts) poly.push_back(CabToEye(eye, p[0], p[1], p[2], p[3] / SIZE_M * tw, p[4] / SIZE_M * th));
-	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, px, tw, th, std::move(poly), eye, CAB_REPEAT);
+	CabDrawPolygonIn(cv.dst, cv.zb, cv.w, cv.h, px, tw, th, poly, eye, CAB_REPEAT, 256);
 }
 
 /**
@@ -15898,8 +15904,8 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 			const auto &p = _cab_tunnel_profile[i], &q = _cab_tunnel_profile[i + 1];
 			auto a = CabTunnelPoint(t, sa, p[0], p[1]), b = CabTunnelPoint(t, sb, p[0], p[1]), c = CabTunnelPoint(t, sb, q[0], q[1]), d = CabTunnelPoint(t, sa, q[0], q[1]);
 			const double v0 = std::min(round_m[i] * CAB_WALL_PX_M, tex.h - 0.01), v1 = std::min(round_m[i + 1] * CAB_WALL_PX_M, tex.h - 0.01);
-			std::vector<CabPoint> poly{CabToEye(eye, a[0], a[1], a[2], 0, v0), CabToEye(eye, b[0], b[1], b[2], tu1, v0), CabToEye(eye, c[0], c[1], c[2], tu1, v1), CabToEye(eye, d[0], d[1], d[2], 0, v1)};
-			CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex.px.data(), tex.w, tex.h, std::move(poly), eye, false, static_cast<uint>(std::lround(256 * light)));
+			const std::initializer_list<CabPoint> poly{CabToEye(eye, a[0], a[1], a[2], 0, v0), CabToEye(eye, b[0], b[1], b[2], tu1, v0), CabToEye(eye, c[0], c[1], c[2], tu1, v1), CabToEye(eye, d[0], d[1], d[2], 0, v1)};
+			CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex.px.data(), tex.w, tex.h, poly, eye, false, static_cast<uint>(std::lround(256 * light)));
 		}
 		auto f0 = CabTunnelPoint(t, sa, -CAB_TUNNEL_HALF, 0), f1 = CabTunnelPoint(t, sb, -CAB_TUNNEL_HALF, 0), f2 = CabTunnelPoint(t, sb, CAB_TUNNEL_HALF, 0), f3 = CabTunnelPoint(t, sa, CAB_TUNNEL_HALF, 0);
 		CabDrawSolid(cv, eye, {f0, f1, f2, f3}, CabShade(floor, light));
@@ -16176,8 +16182,20 @@ bool ThreeDStationStandsOn(const TileInfo *ti)
 }
 
 /** A figure standing in the view from the eyes (the clay town's mushrooms, DrawThemedTrees()): a billboard of its picture. */
+/**
+ * A figure's name kept for the view from the eyes, each once (a few hundred kinds): a figure collected each frame points
+ * to it, no heap block a figure of a long name (the phone's Wine, 20. 11.). Collected on one thread, as _cab_figures.
+ */
+static std::string_view CabFigureName(std::string_view name)
+{
+	static std::set<std::string, std::less<>> names;
+	auto it = names.find(name);
+	if (it == names.end()) it = names.emplace(name).first;
+	return *it;
+}
+
 struct CabFigure {
-	std::string name; ///< the figure of the indices
+	std::string_view name; ///< the figure of the indices (CabFigureName())
 	float size;       ///< its scale
 	double x, y, z;   ///< where it stands, world units
 	float facing;     ///< which way it faces, degrees as the figures count it
@@ -16263,7 +16281,7 @@ static constexpr float CAB_FIGURE_SCALE = THREE_D_EYE_PEOPLE_SCALE;
  */
 void AddCabFigure(std::string_view name, float size, double x, double y, double z, float facing, int frame, int state)
 {
-	CabFigure f{std::string(name), size, x, y, z, facing, frame};
+	CabFigure f{CabFigureName(name), size, x, y, z, facing, frame};
 	f.state = state;
 	_cab_figures.push_back(std::move(f));
 }
@@ -16275,7 +16293,7 @@ void AddCabFigure(std::string_view name, float size, double x, double y, double 
  */
 void AddCabGroundFigure(std::string_view name, double x, double y, double z, float facing)
 {
-	CabFigure f{std::string(name), 1.0f, x, y, z, facing, 0};
+	CabFigure f{CabFigureName(name), 1.0f, x, y, z, facing, 0};
 	f.lies = true;
 	_cab_figures.push_back(std::move(f));
 }
@@ -16346,7 +16364,7 @@ static void DrawEyeWires(const CabCanvas &cv, const CabEye &eye)
  */
 void AddCabWaterFigure(std::string_view name, float size, double x, double y, double z, double base, float facing, int frame, int state, bool glows, float pitch)
 {
-	CabFigure f{std::string(name), size, x, y, z, facing, frame};
+	CabFigure f{CabFigureName(name), size, x, y, z, facing, frame};
 	f.state = state;
 	f.base = base;
 	f.pitch = pitch;
@@ -16364,7 +16382,7 @@ void AddCabWaterFigure(std::string_view name, float size, double x, double y, do
  */
 void AddCabTumbler(std::string_view name, float size, double x, double y, double z, float facing, int frame, float pitch, float roll)
 {
-	CabFigure f{std::string(name), size, x, y, z, facing, frame};
+	CabFigure f{CabFigureName(name), size, x, y, z, facing, frame};
 	f.pitch = pitch;
 	f.roll = roll;
 	f.missile = true;
@@ -16381,7 +16399,7 @@ void AddCabTumbler(std::string_view name, float size, double x, double y, double
  */
 void AddCabMissile(std::string_view name, double x, double y, double z, float facing, float pitch)
 {
-	CabFigure f{std::string(name), 1.0f, x, y, z, facing, 0};
+	CabFigure f{CabFigureName(name), 1.0f, x, y, z, facing, 0};
 	f.pitch = pitch;
 	f.missile = true;
 	_cab_figures.push_back(std::move(f));
@@ -16393,7 +16411,7 @@ void AddCabMissile(std::string_view name, double x, double y, double z, float fa
  */
 static void AddCabVehicle(const ThreeDEyeVehicle &ev, bool own_car)
 {
-	CabFigure f{std::string(), ev.scale, ev.x, ev.y, ev.z, ev.facing, 0};
+	CabFigure f{std::string_view(), ev.scale, ev.x, ev.y, ev.z, ev.facing, 0};
 	f.obj = ev.obj;
 	f.along = ev.along;
 	f.pitch = ev.pitch;
@@ -16409,7 +16427,7 @@ static void AddCabVehicle(const ThreeDEyeVehicle &ev, bool own_car)
 /** A vehicle of sprites only in the view from the eyes: its likeness's solid (GetThreeDEyeLikeness()), always by its triangles. */
 static void AddCabLikeness(const ThreeDEyeLikeness &el, double z)
 {
-	CabFigure f{std::string(), 1.0f, el.x, el.y, z, el.facing, 0};
+	CabFigure f{std::string_view(), 1.0f, el.x, el.y, z, el.facing, 0};
 	f.along = el.along;
 	f.pitch = el.pitch;
 	f.likeness = el.solid;
@@ -16460,7 +16478,7 @@ static ThreeDEyeVehicle CabFigureVehicle(const CabFigure &fg)
  */
 static void AddCabPlant(std::string_view name, float scale, float stretch, double x, double y, double z, float facing, float rise_x = 0, float rise_y = 0)
 {
-	CabFigure &f = _cab_figures.emplace_back(CabFigure{std::string(name), scale, x, y, z, facing, 0, stretch, true});
+	CabFigure &f = _cab_figures.emplace_back(CabFigure{CabFigureName(name), scale, x, y, z, facing, 0, stretch, true});
 	f.rise_x = rise_x;
 	f.rise_y = rise_y;
 }
@@ -16478,8 +16496,24 @@ struct EyeFoundationTile {
 	int top_z;       ///< and the height of that ground's lowest corner
 };
 
-/** The ground of the tiles in the view from the eyes by their place (x | y << 16): its slope and the height of its lowest corner, on a foundation its top's. */
-using EyeTileGrounds = std::unordered_map<uint32_t, std::pair<Slope, int>>;
+/**
+ * The ground of the tiles in the view from the eyes by their place: its slope and the height of its lowest corner, on a
+ * foundation its top's. A grid over the rectangle they lie in, not a map of a heap block a tile (the phone's Wine, 20. 11.:
+ * the night's view from the eyes collected 52 ms, a third of its heap blocks these).
+ */
+struct EyeTileGrounds {
+	static constexpr int NONE = INT32_MIN; ///< a height of a place not collected
+	int x0 = 0, y0 = 0, w = 0, h = 0;
+	std::vector<std::pair<Slope, int>> at; ///< by (x - x0) + (y - y0) * w; NONE its height not collected
+
+	/** The ground of a place, nullptr not collected. */
+	const std::pair<Slope, int> *Find(int x, int y) const
+	{
+		if (x < this->x0 || y < this->y0 || x >= this->x0 + this->w || y >= this->y0 + this->h) return nullptr;
+		const std::pair<Slope, int> &g = this->at[(x - this->x0) + static_cast<size_t>(y - this->y0) * this->w];
+		return g.second == NONE ? nullptr : &g;
+	}
+};
 
 /** The corner of a tile at a point of its square, x and y 0 or TILE_SIZE from its north corner (the ground's corners, 4. of CollectEyeFrame()). */
 static Corner TileCornerAt(int cx, int cy)
@@ -16582,8 +16616,8 @@ static void DrawEyeDecal(const CabCanvas &cv, const CabEye &eye, const ThreeDVeh
 	if (_eye_frame != nullptr) _eye_frame->kept[tex->px.data()] = tex->uid.value;
 	/* A half texel in from its edges. */
 	const double u0 = 0.5, u1 = tex->w - 0.5, v0 = 0.5, v1 = tex->h - 0.5;
-	std::vector<CabPoint> poly = {CabToEye(eye, ax, ay, z0, u0, v1), CabToEye(eye, bx, by, z0, u1, v1), CabToEye(eye, bx, by, z1, u1, v0), CabToEye(eye, ax, ay, z1, u0, v0)};
-	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex->px.data(), tex->w, tex->h, std::move(poly), eye, 0, light);
+	const std::initializer_list<CabPoint> poly = {CabToEye(eye, ax, ay, z0, u0, v1), CabToEye(eye, bx, by, z0, u1, v1), CabToEye(eye, bx, by, z1, u1, v0), CabToEye(eye, ax, ay, z1, u0, v0)};
+	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex->px.data(), tex->w, tex->h, poly, eye, 0, light);
 }
 
 /**
@@ -16665,8 +16699,7 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 	const std::span<const std::string> graffiti = GetThreeDGraffiti();
 	const std::span<const std::string> spalls = GetThreeDConcreteSpalls();
 	auto ground_of = [&grounds](int x, int y) -> std::pair<Slope, int> {
-		auto it = grounds.find(static_cast<uint32_t>(x) | static_cast<uint32_t>(y) << 16);
-		if (it != grounds.end()) return it->second;
+		if (const std::pair<Slope, int> *g = grounds.Find(x, y); g != nullptr) return *g;
 		auto [s, z] = GetFoundationPixelSlope(TileXY(x, y));
 		return {s, z};
 	};
@@ -16750,12 +16783,13 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 				const double u_l_m = (lx * rx + ly * ry) / OBJECT_UNITS_PER_METRE;
 				const double u_l = (u_l_m / repeat_w_m - std::floor(u_l_m / repeat_w_m)) * tw;
 				const double u_r = u_l + edge_m / repeat_w_m * tw;
-				std::vector<CabPoint> poly;
+				thread_local std::vector<CabPoint> poly;
+				poly.clear();
 				poly.push_back(CabToEye(eye, lx, ly, EyeLevelZ(foot_l), u_l, v_of(foot_l)));
 				poly.push_back(CabToEye(eye, rwx, rwy, EyeLevelZ(foot_r), u_r, v_of(foot_r)));
 				if (top[r] > foot_r) poly.push_back(CabToEye(eye, rwx, rwy, EyeLevelZ(top[r]), u_r, v_of(top[r])));
 				if (top[l] > foot_l) poly.push_back(CabToEye(eye, lx, ly, EyeLevelZ(top[l]), u_l, v_of(top[l])));
-				CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, px, tw, th, std::move(poly), eye, CAB_REPEAT, light);
+				CabDrawPolygonIn(cv.dst, cv.zb, cv.w, cv.h, px, tw, th, poly, eye, CAB_REPEAT, light);
 			}
 			if (fmin > EYE_WALL_DETAIL_UNITS) continue;
 			/* Along it from the left: a fraction of its length to the world, and its top and its foot there (the game's z). */
@@ -18096,9 +18130,10 @@ static void DrawEyeWaterBed(const CabEye &eye, uint32_t *dst, float *zb, int wid
 						const double light = (0.55 + 0.45 * level) * (1.0 - 0.3 * std::clamp(low / EyeLevelZ(2.0 * TILE_HEIGHT), 0.0, 1.0));
 						colours.push_back(Colour(static_cast<uint8_t>(168 * light), static_cast<uint8_t>(150 * light), static_cast<uint8_t>(104 * light)).data);
 						const uint32_t *tex = EyeColour(colours.back());
-						std::vector<CabPoint> poly;
+						thread_local std::vector<CabPoint> poly;
+						poly.clear();
 						for (const auto *v : tri) poly.push_back(CabToEye(eye, (*v)[0], (*v)[1], (*v)[2], 0, 0));
-						CabDrawPolygon(dst, zb, width, height, tex, 1, 1, std::move(poly), eye, 0);
+						CabDrawPolygonIn(dst, zb, width, height, tex, 1, 1, poly, eye, 0, 256);
 					}
 				}
 			}
@@ -18903,7 +18938,10 @@ static void DrawEyeVehicleGlass(const CabEye &eye, uint32_t *dst, float *zb, int
 			if (!ThreeDVehicleShape::Shown(tn < shape->night_part.size() ? shape->night_part[tn] : 0, parts)) continue;
 			uint32_t glass = tn < shape->night_colour.size() ? shape->night_colour[tn] : Colour(255, 244, 216).data;
 			const uint32_t *glass_tex = EyeColour(glass);
-			std::vector<CabPoint> poly;
+			/* Its corners into a list kept for them, none made a triangle (the phone's Wine, 20. 11.: at night the eyes' collecting
+			 * of 52 ms, its "haze and night" 24 ms -- a heap block for every lamp's triangle). */
+			thread_local std::vector<CabPoint> poly;
+			poly.clear();
 			for (int k = 0; k < 3; k++) {
 				const uint32_t i = shape->night_tri[t + k];
 				if (i >= corners) break;
@@ -18916,7 +18954,7 @@ static void DrawEyeVehicleGlass(const CabEye &eye, uint32_t *dst, float *zb, int
 				wy += dy / d * lift;
 				poly.push_back(CabToEye(eye, wx, wy, wz, 0, 0));
 			}
-			if (poly.size() == 3) CabDrawPolygon(dst, zb, width, height, glass_tex, 1, 1, std::move(poly), eye, false);
+			if (poly.size() == 3) CabDrawPolygonIn(dst, zb, width, height, glass_tex, 1, 1, poly, eye, false, 256);
 		}
 	}
 }
@@ -20756,13 +20794,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				for (int i = 0; i < 4; i++) {
 					less_hull({HullPoint{x0 + cxs[i], y0 + cys[i], static_cast<double>(t.z)}, HullPoint{x0 + cxs[(i + 1) % 4], y0 + cys[(i + 1) % 4], static_cast<double>(t.z)}, HullPoint{x0 + mid, y0 + mid, static_cast<double>(t.z)}},
 							[&](const std::vector<HullPoint> &piece) {
-						std::vector<CabPoint> poly;
+						thread_local std::vector<CabPoint> poly;
+						poly.clear();
 						for (const HullPoint &q : piece) {
 							double cx, cy;
 							RemapCoordsF(q[0], q[1], q[2], cx, cy);
 							poly.push_back(CabToEye(eye, q[0], q[1], EyeLevelZ(q[2]) - sink, cx * scale - gl, cy * scale - gt));
 						}
-						CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, std::move(poly), eye, ground_fill);
+						CabDrawPolygonIn(dst, zb, width, height, gpx, gw, gh, poly, eye, ground_fill, 256);
 					});
 				}
 				continue;
@@ -20788,9 +20827,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				for (const EyeRoadMark &m : marks) {
 					mark_colours.push_back(m.colour.data);
 					const uint32_t *tex = EyeColour(mark_colours.back());
-					std::vector<CabPoint> poly;
+					thread_local std::vector<CabPoint> poly;
+					poly.clear();
 					for (const auto &c : m.corner) poly.push_back(CabToEye(eye, c[0], c[1], EyeLevelZ(c[2]) + LIFT, 0, 0));
-					CabDrawPolygon(dst, zb, width, height, tex, 1, 1, std::move(poly), eye, 0);
+					CabDrawPolygonIn(dst, zb, width, height, tex, 1, 1, poly, eye, 0, 256);
 				}
 			};
 			if (ground_kept) {
@@ -20828,14 +20868,26 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	const CabCanvas cv{dst, zb, width, height};
 	/* The sides of the foundations: retaining walls of bricks and of stone (DrawEyeRetainingWalls()). */
 	{
-		std::vector<EyeFoundationTile> founded;
-		EyeTileGrounds grounds;
-		grounds.reserve(tiles.size());
+		thread_local std::vector<EyeFoundationTile> founded;
+		thread_local EyeTileGrounds grounds;
+		founded.clear();
+		int x0 = INT32_MAX, y0 = INT32_MAX, x1 = INT32_MIN, y1 = INT32_MIN;
 		for (const CabTile &t : tiles) {
-			grounds.emplace(static_cast<uint32_t>(t.x) | static_cast<uint32_t>(t.y) << 16, std::pair{t.slope, t.z});
+			x0 = std::min(x0, t.x);
+			y0 = std::min(y0, t.y);
+			x1 = std::max(x1, t.x);
+			y1 = std::max(y1, t.y);
 			if (t.foundation) founded.push_back({TileXY(t.x, t.y), t.slope, t.z});
 		}
-		DrawEyeRetainingWalls(cv, eye, founded, grounds);
+		if (!founded.empty()) {
+			grounds.x0 = x0;
+			grounds.y0 = y0;
+			grounds.w = x1 - x0 + 1;
+			grounds.h = y1 - y0 + 1;
+			grounds.at.assign(static_cast<size_t>(grounds.w) * grounds.h, {SLOPE_FLAT, EyeTileGrounds::NONE});
+			for (const CabTile &t : tiles) grounds.at[(t.x - x0) + static_cast<size_t>(t.y - y0) * grounds.w] = {t.slope, t.z};
+			DrawEyeRetainingWalls(cv, eye, founded, grounds);
+		}
 	}
 	/* The wires of our catenary the tiles put (AddCabWire()), as the fishing rod's line. */
 	DrawEyeWires(cv, eye);
@@ -21999,6 +22051,7 @@ static void DrawEyeFrame(EyeFrame &f)
 			f.dropped = true;
 			f.passes.clear();
 			f.colours.clear();
+			f.single_colours.clear();
 			f.sprites.clear();
 			f.canvases.clear();
 			f.kept.clear();
@@ -22044,6 +22097,7 @@ static void DrawEyeFrame(EyeFrame &f)
 	/* What the frame pointed to is let go of here: nothing of it is read again. */
 	f.passes.clear();
 	f.colours.clear();
+	f.single_colours.clear();
 	f.sprites.clear();
 	f.canvases.clear();
 	f.kept.clear();
@@ -22112,6 +22166,7 @@ static std::unique_ptr<EyeFrame> NewEyeFrame(const void *client)
 	}
 	f->passes.clear();
 	f->colours.clear();
+	f->single_colours.clear();
 	f->sprites.clear();
 	f->canvases.clear();
 	f->kept.clear();
