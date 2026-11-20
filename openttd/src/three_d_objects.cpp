@@ -5294,6 +5294,45 @@ static const TrackArcMaterials *TrackArcMaterialsOf(bool concrete)
 	return m.bed != nullptr && m.sleeper != nullptr ? &m : nullptr;
 }
 
+/**
+ * The patches of grass over a straight piece of an overgrown track (kolej_porost_rovna_*, objekty/nase/porost.py) for
+ * the arcs (GetThreeDTrackArc()): read of its file once -- its corners in metres (along x from the piece's middle, across
+ * y, up z), their u and v, its triangles, its picture of grass.
+ */
+struct TrackArcGrass {
+	bool tried = false;
+	ThreeDTextureBytes png;
+	std::vector<float> pos, uv;
+	std::vector<uint32_t> tri;
+};
+static TrackArcGrass _track_arc_grass[2]; // the stages 1 and 2 (GetTrackOvergrowthStage())
+
+/** The patches of grass of a stage of overgrowth (1, 2), nullptr without them. */
+static const TrackArcGrass *TrackArcGrassOf(uint stage)
+{
+	if (stage < 1 || stage > 2) return nullptr;
+	TrackArcGrass &g = _track_arc_grass[stage - 1];
+	if (!g.tried) {
+		g.tried = true;
+		const std::string name = fmt::format("kolej_porost_rovna_{}", stage);
+		const ThreeDVehicleObject *fig = GetThreeDFigure(name);
+		GlbMesh mesh;
+		if (fig != nullptr && ReadGlbMesh(fig->file, mesh, true) && mesh.uv.size() / 2 == mesh.pos.size() / 3) {
+			for (const GlbTexture &tex : mesh.textures) {
+				if (tex.png != nullptr) {
+					g.png = tex.png;
+					break;
+				}
+			}
+			g.pos = std::move(mesh.pos);
+			g.uv = std::move(mesh.uv);
+			g.tri = std::move(mesh.tri);
+		}
+		if (g.png == nullptr || g.tri.empty()) Debug(misc, 0, "3D track: no patches of grass of {} for the arcs", name);
+	}
+	return g.png != nullptr && !g.tri.empty() ? &g : nullptr;
+}
+
 /** An arc of our track made (GetThreeDTrackArc()), kept by the shape of its centre line; let go of when not drawn for a while. */
 struct TrackArcMade {
 	std::unique_ptr<ThreeDObject> obj;
@@ -5313,9 +5352,11 @@ static bool LazyPending(const void *of);
  * made here, as the pieces of the bridges are (PlaceIndustryPart()), in the world's units from the tile's north corner,
  * its foot the tile's ground (a round tile is flat); drawn as a house is, from above and from the eyes.
  * @param concrete concrete sleepers (an electrified track)
+ * @param overgrown its stage of overgrowth (GetTrackOvergrowthStage()) on the turned map: 1 and 2 our patches of grass
+ *                  over it, as over the straight pieces (the player, 21. 11.: "take the grass on the curves"); 0 none
  * @return nullptr: the piece is not drawn round (straight within its tile), or the pictures are not there
  */
-const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete)
+const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete, uint overgrown)
 {
 	/* The straight piece's measures (koleje.py), metres; across as wide as the track is (ThreeDTrackWidth(): the wide
 	 * one with the vehicles at the original size), its pictures the same (the wide piece's are the narrow one's
@@ -5329,6 +5370,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 	const double sleeper_w = concrete ? 0.28 : 0.26;
 	const TrackArcMaterials *mats = TrackArcMaterialsOf(concrete);
 	if (mats == nullptr) return nullptr;
+	const TrackArcGrass *grass = overgrown != 0 ? TrackArcGrassOf(overgrown) : nullptr;
 	/* Its centre line, about every half metre: none for a piece straight within its tile. */
 	const double units = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
 	std::vector<RoundTrackPoint> line = RoundTrackCentreLine(tile, track, 0.5 * units);
@@ -5343,6 +5385,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 	mix(to_underlying(track));
 	mix(concrete ? 1 : 0);
 	mix(static_cast<uint64_t>(std::lround(width * 100)));
+	mix(grass != nullptr ? overgrown : 0);
 	for (const RoundTrackPoint &p : line) {
 		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.x * 64))));
 		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.y * 64))));
@@ -5392,14 +5435,19 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 
 	auto made = std::make_unique<ThreeDObject>();
 	ThreeDObject &o = *made;
-	o.name = fmt::format("kolej_oblouk_{}_{}{}", tile.base(), to_underlying(track), width > 1.0 ? "_siroka" : "");
+	o.name = fmt::format("kolej_oblouk_{}_{}{}{}", tile.base(), to_underlying(track), width > 1.0 ? "_siroka" : "", grass != nullptr ? fmt::format("_porost{}", overgrown) : std::string());
 	o.variants = 0; // no house's
 	o.tiles_x = o.tiles_y = 1;
 	/* Its pictures, all its other materials' (none its own): 1 the bed's, 2 the sleeper's, 3 the rails', 4 their heads'. */
 	o.texture_of = SIZE_MAX;
 	o.material_pngs = {mats->bed, mats->sleeper, nullptr, nullptr};
 	o.material_flats = {0, 0, mats->rail, mats->head};
-	o.material_levels.assign(4, nullptr);
+	if (grass != nullptr) {
+		/* 5 its grass's (TrackArcGrass). */
+		o.material_pngs.push_back(grass->png);
+		o.material_flats.push_back(0);
+	}
+	o.material_levels.assign(o.material_pngs.size(), nullptr);
 	o.texels_per_unit = static_cast<float>(TEX_W / (BED_W * units));
 	std::vector<float> nrm;
 	/* A face of four corners counter-clockwise seen from outside, its outward normal (the light, which side is seen). */
@@ -5533,6 +5581,53 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 			continue;
 		}
 		sleeper(half_l, -half_l);
+	}
+	if (grass != nullptr) {
+		/* Its grass: the straight piece's patches bent along the arc -- a corner as far along the centre line as along
+		 * the piece, as far across it and as high; the piece laid again from each tile's length on, cut at the arc's
+		 * end. Over the straight way of a switch the straight piece's own patches lie on its bed: of the arc's only
+		 * those outside that bed. */
+		const size_t corners = grass->pos.size() / 3;
+		std::vector<uint32_t> placed(corners);
+		std::vector<double> along(corners);
+		for (double from = 0; from < total - 1e-6; from += TILE_SIZE) {
+			const uint32_t base = static_cast<uint32_t>(o.pos.size() / 3);
+			size_t stretch = 0;
+			/* Where the centre line is so far along it, and the way across there (as the bed's corners: across at each end of the stretch by its own way). */
+			auto at_length = [&](double s, double off) {
+				while (stretch + 2 < at.size() && at[stretch + 1].s < s) stretch++;
+				while (stretch > 0 && at[stretch].s > s) stretch--;
+				const At &a = at[stretch], &b = at[stretch + 1];
+				const double f = b.s > a.s ? std::clamp((s - a.s) / (b.s - a.s), 0.0, 1.0) : 0.0;
+				const double ax = a.x - a.ty * off, ay = a.y + a.tx * off, bx = b.x - b.ty * off, by = b.y + b.tx * off;
+				return std::array<double, 2>{ax + (bx - ax) * f, ay + (by - ay) * f};
+			};
+			for (size_t c = 0; c < corners; c++) {
+				along[c] = from + grass->pos[c * 3] * units + TILE_SIZE / 2.0;
+				const std::array<double, 2> p = at_length(std::clamp(along[c], 0.0, total), grass->pos[c * 3 + 1] * units);
+				placed[c] = base + static_cast<uint32_t>(c);
+				o.pos.insert(o.pos.end(), {static_cast<float>(p[0]), static_cast<float>(p[1]), static_cast<float>(grass->pos[c * 3 + 2] * hpm)});
+				o.uv.insert(o.uv.end(), {grass->uv[c * 2], grass->uv[c * 2 + 1]});
+				nrm.insert(nrm.end(), {0.0f, 0.0f, 1.0f});
+				o.corner_tex.push_back(5);
+			}
+			for (size_t k = 0; k + 2 < grass->tri.size(); k += 3) {
+				const uint32_t ia = grass->tri[k], ib = grass->tri[k + 1], ic = grass->tri[k + 2];
+				if (std::max({ia, ib, ic}) >= corners) continue;
+				/* Past the arc's end: the next tile's piece has its own. */
+				const double middle = (along[ia] + along[ib] + along[ic]) / 3;
+				if (middle < 0 || middle > total) continue;
+				const float *a = &o.pos[placed[ia] * 3], *b = &o.pos[placed[ib] * 3], *c = &o.pos[placed[ic] * 3];
+				const double gz = static_cast<double>(b[0] - a[0]) * (c[1] - a[1]) - static_cast<double>(b[1] - a[1]) * (c[0] - a[0]);
+				if (std::abs(gz) < 1e-9) continue;
+				/* Over the straight way's bed (a switch): the straight piece's patches are there. */
+				at_length(middle, 0);
+				if (at[stretch].over && at[stretch + 1].over && std::abs(aside((a[0] + b[0] + c[0]) / 3.0, (a[1] + b[1] + c[1]) / 3.0)) < half_bed) continue;
+				o.tri.insert(o.tri.end(), {placed[ia], placed[ib], placed[ic]});
+				o.tri_tex.push_back(5);
+				o.facing.push_back(gz > 0 ? 1 : -1);
+			}
+		}
 	}
 	o.light = CornerLight(nrm);
 	o.top = static_cast<float>(rail_z1);

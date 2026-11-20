@@ -3302,8 +3302,9 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 	}
 
 	/* A track no trains go on grown over (GetTrackOvergrowthStage()): on the map our patches of grass over its pieces
-	 * (kolej_porost_*, porost.py) -- from the eyes our grass's tufts are over it (AddOurGrass() of viewport.cpp) --; not
-	 * on a round curve's arcs (its straight pieces have them), nor on snow or in the desert. */
+	 * (kolej_porost_*, porost.py) -- from the eyes our grass's tufts are over it (AddOurGrass() of viewport.cpp) --, on a
+	 * round curve's arcs the straight piece's patches bent along them (GetThreeDTrackArc()); not on snow or in the
+	 * desert. */
 	uint overgrown = 0;
 	if (!eye && !pipe && IsPlainRailTile(ti->tile)) {
 		const RailGroundType g = GetRailGroundType(ti->tile);
@@ -3314,7 +3315,7 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 		/* A round piece along its arc in one (GetThreeDTrackArc(); the player: "like the fishing rod's line, a thick square
 		 * rope"), an object standing on the tile as a house does; a piece straight within its tile as on any tile. */
 		if (round) {
-			if (const ThreeDObject *arc = GetThreeDTrackArc(ti->tile, t, concrete); arc != nullptr) {
+			if (const ThreeDObject *arc = GetThreeDTrackArc(ti->tile, t, concrete, overgrown); arc != nullptr) {
 				AddThreeDTileObject(arc, ti->tile, ti->z);
 				continue;
 			}

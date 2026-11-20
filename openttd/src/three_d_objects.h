@@ -1802,7 +1802,7 @@ enum class ThreeDBridgePiece : uint8_t {
 /** The "type" of the aqueducts' 3D pieces (a record with "akvadukt": true; the colleague's hra/3d/PROSBA-AKVADUKTY.md): past the game's bridge types. */
 static constexpr uint THREE_D_AQUEDUCT = 13; // MAX_BRIDGES of bridge.h (a static_assert in three_d_objects.cpp)
 const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map = false, int wall = -1);
-const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete);
+const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete, uint overgrown = 0);
 /** A wire of our catenary (GetThreeDWires()): its ends, world units from its tile's north corner and units of height over the height the wires stand at. */
 struct ThreeDWire {
 	float x0, y0, z0, x1, y1, z1;
