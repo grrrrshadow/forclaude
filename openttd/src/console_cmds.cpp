@@ -11882,6 +11882,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_gpu_standing_lean = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici stav {}", _gpu_standing_lean ? "usporne" : "jako drive");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "delit") {
+		/* 'stojici delit 0|1': a free place of the kept pictures bigger than asked for split, the rest free again (1), or
+		 * taken whole (0). */
+		extern bool _standing_free_split;
+		_standing_free_split = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici delit {}", _standing_free_split ? "ano" : "ne");
+		return true;
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "trvale") {
 		/* 'stojici trvale 0|1': a vehicle of the moving layer standing as it stood placed as then (1; LastingPlace of
 		 * three_d_vehicle_object.cpp), or placed anew every time (0, as before). */

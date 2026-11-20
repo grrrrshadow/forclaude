@@ -131,6 +131,9 @@ std::atomic<bool> _three_d_gpu_show = true;
 bool _eye_buildings_by_kind = true;
 /** The rig ('test3d ocidavky 0|1'): the runs of the triangles of a picture from the eyes drawn texture by texture, each texture's by one call (1; DrawEyeOnCard()), or in the order they were gathered (0, as before 20. 11.). */
 bool _eye_runs_by_texture = true;
+/** The rig ('test3d stojici delit 0|1'): a free place bigger than asked for split, what is left free again (1; TakeFreeStandingPlace()), or taken whole (0, as before 21. 11.). */
+bool _standing_free_split = true;
+
 
 /*
  * The card's diary, 3d_karta.log in the player's folder. The player's build #285, the first with the card, brought the
@@ -1099,6 +1102,10 @@ std::map<std::pair<int, int>, std::vector<std::array<int, 2>>> _standing_free; /
 std::array<int, 2> _standing_reserved_size = {0, 0}; ///< the size of the place StandingReserve() gave last (kept)
 uint64_t _standing_swept_at = 0;                     ///< the pass the idle places were last looked for
 std::atomic<uint64_t> _standing_places_reused = 0, _standing_places_cleared = 0; ///< for the diary
+/** For the diary: how much of the kept pictures' atlas their places take, at most since the diary asked -- the vehicles'
+ * and figures' and the other pictures' (the blocks' sprites and faces), per mille of it; and how many places. Counted
+ * by the card's thread about once a second (StandingFillCount()). */
+std::atomic<int> _standing_fill_vehicles = 0, _standing_fill_pictures = 0, _standing_fill_places = 0, _standing_fill_free = 0;
 std::atomic<int> _rig_standing_atlas_size = 0; ///< Rig ('test3d atlas <px>'): the kept pictures so big, 0 as they are
 
 void ClearStandingPlaces()
@@ -5367,9 +5374,28 @@ void StandingPlaceKept(uint64_t key, bool vehicle, uint64_t kept_key)
 	_standing_slots[key] = {_standing_reserved_size[0], _standing_reserved_size[1], _card_clock, std::chrono::steady_clock::now(), kept_key, vehicle};
 }
 
+/** The kept pictures' places counted for the diary (_standing_fill_vehicles), about once a second; the most since it asked. */
+static void StandingFillCount()
+{
+	static auto counted = std::chrono::steady_clock::time_point{};
+	const auto now = std::chrono::steady_clock::now();
+	if (now - counted < std::chrono::seconds(1) || _standing_atlas_size <= 0) return;
+	counted = now;
+	uint64_t vehicles = 0, pictures = 0, free = 0;
+	for (const auto &[key, slot] : _standing_slots) (slot.vehicle ? vehicles : pictures) += static_cast<uint64_t>(slot.w) * slot.h;
+	for (const auto &[size, places] : _standing_free) free += static_cast<uint64_t>(size.first) * size.second * places.size();
+	const uint64_t all = static_cast<uint64_t>(_standing_atlas_size) * _standing_atlas_size;
+	auto most = [](std::atomic<int> &at, int v) { if (v > at.load()) at = v; };
+	most(_standing_fill_vehicles, static_cast<int>(vehicles * 1000 / all));
+	most(_standing_fill_pictures, static_cast<int>(pictures * 1000 / all));
+	most(_standing_fill_free, static_cast<int>(free * 1000 / all));
+	most(_standing_fill_places, static_cast<int>(_standing_slots.size()));
+}
+
 /** The places of the kept pictures not laid from for STANDING_SLOT_IDLE (nor in this pass) made free, their pictures forgotten; once a pass. */
 static void SweepStandingPlaces()
 {
+	StandingFillCount();
 	if (_standing_swept_at == _card_clock) return;
 	_standing_swept_at = _card_clock;
 	std::lock_guard lock(_standing_kept_mutex);
@@ -5391,16 +5417,33 @@ static void SweepStandingPlaces()
 /** A free place at least so big among the kept pictures', the smallest that is; false: none. */
 static bool TakeFreeStandingPlace(int w, int h, std::array<int, 2> &place)
 {
+	/* The smallest that is big enough: not the first one wide enough, maybe many times as big. */
+	auto best = _standing_free.end();
 	for (auto it = _standing_free.lower_bound({w, 0}); it != _standing_free.end(); ++it) {
 		if (it->first.second < h || it->second.empty()) continue;
-		place = it->second.back();
-		it->second.pop_back();
-		_standing_reserved_size = {it->first.first, it->first.second};
-		if (it->second.empty()) _standing_free.erase(it);
-		_standing_places_reused++;
+		if (best == _standing_free.end() || static_cast<int64_t>(it->first.first) * it->first.second < static_cast<int64_t>(best->first.first) * best->first.second) best = it;
+		if (it->first.first == w && it->first.second == h) break;
+		if (!_standing_free_split) break;
+	}
+	if (best == _standing_free.end()) return false;
+	const auto [fw, fh] = best->first;
+	place = best->second.back();
+	best->second.pop_back();
+	if (best->second.empty()) _standing_free.erase(best);
+	_standing_places_reused++;
+	if (!_standing_free_split || (fw == w && fh == h)) {
+		_standing_reserved_size = {fw, fh};
 		return true;
 	}
-	return false;
+	/* Bigger than asked for (a vehicle's place of a near zoom given to one of a far zoom, a sixteenth of it): only as
+	 * much taken, the rest free again -- beside it as high as it, and under it as wide as the place was. Taken whole,
+	 * the kept pictures filled up with a few small ones in the big places the zooms in had left (the player's #387,
+	 * 21. 11.: at night at z4 and z5, after zooming about, places given anew 8 000 times in 5 s, nearly every vehicle
+	 * drawn again in every pass). */
+	_standing_reserved_size = {w, h};
+	if (fw > w) _standing_free[{fw - w, h}].push_back({place[0] + w, place[1]});
+	if (fh > h) _standing_free[{fw, fh - h}].push_back({place[0], place[1] + h});
+	return true;
 }
 
 std::array<int, 2> StandingReserve(bool kept, int w, int h, const std::function<void()> &flush)
@@ -6587,6 +6630,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 		}
 	}
+	StandingFillCount();
 	begin_target();
 	use_pictures();
 	drawing = 0;
@@ -9185,8 +9229,9 @@ std::string ThreeDGpuMovingTimes()
 	const uint64_t drawn = _gpu_moving_drawn.exchange(0), first = _gpu_moving_first.exchange(0);
 	const double first_ms = _gpu_moving_first_ms.exchange(0);
 	if (passes == 0) return "-";
-	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms (z toho kopie {:.0f} ms, {} aut predem {:.0f} ms, {} aut nakresleno znovu {:.0f} ms), drzene obrazky: mist dano znovu {}, vsechny zahozeny {}x",
-			passes, things, copied / 1e6, ms, copy_ms, first, first_ms, drawn, draw_ms, _standing_places_reused.exchange(0), _standing_places_cleared.exchange(0));
+	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms (z toho kopie {:.0f} ms, {} aut predem {:.0f} ms, {} aut nakresleno znovu {:.0f} ms), drzene obrazky: mist dano znovu {}, vsechny zahozeny {}x, zaplneno nejvic auty a postavami {:.1f} %, obrazky {:.1f} %, volnych mist {:.1f} %, mist {}",
+			passes, things, copied / 1e6, ms, copy_ms, first, first_ms, drawn, draw_ms, _standing_places_reused.exchange(0), _standing_places_cleared.exchange(0),
+			_standing_fill_vehicles.exchange(0) / 10.0, _standing_fill_pictures.exchange(0) / 10.0, _standing_fill_free.exchange(0) / 10.0, _standing_fill_places.exchange(0));
 }
 
 /**
