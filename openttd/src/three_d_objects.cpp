@@ -5542,6 +5542,40 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 			quad(4, {across(a, anx, any, c + rail_hw, rail_z1), across(b, bnx, bny, c + rail_hw, rail_z1), across(b, bnx, bny, c - rail_hw, rail_z1), across(a, anx, any, c - rail_hw, rail_z1)}, flat, 0, 0, 1);
 		}
 	}
+	/* An end at the middle of a tile's edge with the way diagonal there: the piece beyond -- a straight diagonal one
+	 * (kolej_sikma_*, koleje.py) -- is cut along the tile's edge, the arc across its own way: between them a wedge of
+	 * bare ground on one side of the middle, the rail there short of the other's (a switch's branch into a diagonal, a
+	 * long diagonal between two arcs; seen on the turned map as a step in the track). The arc's bed and its rail on
+	 * that side go on to the edge. */
+	for (const bool last : {false, true}) {
+		const At &p = last ? at.back() : at.front();
+		if (p.over || std::abs(std::abs(p.tx) - std::abs(p.ty)) > 0.06) continue;
+		const double rx = p.x - TILE_SIZE * std::round(p.x / TILE_SIZE), ry = p.y - TILE_SIZE * std::round(p.y / TILE_SIZE);
+		const bool edge_along_y = std::abs(rx) < 0.05 && std::abs(std::abs(ry) - TILE_SIZE / 2.0) < 0.05;
+		const bool edge_along_x = std::abs(ry) < 0.05 && std::abs(std::abs(rx) - TILE_SIZE / 2.0) < 0.05;
+		if (!edge_along_y && !edge_along_x) continue;
+		const double ex = edge_along_x ? 1.0 : 0.0, ey = edge_along_y ? 1.0 : 0.0;
+		const double nx = -p.ty, ny = p.tx, across_edge = nx * ex + ny * ey;
+		if (std::abs(across_edge) < 0.3) continue;
+		/* Out of the arc there, and the side of the middle on which the edge is farther out than the arc's own end. */
+		const double out_x = last ? p.tx : -p.tx, out_y = last ? p.ty : -p.ty;
+		const double side = (ex * out_x + ey * out_y) / across_edge > 0 ? 1.0 : -1.0;
+		auto own = [&](double off, double z) { return std::array<double, 3>{p.x + nx * off, p.y + ny * off, z}; };
+		auto on_edge = [&](double off, double z) { return std::array<double, 3>{p.x + ex * off / across_edge, p.y + ey * off / across_edge, z}; };
+		/* The bed's picture as far along as the edge is beyond (back from it, where that would be past the picture's end). */
+		const double v = std::clamp((last && std::fmod(p.s, TILE_SIZE) < 1e-6 && p.s > 0 ? TILE_SIZE : std::fmod(p.s, TILE_SIZE)) / TILE_SIZE, 0.0, 1.0);
+		const double beyond = half_bed / TILE_SIZE * (last ? 1.0 : -1.0);
+		const double v_edge = v + beyond < 0.0 || v + beyond > 1.0 ? v - beyond : v + beyond;
+		const double u_mid = (t0 + t1) / 2, u_top = side > 0 ? t0 : t1, u_foot = side > 0 ? sl : sr;
+		const double off = side * half_bed;
+		quad(1, {own(0, bed_top), own(off, bed_top), on_edge(off, bed_top), own(0, bed_top)}, {{{u_mid, v}, {u_top, v}, {u_top, v_edge}, {u_mid, v}}}, 0, 0, 1);
+		quad(1, {own(off, 0), on_edge(off, 0), on_edge(off, bed_top), own(off, bed_top)}, {{{u_foot, v}, {u_foot, v_edge}, {u_top, v_edge}, {u_top, v}}}, side * nx, side * ny, 0);
+		const double c = side * rail_c;
+		const std::array<std::array<double, 2>, 4> flat{{{0.5, 0.5}, {0.5, 0.5}, {0.5, 0.5}, {0.5, 0.5}}};
+		quad(3, {own(c + rail_hw, rail_z0), on_edge(c + rail_hw, rail_z0), on_edge(c + rail_hw, rail_z1), own(c + rail_hw, rail_z1)}, flat, nx, ny, 0);
+		quad(3, {on_edge(c - rail_hw, rail_z0), own(c - rail_hw, rail_z0), own(c - rail_hw, rail_z1), on_edge(c - rail_hw, rail_z1)}, flat, -nx, -ny, 0);
+		quad(4, {own(c + rail_hw, rail_z1), on_edge(c + rail_hw, rail_z1), on_edge(c - rail_hw, rail_z1), own(c - rail_hw, rail_z1)}, flat, 0, 0, 1);
+	}
 	/* The sleepers: at the picture's, every 25th of a tile's length from the start, each across the way there. */
 	const double step = static_cast<double>(TILE_SIZE) / SLEEPERS_A_TILE;
 	const double half_w = sleeper_w / 2 * units, half_l = SLEEPER_L / 2 * units, z0 = (BED_H - 0.01) * hpm, z1 = (BED_H + SLEEPER_OVER) * hpm;
