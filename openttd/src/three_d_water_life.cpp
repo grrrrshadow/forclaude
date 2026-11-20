@@ -35,6 +35,9 @@
 #include "tile_map.h"
 #include "tile_cmd.h"
 #include "water_map.h"
+#include "ship.h"
+#include "vehicle_base.h"
+#include "three_d.h"
 #include "gfx_func.h"
 #include "core/format.hpp"
 #include "core/random_func.hpp"
@@ -42,6 +45,7 @@
 #include "timer/timer_game_tick.h"
 
 #include <cmath>
+#include <vector>
 
 #include "safeguards.h"
 
@@ -217,6 +221,56 @@ bool Swimmable(const ThreeDWaterAnimal &a, Water water, double x, double y)
 	return DepthM(x, y) >= a.size[2] * a.scale + 2 * CLEAR_M;
 }
 
+/**
+ * A boat's hull about the walker, for the fish (the player, 21. 11.: "the water ran into the submarine; now a fish
+ * swims in it" -- they swam through it as through the water): its outline in its own frame, as the sea's surface is cut
+ * by it (hull_cut of viewport.cpp: eight corners within the box of its model), and how low and high it is.
+ */
+struct Hull {
+	double x, y;           ///< its origin, world units
+	double fx, fy;         ///< the way it faces, a unit
+	double mid_a, half_a;  ///< along it: its middle from its origin and half its length, world units
+	double mid_c, half_c;  ///< across it
+	double low, high;      ///< units of height, as the fish's
+};
+std::vector<Hull> _hulls;
+bool _hulls_kept_out_of = true; ///< the rig ('test3d voda trup 0|1'): the fish keep out of the boats' hulls and are not drawn in them (1), or swim through them (0, as before 21. 11.)
+
+/** The hulls of the boats about the walker now (Hull): of those within the fish's reach of it. */
+void FindHulls(double wx, double wy)
+{
+	_hulls.clear();
+	if (!ThreeDEnabled() || !_hulls_kept_out_of) return;
+	for (const Ship *sh : Ship::Iterate()) {
+		if (!sh->IsPrimaryVehicle() || sh->IsInDepot() || sh->vehstatus.Test(VehState::Hidden)) continue;
+		if (std::hypot(sh->x_pos - wx, sh->y_pos - wy) > (GONE_M + 40.0) * OBJECT_UNITS_PER_METRE) continue;
+		ThreeDEyeVehicle ev;
+		if (!GetThreeDEyeVehicle(sh, ev, true) || ev.obj == nullptr) continue;
+		const ThreeDVehicleShape *shape = ev.obj->TryGetShape();
+		if (shape == nullptr || shape->x1 - shape->x0 < 0.5f || shape->y1 - shape->y0 < 0.5f) continue;
+		const double a = ev.facing * M_PI / 180.0;
+		const double along = ev.scale * ev.along * OBJECT_UNITS_PER_METRE, across = ev.scale * OBJECT_UNITS_PER_METRE, up = ev.scale * OBJECT_HEIGHT_PER_METRE;
+		_hulls.push_back({ev.x, ev.y, std::cos(a), std::sin(a),
+				(shape->x0 + shape->x1) / 2.0 * along, (shape->x1 - shape->x0) / 2.0 * 0.96 * along,
+				(shape->y0 + shape->y1) / 2.0 * across, (shape->y1 - shape->y0) / 2.0 * 0.92 * across,
+				ev.z + shape->z0 * up, ev.z + shape->z1 * up});
+	}
+}
+
+/** Whether a point is in a boat's hull (FindHulls()), or within a margin of it, metres. */
+bool InHull(double x, double y, double z, double margin_m)
+{
+	const double m = margin_m * OBJECT_UNITS_PER_METRE, mz = margin_m * OBJECT_HEIGHT_PER_METRE;
+	for (const Hull &h : _hulls) {
+		if (z < h.low - mz || z > h.high + mz) continue;
+		const double dx = x - h.x, dy = y - h.y;
+		const double u = std::abs(dx * h.fx + dy * h.fy - h.mid_a) / (h.half_a + m), w = std::abs(-dx * h.fy + dy * h.fx - h.mid_c) / (h.half_c + m);
+		/* Its eight corners: (1, 0.45) and (0.6, 1) of its box in each quarter. */
+		if (u <= 1.0 && w <= 1.0 && (u - 0.6) / 0.4 + (w - 0.45) / 0.55 <= 1.0) return true;
+	}
+	return false;
+}
+
 /** The first of its school (the one it follows), nullptr itself the first or alone. */
 const Swimmer *LeaderOf(const Swimmer &s)
 {
@@ -282,10 +336,13 @@ void Swim(Swimmer &s, const ThreeDWaterAnimal &a, uint64_t now)
 		s.level = first->level;
 		speed_m *= std::clamp(0.7 + far_m, 0.7, 2.0);
 	}
-	/* Before it the shore or the bed too high (the shallows): it turns, there it does not go. */
+	/* Before it the shore or the bed too high (the shallows): it turns, there it does not go. Nor into a boat's hull;
+	 * one a boat came over swims on out of it (not drawn meanwhile, AddThreeDWaterLifeToEye()). */
 	const double look = std::max(1.0, length_m) * OBJECT_UNITS_PER_METRE;
 	const double ax = s.x + std::cos(s.heading) * look, ay = s.y + std::sin(s.heading) * look;
-	if (!Swimmable(a, s.water, ax, ay)) {
+	const double hull_m = length_m / 2 + 0.3;
+	const bool in_hull = InHull(s.x, s.y, s.z, hull_m);
+	if (!Swimmable(a, s.water, ax, ay) || (!in_hull && InHull(ax, ay, s.z, hull_m))) {
 		if (std::abs(std::remainder(s.want - s.heading, 2 * M_PI)) < M_PI / 2) {
 			s.want = s.heading + (InteractiveRandomRange(2) == 0 ? 1 : -1) * (100 + InteractiveRandomRange(61)) * M_PI / 180.0;
 			s.turn_at = now + 90;
@@ -295,7 +352,7 @@ void Swim(Swimmer &s, const ThreeDWaterAnimal &a, uint64_t now)
 	}
 	s.heading = std::remainder(s.heading + std::clamp(std::remainder(s.want - s.heading, 2 * M_PI), -turn, turn), 2 * M_PI);
 	const double nx = s.x + std::cos(s.heading) * speed_m * OBJECT_UNITS_PER_METRE, ny = s.y + std::sin(s.heading) * speed_m * OBJECT_UNITS_PER_METRE;
-	if (speed_m > 0 && Swimmable(a, s.water, nx, ny)) {
+	if (speed_m > 0 && Swimmable(a, s.water, nx, ny) && (in_hull || !InHull(nx, ny, s.z, hull_m))) {
 		s.x = nx;
 		s.y = ny;
 	}
@@ -474,6 +531,7 @@ const IntervalTimer<TimerGameTick> _water_life_timer({TimerGameTick::Priority::N
 		}
 		++it;
 	}
+	FindHulls(wx, wy);
 	for (Swimmer &s : _swimmers) {
 		const ThreeDWaterAnimal *a = GetThreeDWaterAnimal(s.kind);
 		if (a != nullptr) Swim(s, *a, now);
@@ -630,12 +688,18 @@ void AddThreeDWaterLifeToEye(bool under_water)
 			}
 		}
 	}
+	/* The boats' hulls as they are in this picture (a boat dived or moved since the last tick). */
+	FindHulls(wx, wy);
 	for (const Swimmer &s : _swimmers) {
 		const bool leaping = s.pose == "vyskok";
 		if (!under_water && !leaping) continue;
 		if (!leaping && std::hypot(s.x - wx, s.y - wy) > SEEN_M * OBJECT_UNITS_PER_METRE) continue;
 		const ThreeDWaterAnimal *a = GetThreeDWaterAnimal(s.kind);
 		if (a == nullptr) continue;
+		/* In a boat's hull (a boat came over it; one put there), its middle, its head or its tail: not there to the
+		 * eyes, the cabin is dry. One alongside the hull is seen up to its side. */
+		const double half = a->size[0] * a->scale / 2 * OBJECT_UNITS_PER_METRE, hx = std::cos(s.heading) * half, hy = std::sin(s.heading) * half;
+		if (!leaping && (InHull(s.x, s.y, s.z, 0) || InHull(s.x + hx, s.y + hy, s.z, 0) || InHull(s.x - hx, s.y - hy, s.z, 0))) continue;
 		AddCabWaterFigure(FigureOf(s), a->scale, s.x, s.y, s.z, s.z, static_cast<float>(s.heading * 180.0 / M_PI), FrameOf(s, now), s.state, night && a->glows, s.pitch);
 	}
 }
@@ -686,13 +750,20 @@ bool SendThreeDWaterAnimal(std::string_view name, double ahead_m)
 	return true;
 }
 
+/** The rig: the fish keep out of the boats' hulls (FindHulls()), or swim through them as before. */
+void RigThreeDWaterHulls(bool on)
+{
+	_hulls_kept_out_of = on;
+}
+
 /** The rig: those swimming about, a line each. */
 std::string DescribeThreeDWaterLife()
 {
-	std::string out = fmt::format("{} plave (druhu zvirat ve vode {}, rostlin {})", _swimmers.size(), GetThreeDWaterAnimals().size(), GetThreeDWaterPlants().size());
+	std::string out = fmt::format("{} plave (druhu zvirat ve vode {}, rostlin {}), trupu lodi kolem {}", _swimmers.size(), GetThreeDWaterAnimals().size(), GetThreeDWaterPlants().size(), _hulls.size());
+	for (const Hull &h : _hulls) out += fmt::format("\n  trup na {:.2f},{:.2f} delka {:.1f} m sirka {:.1f} m vyska {:.1f} az {:.1f}", h.x / TILE_SIZE, h.y / TILE_SIZE, 2 * h.half_a / OBJECT_UNITS_PER_METRE, 2 * h.half_c / OBJECT_UNITS_PER_METRE, h.low, h.high);
 	for (const Swimmer &s : _swimmers) {
-		out += fmt::format("\n  {}{} na {:.1f},{:.1f} vyska {:.2f}, smer {:.0f}, hejno {}, barva {}{}", s.kind, s.pose.empty() ? std::string() : "/" + s.pose, s.x / TILE_SIZE, s.y / TILE_SIZE, s.z,
-				s.heading * 180.0 / M_PI, s.school, s.state, s.water == Water::Sea ? ", more" : ", reka");
+		out += fmt::format("\n  {}{} na {:.2f},{:.2f} vyska {:.2f}, smer {:.0f}, hejno {}, barva {}{}{}", s.kind, s.pose.empty() ? std::string() : "/" + s.pose, s.x / TILE_SIZE, s.y / TILE_SIZE, s.z,
+				s.heading * 180.0 / M_PI, s.school, s.state, s.water == Water::Sea ? ", more" : ", reka", InHull(s.x, s.y, s.z, 0) ? ", V TRUPU (nekresli se)" : "");
 	}
 	return out;
 }

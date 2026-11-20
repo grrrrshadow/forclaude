@@ -10169,6 +10169,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * [metru]' puts one (a school of the small ones) so many metres ahead of it (5 without), the orca leaping at once. */
 		if (argv.size() > 3 && argv[2] == "posli") {
 			IConsolePrint(CC_DEFAULT, "test3d: voda {}", SendThreeDWaterAnimal(argv[3], number(4).value_or(5)) ? "poslano" : "NEPOSLANO");
+		} else if (argv.size() > 3 && argv[2] == "trup") {
+			/* 'voda trup 0|1': the fish keep out of the boats' hulls and are not drawn in them (1), or swim through them (0). */
+			extern void RigThreeDWaterHulls(bool on);
+			RigThreeDWaterHulls(number(3).value_or(1) != 0);
 		} else if (argv.size() > 4 && argv[2] == "rostliny") {
 			/* 'voda rostliny <x> <y>': the water lilies and the cattails about a tile. */
 			IConsolePrint(CC_DEFAULT, "test3d: rostliny {}", DescribeThreeDRiverPlants(TileXY(number(3).value_or(0), number(4).value_or(0))));
