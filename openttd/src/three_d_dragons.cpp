@@ -77,6 +77,7 @@ struct Dragon {
 	int from_frame = 0;    ///< the frame of it it left
 	double pace = 1;       ///< how fast the animation goes (chasing: faster)
 	uint64_t until = 0;    ///< when its state ends
+	uint64_t no_way_until = 0; ///< it could not get to the walker (on the water, on a roof): till then it does not go for it
 	uint64_t born = 0;
 	double x = 0, y = 0;   ///< world units
 	double lift = 0;       ///< over the ground, metres
@@ -158,6 +159,15 @@ bool OnMap(double x, double y)
 	return x >= TILE_SIZE && y >= TILE_SIZE && x < (Map::SizeX() - 1) * TILE_SIZE && y < (Map::SizeY() - 1) * TILE_SIZE;
 }
 
+/**
+ * Whether a dragon on foot can be there: on land one walks over (NavWalkable()), not on the water, a house or a steep
+ * slope (the player, 21. 11.: "a dragon landed on the sea and bites my boat. Dragons cannot walk on the water").
+ */
+bool OnFoot(double x, double y)
+{
+	return OnMap(x, y) && NavWalkable(TileVirtXY(static_cast<uint>(x), static_cast<uint>(y)));
+}
+
 /** Its part of the screen dirty, as big as it is and as high as it flies. */
 void MarkDirty(const Dragon &d)
 {
@@ -197,7 +207,8 @@ bool StepTo(Dragon &d, double tx, double ty, double speed_m)
 		return true;
 	}
 	const double nx = d.x + dx / dist * step, ny = d.y + dy / dist * step;
-	if (!OnMap(nx, ny)) return true;
+	/* No step onto the water or what else is not walked over: as far as it gets. */
+	if (!OnFoot(nx, ny)) return true;
 	d.x = nx;
 	d.y = ny;
 	return false;
@@ -264,6 +275,11 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 	const double dist_m = walker ? std::hypot(wx - d.x, wy - d.y) / OBJECT_UNITS_PER_METRE : 1e9;
 	const bool fights = c->Has("utok");
 	const double reach_m = d.length_m / 2 + GAP_M;
+	/* On the ground where it cannot stand -- the water, a house built under it, the land dug away: up and off. */
+	if ((d.state == State::Idle || d.state == State::Wander || d.state == State::Chase || d.state == State::Attack) && !OnFoot(d.x, d.y)) {
+		d.state = State::Leave;
+		d.way.clear();
+	}
 	switch (d.state) {
 		case State::Arrive:
 			SetAnim(d, RestAnim(*c), now);
@@ -276,7 +292,7 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 
 		case State::Idle:
 			SetAnim(d, RestAnim(*c), now);
-			if (fights && dist_m < CHASE_M) {
+			if (fights && dist_m < CHASE_M && now >= d.no_way_until) {
 				d.state = State::Chase;
 			} else if (now - d.born > LIFE_TICKS) {
 				d.state = State::Leave;
@@ -288,7 +304,7 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 
 		case State::Wander:
 			SetAnim(d, "chuze", now, 1.5);
-			if (fights && dist_m < CHASE_M) {
+			if (fights && dist_m < CHASE_M && now >= d.no_way_until) {
 				d.state = State::Chase;
 			} else if (WalkTo(d, d.tx, d.ty, Speed(d, "chuze", 0.02), now)) {
 				d.state = State::Idle;
@@ -306,8 +322,14 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 				d.state = State::Attack;
 				d.struck = false;
 				SetAnim(d, "utok", now, 1.0, true);
-			} else {
-				WalkTo(d, wx, wy, Speed(d, "chuze", 0.02), now);
+			} else if (WalkTo(d, wx, wy, Speed(d, "chuze", 0.02), now)) {
+				/* As near as it gets, and not near enough -- the walker out on the water, on a roof: it stands there a
+				 * while and tries again, not walking on the spot at the shore. */
+				d.heading = std::atan2(wy - d.y, wx - d.x);
+				d.state = State::Idle;
+				d.until = now + 200 + InteractiveRandomRange(200);
+				d.no_way_until = now + 200;
+				d.way.clear();
 			}
 			break;
 
@@ -971,10 +993,11 @@ bool SendThreeDDragon(std::string_view kind, double x, double y)
 		d.health = FLYER_HEALTH;
 		SetAnim(d, "let", now);
 	} else {
-		/* Down where it can stand: not on a house or in the water. */
+		/* Down where it can stand: not on a house or in the water; none near (the open sea), it does not come -- it
+		 * came down on the water there and went for the walker on its boat. */
 		d.x = x;
 		d.y = y;
-		NavNearestWalkable(d.x, d.y, 6);
+		if (!NavNearestWalkable(d.x, d.y, 6)) return false;
 		d.lift = LAND_M;
 		d.state = State::Arrive;
 		d.health = HEALTH;
@@ -992,8 +1015,8 @@ std::string DescribeThreeDDragons()
 	static const char *const STATES[] = {"prilet", "stoji", "chodi", "honi", "utoci", "pada", "lezi", "odlet", "leti"};
 	std::string out = fmt::format("{} draku", _dragons.size());
 	for (const Dragon &d : _dragons) {
-		out += fmt::format("\n  {} {} na {:.1f},{:.1f} vyska {:.1f} m, smer {:.0f}, {} snimek {}, zdravi {}", d.kind, STATES[static_cast<int>(d.state)],
-				d.x / TILE_SIZE, d.y / TILE_SIZE, d.lift, d.heading * 180.0 / M_PI, d.anim, d.frame, d.health);
+		out += fmt::format("\n  {} {} na {:.1f},{:.1f} ({}) vyska {:.1f} m, smer {:.0f}, {} snimek {}, zdravi {}", d.kind, STATES[static_cast<int>(d.state)],
+				d.x / TILE_SIZE, d.y / TILE_SIZE, OnFoot(d.x, d.y) ? "pevnina" : "NESCHUDNE", d.lift, d.heading * 180.0 / M_PI, d.anim, d.frame, d.health);
 		/* The figure drawn: a passage from the animation before while it lasts (Figure()). */
 		int frame;
 		const std::string figure = Figure(d, frame);

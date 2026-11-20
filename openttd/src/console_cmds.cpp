@@ -10150,11 +10150,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (FirstPersonWalkerAt(wx, wy)) IConsolePrint(CC_DEFAULT, "test3d: chodec na {:.2f},{:.2f}", wx / TILE_SIZE, wy / TILE_SIZE);
 		}
 		if (argv.size() > 2 && argv[2] == "posli") {
-			/* 'draci posli [jmeno] [dlazdic]': so many tiles ahead of the walker (4 without it). */
+			/* 'draci posli [jmeno] [dlazdic]': so many tiles ahead of the walker (4 without it); 'draci posli <jmeno> na <x>
+			 * <y>': to that tile. */
 			extern double FirstPersonWalkerHeading();
 			const std::string_view kind = argv.size() > 3 ? argv[3] : std::string_view{};
-			const double ahead = number(4).value_or(4) * static_cast<double>(TILE_SIZE), h = FirstPersonWalkerHeading();
-			const bool sent = SendThreeDDragon(kind, wx + std::cos(h) * ahead, wy + std::sin(h) * ahead);
+			const bool to_tile = argv.size() > 6 && argv[4] == "na";
+			const double ahead = (to_tile ? 0 : number(4).value_or(4)) * static_cast<double>(TILE_SIZE), h = FirstPersonWalkerHeading();
+			const bool sent = to_tile ? SendThreeDDragon(kind, (number(5).value_or(0) + 0.5) * TILE_SIZE, (number(6).value_or(0) + 0.5) * TILE_SIZE) :
+					SendThreeDDragon(kind, wx + std::cos(h) * ahead, wy + std::sin(h) * ahead);
 			IConsolePrint(CC_DEFAULT, "test3d: drak {}", sent ? "poslan" : "NEPOSLAN");
 		} else if (argv.size() > 2 && argv[2] == "uder" && walker) {
 			extern double FirstPersonWalkerHeading();
