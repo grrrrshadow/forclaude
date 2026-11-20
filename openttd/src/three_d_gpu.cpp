@@ -61,8 +61,17 @@
  * needs its pixels in the memory no more (TrimTextures() of three_d_objects.cpp lets them go; the player's logs of
  * 15. 11.: the vehicles' textures 575 MB in the memory and 543 MB on the card, the same pictures twice). The mutex is
  * held by the card's thread while it reads a texture's pixels to put it on, and by whoever lets pixels go.
+ *
+ * The numbers themselves under a mutex of their own, held only while they are read or changed (after the other, when
+ * both): who only asks whether the card holds one (ThreeDGpuHoldsTexture(): the main thread, of every texture of every
+ * building it gives the card) does not wait for a texture being put on. It did -- the card's thread holds the first
+ * mutex all the while it sends a texture's pixels, on the phone tens of milliseconds each --, so while the card took
+ * new textures the main thread stood at each building (the player's diary of 20. 11., #384, the far map by night after
+ * the view from the eyes: "budovy 59.1 ms (242x)" a frame, the card letting go 20 to 31 times in 5 s, 5 to 8 frames a
+ * second; with the card at rest 0.04 ms a building).
  */
 static std::mutex _card_texture_mutex;
+static std::mutex _card_texture_uids_mutex;
 static std::unordered_set<uint64_t> _card_texture_uids;
 
 std::unique_lock<std::mutex> ThreeDGpuTexturesLock()
@@ -73,12 +82,13 @@ std::unique_lock<std::mutex> ThreeDGpuTexturesLock()
 /** Whether the card holds a texture; under ThreeDGpuTexturesLock(). */
 bool ThreeDGpuHoldsTextureLocked(uint64_t uid)
 {
+	std::lock_guard uids_lock(_card_texture_uids_mutex);
 	return _card_texture_uids.contains(uid);
 }
 
 bool ThreeDGpuHoldsTexture(uint64_t uid)
 {
-	std::lock_guard lock(_card_texture_mutex);
+	std::lock_guard uids_lock(_card_texture_uids_mutex);
 	return _card_texture_uids.contains(uid);
 }
 
@@ -3489,6 +3499,7 @@ void ForgetCard()
 	_card_textures.clear();
 	{
 		std::lock_guard lock(_card_texture_mutex);
+		std::lock_guard uids_lock(_card_texture_uids_mutex);
 		_card_texture_uids.clear();
 	}
 	_card_buildings.clear();
@@ -3644,6 +3655,7 @@ void TrimCard()
 			_card_textures.erase(h.uid);
 			CardHeld(_card_held_textures, h.uid, false);
 			std::lock_guard lock(_card_texture_mutex);
+			std::lock_guard uids_lock(_card_texture_uids_mutex);
 			_card_texture_uids.erase(h.uid);
 		} else {
 			GpuBuilding &b = _card_buildings[h.uid];
@@ -3778,6 +3790,7 @@ static bool LetGoOfTextureWithFewerChannels(std::unordered_map<uint64_t, GpuText
 	CardHeld(_card_held_textures, it->first, false);
 	{
 		std::lock_guard lock(_card_texture_mutex);
+		std::lock_guard uids_lock(_card_texture_uids_mutex);
 		_card_texture_uids.erase(it->first);
 	}
 	_card_textures.erase(it);
@@ -3815,7 +3828,10 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
-	_card_texture_uids.insert(t.uid.value);
+	{
+		std::lock_guard uids_lock(_card_texture_uids_mutex);
+		_card_texture_uids.insert(t.uid.value);
+	}
 	CardHeld(_card_held_textures, t.uid.value, true);
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
@@ -3869,7 +3885,10 @@ static const GpuTexture *MaskOnCard(const ThreeDObjectTexture &t, int channels)
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
-	_card_texture_uids.insert(t.uid.value);
+	{
+		std::lock_guard uids_lock(_card_texture_uids_mutex);
+		_card_texture_uids.insert(t.uid.value);
+	}
 	CardHeld(_card_held_textures, t.uid.value, true);
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
