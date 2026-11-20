@@ -3105,7 +3105,7 @@ struct CardDrawnOf {
 	const ThreeDVehicleObject *obj = nullptr;
 	std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 };
-static std::map<VehicleID, CardDrawnOf> _cards_drawn_of;
+static std::map<std::pair<VehicleID, int>, CardDrawnOf> _cards_drawn_of; ///< by the vehicle and the zoom it was drawn at
 
 /** Loads done by the thread since the places owed them were drawn again (TakePicturesMade()); how many since it was told. */
 static std::atomic<bool> _loads_came = false;
@@ -4089,13 +4089,14 @@ double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 }
 
 /** Keep what the card drew of a vehicle: laid again by its key while its next look is not made yet (CardDrawnBefore()). */
-static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, const std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
+static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, const std::shared_ptr<const ThreeDGpuStandingVehicle> &card, ZoomLevel zoom)
 {
+	const std::pair<VehicleID, int> of(v->index, to_underlying(zoom));
 	if (card == nullptr) {
-		_cards_drawn_of.erase(v->index);
+		_cards_drawn_of.erase(of);
 		return;
 	}
-	CardDrawnOf &kept = _cards_drawn_of[v->index];
+	CardDrawnOf &kept = _cards_drawn_of[of];
 	if (kept.card != nullptr && kept.card->key == card->key) return;
 	auto drawn = std::make_shared<ThreeDGpuStandingVehicle>();
 	drawn->key = card->key;
@@ -4116,10 +4117,13 @@ static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, cons
  * What the card drew of a vehicle last, to stand in while its look now is not made yet (CardMade::NotYet: a frame of a
  * horse's walk, a finer texture after a zoom): laid by its key as the card keeps it, nothing drawn when the card does
  * not keep it any more -- no shapes, so nothing of the object is touched; nullptr when the card drew none of it.
+ * What it drew at the same zoom only: kept by the vehicle alone it was whatever view drew the vehicle last, and a
+ * view nearer in stood the vehicle in with the picture of one further out, a quarter of its size, till its look came
+ * (the rig, 20. 11.: the Buran's rocket tiny on its pad as its engines were lit; a vehicle's window beside the map).
  */
-static std::shared_ptr<const ThreeDGpuStandingVehicle> CardDrawnBefore(const Vehicle *v, const ThreeDVehicleObject *obj)
+static std::shared_ptr<const ThreeDGpuStandingVehicle> CardDrawnBefore(const Vehicle *v, const ThreeDVehicleObject *obj, ZoomLevel zoom)
 {
-	auto it = _cards_drawn_of.find(v->index);
+	auto it = _cards_drawn_of.find(std::pair<VehicleID, int>(v->index, to_underlying(zoom)));
 	if (it == _cards_drawn_of.end() || it->second.obj != obj) return nullptr;
 	return it->second.card;
 }
@@ -4275,10 +4279,10 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 		const PictureToMake request = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk);
 		const CardMade made = CardVehicle(request, place.card, place.card_lights);
 		place.on_card = made != CardMade::TooBig;
-		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card);
+		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card, zoom);
 		if (made == CardMade::Drawn && lasting) lasting_drawn = true;
 		if (made == CardMade::NotYet) {
-			place.card = CardDrawnBefore(v, obj);
+			place.card = CardDrawnBefore(v, obj, zoom);
 			_vehicles_owed_pictures.insert(v->index);
 		}
 	}

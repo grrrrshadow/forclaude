@@ -83,6 +83,9 @@ int GetAircraftFlightLevel(T *v, bool takeoff = false);
  * movement table, the aircraft finds its own way over their taxiing tracks. None: not at one (the old airports' table,
  * or the open air).
  */
+/** A rocket stood up on its pad (ModularAircraftState::Launch): its engines are lit for so many of the last steps of its wait (the aircraft's handler steps twice a tick) -- the smoke about the pad, the movement state a GRF shows its flame by. */
+static constexpr uint8_t ROCKET_IGNITION_STEPS = 90;
+
 enum class ModularAircraftState : uint8_t {
 	None = 0, ///< Not at a modular airport.
 	Approach = 1, ///< A plane flying to the start of its final approach, its runway and its way off it reserved.
@@ -97,7 +100,7 @@ enum class ModularAircraftState : uint8_t {
 	HeliApproach = 10, ///< A helicopter flying to the pad it reserved.
 	HeliDescend = 11, ///< A helicopter coming down onto its pad.
 	HeliAscend = 12, ///< A helicopter rising from its pad or its hangar; a rocket rising from its pad.
-	Launch = 13, ///< An aircraft a rocket carries, on its pad: stood up, waiting to rise.
+	Launch = 13, ///< An aircraft a rocket carries, on its pad: stood up, waiting to rise; its engines lit for the last ROCKET_IGNITION_STEPS of it.
 	End, ///< End marker.
 };
 

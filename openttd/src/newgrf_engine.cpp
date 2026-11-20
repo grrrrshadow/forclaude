@@ -163,8 +163,10 @@ static uint8_t MapAircraftMovementState(const Aircraft *v)
 		case ModularAircraftState::Climb: return AMS_TTDP_CLIMBING;
 		case ModularAircraftState::HeliApproach: return AMS_TTDP_FLIGHT_TO_TOWER;
 		case ModularAircraftState::HeliDescend: return AMS_TTDP_HELI_LAND_AIRPORT;
-		case ModularAircraftState::HeliAscend:
-		case ModularAircraftState::Launch: return AMS_TTDP_HELI_TAKEOFF_AIRPORT;
+		case ModularAircraftState::HeliAscend: return AMS_TTDP_HELI_TAKEOFF_AIRPORT;
+		/* A rocket stood up on its pad: on its way to the take-off till its engines are lit, taking off from then --
+		 * so a GRF can show its flame only while they burn (the colleague's buran/pack_buran.py). */
+		case ModularAircraftState::Launch: return v->turn_counter > ROCKET_IGNITION_STEPS ? AMS_TTDP_HELI_TO_TAKEOFF_AIRPORT : AMS_TTDP_HELI_TAKEOFF_AIRPORT;
 		default: return AMS_TTDP_FLIGHT_TO_TOWER;
 	}
 

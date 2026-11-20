@@ -34,7 +34,9 @@
 #include "air_map.h"
 #include "airport.h"
 #include "command_func.h"
+#include "effectvehicle_func.h"
 #include "company_func.h"
+#include "core/random_func.hpp"
 #include "core/backup_type.hpp"
 #include "engine_base.h"
 #include "landscape.h"
@@ -1059,10 +1061,26 @@ static void HandleHeliDescend(Aircraft *v)
 }
 
 /** A plane on its rocket stood up on its pad: after a while it rises as a helicopter does (HandleHeliAscend()), with its engines' roar. */
+/**
+ * The smoke of a rocket's engines (the player, 19. 11.: the flame and the smoke of the rocket; the flame is the GRF's,
+ * by the movement state): a white cloud of the game's own now and then, somewhere within spread of the rocket.
+ * @param dz how far under the rocket (the pad's ground while it stands, the end of its flame while it climbs)
+ */
+static void RocketSmoke(const Aircraft *v, int spread, int dz)
+{
+	const uint32_t r = Random();
+	if (GB(r, 0, 2) != 0) return;
+	const int dx = static_cast<int>(GB(r, 2, 8)) * (2 * spread + 1) / 256 - spread;
+	const int dy = static_cast<int>(GB(r, 10, 8)) * (2 * spread + 1) / 256 - spread;
+	CreateEffectVehicleRel(v, dx, dy, dz, GB(r, 18, 2) == 0 ? EV_CRASH_SMOKE : EV_STEAM_SMOKE);
+}
+
 static void HandleLaunch(Aircraft *v)
 {
 	if (v->turn_counter > 0) {
 		v->turn_counter--;
+		/* Its engines lit a while before it rises: the smoke about the pad (the GRF shows its flame, MapAircraftMovementState()). */
+		if (v->turn_counter <= ROCKET_IGNITION_STEPS) RocketSmoke(v, TILE_SIZE, 0);
 		return;
 	}
 	if (!PlayVehicleSound(v, VSE_START)) {
@@ -1088,6 +1106,8 @@ static void HandleHeliAscend(Aircraft *v)
 		return;
 	}
 	if (u != nullptr) u->cur_speed = 32;
+	/* A rocket's smoke behind it as it climbs. */
+	if (StartsByRocket(v->engine_type)) RocketSmoke(v, TILE_SIZE / 2, -static_cast<int>(TILE_HEIGHT));
 	int count = UpdateAircraftSpeed(v);
 	if (count == 0) return;
 	const TileIndex pad = v->tile;
