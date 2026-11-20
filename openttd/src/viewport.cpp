@@ -13877,7 +13877,12 @@ static double _cab_near = CAB_NEAR;
 /** Cut a polygon to what lies ahead of a near plane. */
 static void CabClipNear(std::vector<CabPoint> &poly, double near)
 {
-	std::vector<CabPoint> out;
+	/* Wholly ahead -- nearly every one --: as it is, no list made. A list made and grown for every triangle of the
+	 * ground was more than half of a picture from the eyes' 25 000 allocations of memory (the rig, gdb, 21. 11.), each
+	 * dear under Wine and box64: the player's phone collected a picture 10 to 25 times as long as the rig. */
+	if (std::ranges::all_of(poly, [near](const CabPoint &p) { return p.f >= near; })) return;
+	thread_local std::vector<CabPoint> out;
+	out.clear();
 	size_t n = poly.size();
 	for (size_t i = 0; i < n; i++) {
 		const CabPoint &p = poly[i], &q = poly[(i + 1) % n];
@@ -13888,7 +13893,7 @@ static void CabClipNear(std::vector<CabPoint> &poly, double near)
 			out.push_back({near, p.r + (q.r - p.r) * t, p.u + (q.u - p.u) * t, p.tu + (q.tu - p.tu) * t, p.tv + (q.tv - p.tv) * t});
 		}
 	}
-	poly.swap(out);
+	poly.assign(out.begin(), out.end());
 }
 
 /** Cut a polygon to what lies ahead of the near plane of the picture being collected. */
@@ -14638,8 +14643,8 @@ static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint
 	CabRasterRows(dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, 0, h, _cab_glass_alpha, grass_eye);
 }
 
-/** Draw a polygon of the eye's frame, cut to the near plane, as a fan of triangles. */
-static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> poly, const CabEye &eye, uint8_t fill_holes, uint light = 256)
+/** Draw a polygon of the eye's frame, cut to the near plane (in place), as a fan of triangles. */
+static void CabDrawPolygonIn(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> &poly, const CabEye &eye, uint8_t fill_holes, uint light)
 {
 	CabClipNear(poly);
 	if (poly.size() < 3) return;
@@ -14650,6 +14655,20 @@ static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_
 		CabRasterTriangle(dst, zb, w, h, tex, tw, th, v0, prev, cur, fill_holes, light);
 		prev = cur;
 	}
+}
+
+/** @copydoc CabDrawPolygonIn() */
+static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> poly, const CabEye &eye, uint8_t fill_holes, uint light = 256)
+{
+	CabDrawPolygonIn(dst, zb, w, h, tex, tw, th, poly, eye, fill_holes, light);
+}
+
+/** @copydoc CabDrawPolygonIn() Its corners given as they are ({a, b, c}): into a list kept for it, none made each time (a triangle of the ground each). */
+static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::initializer_list<CabPoint> corners, const CabEye &eye, uint8_t fill_holes, uint light = 256)
+{
+	thread_local std::vector<CabPoint> poly;
+	poly.assign(corners.begin(), corners.end());
+	CabDrawPolygonIn(dst, zb, w, h, tex, tw, th, poly, eye, fill_holes, light);
 }
 
 /** The sprites kept as textures (_cab_textures) at CAB_TEXTURES_KEPT: the oldest half goes. No frame may be drawn from them (EyeFrameDrawing()). */
