@@ -932,11 +932,13 @@ static bool ConTestLevelCrossing(std::span<std::string_view> argv)
 static bool ConTestModularAirport(std::span<std::string_view> argv)
 {
 	if (argv.size() < 5 || argv.size() > 7) {
-		IConsolePrint(CC_HELP, "Build two modular airports and an aircraft flying between them. Usage: 'testmodletiste <x> <y> <x2> <y2> [<jmeno> [bezpadu]]'.");
+		IConsolePrint(CC_HELP, "Build two modular airports and an aircraft flying between them. Usage: 'testmodletiste <x> <y> <x2> <y2> [<jmeno> [bezpadu|budovy]]'.");
 		return true;
 	}
-	/* 'bezpadu': the airports without their helipad -- what a plane on a rocket is told there (GetRocketAircraftCannotUseReason()). */
+	/* 'bezpadu': the airports without their helipad -- what a plane on a rocket is told there (GetRocketAircraftCannotUseReason());
+	 * 'budovy': each with its six buildings in a row behind the hangar (let_budova_0..5). */
 	const bool no_pad = argv.size() > 6 && argv[6] == "bezpadu";
+	const bool buildings = argv.size() > 6 && argv[6] == "budovy";
 	auto px = ParseInteger(argv[1]), py = ParseInteger(argv[2]), qx = ParseInteger(argv[3]), qy = ParseInteger(argv[4]);
 	if (!px.has_value() || !py.has_value() || !qx.has_value() || !qy.has_value()) return false;
 	const std::string wanted = argv.size() > 5 ? std::string(argv[5]) : std::string();
@@ -967,8 +969,8 @@ static bool ConTestModularAirport(std::span<std::string_view> argv)
 			CommandCost c = Command<Commands::BuildAirportTaxiway>::Do(flags, TileXY(ax, ay), TileXY(bx, by), track, AirportSurface::Asphalt, st->index, false);
 			if (c.Failed() && why.empty()) why = fmt::format("pojezdovka {},{}: {}", ax, ay, RefusalReason(c));
 		};
-		auto piece = [&](uint ax, uint ay, ModularAirportKind kind, DiagDirection dir) {
-			CommandCost c = Command<Commands::BuildAirportPiece>::Do(flags, TileXY(ax, ay), kind, dir, 0, AirportSurface::Asphalt, st->index, false);
+		auto piece = [&](uint ax, uint ay, ModularAirportKind kind, DiagDirection dir, uint8_t building = 0) {
+			CommandCost c = Command<Commands::BuildAirportPiece>::Do(flags, TileXY(ax, ay), kind, dir, building, AirportSurface::Asphalt, st->index, false);
 			if (c.Failed() && why.empty()) why = fmt::format("kus {},{}: {}", ax, ay, RefusalReason(c));
 		};
 		/* Down from both ends of the runway; along to the stand; the turn up to the far end's way. */
@@ -986,6 +988,11 @@ static bool ConTestModularAirport(std::span<std::string_view> argv)
 		if (!no_pad) {
 			piece(x + 5, y + 3, ModularAirportKind::Helipad, DiagDirection::NW);
 			taxi(x + 5, y + 3, x + 5, y + 3, Track::Y);
+		}
+		if (buildings) {
+			/* From the hangar's tile out, each beside one built: the round terminal, the tower, then the others. */
+			static constexpr std::pair<int, uint8_t> ROW[] = {{3, 2}, {2, 1}, {4, 0}, {1, 3}, {5, 4}, {0, 5}};
+			for (const auto &[dx, b] : ROW) piece(x + dx, y + 4, ModularAirportKind::Building, DiagDirection::SW, b);
 		}
 		return st;
 	};
