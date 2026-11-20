@@ -11762,6 +11762,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _house_levels_asked_only;
 		_house_levels_asked_only = number(2).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: urovne textur domu {}", _house_levels_asked_only ? "jen chtene" : "vsechny");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "okraj") {
+		/* 'stojici okraj 0|1': a moving thing the card lacked only coming over the view's edge given whole with the next
+		 * frame's pass (1), or all the moving things laid again at once for it (0). */
+		extern bool _movers_edge_next_frame;
+		_movers_edge_next_frame = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici okraj {}", _movers_edge_next_frame ? "s dalsim snimkem" : "hned znovu");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "okna") {
 		/* 'stojici okna 0|1': the lit glass of the buildings by night laid by the card of what it holds with their
 		 * shapes (1), or placed corner by corner by the processor (0). */

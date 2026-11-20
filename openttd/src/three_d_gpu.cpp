@@ -6624,6 +6624,9 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					if (!_standing_failed_keys.contains(v.key)) {
 						s.missing++;
 						s.missing_keys.push_back(v.key);
+						/* Wholly within the block, not one coming over its edge (ThreeDGpuStanding::missing_inside). */
+						const std::array<int, 4> &r = reach[k];
+						if (r[0] >= s.view_x && r[1] >= s.view_y && r[2] <= s.view_x + s.width && r[3] <= s.view_y + s.height) s.missing_inside++;
 					}
 					continue;
 				} else {
