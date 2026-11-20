@@ -4958,6 +4958,13 @@ static Train *FindOrClaimCoupleTarget(Train *v, const Order &order, const Waypoi
 				continue;
 			}
 			if (rake->last_station_visited != dest) continue;
+			/* A casualty -- broken down, wrecked, sold for scrap -- does wait to be fetched, but by its rescue
+			 * engine alone: IsValidCouplePartner() turns it down for anybody else, and the two have to agree.
+			 * Taken here it was a target no road led to, and the collector went on to whatever safe ground it
+			 * was given, straight into it (the player's polygon, depot A, 20. 11.: a clone of 89 under "couple
+			 * any" claimed 42, broken down as it left station 1 with its partner, and crashed into it -- one
+			 * breakdown, two wrecks). */
+			if ((rake->breakdown_ctr == 1 || rake->IsWrecked() || rake->IsSoldForScrap()) && v->rescue_target != rake->index) continue;
 			if (through != nullptr) {
 				bool on_reachable = false;
 				for (const Train *u = rake; u != nullptr; u = u->Next()) {

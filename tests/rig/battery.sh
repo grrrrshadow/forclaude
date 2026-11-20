@@ -1083,6 +1083,31 @@ testza 10 testbrzda 59
 testza 10 testbrzda 60
 testza 8000 testbrzda 61
 testza 8000 testklon 61 3" 30000 -g $S/rig.sav
+# Depots A (9, (89,16)) and B (10, (108,16)) of the polygon: engine-wagon-engine
+# trains, 85-88 and 77-80 waiting at station 1, the collectors 89 and 81 under
+# "couple any, reverse out" and "decouple the whole train" -- the player's
+# protocol, as for the other depots. Breakdowns stay on: in rigDA the collector
+# 42 breaks down leaving station 1 with its partner, and a clone of 89 claimed
+# it and crashed into it (two wrecks, before the casualty test in
+# FindOrClaimCoupleTarget(), 20. 11.). A breakdown blocks its track for the
+# rig's 90 days, so not all eight get home; with the player's 14, or without
+# breakdowns, both depots couple 4 and bring 8 home.
+run_scene rigDA "vlak123 on
+testpauza
+testza 10 testbrzda 85
+testza 10 testbrzda 86
+testza 10 testbrzda 87
+testza 10 testbrzda 88
+testza 8000 testbrzda 89
+testza 8000 testklon 89 3" 30000 -g $S/rig.sav
+run_scene rigDB "vlak123 on
+testpauza
+testza 10 testbrzda 77
+testza 10 testbrzda 78
+testza 10 testbrzda 79
+testza 10 testbrzda 80
+testza 8000 testbrzda 81
+testza 8000 testklon 81 3" 30000 -g $S/rig.sav
 # Automatic departure on a couple order (polygon, TEMATA 2.41): a dual-headed
 # waiter is collected by a dual-headed collector whose next stop is back the
 # way it came. 62 with no flag carries on round the loop; 63 with "automatic"
