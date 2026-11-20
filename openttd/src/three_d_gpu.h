@@ -561,6 +561,9 @@ struct ThreeDGpuStandingItem {
 	std::array<float, 6> box{};
 	float mid = 0;
 	bool boxed = false;
+	/** Among the moving things (ThreeDGpuStanding::moving) under every one of them, whichever is laid first: a shadow.
+	 * Against what stands by its box as any; among the moving things the furthest. */
+	bool under_movers = false;
 	/** A vehicle laid by its own depth (ThreeDGpuStandingVehicle::near_span): how near the world point it hangs from is. */
 	float hang_near = 0;
 	bool own_near = false;

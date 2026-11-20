@@ -7515,7 +7515,7 @@ bool _small_views_moving_layer_on = true;
 uint64_t _turned_moving_small_passes = 0; ///< the diary: of the times the moving things were laid, those of the small views
 uint64_t _turned_moving_lacked_twice = 0; ///< the diary: things the card lacked in the pass that gave them whole too (TurnedCardLayMovers()): not laid that frame
 uint64_t _turned_moving_put_off = 0;      ///< the diary: things the card lacked coming over the view's edge, given whole with the next frame's pass (TurnedCardLayMoversOnce())
-/** The rig ('test3d stojici okraj 0|1'): a thing the card lacked only coming over the view's edge given whole with the next frame's pass (1), or all the moving things laid again at once for it (0, as before 20. 11.). */
+/** The rig ('test3d stojici vjezd 0|1'): a thing the card lacked only coming over the view's edge given whole with the next frame's pass (1), or all the moving things laid again at once for it (0, as before 20. 11.). */
 bool _movers_edge_next_frame = true;
 uint64_t _turned_moving_passes = 0;       ///< the diary: times they were laid
 double _turned_moving_ms = 0;             ///< and how long that took on the main thread, the card's part waited for
@@ -9046,6 +9046,9 @@ static uint32_t TurnedOrder(double near)
  * What stands on a block for the card, in its place in the order (TurnedOrder()), with its box: each pixel of it laid
  * by how near it is there (ThreeDGpuStandingItem::box).
  */
+/** The rig ('test3d stojici stin 0|1'): a shadow among the moving things laid under every one of them (1; ThreeDGpuStandingItem::under_movers), or by its box as any (0, as before 20. 11.). */
+bool _mover_shadows_under = true;
+
 static void AddTurnedStandingThingInOrder(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const TurnedSprite &s)
 {
 	const size_t from = out.items.size();
@@ -9062,12 +9065,18 @@ static void AddTurnedStandingThingInOrder(ThreeDGpuStanding &out, const DrawPixe
 	};
 	double xr, yr;
 	TurnWorldPoint((box[0] + box[3]) * 0.5, (box[1] + box[4]) * 0.5, xr, yr);
+	/* A shadow among the moving things (an aircraft's, a disaster's: its sprite darkening what is under it): under every
+	 * one of them. Its box lies where its aircraft's does while that stands on the ground, and laid by it the shadow
+	 * came over the aircraft, the airport's ground through it (the player, 20. 11., an aircraft of the game on an
+	 * airport: "not seen on the airport, in the air it was fine, it still looks like a clash with its own shadow"). */
+	const bool shadow = out.moving && _mover_shadows_under && kind == STANDING_SPRITE && HasBit(ps.image, PALETTE_MODIFIER_TRANSPARENT);
 	for (size_t k = from; k < out.items.size(); k++) {
 		ThreeDGpuStandingItem &item = out.items[k];
 		item.order = order;
 		item.box = box;
 		item.mid = static_cast<float>(xr + yr);
 		item.boxed = true;
+		item.under_movers = shadow;
 	}
 }
 

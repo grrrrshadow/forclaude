@@ -1600,7 +1600,8 @@ void main()
 
 /* The pictures laid on the turned map (DrawStandingOnCard()), as STANDING_VERTEX with each one's box after its order
  * (ThreeDGpuStandingItem::box): its lowest corner and middle, its highest corner and how its depth comes -- 0 by its
- * box, 1 as given (a_pos.z: a figure in a building's depth), 2 as given, its order alone, 3 a vehicle's own (STANDING_FRAGMENT). */
+ * box, 1 as given (a_pos.z: a figure in a building's depth), 2 as given, its order alone, 3 a vehicle's own, 4 by its box
+ * and under every thing that moves (a shadow, ThreeDGpuStandingItem::under_movers) (STANDING_FRAGMENT). */
 const char *const STANDING_BOX_VERTEX = R"(#version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
@@ -1644,7 +1645,12 @@ void main()
 	/* How near this pixel of it is: by its box, as given, or a vehicle's by its own depth kept beside the atlas
 	 * (how 3: v_lo its nearness's least and span, how near the point it hangs from is). */
 	float order = v_order, depth = v_depth;
-	if (v_hi.w > 2.5) {
+	if (v_hi.w > 3.5) {
+		/* A shadow among the things that move (how 4): against what stands by its box, under every thing that moves --
+		 * the furthest of them, none of them hidden by it whichever is laid first. */
+		order = NearOrder(PixelNear(v_lo.xyz, v_hi.xyz, v_lo.w));
+		depth = 0.0;
+	} else if (v_hi.w > 2.5) {
 		vec4 n = texelFetch(u_near_tex, ivec2(floor(v_uv)), 0);
 		float near = v_lo.w + v_lo.x + (floor(n.r * 255.0 + 0.5) * 256.0 + floor(n.g * 255.0 + 0.5)) / 65535.0 * v_lo.y;
 		order = NearOrder(near);
@@ -5930,6 +5936,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		} else if (!item.boxed) {
 			how = 2.0f;
 			z = std::clamp((static_cast<float>(item.order) / 32.0f - 262144.0f - s.depth[0]) / std::max(1e-3f, s.depth[1]), 0.0f, 1.0f);
+		} else if (s.moving && item.under_movers) {
+			how = 4.0f;
 		}
 		std::array<float, 8> box = {item.box[0], item.box[1], item.box[2], item.mid, item.box[3], item.box[4], item.box[5], how};
 		if (how == 3.0f) box = {item.vehicle->near_min, item.vehicle->near_span, 0.0f, item.hang_near, 0.0f, 0.0f, 0.0f, how};
