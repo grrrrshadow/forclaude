@@ -751,6 +751,12 @@ bool SendThreeDWaterAnimal(std::string_view name, double ahead_m)
 }
 
 /** The rig: the fish keep out of the boats' hulls (FindHulls()), or swim through them as before. */
+/** Whether the boats' hulls keep the water out (the rig's 'test3d voda trup 0|1'): the fish, and from within a hull the sea's surface and its haze (viewport.cpp). */
+bool ThreeDWaterHullsKept()
+{
+	return _hulls_kept_out_of;
+}
+
 void RigThreeDWaterHulls(bool on)
 {
 	_hulls_kept_out_of = on;

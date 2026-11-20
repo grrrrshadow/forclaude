@@ -389,6 +389,9 @@ struct ThreeDGpuEyeStep {
 	std::array<int, 4> lay_rect{}; ///< Lay: where on the picture lay_px and lay_z are, x, y (rows from the top), width, height
 	std::array<float, 3> colour{};
 	std::array<float, 3> absorb{}; ///< FarHaze under the water: how much of red, green and blue the water takes a world unit past from, 0 the haze from from to to
+	bool hull = false;             ///< FarHaze under the water, the eye in a boat's hull (EyeHull of viewport.cpp): the way through the hull is no water
+	std::array<std::array<float, 3>, 8> hull_sides{}; ///< its sides from the eye, a side's nx, ny, c: within it where nx * x + ny * y <= c
+	std::array<float, 2> hull_z{}; ///< its keel and its top from the eye, the height as x and y
 	float from = 0, to = 0, depth = 0, horizon = 0;
 	std::vector<ThreeDGpuEyeGlow> glows;
 	std::vector<ThreeDGpuEyeLight> lights;

@@ -18960,6 +18960,31 @@ static void DrawEyeVehicleGlass(const CabEye &eye, uint32_t *dst, float *zb, int
 }
 
 /** Where a pixel of the view from the eyes is in the world: x, y, and its height as x and y (CAB_Z_SCALE). */
+/**
+ * The hull of the boat the eye is in while it is under the water's surface (CollectEyeFrame()): the water, and its
+ * haze, begin outside it (the player, 21. 11.: "so that there is no water either, no surface in the submarine" -- the
+ * far end of the cabin faded into the sea's colour as if it stood full of water). Its outline as the fish have it
+ * (FindHulls() of three_d_water_life.cpp): eight sides within its model's box, from its keel to its top.
+ */
+struct EyeHull {
+	bool inside = false; ///< the eye is in it: else none of the rest
+	std::array<std::array<float, 3>, 8> sides{}; ///< a side's nx, ny, c: a place x, y from the eye is within it where nx * x + ny * y <= c
+	float low = 0, high = 0; ///< its keel and its top from the eye, the height as x and y (CabPixelInWorld())
+
+	/** The share of the straight way from the eye to a place that lies outside it: 0 a place within. */
+	double Outside(double x, double y, double zu) const
+	{
+		double t = 1.0;
+		for (const auto &side : this->sides) {
+			const double d = side[0] * x + side[1] * y;
+			if (d > side[2]) t = std::min(t, side[2] / d);
+		}
+		if (zu > this->high) t = std::min(t, this->high / zu);
+		if (zu < this->low) t = std::min(t, this->low / zu);
+		return 1.0 - t;
+	}
+};
+
 static inline void CabPixelInWorld(const CabEye &eye, double sx, double sy, float iw, double &x, double &y, double &zu)
 {
 	const double f = 1.0 / iw;
@@ -19923,6 +19948,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * water as the diving walker has them -- else the surface was drawn over the eye and the sky under it. The haze from
 	 * a few metres on: the cab about the eye stays as it is. */
 	bool cab_under_water = false;
+	EyeHull eye_hull; ///< the boat's the eye is in, under the water (found with the sea's surface cut by it, 4.)
 	if (walker == nullptr) {
 		const std::optional<double> surface = EyeWaterSurfaceZ(eye.x, eye.y);
 		cab_under_water = surface.has_value() && eye.z < EyeLevelZ(*surface);
@@ -20726,17 +20752,126 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const ThreeDVehicleShape *shape = nullptr;
 			if (boat != nullptr && boat->type == VehicleType::Ship && GetThreeDEyeVehicle(boat, ev, true) && ev.obj != nullptr) shape = ev.obj->TryGetShape();
 			const std::optional<double> surface = shape != nullptr ? EyeWaterSurfaceZ(ev.x, ev.y) : std::nullopt;
-			if (surface.has_value()) {
-				const double line = (*surface - ev.z) / (ev.scale * OBJECT_HEIGHT_PER_METRE); // the waterline, metres up the model
+			extern bool ThreeDWaterHullsKept();
+			const bool hull_kept = ThreeDWaterHullsKept();
+			/* Driven with the camera that leaves its model out (CabCamera::Bare, a cab of MSTS, no cab's eye in it): no
+			 * hull stands there to cut the sea -- a hole in its surface showed where the boat is not drawn. */
+			const bool boat_drawn = walker != nullptr || roof || (in_model_cab && cab_camera == CabCamera::Inside && !camera.msts);
+			if (surface.has_value() && (boat_drawn || !hull_kept)) {
+				/* Where the boat is from the eyes: lifted as its figure is when drawn (EyeStandZ(); under the surface every
+				 * depth is stretched as the land's levels are), and the sea's surface as its tiles' ground is. Its plain
+				 * height (17. 11.) put the waterline too low on a boat dived: by two thirds of its dive. */
+				const double boat_z = EyeStandZ(ev.x, ev.y, ev.z);
+				const double line = hull_kept ? (EyeLevelZ(*surface) - boat_z) / (ev.scale * OBJECT_HEIGHT_PER_METRE)
+						: (*surface - ev.z) / (ev.scale * OBJECT_HEIGHT_PER_METRE); // the waterline, metres up the model
 				double rear = 1e9, front = -1e9, left = 1e9, right = -1e9;
-				for (size_t c = 0; c + 2 < shape->pos.size(); c += 3) {
-					if (std::abs(shape->pos[c + 2] - line) > 0.6) continue;
-					rear = std::min<double>(rear, shape->pos[c]);
-					front = std::max<double>(front, shape->pos[c]);
-					left = std::min<double>(left, shape->pos[c + 1]);
-					right = std::max<double>(right, shape->pos[c + 1]);
+				if (hull_kept) {
+					/* Where its triangles cross the waterline: the hull's cut there, whatever the height. Its corners
+					 * within 0.6 m of the line alone (17. 11.) were none where a tall flat side has no corner near
+					 * it -- dived to its windows the sea's surface stood in the cabin again (the player, 21. 11.). */
+					const size_t corners = shape->pos.size() / 3;
+					thread_local std::vector<std::array<double, 2>> crossed; // where, metres of the model
+					crossed.clear();
+					for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+						for (int e = 0; e < 3; e++) {
+							const size_t ia = shape->tri[t + e], ib = shape->tri[t + (e + 1) % 3];
+							if (ia >= corners || ib >= corners) continue;
+							const double za = shape->pos[ia * 3 + 2] - line, zb2 = shape->pos[ib * 3 + 2] - line;
+							if ((za > 0) == (zb2 > 0)) continue;
+							const double f = za / (za - zb2);
+							const double px = shape->pos[ia * 3] + (shape->pos[ib * 3] - shape->pos[ia * 3]) * f;
+							const double py = shape->pos[ia * 3 + 1] + (shape->pos[ib * 3 + 1] - shape->pos[ia * 3 + 1]) * f;
+							rear = std::min(rear, px);
+							front = std::max(front, px);
+							left = std::min(left, py);
+							right = std::max(right, py);
+							crossed.push_back({px, py});
+						}
+					}
+					/* Its outline there: the place farthest out each way round, twenty-four ways, a hand's breadth beyond it
+					 * (the eight corners in the box of the cut were within the wall where the hull is round: with the eye
+					 * at the surface a strip of the sea showed along the cabin's wall as a line). */
+					if (front - rear > 0.5 && right - left > 0.5) {
+						static constexpr int WAYS = 24;
+						static constexpr double BEYOND_M = 0.08;
+						const double fa = ev.facing * M_PI / 180.0, ffx = std::cos(fa), ffy = std::sin(fa);
+						hull_box[0] = hull_box[1] = 1e18;
+						hull_box[2] = hull_box[3] = -1e18;
+						for (int w = 0; w < WAYS; w++) {
+							const double wa = w * 2.0 * M_PI / WAYS, wx = std::cos(wa), wy = std::sin(wa);
+							const std::array<double, 2> *far = &crossed.front();
+							double most = -1e18;
+							for (const auto &q : crossed) {
+								const double d = q[0] * wx + q[1] * wy;
+								if (d > most) {
+									most = d;
+									far = &q;
+								}
+							}
+							const double mx = ((*far)[0] + wx * BEYOND_M) * ev.scale * ev.along * OBJECT_UNITS_PER_METRE, my = ((*far)[1] + wy * BEYOND_M) * ev.scale * OBJECT_UNITS_PER_METRE;
+							const std::array<double, 2> at{ev.x + mx * ffx - my * ffy, ev.y + mx * ffy + my * ffx};
+							if (!hull_cut.empty() && std::hypot(at[0] - hull_cut.back()[0], at[1] - hull_cut.back()[1]) < 1e-6) continue;
+							hull_cut.push_back(at);
+							hull_box[0] = std::min(hull_box[0], at[0]);
+							hull_box[1] = std::min(hull_box[1], at[1]);
+							hull_box[2] = std::max(hull_box[2], at[0]);
+							hull_box[3] = std::max(hull_box[3], at[1]);
+						}
+						if (hull_cut.size() < 3) hull_cut.clear();
+					}
+					/* And the water beside the hull under the surface, the eye over it: a wall of the sea's colour round
+					 * the cut, from the surface down past the keel. Where the surface is cut away nothing was drawn
+					 * under it, and a window under the waterline looked out on the pale of the far ground (17. 11.,
+					 * left then: "seen light"). Under the surface the water's haze is all about. */
+					if (!hull_cut.empty() && !under_water) {
+						mark_colours.push_back(Colour(24, 72, 92).data);
+						const uint32_t *water = EyeColour(mark_colours.back());
+						const double top = EyeLevelZ(*surface), keel = boat_z + (shape->z0 - 1.0) * ev.scale * OBJECT_HEIGHT_PER_METRE;
+						for (size_t k = 0; k < hull_cut.size(); k++) {
+							const auto &ca = hull_cut[k], &cb = hull_cut[(k + 1) % hull_cut.size()];
+							thread_local std::vector<CabPoint> poly;
+							poly.clear();
+							poly.push_back(CabToEye(eye, ca[0], ca[1], top, 0, 0));
+							poly.push_back(CabToEye(eye, cb[0], cb[1], top, 0, 0));
+							poly.push_back(CabToEye(eye, cb[0], cb[1], keel, 0, 0));
+							poly.push_back(CabToEye(eye, ca[0], ca[1], keel, 0, 0));
+							CabDrawPolygonIn(dst, zb, width, height, water, 1, 1, poly, eye, 0, 256);
+						}
+					}
+				} else {
+					/* The rig ('test3d voda trup 0'): as before 21. 11. */
+					for (size_t c = 0; c + 2 < shape->pos.size(); c += 3) {
+						if (std::abs(shape->pos[c + 2] - line) > 0.6) continue;
+						rear = std::min<double>(rear, shape->pos[c]);
+						front = std::max<double>(front, shape->pos[c]);
+						left = std::min<double>(left, shape->pos[c + 1]);
+						right = std::max<double>(right, shape->pos[c + 1]);
+					}
 				}
-				if (front - rear > 0.5 && right - left > 0.5) {
+				/* The eye in it under the water: its sides from the eye, for the water's haze (EyeHull). */
+				if (hull_kept && under_water && shape->x1 - shape->x0 > 0.5f && shape->y1 - shape->y0 > 0.5f) {
+					const double ha = ev.facing * M_PI / 180.0, hfx = std::cos(ha), hfy = std::sin(ha);
+					const double along = ev.scale * ev.along * OBJECT_UNITS_PER_METRE, across = ev.scale * OBJECT_UNITS_PER_METRE, up = ev.scale * OBJECT_HEIGHT_PER_METRE;
+					const double hmid_a = (shape->x0 + shape->x1) / 2.0 * along, hhalf_a = (shape->x1 - shape->x0) / 2.0 * 0.96 * along;
+					const double hmid_c = (shape->y0 + shape->y1) / 2.0 * across, hhalf_c = (shape->y1 - shape->y0) / 2.0 * 0.92 * across;
+					const double ex = eye.x - ev.x, ey = eye.y - ev.y;
+					const double eu = (ex * hfx + ey * hfy - hmid_a) / hhalf_a, ew = (-ex * hfy + ey * hfx - hmid_c) / hhalf_c;
+					/* Its box and its corners cut off ((1, 0.45) and (0.6, 1) of the box in each quarter, InHull()): a u + b w <= c. */
+					static constexpr double K = 1.0 + 0.6 / 0.4 + 0.45 / 0.55;
+					static constexpr double abc[8][3] = {{1, 0, 1}, {-1, 0, 1}, {0, 1, 1}, {0, -1, 1},
+							{1 / 0.4, 1 / 0.55, K}, {1 / 0.4, -1 / 0.55, K}, {-1 / 0.4, 1 / 0.55, K}, {-1 / 0.4, -1 / 0.55, K}};
+					eye_hull.inside = true;
+					for (int k = 0; k < 8; k++) {
+						const double c = abc[k][2] - abc[k][0] * eu - abc[k][1] * ew;
+						if (c < 0) eye_hull.inside = false;
+						eye_hull.sides[k] = {static_cast<float>(abc[k][0] * hfx / hhalf_a - abc[k][1] * hfy / hhalf_c),
+								static_cast<float>(abc[k][0] * hfy / hhalf_a + abc[k][1] * hfx / hhalf_c), static_cast<float>(c)};
+					}
+					eye_hull.low = static_cast<float>((boat_z + shape->z0 * up - eye.z) * CAB_Z_SCALE);
+					eye_hull.high = static_cast<float>((boat_z + shape->z1 * up - eye.z) * CAB_Z_SCALE);
+					if (eye_hull.low > 0 || eye_hull.high < 0) eye_hull.inside = false;
+				}
+				if (!hull_kept && front - rear > 0.5 && right - left > 0.5) {
 					const double a = ev.facing * M_PI / 180.0, fx = std::cos(a), fy = std::sin(a);
 					const double mid_a = (rear + front) / 2, half_a = (front - rear) / 2 * 0.96, mid_c = (left + right) / 2, half_c = (right - left) / 2 * 0.92;
 					static constexpr double oct[8][2] = {{1, 0.45}, {0.6, 1}, {-0.6, 1}, {-1, 0.45}, {-1, -0.45}, {-0.6, -1}, {0.6, -1}, {1, -0.45}};
@@ -21548,7 +21683,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	{
 		/* Under the water instead: its own haze near the eyes, the sky all of it (the surface seen from under it, the
 		 * bed and what is in the water fade into the water's colour within twenty metres). */
-		const double fog_near = under_water ? (cab_under_water ? 3.0 : 0.5) * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.6;
+		/* (From within a boat's hull the water begins at the hull, EyeHull: its haze half a metre past it, as the diver's.) */
+		const double fog_near = under_water ? (cab_under_water && !eye_hull.inside ? 3.0 : 0.5) * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.6;
 		const double fog_far = under_water ? EYE_UNDER_WATER_SEEN_M * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.98;
 		const Colour far_haze = under_water ? Colour(24, 72, 92) : Colour(150, 178, 205);
 		const double horizon = under_water ? -1.0 : EyeHorizonY(eye);
@@ -21561,7 +21697,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			static constexpr std::array<double, 3> PER_METRE = {0.30, 0.17, 0.14};
 			for (int k = 0; k < 3; k++) absorb[k] = PER_METRE[k] / OBJECT_UNITS_PER_METRE;
 		}
-		out.Job([width, height, fog_near, fog_far, far_haze, horizon, absorb](uint32_t *dst, float *zb) {
+		out.Job([width, height, fog_near, fog_far, far_haze, horizon, absorb, eye, eye_hull](uint32_t *dst, float *zb) {
 			ParallelRows(height, [&](int lo, int hi) {
 			for (int y = lo; y < hi; y++) {
 				for (int x = 0; x < width; x++) {
@@ -21571,7 +21707,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						if (y < horizon) continue; // the sky
 						f = {1.0, 1.0, 1.0};
 					} else if (absorb[0] > 0) {
-						const double d = 1.0 / zb[i] - fog_near;
+						double water = 1.0 / zb[i];
+						if (eye_hull.inside) {
+							/* Of the way to it, what lies outside the hull the eye is in. */
+							double wx, wy, wzu;
+							CabPixelInWorld(eye, x + 0.5, y + 0.5, zb[i], wx, wy, wzu);
+							water *= eye_hull.Outside(wx - eye.x, wy - eye.y, wzu - eye.z * CAB_Z_SCALE);
+						}
+						const double d = water - fog_near;
 						if (d <= 0.0) continue;
 						for (int k = 0; k < 3; k++) f[k] = 1.0 - std::exp(-absorb[k] * d);
 					} else {
@@ -21584,8 +21727,13 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 			});
-		}, [fog_near, fog_far, far_haze, horizon, absorb](EyeCard &card) {
+		}, [fog_near, fog_far, far_haze, horizon, absorb, eye_hull](EyeCard &card) {
 			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::FarHaze);
+			if (eye_hull.inside && absorb[0] > 0) {
+				st.hull = true;
+				st.hull_sides = eye_hull.sides;
+				st.hull_z = {eye_hull.low, eye_hull.high};
+			}
 			st.colour = {static_cast<float>(far_haze.r), static_cast<float>(far_haze.g), static_cast<float>(far_haze.b)};
 			st.absorb = {static_cast<float>(absorb[0]), static_cast<float>(absorb[1]), static_cast<float>(absorb[2])};
 			st.from = static_cast<float>(fog_near);

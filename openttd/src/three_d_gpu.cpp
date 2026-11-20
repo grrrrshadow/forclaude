@@ -1179,6 +1179,7 @@ GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
 uint64_t _frame_shadow_key = 0;
 std::atomic<bool> _frame_programs = false; ///< compiled: the frame on the card is possible
 GpuProgram _frame_tri_program, _frame_background_program, _frame_haze_program, _frame_far_haze_program, _frame_shadow_program;
+GpuProgram _frame_hull_haze_program; ///< the water's haze from within a hull (EYE_HULL_HAZE_FRAGMENT); program 0: not made, the far haze's instead
 GpuProgram _frame_night_program, _frame_lamps_program, _frame_blasts_program, _frame_glow_after_program, _frame_lay_program;
 GpuProgram _frame_glow_program, _frame_star_program, _frame_moon_program, _frame_copy_program;
 /* The pictures shown straight from the card (ThreeDGpuEyeFrame::shown): three in turn, the video driver drawing the
@@ -2338,6 +2339,47 @@ void main()
 		f = 1.0 - exp(-u_absorb * max(0.0, 1.0 / z - u_from));
 	} else {
 		f = vec3(clamp((1.0 / z - u_from) / (u_to - u_from), 0.0, 1.0));
+	}
+	if (f != vec3(0.0)) c = floor(c + (u_haze - c) * f);
+	Put(c);
+}
+)";
+
+/* The water's haze seen from within a boat's hull (ThreeDGpuEyeStep::hull; the player, 21. 11.: "no water in the
+ * submarine" -- the far end of the cabin faded into the sea): as EYE_FAR_HAZE_FRAGMENT under the water, the part of the
+ * way to a pixel that lies within the hull not counted. A program of its own, the eight sides each a uniform: the haze
+ * of every other frame stays the program it was, and where a driver will not have this one the old haze is drawn. */
+const char *const EYE_HULL_HAZE_FRAGMENT = R"(
+uniform vec3 u_haze;
+uniform vec3 u_absorb;
+uniform float u_from;
+uniform vec3 u_h0, u_h1, u_h2, u_h3, u_h4, u_h5, u_h6, u_h7; // the hull's sides from the eye: nx, ny, c
+uniform vec2 u_hull_z; // its keel and its top from the eye
+float Side(vec3 s, vec2 w, float t)
+{
+	float d = dot(s.xy, w);
+	return d > s.z ? min(t, s.z / d) : t;
+}
+void main()
+{
+	ivec2 p = Pixel();
+	vec3 c = ColourAt(p);
+	float z = IwAt(p);
+	vec3 f = vec3(1.0);
+	if (z > 0.0) {
+		vec3 w = InWorld(vec2(p) + 0.5, z);
+		float t = 1.0;
+		t = Side(u_h0, w.xy, t);
+		t = Side(u_h1, w.xy, t);
+		t = Side(u_h2, w.xy, t);
+		t = Side(u_h3, w.xy, t);
+		t = Side(u_h4, w.xy, t);
+		t = Side(u_h5, w.xy, t);
+		t = Side(u_h6, w.xy, t);
+		t = Side(u_h7, w.xy, t);
+		if (w.z > u_hull_z.y) t = min(t, u_hull_z.y / w.z);
+		if (w.z < u_hull_z.x) t = min(t, u_hull_z.x / w.z);
+		f = 1.0 - exp(-u_absorb * max(0.0, (1.0 - t) / z - u_from));
 	}
 	if (f != vec3(0.0)) c = floor(c + (u_haze - c) * f);
 	Put(c);
@@ -7657,6 +7699,13 @@ void StartEyeFrame()
 		Diary("snimek z oci na karte ne: " + why, true);
 		return;
 	}
+	/* Not one of those the frame cannot do without: where it is not made, the water's haze as before it. */
+	_frame_hull_haze_program.program = 0;
+	if (!pixel(_frame_hull_haze_program, EYE_HULL_HAZE_FRAGMENT)) {
+		if (_frame_hull_haze_program.program != 0) gl.glDeleteProgram(_frame_hull_haze_program.program); // made, not linked
+		_frame_hull_haze_program.program = 0;
+		Diary("mlha vody za trupem lodi na karte ne (kresli se stara): " + why, true);
+	}
 	GLuint textures[11];
 	gl.glGenTextures(11, textures);
 	_frame_colour[0] = textures[0];
@@ -7754,7 +7803,8 @@ void EndEyeFrame()
 	for (GLuint b : {_frame_vbo, _frame_glow_vbo, _frame_star_vbo}) if (b != 0) gl.glDeleteBuffers(1, &b);
 	for (GLuint a : {_frame_vao, _frame_empty_vao, _frame_glow_vao, _frame_star_vao}) if (a != 0) gl.glDeleteVertexArrays(1, &a);
 	for (GpuProgram *p : {&_frame_tri_program, &_frame_background_program, &_frame_haze_program, &_frame_far_haze_program, &_frame_shadow_program, &_frame_night_program,
-			&_frame_lamps_program, &_frame_blasts_program, &_frame_glow_after_program, &_frame_lay_program, &_frame_glow_program, &_frame_star_program, &_frame_moon_program, &_frame_copy_program}) {
+			&_frame_lamps_program, &_frame_blasts_program, &_frame_glow_after_program, &_frame_lay_program, &_frame_glow_program, &_frame_star_program, &_frame_moon_program, &_frame_copy_program,
+			&_frame_hull_haze_program}) {
 		if (p->program != 0) gl.glDeleteProgram(p->program);
 	}
 }
@@ -8204,6 +8254,18 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				done();
 				break;
 			case Kind::FarHaze:
+				if (s.hull && _frame_hull_haze_program.program != 0) {
+					const GLuint hp = _frame_hull_haze_program.program;
+					job(_frame_hull_haze_program, "mlha vody za trupem");
+					gl.glUniform3f(UniformOf(hp, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
+					gl.glUniform1f(UniformOf(hp, "u_from"), s.from);
+					gl.glUniform3f(UniformOf(hp, "u_absorb"), s.absorb[0], s.absorb[1], s.absorb[2]);
+					static const char *const SIDES[8] = {"u_h0", "u_h1", "u_h2", "u_h3", "u_h4", "u_h5", "u_h6", "u_h7"};
+					for (int k = 0; k < 8; k++) gl.glUniform3f(UniformOf(hp, SIDES[k]), s.hull_sides[k][0], s.hull_sides[k][1], s.hull_sides[k][2]);
+					gl.glUniform2f(UniformOf(hp, "u_hull_z"), s.hull_z[0], s.hull_z[1]);
+					done();
+					break;
+				}
 				job(_frame_far_haze_program, "mlha v dali");
 				gl.glUniform3f(UniformOf(_frame_far_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
 				gl.glUniform1f(UniformOf(_frame_far_haze_program.program, "u_from"), s.from);
