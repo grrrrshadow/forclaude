@@ -625,6 +625,9 @@ static void AddTileSpriteToDraw(SpriteID image, PaletteID pal, int32_t x, int32_
 	ts.y = pt.y + extra_offs_y;
 }
 
+/** The standing sprite a first child is given to (AddChildSpriteScreen()): -1 the last one added, as the game does; a foundation's own while its ground is added (AddChildSpriteToFoundation()). */
+static int _child_of_parent = -1;
+
 /**
  * Adds a child sprite to the active foundation.
  *
@@ -645,6 +648,11 @@ static void AddChildSpriteToFoundation(SpriteID image, PaletteID pal, const SubS
 
 	/* Change the active ChildSprite list to the one of the foundation */
 	AutoRestoreBackup backup(_vd.last_child, _vd.last_foundation_child[foundation_part]);
+	/* Its first child is the foundation's, whatever has been added among the standing sprites since: "the last one"
+	 * is the foundation only while nothing is drawn between it and the ground on it. Our 3D track is (a depot's, a
+	 * station's, a crossing's: DrawThreeDTrackOn() before the tile's ground), and the ground went to the track's piece
+	 * as its child -- the top of the foundation left bare under the depot. */
+	AutoRestoreBackup parent_backup(_child_of_parent, _vd.foundation[foundation_part]);
 	AddChildSpriteScreen(image, pal, offs.x + extra_offs_x, offs.y + extra_offs_y, false, sub, false, false);
 }
 
@@ -959,6 +967,8 @@ void AddChildSpriteScreen(SpriteID image, PaletteID pal, int x, int y, bool tran
 	int32_t child_id = static_cast<int32_t>(_vd.child_screen_sprites_to_draw.size());
 	if (_vd.last_child != LAST_CHILD_PARENT) {
 		_vd.child_screen_sprites_to_draw[_vd.last_child].next = child_id;
+	} else if (_child_of_parent >= 0 && static_cast<size_t>(_child_of_parent) < _vd.parent_sprites_to_draw.size()) {
+		_vd.parent_sprites_to_draw[_child_of_parent].first_child = child_id;
 	} else {
 		_vd.parent_sprites_to_draw.back().first_child = child_id;
 	}
@@ -1402,12 +1412,16 @@ static bool ObjectsIndexReadOrOwed()
 	return false;
 }
 
+static bool TurnedWallsOwedReady();
+
 /** Objects made ready in the background: the tiles drawn as their sprites meanwhile drawn again, with them. */
 static const IntervalTimer<TimerWindow> _objects_readied_timer(std::chrono::milliseconds(100), [](auto) {
 	if (_objects_index_owed && ThreeDObjectsIndexRead()) {
 		_objects_index_owed = false;
 		MarkWholeScreenDirty();
 	}
+	/* The faces of the retaining walls drawn coarser, or as the game's foundations, till their textures were made. */
+	if (TurnedWallsOwedReady()) MarkWholeScreenDirty();
 	static uint64_t seen = 0;
 	const uint64_t now = ThreeDObjectsReadied();
 	if (now == seen) return;
@@ -4127,6 +4141,156 @@ static size_t _turned_foundation_pixels = 0;
 static constexpr size_t TURNED_FOUNDATION_PIXELS = static_cast<size_t>(16) << 20; ///< kept at most (64 MB), then drawn anew
 static uint32_t _turned_ground_block = 0; ///< counts the blocks drawn turned
 
+static int EyeWallMaterial(TileIndex tile);
+
+/** How many levels of the land down the face of a retaining wall has in its picture for the map (TurnedWallSheet()): a foundation is no higher than two, and its top need not be on a level. */
+static constexpr int TURNED_WALL_LEVELS = 3;
+/** The pictures of the faces of the retaining walls for the map, by material, light and size (TurnedWallSheet()). */
+static std::map<std::array<int, 3>, TurnedFoundationTexture> _turned_wall_sheets;
+/** The faces asked for finer than they were there yet: material and level (TurnedWallsOwedReady()). */
+static std::set<std::pair<int, int>> _turned_walls_owed;
+
+/** The figure of a retaining wall's face by its material (EyeWallMaterial()): of bricks, of stone, of concrete. */
+static const ThreeDVehicleObject *TurnedWallFace(int mat)
+{
+	static const char * const NAMES[3] = {"zed_lic_cihly", "zed_lic_kamen", "zed_lic_beton"};
+	return GetThreeDFigure(NAMES[mat]);
+}
+
+/** The level of a face's texture the map draws it from at a zoom, about a texel to a pixel, and how wide that level is. */
+static int TurnedWallLevel(const ThreeDVehicleObject &face, ZoomLevel zoom, int repeats, int &width)
+{
+	int tw0 = 1, th0 = 1;
+	face.TextureSize(0, tw0, th0);
+	/* A tile's edge turned to face the screen, in pixels at the zoom, its repeats along it. */
+	const double edge_px = static_cast<double>(UnScaleByZoom(static_cast<int>(TILE_SIZE * 2 * ZOOM_BASE * 1.4142), zoom));
+	const double want = std::max(1.0, edge_px / repeats);
+	const int level = std::clamp(static_cast<int>(std::floor(std::log2(std::max(1.0, tw0 / want)))), 0, 6);
+	width = std::max(1, tw0 >> level);
+	return level;
+}
+
+/** The faces drawn coarser than asked are there now (TurnedWallSheet()): the map is drawn again with them. */
+static bool TurnedWallsOwedReady()
+{
+	bool ready = false;
+	for (auto it = _turned_walls_owed.begin(); it != _turned_walls_owed.end();) {
+		const ThreeDVehicleObject *face = TurnedWallFace(it->first);
+		int tw0 = 1, th0 = 1;
+		if (face != nullptr) face->TextureSize(0, tw0, th0);
+		const ThreeDObjectTexture *tex = face != nullptr ? face->TryGetTexture(it->second) : nullptr;
+		if (tex != nullptr && !tex->px.empty() && tex->w >= std::max(1, tw0 >> it->second)) {
+			ready = true;
+			it = _turned_walls_owed.erase(it);
+		} else {
+			++it;
+		}
+	}
+	return ready;
+}
+
+/**
+ * The face of a retaining wall for the map (AddTurnedTileGround()): our board of bricks, stone or concrete, as the view
+ * from the eyes has it (DrawEyeRetainingWalls()), in one picture a tile's edge wide and TURNED_WALL_LEVELS levels of
+ * the land high -- its whole repeats along the edge, one to a level, in the light of the wall's side. The ground's
+ * pieces take their pixels from one picture with no repeating, on the card too; so the repeats are in the picture.
+ *
+ * The player (#391): "and where are our fills of the slopes, the brick wall, stone, concrete? In the first person they
+ * are there, from above not. Facing north there is OpenTTD's own fill, and the turned map has such blurred fills."
+ * The walls were the game's foundation sprite laid over them: its two drawn sides, mirrored for the other two.
+ * @param mat the material (EyeWallMaterial())
+ * @param e the tile's edge the wall stands on: N-E, E-S, S-W, W-N
+ * @param zoom the zoom drawn at
+ * @return the picture, or nullptr: no such board, or its texture not made yet (asked for; the game's foundation meanwhile)
+ */
+static TurnedFoundationTexture *TurnedWallSheet(int mat, int e, ZoomLevel zoom)
+{
+	static const int NX[4] = {-1, 0, 1, 0}, NY[4] = {0, 1, 0, -1};
+	/* Asked once for a block of the map: every tile of it with a foundation has four walls to ask for (a town on a
+	 * hillside), and the answer is the same for all of them. */
+	struct Asked {
+		uint32_t block = 0;
+		ZoomLevel zoom = ZoomLevel::Normal;
+		bool known[3][4] = {};
+		TurnedFoundationTexture *sheet[3][4] = {};
+	};
+	static Asked asked;
+	if (asked.block != _turned_ground_block || asked.zoom != zoom) {
+		asked = Asked{};
+		asked.block = _turned_ground_block;
+		asked.zoom = zoom;
+	}
+	if (asked.known[mat][e]) return asked.sheet[mat][e];
+	asked.known[mat][e] = true;
+	TurnedFoundationTexture *&answer = asked.sheet[mat][e];
+
+	const ThreeDVehicleObject *face = TurnedWallFace(mat);
+	if (face == nullptr) return nullptr;
+	/* A whole number of the board's widths along a tile's edge, as from the eyes: the bricks go on round the corners. */
+	const double edge_m = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	const double board_m = std::max(0.5f, GetThreeDBoardSize(face->name).first);
+	const int repeats = std::clamp(static_cast<int>(std::lround(edge_m / board_m)), 1, 8);
+	int want_w = 1;
+	const int level = TurnedWallLevel(*face, zoom, repeats, want_w);
+	const ThreeDObjectTexture *tex = face->TryGetTexture(level);
+	if (tex == nullptr || tex->px.empty() || tex->w <= 0 || tex->h <= 0) {
+		_turned_walls_owed.emplace(mat, level);
+		return nullptr;
+	}
+	/* A coarser one stands in till the one asked for is made. */
+	if (tex->w < want_w) _turned_walls_owed.emplace(mat, level);
+
+	const int light = ThreeDLightOfNormal(NX[e], NY[e], 0);
+	auto [it, made] = _turned_wall_sheets.try_emplace({mat, light, tex->w});
+	TurnedFoundationTexture &sheet = it->second;
+	if (made) {
+		sheet.w = repeats * tex->w;
+		sheet.h = TURNED_WALL_LEVELS * tex->h;
+		sheet.px.resize(static_cast<size_t>(sheet.w) * sheet.h);
+		for (int y = 0; y < sheet.h; y++) {
+			const uint32_t *src = tex->px.data() + static_cast<size_t>(y % tex->h) * tex->w;
+			uint32_t *dst = sheet.px.data() + static_cast<size_t>(y) * sheet.w;
+			for (int x = 0; x < sheet.w; x++) {
+				Colour c(ShadedPixel(src[x % tex->w], light));
+				c.a = 255;
+				dst[x] = c.data;
+			}
+		}
+		GroundHash key;
+		key.Mix(0x5741115ULL);
+		key.Mix(static_cast<uint32_t>(mat) | static_cast<uint64_t>(light) << 8 | static_cast<uint64_t>(tex->w) << 24 | static_cast<uint64_t>(tex->h) << 44);
+		sheet.key = key.key;
+	}
+	answer = &sheet;
+	return answer;
+}
+
+/** The rig (test3d zdi): the faces of the retaining walls of the map -- their boards, the level asked at the main view's zoom, what is there of it, the pictures made. */
+std::string DescribeTurnedWalls()
+{
+	const Window *w = GetMainWindow();
+	const ZoomLevel zoom = w != nullptr && w->viewport != nullptr ? w->viewport->zoom : ZoomLevel::Normal;
+	std::string out = fmt::format("zoom {}", to_underlying(zoom));
+	for (int mat = 0; mat < 3; mat++) {
+		const ThreeDVehicleObject *face = TurnedWallFace(mat);
+		if (face == nullptr) {
+			out += fmt::format("; material {}: deska chybi", mat);
+			continue;
+		}
+		int tw0 = 1, th0 = 1;
+		const bool sized = face->TextureSize(0, tw0, th0);
+		const double board_m = std::max(0.5f, GetThreeDBoardSize(face->name).first);
+		const int repeats = std::clamp(static_cast<int>(std::lround(TILE_SIZE / OBJECT_UNITS_PER_METRE / board_m)), 1, 8);
+		int want_w = 1;
+		const int level = TurnedWallLevel(*face, zoom, repeats, want_w);
+		const ThreeDObjectTexture *tex = face->TryGetTexture(level);
+		out += fmt::format("; material {} ({}): textura {}x{}{}, opakovani {}, uroven {} (sirka {}), je {}", mat, face->name, tw0, th0, sized ? "" : " (nezjistena)", repeats, level, want_w,
+				tex == nullptr ? std::string("nic") : fmt::format("{}x{} pixelu {}", tex->w, tex->h, tex->px.size()));
+	}
+	out += fmt::format("; obrazku zdi {}, dluznych {}", _turned_wall_sheets.size(), _turned_walls_owed.size());
+	return out;
+}
+
 /** A piece of the ground of a block (ViewportDoDrawTurned()): a triangle, and the texture its pixels come from. */
 struct TurnedGroundPiece {
 	const uint32_t *tex;
@@ -4236,9 +4400,24 @@ static void AddTurnedTileGround(std::vector<TurnedGroundPiece> &pieces, std::vec
 			key.Mix(cs.relative);
 		}
 	}
+	/* The faces of its walls: our boards (TurnedWallSheet()), by the tile's material and each side's light. A change of
+	 * them is a change of the tile's look as any other. */
+	TurnedFoundationTexture *wall_sheet[4] = {};
+	if (foundation) {
+		const int mat = EyeWallMaterial(TileXY(x0 / TILE_SIZE, y0 / TILE_SIZE));
+		for (int e = 0; e < 4; e++) {
+			wall_sheet[e] = TurnedWallSheet(mat, e, zoom);
+			key.Mix(wall_sheet[e] != nullptr ? wall_sheet[e]->key : 0x5741100ULL);
+		}
+	}
+	/* With our walls on its sides the game's foundation sprite -- its walls -- is not drawn into the tile's picture, only
+	 * what stands on it, the ground on top: left in, its rock showed again along the edges of the top wherever the
+	 * ground does not reach them (a depot's tile with our track: no ground of the game's at all), taken for the
+	 * nearest drawn pixel there (DrawTexturedTriangle()). */
+	const bool own_walls = wall_sheet[0] != nullptr || wall_sheet[1] != nullptr || wall_sheet[2] != nullptr || wall_sheet[3] != nullptr;
 	/* The tiles beside it under and over its top, as the game draws them (below): part of its picture. */
-	const auto draw_foundation = [](const ParentSpriteToDraw &ps) {
-		if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+	const auto draw_foundation = [own_walls](const ParentSpriteToDraw &ps) {
+		if (ps.image != SPR_EMPTY_BOUNDING_BOX && !own_walls) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
 		for (int child_idx = ps.first_child; child_idx >= 0;) {
 			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
 			child_idx = cs.next;
@@ -4316,7 +4495,7 @@ static void AddTurnedTileGround(std::vector<TurnedGroundPiece> &pieces, std::vec
 			for (int k : {2, 0, 1}) {
 				if (foundation_index[k] == -1) continue;
 				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[foundation_index[k]];
-				if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+				if (ps.image != SPR_EMPTY_BOUNDING_BOX && !own_walls) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
 				int child_idx = ps.first_child;
 				while (child_idx >= 0) {
 					const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
@@ -4465,6 +4644,40 @@ static void AddTurnedTileGround(std::vector<TurnedGroundPiece> &pieces, std::vec
 	std::sort(walls, walls + num_walls, [](const Wall &p, const Wall &q) { return p.near < q.near; });
 	for (int i = 0; i < num_walls; i++) {
 		int a = walls[i].a, b = walls[i].b;
+		if (TurnedFoundationTexture *sheet = wall_sheet[a]; sheet != nullptr) {
+			/* Our wall: its picture's width along the edge, from the left as one sees the face from outside, a level
+			 * of the land to each of its rows of repeats, counted down from the level at or over its top -- so the
+			 * rows go on from tile to tile. */
+			static const int NX[4] = {-1, 0, 1, 0}, NY[4] = {0, 1, 0, -1};
+			if (sheet->block != _turned_ground_block) {
+				sheet->block = _turned_ground_block;
+				sheet->index = static_cast<uint32_t>(textures.size()) + 1;
+				textures.push_back(sheet);
+			}
+			const bool a_left = (cxs[b] - cxs[a]) * -NY[a] + (cys[b] - cys[a]) * NX[a] > 0;
+			const int l = a_left ? a : b, r = a_left ? b : a;
+			const double from_z = std::ceil(std::max(wz[a], wz[b]) / TILE_HEIGHT - 1e-9) * TILE_HEIGHT;
+			const double row_h = static_cast<double>(sheet->h) / TURNED_WALL_LEVELS;
+			auto wall_vertex = [&](int corner, double z, double u) {
+				TurnedVertex out;
+				double fx, fy;
+				ProjectTurnedF(wx[corner], wy[corner], z, fx, fy);
+				out.x = (fx - frame.left) * scale;
+				out.y = (fy - frame.top) * scale;
+				out.u = u;
+				out.v = std::clamp((from_z - z) / TILE_HEIGHT, 0.0, static_cast<double>(TURNED_WALL_LEVELS)) * row_h;
+				return out;
+			};
+			const TurnedVertex l_top = wall_vertex(l, wz[l], 0), r_top = wall_vertex(r, wz[r], sheet->w);
+			const TurnedVertex r_bot = wall_vertex(r, bz[r], sheet->w), l_bot = wall_vertex(l, bz[l], 0);
+			if (debug) {
+				IConsolePrint(CC_DEFAULT, "ladeni:   stena {}-{} nase, obrazek {}x{} c.{}, blok ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) radky {:.1f}..{:.1f}",
+						a, b, sheet->w, sheet->h, sheet->index, l_top.x, l_top.y, r_top.x, r_top.y, r_bot.x, r_bot.y, l_bot.x, l_bot.y, std::min(l_top.v, r_top.v), std::max(l_bot.v, r_bot.v));
+			}
+			pieces.push_back({sheet->px.data(), sheet->w, sheet->h, sheet->index, l_top, r_top, r_bot});
+			pieces.push_back({sheet->px.data(), sheet->w, sheet->h, sheet->index, l_top, r_bot, l_bot});
+			continue;
+		}
 		/* The game draws the walls below the edges E-S and S-W; the other two take their pixels mirrored through the middle. */
 		bool drawn = (a == 1 && b == 2) || (a == 2 && b == 3);
 		int ta = drawn ? a : (a + 2) & 3, tb = drawn ? b : (b + 2) & 3;
@@ -4927,7 +5140,7 @@ static void AddTurnedTextureSprites(std::vector<TurnedTextureSprite> &out, const
 	const Point c = RemapCoords(ps.ax, ps.ay, ps.az), t = ProjectTurned(ps.ax, ps.ay, ps.az);
 	const int shift_x = t.x - c.x, shift_y = t.y - c.y;
 	const int sx = ps.x - shift_x, sy = ps.y - shift_y, sleft = ps.left - shift_x, stop = ps.top - shift_y;
-	out.push_back({ps.image, ps.pal, ps.sub, sx, sy});
+	if (ps.image != SPR_EMPTY_BOUNDING_BOX) out.push_back({ps.image, ps.pal, ps.sub, sx, sy});
 	for (int child_idx = ps.first_child; child_idx >= 0;) {
 		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
 		child_idx = cs.next;
@@ -5681,9 +5894,23 @@ static void DrawTurnedDepot(const DrawPixelInfo &frame, const ParentSpriteToDraw
 	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, (part.x0 + part.x1) / 2.0, (part.y0 + part.y1) / 2.0, 360.0);
 }
 
-/** The sprites of a depot on its tile given their box for the turned view: the tallest the shed, the rest drawn into it. */
-static void TurnedDepot(TileIndex tile, size_t first_parent)
+/**
+ * The sprites of a depot on its tile given their box for the turned view: the tallest the shed, the rest drawn into it.
+ *
+ * Not the tile's foundation: that is the ground's (AddTurnedTileGround()), laid with it and then emptied. With our
+ * depot standing there as an object the foundation is the only sprite of the tile left, and it was taken for the
+ * shed: a box of a depot's shape under the object, and by the time it was drawn its sprite was the empty one -- the
+ * game's "no such sprite" mark laid over it (the player, #391: "a depot on a slope, something blue is drawn under
+ * it, a blue disc with a black net about it").
+ * @param tile the depot's tile
+ * @param first_parent the first of its sprites in _vd.parent_sprites_to_draw
+ * @param foundation its foundation sprites there, or -1 (TurnedTile::foundation)
+ */
+static void TurnedDepot(TileIndex tile, size_t first_parent, const int foundation[3])
 {
+	const auto is_foundation = [foundation](size_t i) {
+		return static_cast<int>(i) == foundation[0] || static_cast<int>(i) == foundation[1] || static_cast<int>(i) == foundation[2];
+	};
 	TurnedDepotKind kind;
 	Axis axis;
 	if (IsRailDepotTile(tile)) {
@@ -5702,7 +5929,7 @@ static void TurnedDepot(TileIndex tile, size_t first_parent)
 	size_t body = SIZE_MAX;
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
-		if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+		if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0 || is_foundation(i)) continue;
 		if (body == SIZE_MAX || ps.top < _vd.parent_sprites_to_draw[body].top) body = i;
 	}
 	if (body == SIZE_MAX) return;
@@ -5710,7 +5937,7 @@ static void TurnedDepot(TileIndex tile, size_t first_parent)
 	/* The rest -- the door's frame -- drawn into the shed's texture, where the game draws them. */
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
-		if (i == body || ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
+		if (i == body || ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0 || is_foundation(i)) continue;
 		ParentSpriteToDraw &shed = _vd.parent_sprites_to_draw[body];
 		int idx = static_cast<int>(_vd.child_screen_sprites_to_draw.size());
 		_vd.child_screen_sprites_to_draw.push_back({ps.image, ps.pal, ps.sub, ps.x - shed.x, ps.y - shed.y, false, -1});
@@ -9411,7 +9638,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 			if (tile_type == TileType::TunnelBridge && IsBridge(_cur_ti.tile)) TurnedBridgeHead(_cur_ti.tile, first_parent, pieces && !under);
 			/* A depot: one box over its tile (TurnedDepot()); see-through, its sprites as they are. */
 			if ((tile_type == TileType::Railway || tile_type == TileType::Road || tile_type == TileType::Water) && !IsTransparencySet(TransparencyOption::Buildings)) {
-				TurnedDepot(_cur_ti.tile, first_parent);
+				TurnedDepot(_cur_ti.tile, first_parent, t.foundation);
 			}
 		}
 

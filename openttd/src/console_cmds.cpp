@@ -13696,6 +13696,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			} else if (argv[k] == "depo") {
 				r = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, at, rt, static_cast<DiagDirection>(ParseInteger(argv[k + 1]).value_or(0) & 3));
 				done = true;
+			} else if (argv[k] == "garaz") {
+				/* 'garaz <0..3>': a road depot there instead, its door at that edge (on the corners 'zvedni' raised: a garage on a foundation). */
+				r = Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, at, ROADTYPE_ROAD, static_cast<DiagDirection>(ParseInteger(argv[k + 1]).value_or(0) & 3));
+				done = true;
 			}
 		}
 		if (!done) r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, at, rt, static_cast<Track>(*tr), false);
@@ -13718,6 +13722,23 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE ({})", *tr, *x, *y, r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
+		return true;
+	} else if (what == "zdi") {
+		/* The rig: the faces of the retaining walls on the map (TurnedWallSheet() of viewport.cpp); 'zdi dum [n]' the
+		 * n-th house standing on a slope, on its foundation -- the view moved to it (the brick walls). */
+		extern std::string DescribeTurnedWalls();
+		if (argv.size() > 2 && argv[2] == "dum") {
+			int skip = number(3).value_or(0);
+			for (const TileIndex t : Map::Iterate()) {
+				if (!IsTileType(t, TileType::House) || GetTileSlope(t) == SLOPE_FLAT || skip-- > 0) continue;
+				ScrollMainWindowToTile(t, true);
+				IConsolePrint(CC_DEFAULT, "test3d: zdi dum na svahu {},{} (svah {})", TileX(t), TileY(t), to_underlying(GetTileSlope(t)));
+				return true;
+			}
+			IConsolePrint(CC_ERROR, "test3d: zdi dum: zadny dum na svahu.");
+			return true;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: zdi {}", DescribeTurnedWalls());
 		return true;
 	} else if (what == "casy") {
 		/* The rig: where the turned view's time went since the last 'casy' (the round curves, the pictures of vehicles). */
