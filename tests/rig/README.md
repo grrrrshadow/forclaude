@@ -125,6 +125,9 @@ compare a change to.
     RIG_DIR=... BATTERY_STABLE=run.stable ./battery.sh > run.out
     diff battery_baseline.stable run.stable
 
+The battery changes to its own directory first, so it can be called from
+anywhere; a relative `BATTERY_STABLE` is taken from where it was called.
+
 Seven of its scenes need saves that are not in the repository and come out all
 zeroes without them, so on a rig missing those the difference is those seven
 lines and nothing else. Take the baseline again when a change is meant to
@@ -172,8 +175,22 @@ identity moves to its other head; the dual-head list normalisation left
 to sheds): all 80 scenes 4/4, no collision and no assert, and the units
 put down crossed go on to their next stop and home.
 
-Scenes are to be re-run once the engine–wagons–engine depots (A/B) are
-worked on again.
+The matrix is played with breakdowns off (`matrix_gen.py` writes the setting
+into every scene): since a casualty waits for a rescue engine, one breakdown
+holds its track for the rig's ninety days and the scenes count traffic jams
+instead of couplings. Re-run 21. 11. after the work on the
+engine–wagon–engine depots (A/B; the identity of a collector whose list is
+turned at coupling, the uphill/downhill bookkeeping after coupling): all 80
+scenes as `matrix_after_fix.out`.
+
+Depots A and B themselves are in the battery: `rigDA`/`rigDB` (a collector
+and its clones, breakdowns on), `rigDAo`/`rigDBo` (the same with rescue
+engines) and `rigXAA`, `rigXBB`, `rigXAB`, `rigXBA` -- the player's own test:
+the four waiting trains first, the four real collectors once those stand at
+station 1, each depot with its own and crosswise with the other's, breakdowns
+off. Each of those four writes a second line, `vlaku`, `bezrozkazu` and
+`vdepu` at the start / at the end: the same number of trains, none without
+orders, all of them home.
 
 ## The rig's own sets, in yagl
 

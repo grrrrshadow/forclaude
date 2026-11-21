@@ -5197,7 +5197,7 @@ static bool ConTestSell(std::span<std::string_view> argv)
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy|porouchanydlouhy] [signal cycle] [dve]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy|porouchanydlouhy|svah] [signal cycle] [dve]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -5255,6 +5255,16 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * which nobody has been paid for, stays where it is, with the tow standing
 	 * right against it. The player's crash: the tow drove off through it. */
 	bool broken_long_variant = argv.size() >= 2 && argv[1] == "porouchanydlouhy";
+	/* 'svah': 'rovina' with a hump in the line right where the casualty breaks
+	 * down, and a casualty long enough to lie over all of it -- its head just
+	 * over the top and going down, its middle on the top, its tail still coming
+	 * up. The tow climbs the same slope from the other side and couples on it.
+	 * Whichever depot the joined train then leaves for, some of its vehicles
+	 * set off the opposite way to the one they came, on a sloped tile: the
+	 * player's crash, where a train lying over a slope was coupled to and the
+	 * game fell over twelve ticks later, on the first vehicle whose height no
+	 * longer agreed with the ground under it. */
+	bool hump_variant = argv.size() >= 2 && argv[1] == "svah";
 	/* 'depozpet' is 'depo' without the shed on the stub: pull the west depot
 	 * down once the tow is out (testzbourat depo) and the only depot left to
 	 * bring the casualty to is the one it is half inside of, behind the tow. */
@@ -5354,6 +5364,22 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		IConsolePrint(CC_ERROR, "testodtah: depot failed.");
 		return true;
 	}
+	if (hump_variant) {
+		/* Two rows of corners across the line go up, before the rails: the tile
+		 * on the near side of them climbs, the one between them is the top and
+		 * the one beyond comes down again. The north and east corners of a tile
+		 * are the two on its low-x side, so each call lifts one such row and no
+		 * corner is lifted twice. */
+		for (uint vx : {xj + 9, xj + 10}) {
+			auto [terra, cost_t, tile_t] = Command<Commands::TerraformLand>::Do(DoCommandFlag::Execute, TileXY(vx, y0), SLOPE_NE, true);
+			if (terra.Failed()) {
+				IConsolePrint(CC_ERROR, "testodtah svah: terraform at ({},{}) failed - {}", vx, y0, RefusalReason(terra));
+				return true;
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "testodtah svah: sklony ({},{}) {:#x}, ({},{}) {:#x}, ({},{}) {:#x}.",
+				xj + 8, y0, to_underlying(GetTileSlope(TileXY(xj + 8, y0))), xj + 9, y0, to_underlying(GetTileSlope(TileXY(xj + 9, y0))), xj + 10, y0, to_underlying(GetTileSlope(TileXY(xj + 10, y0))));
+	}
 	if (Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, TileXY(x0 + LEN - 2, y0), TileXY(x0 + 1, y0), RAILTYPE_RAIL, Track::X, false, true).Failed()) {
 		IConsolePrint(CC_ERROR, "testodtah: track failed.");
 		return true;
@@ -5419,6 +5445,17 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 			auto [cost_x, veh_x, un_x1, un_x2, un_x3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
 			if (cost_x.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_x, Train::Get(veh_c)->Last()->index, false).Failed()) {
 				IConsolePrint(CC_ERROR, "testodtah: dlouhy prodavany vlak - vagon se nepodaril.");
+				return true;
+			}
+		}
+	}
+
+	if (hump_variant) {
+		/* Seven vehicles, three and a half tiles: the hump is three. */
+		for (int i = 0; i < 5; i++) {
+			auto [cost_x, veh_x, un_x1, un_x2, un_x3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost_x.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_x, Train::Get(veh_c)->Last()->index, false).Failed()) {
+				IConsolePrint(CC_ERROR, "testodtah svah: vagon se nepodaril.");
 				return true;
 			}
 		}
@@ -5510,7 +5547,7 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	_testodtah_sell_broken = sell_broken_variant;
 	_testodtah_sell_after = 0;
 	_testodtah_break_tile = wagons_variant ? INVALID_TILE : half_in_depot ? TileXY(x0 + LEN - 2, y0) : faraway ? TileXY(x0 + LEN - 6, y0) :
-			((plain || oneway || sell_variant || sell_broken_variant || broken_long_variant) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
+			((plain || oneway || sell_variant || sell_broken_variant || broken_long_variant || hump_variant) ? TileXY(xj + 8, y0) : (crossing ? TileXY(xj, y0) : TileXY(xj, y0 + 1)));
 	_testodtah_cross_tile = crossing ? TileXY(xj, y0) : INVALID_TILE;
 	_testodtah_depot_w = depot_w;
 	_testspoj_active = true;

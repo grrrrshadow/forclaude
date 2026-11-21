@@ -1,6 +1,13 @@
 #!/bin/bash
 S=${RIG_DIR:?set RIG_DIR to the rig working directory (build/, ttdhome/, h2/, h3/, *.sav)}
 H=$S/ttdhome
+# Played from its own directory, wherever it is called from. The game keeps
+# its saved games in the directory it is started in when that has a save/ of
+# its own, and the language check at the end names the sources from here: a
+# run started in the rig directory came out with two lines changed
+# (ridicjmeno, cestina) that were the directory's and not the game's.
+case "${BATTERY_STABLE:-}" in ''|/*) ;; *) BATTERY_STABLE=$PWD/$BATTERY_STABLE ;; esac
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
 
 # One map for every scene that starts a new game, instead of a fresh random one
 # each time. A scene builds its own track, stations and road stops on whatever
@@ -403,6 +410,21 @@ run_scene vlekblok "vlak123 on
 testspoj vlek blok" 8000
 run_scene odtahrovina "vlak123 on
 testodtah rovina" 14000
+# The same road with a hump in it where the casualty breaks down (21. 11., the
+# player's crash on #390): seven vehicles lying over the climb, the top and
+# the descent, the tow coupling on the slope from the other side. The joined
+# train leaves the opposite way to the one some of its vehicles came, on a
+# sloped tile, and coupling never told them so: the first to move kept
+# counting its height the old way and the game stopped on the check twelve
+# ticks later (ground_vehicle.hpp, z_pos against the ground). The first goes
+# home west, the tow turning round on the slope; in the second the west depot
+# is pulled down once the tow is out of it, so it takes the casualty on east
+# and the casualty is the one that turns.
+run_scene odtahsvah "vlak123 on
+testodtah svah" 14000
+run_scene odtahsvahzpet "vlak123 on
+testodtah svah
+testzatik 800 testzbourat depo" 14000
 run_scene odtahkrizeni "vlak123 on
 testodtah krizeni" 14000
 run_scene odtahjednosmer "vlak123 on
@@ -1147,6 +1169,41 @@ testza 10 testbrzda 79
 testza 10 testbrzda 80
 testza 8000 testbrzda 81
 testza 8000 testklon 81 3" 30000 -g $S/rig.sav
+# Depots A and B the way the player tests them (21. 11.): the four waiting
+# trains first, and the four collectors only once those stand at station 1;
+# each depot's collectors with its own waiters and crosswise with the other's.
+# The real collectors, not clones of the first: 83, 84, 91 and 92 have no
+# waypoint before the station and reach their partner nose first, which no
+# clone of 81 or 89 does. Those are the ones whose list is turned at coupling,
+# and the train's number, orders and windows stayed on the old head, now a
+# vehicle in the middle: the new head got a fresh number (41, 42) and no orders
+# and stood at the platform with the brake on -- half of all couplings, in the
+# player's words. Breakdowns are off, so nothing depends on a tow: every scene
+# couples 4 and all eight are home again. The extra line says so: trains,
+# trains without orders and trains in a depot, at the start / at the end.
+cross_scene() { # name waiters collectors
+  local name=$1 scr="setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testza 5 testrozkazy"
+  local v
+  for v in $2; do scr="$scr
+testza 10 testbrzda $v"; done
+  for v in $3; do scr="$scr
+testza 4000 testbrzda $v"; done
+  run_scene $name "$scr
+testza 12900 testrozkazy" 14000 -g $S/rig.sav
+  local L=$S/reg_$name.log
+  local first=$(grep -n -m1 '^vlak [0-9]*: ([0-9]*,[0-9]*) vozu ' $L | cut -d: -f1)
+  local split=$(awk -v f="$first" 'NR >= f && /^vlak [0-9]*: \([0-9]*,[0-9]*\) vozu / { if (seen[$2]++) { print NR; exit } }' $L)
+  local a=$(sed -n "${first:-1},$(( ${split:-1} - 1 ))p" $L | grep '^vlak [0-9]*: ([0-9]*,[0-9]*) vozu ')
+  local b=$(sed -n "${split:-1},\$p" $L | grep '^vlak [0-9]*: ([0-9]*,[0-9]*) vozu ')
+  echo "$name: vlaku=$(echo "$a" | grep -c .)/$(echo "$b" | grep -c .) bezrozkazu=$(echo "$a" | grep -c 'rozkazu 0$')/$(echo "$b" | grep -c 'rozkazu 0$') vdepu=$(echo "$a" | grep -c ' v depu ')/$(echo "$b" | grep -c ' v depu ')" | tee -a ${BATTERY_STABLE:-/dev/null}
+}
+cross_scene rigXAA "85 86 87 88" "89 90 91 92"
+cross_scene rigXBB "77 78 79 80" "81 82 83 84"
+cross_scene rigXAB "85 86 87 88" "81 82 83 84"
+cross_scene rigXBA "77 78 79 80" "89 90 91 92"
 # Automatic departure on a couple order (polygon, TEMATA 2.41): a dual-headed
 # waiter is collected by a dual-headed collector whose next stop is back the
 # way it came. 62 with no flag carries on round the loop; 63 with "automatic"

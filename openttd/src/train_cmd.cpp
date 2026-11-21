@@ -8799,6 +8799,66 @@ bool IsCoupleHeldNoseFirst(const Train *v)
 }
 
 /**
+ * The train that goes on being the train had its list turned round for a coupling (CoupleTrainTo()): what makes it
+ * the train -- its orders, its number, its brake let off -- goes to the engine now first in the list.
+ *
+ * A train of an engine at each end met its partner nose first, so its list was relinked back to front and the engine
+ * that stood at its tail came first. Everything the game asks a train it asks the head of the list, and the identity
+ * stayed on the engine that had led: the splice made the new head a front engine with a fresh number, no orders and
+ * its brake on. The player's polygon, depots A and B (engine, wagon, engine), every collector that came to its
+ * partner going forwards (#390, 21. 11.: "after the coupling the trains lose their orders, half of all couplings
+ * stand with a stop sign and no orders" -- train 83 with its partner became a "train 41"). The rule is the one of the
+ * two heads of a multiple unit (SwapDualHeadRoles()) and of a chain put down (LetIdentityLeadDroppedChain()): the
+ * identity goes with whichever engine leads the list. Which end leads on the ground is the list's own business and
+ * stays as the turning left it (ReverseConsistOrder()).
+ *
+ * @param was_head the head of the list before it was turned
+ * @param head the head of the list now
+ */
+static void LetIdentityLeadTurnedList(Train *was_head, Train *head)
+{
+	if (head == was_head || was_head->unitnumber == 0 || head->unitnumber != 0) return;
+	if (!head->IsEngine() || head->IsArticulatedPart() || head->IsRearDualheaded()) return;
+	const bool backwards = head->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
+	TransferTrainIdentity(was_head, head);
+	head->vehicle_flags.Set(VehicleFlag::DrivingBackwards, backwards);
+}
+
+/**
+ * Set a standing vehicle's uphill/downhill bookkeeping for the way it is going to travel now.
+ *
+ * The bookkeeping is written when a vehicle enters a tile, for the way it is going then, and its height is counted
+ * on from it step by step (GroundVehicle::UpdateZPosition()). A train that starts the other way has every vehicle's
+ * turned round (ReverseTrainDirection()); a coupling changes which way a train travels without that -- the train
+ * collected is drawn back the way it came, or on the way its collector was going -- and its vehicles standing on a
+ * slope kept the bookkeeping of their arrival: counted the wrong way on the first steps, the height no longer the
+ * ground's, and the game stopped on that (the player's #390: a rescue engine coupled on level track to a train of
+ * twenty-two vehicles lying over a slope, twelve ticks later "z_pos == GetSlopePixelZ()"). Worked out from the
+ * ground instead, as when it comes onto the tile: the tile's middle against the edge it came in over, for the way
+ * it travels now. Only on straight track (TileMayHaveSlopedTrack()); a vehicle in a bore, on a bridge or in a shed
+ * keeps what it has.
+ *
+ * @param u the vehicle, standing
+ */
+static void SetInclinationForTravel(Train *u)
+{
+	/* (As Train::TileMayHaveSlopedTrack(): any track that is not along x or y cannot be sloped.) */
+	if (u->track != Track::X && u->track != Track::Y) return;
+	const int tx = u->x_pos & ~TILE_UNIT_MASK, ty = u->y_pos & ~TILE_UNIT_MASK;
+	int ex = tx + TILE_SIZE / 2, ey = ty + TILE_SIZE / 2;
+	switch (DirToDiagDir(u->GetMovingDirection())) {
+		case DiagDirection::NE: ex = tx + TILE_SIZE - 1; break; // towards -x: in over the edge of +x
+		case DiagDirection::SW: ex = tx; break;
+		case DiagDirection::SE: ey = ty; break;
+		case DiagDirection::NW: ey = ty + TILE_SIZE - 1; break;
+		default: return;
+	}
+	const int entry_z = GetSlopePixelZ(ex, ey, true), middle_z = GetSlopePixelZ(tx + TILE_SIZE / 2, ty + TILE_SIZE / 2, true);
+	u->gv_flags.Reset({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown});
+	if (middle_z != entry_z) u->gv_flags.Set(middle_z > entry_z ? GroundVehicleFlag::GoingUp : GroundVehicleFlag::GoingDown);
+}
+
+/**
  * Couple a stopped train to another stopped train immediately adjacent to
  * it on the open track (as opposed to #CmdMoveRailVehicle, which rearranges
  * consists inside a depot). See #GetTrainCouplePartner for exactly which
@@ -9098,8 +9158,10 @@ static CommandCost CoupleTrainTo(DoCommandFlags flags, Train *v, Train *partner,
 		 * this right for a train that reversed on its way here, which is the
 		 * usual case. */
 		if (DistanceSquaredBetweenVehicles(leading->First(), trailing) < DistanceSquaredBetweenVehicles(leading->Last(), trailing)) {
+			Train *led = leading;
 			leading = ReverseConsistOrder(leading);
 			leading_turned = true;
+			LetIdentityLeadTurnedList(led, leading);
 		}
 		if (DistanceSquaredBetweenVehicles(trailing->Last(), leading) < DistanceSquaredBetweenVehicles(trailing->First(), leading)) {
 			trailing = ReverseConsistOrder(trailing);
@@ -9118,7 +9180,12 @@ static CommandCost CoupleTrainTo(DoCommandFlags flags, Train *v, Train *partner,
 	auto put_back = [&]() {
 		if (!flags.Test(DoCommandFlag::Execute)) return;
 		if (trailing_turned) trailing = ReverseConsistOrder(trailing);
-		if (leading_turned) leading = ReverseConsistOrder(leading);
+		if (leading_turned) {
+			/* (And its identity back on the engine that carried it, LetIdentityLeadTurnedList().) */
+			Train *led = leading;
+			leading = ReverseConsistOrder(leading);
+			LetIdentityLeadTurnedList(led, leading);
+		}
 		leading->ReserveTrackUnderConsist();
 		trailing->ReserveTrackUnderConsist();
 	};
@@ -9220,6 +9287,10 @@ static CommandCost CoupleTrainTo(DoCommandFlags flags, Train *v, Train *partner,
 	 * you came", whichever way the engine actually arrived. */
 	new_head->flags.Reset(VehicleRailFlag::Reversing);
 	new_head->ConsistChanged(CCF_TRACK);
+
+	/* Which way the joined train travels is settled: every vehicle's uphill/downhill bookkeeping for that way, before
+	 * anything of it is moved (SetInclinationForTravel()). */
+	for (Train *u = new_head; u != nullptr; u = u->Next()) SetInclinationForTravel(u);
 
 	/* The two halves were joined across a gap; walk it shut before anything
 	 * tries to drive this train. */

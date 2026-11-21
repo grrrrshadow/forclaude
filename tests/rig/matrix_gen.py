@@ -30,7 +30,12 @@ def scene(fam, wside, cside, n):
     units, coll = FAM[fam]
     ws, t0, d = VAR[n - 1]
     c = coll[cside]
-    lines = ["vlak123 on", "testpauza"]
+    # Breakdowns off: since a casualty waits for a rescue engine (the rig's
+    # ninety days) one breakdown holds its track for the rest of the scene,
+    # and the matrix came out as a count of traffic jams. It measures
+    # couplings; breakdowns about the same stations are the battery's
+    # rigDA/rigDB and their tow scenes.
+    lines = ["setting difficulty.vehicle_breakdowns 0", "vlak123 on", "testpauza"]
     for i, u in enumerate(units[wside]):
         lines.append(f"testzatik {10 + i * ws} testbrzda {u}")
     lines.append(f"testzatik 20 testklon {c} 3 stoj")
