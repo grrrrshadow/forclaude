@@ -20,6 +20,7 @@
 #include "newgrf_text.h"
 #include "roadveh.h"
 #include "train.h"
+#include "aircraft.h"
 #include "true_colour.h"
 #include "palette_func.h"
 #include "debug.h"
@@ -460,6 +461,14 @@ void ApplyVehicleConfig(Vehicle *v)
 		switch (u->type) {
 			case VehicleType::Road: RoadVehicle::From(u)->UpdateViewport(true, false); break;
 			case VehicleType::Train: Train::From(u)->UpdateViewport(true, false); break;
+			case VehicleType::Aircraft: {
+				/* An aircraft's picture is taken only as it is put somewhere (SetAircraftPosition()): put where it is (the
+				 * Mi-24's colours, the player 21. 11.). Its shadow and rotor follow it there. */
+				Aircraft *a = Aircraft::From(u);
+				extern void SetAircraftPosition(Aircraft *v, int x, int y, int z);
+				if (a->IsNormalAircraft()) SetAircraftPosition(a, a->x_pos, a->y_pos, a->z_pos);
+				break;
+			}
 			default: u->UpdateViewport(true); break;
 		}
 	}
