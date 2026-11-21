@@ -17916,6 +17916,42 @@ std::optional<double> EyeWaterSurfaceZ(double x, double y)
 	return static_cast<double>(GetSlopePixelZ(ix, iy, true));
 }
 
+/**
+ * The height of the surface of the water a boat floats in at a world point of it (the eye in it, its middle), units of
+ * height: the water's there (EyeWaterSurfaceZ()), else that of the nearest open water (EyeSwimTile()) within a tile of
+ * it. A boat's bow reaches over what is no open water -- under a dock's pier, over a coast, a river's bank --, and the
+ * eye in it there was taken for one on dry land: dived, not under the water, the sea's surface drawn over it and the
+ * sky under it, the shore seen from below (the player, 21. 11., #389: "with the submarine dived under the harbour I
+ * look into another world where everything is upside down; I cannot drive into that world, yet it is there"). Not for
+ * an eye ashore: land may lie under the surface of a canal beside it. None with no open water about.
+ * @param level the height the boat floats at (its z_pos): water about it at another level (above or below a lock) is not its
+ */
+static std::optional<double> EyeBoatSurfaceZ(double x, double y, int level)
+{
+	if (const std::optional<double> here = EyeWaterSurfaceZ(x, y); here.has_value()) return here;
+	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return std::nullopt;
+	const int tx = static_cast<int>(x) / static_cast<int>(TILE_SIZE), ty = static_cast<int>(y) / static_cast<int>(TILE_SIZE);
+	std::optional<double> surface;
+	double nearest = TILE_SIZE;
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			const int nx = tx + dx, ny = ty + dy;
+			if (nx < 0 || ny < 0 || nx >= static_cast<int>(Map::SizeX()) || ny >= static_cast<int>(Map::SizeY())) continue;
+			if (!EyeSwimTile(TileXY(nx, ny))) continue;
+			/* The point of that tile nearest. */
+			const double cx = std::clamp(x, nx * static_cast<double>(TILE_SIZE), (nx + 1) * static_cast<double>(TILE_SIZE) - 0.001);
+			const double cy = std::clamp(y, ny * static_cast<double>(TILE_SIZE), (ny + 1) * static_cast<double>(TILE_SIZE) - 0.001);
+			const double away = std::hypot(cx - x, cy - y);
+			if (away >= nearest) continue;
+			const int z = GetSlopePixelZ(static_cast<int>(cx), static_cast<int>(cy), true);
+			if (std::abs(z - level) > static_cast<int>(TILE_HEIGHT) / 2) continue;
+			nearest = away;
+			surface = static_cast<double>(z);
+		}
+	}
+	return surface;
+}
+
 /** How far from the land the sea is deepest, tiles (EyeWaterDepth()); how deep it is there, levels. */
 static constexpr int EYE_SEA_REACH = 6;
 static constexpr double EYE_SEA_LEVELS = 4.0;
@@ -19955,15 +19991,20 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * a few metres on: the cab about the eye stays as it is. */
 	bool cab_under_water = false;
 	EyeHull eye_hull; ///< the boat's the eye is in, under the water (found with the sea's surface cut by it, 4.)
+	/* (In a boat by the water it floats in, EyeBoatSurfaceZ(): its bow under a dock's pier or over a coast, the eye in
+	 * it is over no open water.) */
+	extern VehicleID FirstPersonBoatAboard();
+	const Vehicle *eye_boat = walker != nullptr ? Vehicle::GetIfValid(FirstPersonBoatAboard()) : v;
+	const bool eye_in_boat = eye_boat != nullptr && eye_boat->type == VehicleType::Ship;
 	if (walker == nullptr) {
-		const std::optional<double> surface = EyeWaterSurfaceZ(eye.x, eye.y);
+		const std::optional<double> surface = eye_in_boat ? EyeBoatSurfaceZ(eye.x, eye.y, eye_boat->z_pos) : EyeWaterSurfaceZ(eye.x, eye.y);
 		cab_under_water = surface.has_value() && eye.z < EyeLevelZ(*surface);
 		under_water = cab_under_water;
 	} else if (!walker->swimming && !walker->fly && !FirstPersonTunnelFloor(walker->x, walker->y, FirstPersonFeetZ(*walker)).has_value()) {
 		/* And of the walker dry under the surface -- walking about a boat that dived (the player, 16. 11., in the
 		 * submarine: "driving it is right, I see the fish; walking on its deck dived, the sky is below and the sea
 		 * above"): as from its cab. Not in a tunnel under the water. */
-		const std::optional<double> surface = EyeWaterSurfaceZ(eye.x, eye.y);
+		const std::optional<double> surface = eye_in_boat ? EyeBoatSurfaceZ(eye.x, eye.y, eye_boat->z_pos) : EyeWaterSurfaceZ(eye.x, eye.y);
 		cab_under_water = surface.has_value() && eye.z < EyeLevelZ(*surface);
 		under_water = cab_under_water;
 	}
@@ -20757,7 +20798,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			ThreeDEyeVehicle ev;
 			const ThreeDVehicleShape *shape = nullptr;
 			if (boat != nullptr && boat->type == VehicleType::Ship && GetThreeDEyeVehicle(boat, ev, true) && ev.obj != nullptr) shape = ev.obj->TryGetShape();
-			const std::optional<double> surface = shape != nullptr ? EyeWaterSurfaceZ(ev.x, ev.y) : std::nullopt;
+			/* (The water it floats in, EyeBoatSurfaceZ(): its middle may be over a coast.) */
+			const std::optional<double> surface = shape != nullptr ? EyeBoatSurfaceZ(ev.x, ev.y, boat->z_pos) : std::nullopt;
 			extern bool ThreeDWaterHullsKept();
 			const bool hull_kept = ThreeDWaterHullsKept();
 			/* Driven with the camera that leaves its model out (CabCamera::Bare, a cab of MSTS, no cab's eye in it): no

@@ -12805,9 +12805,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_ERROR, "test3d: jizda {} {}: takove vozidlo neni.", *type, *unit);
 	} else if (what == "jizda_na" && argv.size() > 5) {
-		/* 'jizda_na <unit> <x> <y> <yaw> [lod]': a road vehicle driven freely put on the middle of a tile at a heading
-		 * (CAB_YAW_TURN a turn, 0 along +x): before the end of a bridge, to drive up it; 'lod' a ship (before the portal
-		 * of a tunnel for ships). */
+		/* 'jizda_na <unit> <x> <y> <yaw> [lod [<ox> <oy>]]': a road vehicle driven freely put on the middle of a tile at
+		 * a heading (CAB_YAW_TURN a turn, 0 along +x): before the end of a bridge, to drive up it; 'lod' a ship (before
+		 * the portal of a tunnel for ships), with <ox> <oy> so many world units from the tile's north corner (its bow
+		 * under a dock). */
 		auto unit = number(2), x = number(3), y = number(4), yaw = number(5);
 		const bool ship = argv.size() > 6 && argv[6] == "lod";
 		for (Vehicle *u : Vehicle::Iterate()) {
@@ -12816,8 +12817,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (!u->cab_free) Command<Commands::CabDrive>::Do(DoCommandFlag::Execute, u->index, 0);
 			if (ship) {
 				Ship *s = Ship::From(u);
-				s->x_pos = static_cast<int>(*x) * TILE_SIZE + TILE_SIZE / 2;
-				s->y_pos = static_cast<int>(*y) * TILE_SIZE + TILE_SIZE / 2;
+				/* ('... lod <ox> <oy>': so many world units from the tile's north corner, else its middle.) */
+				s->x_pos = static_cast<int>(*x) * TILE_SIZE + (argv.size() > 8 ? std::clamp(number(7).value_or(8), 0, 15) : static_cast<int>(TILE_SIZE / 2));
+				s->y_pos = static_cast<int>(*y) * TILE_SIZE + (argv.size() > 8 ? std::clamp(number(8).value_or(8), 0, 15) : static_cast<int>(TILE_SIZE / 2));
 				s->tile = TileVirtXY(s->x_pos, s->y_pos);
 				s->z_pos = GetTilePixelZ(s->tile);
 				s->cab_px = s->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
