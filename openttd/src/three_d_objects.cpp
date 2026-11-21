@@ -16831,6 +16831,32 @@ static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
 static bool _three_d_forget_owed = false;
 uint64_t _three_d_forgets_done = 0;     ///< the diary: forgettings done since its last line
 uint64_t _three_d_forgets_put_off = 0;  ///< and put off, something holding what the objects made
+/**
+ * How long the forgettings took the main thread since the diary's last line, and the longest one by its parts (the
+ * player's diary of #390: the game stood 1.0 to 1.6 s in the windows' timers in the lines a forgetting was done in, and
+ * no word of which part of it): the textures trimmed, the pictures, the simpler shapes joined, the buildings' paint
+ * and levels, the objects not drawn forgotten, the shapes no one keeps.
+ */
+static constexpr int FORGET_PARTS = 6;
+static double _three_d_forget_ms = 0, _three_d_forget_longest_ms = 0;
+static std::array<double, FORGET_PARTS> _three_d_forget_longest_parts{};
+static size_t _three_d_forget_longest_count = 0;
+
+/** For the diary of the frames: the time of the forgettings (_three_d_forget_ms), counted anew. */
+std::string TakeThreeDForgetTimes()
+{
+	static constexpr std::array<const char *, FORGET_PARTS> NAMES = {"textury", "obrazky", "tvary jednodussi", "lak a urovne domu", "objekty", "tvary bez drzitele"};
+	std::string s = fmt::format("{:.0f} ms", _three_d_forget_ms);
+	if (_three_d_forget_longest_ms >= 1.0) {
+		s += fmt::format(", nejdelsi {:.0f} ms ({} zapomenuto:", _three_d_forget_longest_ms, _three_d_forget_longest_count);
+		for (int k = 0; k < FORGET_PARTS; k++) s += fmt::format(" {} {:.0f}", NAMES[k], _three_d_forget_longest_parts[k]);
+		s += ")";
+	}
+	_three_d_forget_ms = _three_d_forget_longest_ms = 0;
+	_three_d_forget_longest_parts = {};
+	_three_d_forget_longest_count = 0;
+	return s;
+}
 
 /**
  * The buildings' painted textures not asked for for three quarters of a minute let go of (the player's log of
@@ -16873,9 +16899,30 @@ static void ForgetUnusedThreeDObjectsNow()
 	}
 	_three_d_forget_owed = false;
 	_three_d_forgets_done++;
+	/* How long each part takes the main thread (TakeThreeDForgetTimes()). */
+	std::array<double, FORGET_PARTS> part_ms{};
+	size_t forgotten = 0;
+	auto part_started = std::chrono::steady_clock::now();
+	auto part_done = [&](int part) {
+		const auto now = std::chrono::steady_clock::now();
+		part_ms[part] += std::chrono::duration<double, std::milli>(now - part_started).count();
+		part_started = now;
+	};
+	auto all_done = [&] {
+		double sum = 0;
+		for (double ms : part_ms) sum += ms;
+		_three_d_forget_ms += sum;
+		if (sum > _three_d_forget_longest_ms) {
+			_three_d_forget_longest_ms = sum;
+			_three_d_forget_longest_parts = part_ms;
+			_three_d_forget_longest_count = forgotten;
+		}
+	};
 	TrimThreeDTextures();
 	TrimThreeDEyePainted();
+	part_done(0);
 	TrimThreeDPictures();
+	part_done(1);
 	/* Of the shapes kept, the simpler shapes that save little joined (ThreeDVehicleShape::JoinSimpler()). */
 	{
 		std::vector<std::shared_ptr<const ThreeDVehicleShape>> kept;
@@ -16890,11 +16937,15 @@ static void ForgetUnusedThreeDObjectsNow()
 		for (const auto &shape : kept) joined += shape->JoinSimpler();
 		if (joined > 0) Debug(misc, 1, "3D objects: {} simpler shapes joined with finer ones", joined);
 	}
+	part_done(2);
 	TrimThreeDPainted();
 	TrimThreeDHouseLevels();
-	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) return;
+	part_done(3);
+	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) {
+		all_done();
+		return;
+	}
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
-	size_t forgotten = 0;
 	for (const ThreeDObject &o : _three_d_objects) {
 		if (o.used >= before || (o.levels.empty() && o.painted.empty() && std::ranges::all_of(o.shapes, [](const auto &p) { return p == nullptr; }))) continue;
 		o.Forget();
@@ -16915,6 +16966,7 @@ static void ForgetUnusedThreeDObjectsNow()
 			++it;
 		}
 	}
+	part_done(4);
 	/* The shapes read that nothing keeps any more (the poses of a passage gone, a vehicle's frames). */
 	{
 		std::lock_guard lock(_vehicle_shapes_mutex);
@@ -16926,6 +16978,8 @@ static void ForgetUnusedThreeDObjectsNow()
 			}
 		}
 	}
+	part_done(5);
+	all_done();
 
 	if (forgotten > 0) Debug(misc, 1, "3D objects: {} not drawn for {} s forgotten", forgotten, THREE_D_FORGET_AFTER);
 }

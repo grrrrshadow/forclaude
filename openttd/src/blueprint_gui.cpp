@@ -251,6 +251,32 @@ static bool WriteBlueprintSetFile(const std::string &file_name)
 }
 
 /**
+ * The rig ('test3d blueprint'): the local company's infrastructure in an area copied into the first slot, the other
+ * slots emptied, and the set written to a file as the game exports it (the player, 21. 11.: "I have not even the
+ * blueprint of the test polygon any more" -- it is in a save of the rig). The file goes into the blueprint directory
+ * of the player's game and is loaded there from the blueprints' window.
+ * @param area the area to copy
+ * @param name the blueprint's name
+ * @param path the file to write, with its directory
+ * @param[out] items how many elements were copied; width, height the blueprint's size
+ * @return whether it was written (false too when the blueprint is empty or too big to be read again)
+ */
+bool RigWriteBlueprintSet(TileArea area, const std::string &name, const std::string &path, uint &items, uint &width, uint &height)
+{
+	for (uint i = 0; i < NUM_BLUEPRINT_SLOTS; i++) GetBlueprint(i) = Blueprint{};
+	Blueprint &bp = GetBlueprint(0);
+	items = CopyAreaToBlueprint(area, bp);
+	bp.name = name;
+	width = bp.width;
+	height = bp.height;
+	if (items == 0 || bp.width > MAX_BLUEPRINT_DIMENSION || bp.height > MAX_BLUEPRINT_DIMENSION) return false;
+	auto file = FileHandle::Open(path, "wb");
+	if (!file.has_value()) return false;
+	const std::string text = EncodeBlueprintSetText();
+	return fwrite(text.data(), 1, text.size(), *file) == text.size();
+}
+
+/**
  * Read a full 8-slot blueprint set from a file in the blueprint directory.
  * @param file_name File name including extension, relative to #GetBlueprintBaseDirectory.
  * @param[out] slots Filled with exactly #NUM_BLUEPRINT_SLOTS blueprints on success.

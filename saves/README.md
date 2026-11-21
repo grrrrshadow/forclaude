@@ -85,3 +85,7 @@ přes `-g` a scény jsou v baterii.
   cestě ke stanici 9, kde stojí prázdná řada (35,60) s „nenakládat“ (řada
   vožená po kouscích k nakládce). Starý filtr ji bral za plnou („hotová“).
   Scéna `vlak6plne` (TEMATA_RUZNE §119).
+- `polygon_blueprint.txt` — blueprint zkušebního polygonu z `rig.sav` (21. 11.,
+  hráč o svůj přišel): sada blueprintů hry (`OTTD-BPSET-1;…`), polygon v 1.
+  slotu, 404 prvků, 34×19 dlaždic. Patří do složky `blueprint` vedle savů hry
+  a načítá se v okně blueprintů. Vyrobeno rigem: `test3d blueprint <soubor>`.

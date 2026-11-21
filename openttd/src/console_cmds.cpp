@@ -9525,6 +9525,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else {
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", argv[4], *x, *y);
 		}
+	} else if (what == "blueprint" && argv.size() > 2) {
+		/* 'blueprint <file> [<name> [<x0> <y0> <x1> <y1>]]': the first company's infrastructure on the map (or in the
+		 * area) written as a set of blueprints with it in the first slot, the game's own export. */
+		extern bool RigWriteBlueprintSet(TileArea area, const std::string &name, const std::string &path, uint &items, uint &width, uint &height);
+		if (Company::IsValidID(CompanyID::Begin()) && _local_company != CompanyID::Begin()) SetLocalCompany(CompanyID::Begin());
+		TileArea area(TileXY(1, 1), Map::SizeX() - 2, Map::SizeY() - 2);
+		if (argv.size() > 7) {
+			const uint x0 = number(4).value_or(1), y0 = number(5).value_or(1), x1 = number(6).value_or(1), y1 = number(7).value_or(1);
+			area = TileArea(TileXY(std::min(x0, x1), std::min(y0, y1)), TileXY(std::max(x0, x1), std::max(y0, y1)));
+		}
+		uint items = 0, width = 0, height = 0;
+		const bool written = RigWriteBlueprintSet(area, argv.size() > 3 ? std::string(argv[3]) : std::string("polygon"), std::string(argv[2]), items, width, height);
+		IConsolePrint(written ? CC_DEFAULT : CC_ERROR, "test3d: blueprint {}: {} prvku, {}x{} dlazdic, mapa {}x{}, {}", argv[2], items, width, height, Map::SizeX(), Map::SizeY(), written ? "zapsano" : "NEZAPSANO");
 	} else if (what == "naraz" && argv.size() > 2) {
 		/* 'naraz 0|1': what the thread in the background makes (shapes, textures, the sprites of 3D vehicles) made at
 		 * once by the one asking (1), as before there was the thread -- to compare the two ways. */
