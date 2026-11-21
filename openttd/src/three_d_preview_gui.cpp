@@ -83,6 +83,12 @@ static constexpr int PREVIEW_GAP = 40; // the player: the things turning almost 
 /** A preview whose frame is wider or taller than this is drawn at the next coarser zoom (the player: a long wagon at 2x, not 4x). */
 static constexpr int PREVIEW_MAX_SIZE = 360;
 
+/**
+ * A square beside the purchase window with a side under this shows no vehicle of a 3D object, pixels: no room for it
+ * (PreviewObjectSide()).
+ */
+static constexpr int PREVIEW_OBJECT_MIN_SIDE = 48;
+
 /** A preview beside a window. */
 struct ThreeDPreview {
 	bool vehicle;               ///< a vehicle beside the purchase window, else an industry beside its window
@@ -341,7 +347,8 @@ static int PreviewObjectSide(const ThreeDPreview &p)
 	const Window *w = PreviewParent(p);
 	if (w == nullptr) return 0;
 	const int room = std::max(_screen.width - (w->left + w->width) - PREVIEW_GAP, w->left - PREVIEW_GAP);
-	return std::min({std::max(w->height, 160), room, _screen.height});
+	const int side = std::min({std::max(w->height, 160), room, _screen.height});
+	return side >= PREVIEW_OBJECT_MIN_SIDE ? side : 0;
 }
 
 /** Draw a vehicle preview: its likeness at the angle, turning about its middle; returns where it was drawn. */
@@ -350,15 +357,19 @@ static Rect DrawVehiclePreview(ThreeDPreview &p, bool draw)
 	/* A vehicle of a 3D object: the object itself, filling the square beside the window, turning about its middle. */
 	if (GetThreeDVehicleObject(p.engine) != nullptr && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32) {
 		const int side = PreviewObjectSide(p);
-		if (side > 0) {
-			Rect r = PreviewPlace(p, side, side);
-			if (r.right <= r.left || !draw) return r;
-			int cx, cy;
-			if (const ThreeDModelPicture *op = GetThreeDVehicleObjectPreviewFit(p.engine, side, PreviewAzimuth(p), cx, cy); op != nullptr) {
-				BlitPicture(*op, r.left + side / 2 - cx, r.top + side / 2 - cy);
-			}
-			return r;
+		/* No room beside the window (the interface big on a small screen, the purchase window as wide as the screen):
+		 * nothing. Not its sprites, as a vehicle without an object below -- those are its object drawn at 16x for each
+		 * direction, millions of pixels of a big one, each made into a sprite by the main thread as the preview
+		 * turned, and then not drawn for want of room: the game stood 9 to 15 s at a time on the player's phone (#389,
+		 * 21. 11.: "it always waits for something before they close"; PreviewTick() the same). */
+		if (side <= 0) return {};
+		Rect r = PreviewPlace(p, side, side);
+		if (r.right <= r.left || !draw) return r;
+		int cx, cy;
+		if (const ThreeDModelPicture *op = GetThreeDVehicleObjectPreviewFit(p.engine, side, PreviewAzimuth(p), cx, cy); op != nullptr) {
+			BlitPicture(*op, r.left + side / 2 - cx, r.top + side / 2 - cy);
 		}
+		return r;
 	}
 	const ThreeDVehicleModel *model = PreviewVehicleModel(p);
 	if (model == nullptr) return DrawVehicleSprites(p, draw);
@@ -649,8 +660,12 @@ static void PreviewTick()
 				p.object_frame_made = false;
 				changed = true;
 			}
-			const int side = BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && GetThreeDVehicleObject(p.engine) != nullptr ? PreviewObjectSide(p) : 0;
-			if (side > 0) {
+			const bool of_object = BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && GetThreeDVehicleObject(p.engine) != nullptr;
+			const int side = of_object ? PreviewObjectSide(p) : 0;
+			if (of_object && side <= 0) {
+				/* A vehicle drawn from its 3D object and no room for it beside the window: nothing shown, and none
+				 * of its sprites asked for (DrawVehiclePreview()). */
+			} else if (side > 0) {
 				/* A vehicle drawn from its 3D object (DrawVehiclePreview()): no likeness made of its sprites (it was,
 				 * a second and its eight sprites at 16x each time one was chosen, for nothing drawn). Its frames are
 				 * made in the background a few ahead; it turns on to the next when it is there, and waits for it

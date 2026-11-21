@@ -89,6 +89,28 @@ static struct {
 } _sprite_churn;
 
 /**
+ * The sprites of vehicles drawn from their 3D objects the main thread made since the diary last asked (GetRawSprite():
+ * the object's picture at 16x into the levels and the blitter's form): how many, how long, and the longest with its
+ * bytes. The player's diary of #389 had the game stand 9 to 15 s in the main window's drawing and no word of what it
+ * was -- the preview beside the purchase window asking for such sprites of a big vehicle.
+ */
+static struct {
+	uint64_t made = 0;
+	double ms = 0;
+	double longest_ms = 0;
+	uint32_t longest_bytes = 0;
+} _object_sprites_made;
+
+/** For the diary of the frames: the sprites of 3D vehicles the main thread made (_object_sprites_made), counted anew. */
+std::string TakeObjectSpritesMade()
+{
+	const auto m = _object_sprites_made;
+	_object_sprites_made = {};
+	if (m.made == 0) return "sprity 3D vozidel hlavnim vlaknem 0";
+	return fmt::format("sprity 3D vozidel hlavnim vlaknem {}x {:.0f} ms (nejdel {:.0f} ms, {} kB)", m.made, m.ms, m.longest_ms, m.longest_bytes / 1024);
+}
+
+/**
  * For the diary of the frames: what the full sprite memory cost since the last time (_sprite_churn), counted anew.
  * @param[out] dropped the sprites thrown out to make room
  * @param[out] dropped_mb their megabytes
@@ -1975,6 +1997,14 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 			_spritecache_bytes_used += sc->length;
 			const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
 			sc->load_tenths = static_cast<uint16_t>(std::clamp(ms * 10.0, 0.0, 65535.0));
+			if (sc->object_sprite != 0) {
+				_object_sprites_made.made++;
+				_object_sprites_made.ms += ms;
+				if (ms > _object_sprites_made.longest_ms) {
+					_object_sprites_made.longest_ms = ms;
+					_object_sprites_made.longest_bytes = sc->length;
+				}
+			}
 			if (sc->dropped) {
 				sc->dropped = false;
 				_sprite_churn.reloaded++;

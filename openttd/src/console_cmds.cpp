@@ -9525,6 +9525,30 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else {
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", argv[4], *x, *y);
 		}
+	} else if (what == "sprity_vozidla" && argv.size() > 2) {
+		/* 'sprity_vozidla <unit>': the sprites of the eight directions of a vehicle drawn from its 3D object made now
+		 * (the map's, at 16x), each with its size and how long the main thread took to make it (the player's #389: the
+		 * game stood 9 to 15 s when the sprite of a big aircraft came). */
+		extern bool _three_d_load_at_once;
+		AutoRestoreBackup at_once(_three_d_load_at_once, true);
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!u->IsPrimaryVehicle() || u->unitnumber != static_cast<UnitID>(number(2).value_or(1))) continue;
+			if (argv.size() > 3 && u->type != (argv[3] == "letadlo" ? VehicleType::Aircraft : argv[3] == "lod" ? VehicleType::Ship : argv[3] == "auto" ? VehicleType::Road : VehicleType::Train)) continue;
+			for (int d = 0; d < 8; d++) {
+				VehicleSpriteSeq seq;
+				if (!GetThreeDVehicleObjectSprite(u->engine_type, u, static_cast<Direction>(d), EngineImageType::OnMap, &seq)) {
+					IConsolePrint(CC_ERROR, "test3d: sprity_vozidla {}: neni 3D objekt", u->unitnumber);
+					break;
+				}
+				for (uint k = 0; k < seq.count; k++) {
+					const auto started = std::chrono::steady_clock::now();
+					const Sprite *spr = GetSprite(seq.seq[k].sprite, SpriteType::Normal);
+					IConsolePrint(CC_DEFAULT, "test3d: sprity_vozidla {} smer {} kus {}: {}x{} px za {:.0f} ms", u->unitnumber, d, k, spr->width, spr->height,
+							std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
+				}
+			}
+			break;
+		}
 	} else if (what == "klikni" && argv.size() > 3) {
 		/* 'klikni <x> <y> [nakup [text]]': a click on the tile as the player's (ClickTile(): a station's window, a depot's, a
 		 * hangar's); with "nakup" the purchase window of the depot or hangar there after it. */
@@ -9597,19 +9621,27 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			return true;
 		}
+		if (argv[2] == "zavridepo") {
+			/* 'okno zavridepo': the depots' windows closed as the player closes one (its purchase window goes with it). */
+			CloseWindowByClass(WindowClass::VehicleDepot);
+			IConsolePrint(CC_DEFAULT, "test3d: okno zavridepo: nakup {}", FindWindowByClass(WindowClass::BuildVehicle) != nullptr ? "ZUSTAL" : "zavren s nim");
+			return true;
+		}
 		if (argv[2] == "kup" && argv.size() > 3) {
-			/* 'okno kup <pocet>': so many more of the first road vehicle's engine bought into its depot, standing in it
-			 * as the player's new ones do (the player's log of 5. 11.: twenty bought, their windows open). */
+			/* 'okno kup <pocet> [letadlo|lod]': so many more of the first road vehicle's (aircraft's, ship's) engine bought
+			 * into its depot, standing in it as the player's new ones do (the player's log of 5. 11.: twenty bought, their
+			 * windows open); an aircraft's or a ship's with its window opened, as the purchase window opens it. */
+			const VehicleType kup_type = argv.size() > 4 && argv[4] == "letadlo" ? VehicleType::Aircraft : argv.size() > 4 && argv[4] == "lod" ? VehicleType::Ship : VehicleType::Road;
 			const Vehicle *first = nullptr;
 			for (const Vehicle *v : Vehicle::Iterate()) {
-				if (v->IsPrimaryVehicle() && v->type == VehicleType::Road) {
+				if (v->IsPrimaryVehicle() && v->type == kup_type) {
 					first = v;
 					break;
 				}
 			}
 			TileIndex depot = INVALID_TILE;
 			for (TileIndex t : Map::Iterate()) {
-				if (IsDepotTile(t) && GetDepotVehicleType(t) == VehicleType::Road) {
+				if (IsDepotTile(t) && GetDepotVehicleType(t) == kup_type) {
 					depot = t;
 					break;
 				}
@@ -9623,6 +9655,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			for (int i = 0; i < ParseInteger<int>(argv[3]).value_or(0); i++) {
 				auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, first->engine_type, true, INVALID_CARGO, ClientID::Invalid);
 				if (cost.Succeeded()) bought++;
+				if (cost.Succeeded() && kup_type != VehicleType::Road && Vehicle::IsValidID(veh)) ShowVehicleViewWindow(Vehicle::Get(veh));
 			}
 			IConsolePrint(CC_DEFAULT, "test3d: okno kup {} do depa {},{}", bought, TileX(depot), TileY(depot));
 			return true;
