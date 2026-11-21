@@ -70,6 +70,10 @@ prodatvagonkyperon: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0
 ikonaprodatvlak: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
 ikonaprodatvagonky: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahprodat: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahprodatbez: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahprodatbezdve: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahrovinabez: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahrovinablok: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahprodatdlouhy: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 porouchanydlouhy: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahzavagonky: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=4 auto=0 odmitnuto=0

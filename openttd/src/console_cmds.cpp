@@ -5197,7 +5197,7 @@ static bool ConTestSell(std::span<std::string_view> argv)
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy|porouchanydlouhy|svah] [signal cycle] [dve]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy|porouchanydlouhy|svah] [signal cycle] [dve] [bezsignalu|blokova]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -5274,6 +5274,19 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	 * testpostav because only the scene knows where it put its depots: the
 	 * strip lands wherever the map happens to be flat. */
 	bool second_tow = argv.size() >= 4 ? argv[3] == "dve" : (argv.size() >= 3 && argv[2] == "dve");
+	/* 'bezsignalu', anywhere after the variant: the same strip with no signal
+	 * on it at all, so the whole line and both depot doors are one block --
+	 * the player's line, where a sold train stood in that block and no rescue
+	 * engine ever came out for it. */
+	bool no_signals = false;
+	/* 'blokova': ordinary block signals instead of path signals, so the
+	 * casualty's block shows red at both ends for as long as it stands there. */
+	bool block_signals = false;
+	for (size_t i = 2; i < argv.size(); i++) {
+		if (argv[i] == "bezsignalu") no_signals = true;
+		if (argv[i] == "blokova") block_signals = true;
+		if (argv[i] == "dve") second_tow = true;
+	}
 	uint8_t sig_cycle = 0;
 	if (oneway && argv.size() >= 3) {
 		auto n = ParseInteger(argv[2]);
@@ -5398,8 +5411,9 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 		return true;
 	}
 	for (uint sx : {x0 + 2, xj - 3, xj + 3, x0 + LEN - 3}) {
+		if (no_signals) break;
 		if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(sx, y0), Track::X,
-				oneway ? SignalType::PathOneWay : SignalType::Path, SignalVariant::Electric,
+				block_signals ? SignalType::Block : oneway ? SignalType::PathOneWay : SignalType::Path, SignalVariant::Electric,
 				false, false, false, SignalType::Block, SignalType::Block, oneway ? sig_cycle : 0, 0).Failed()) {
 			IConsolePrint(CC_ERROR, "testodtah: signal at ({},{}) failed.", sx, y0);
 			return true;

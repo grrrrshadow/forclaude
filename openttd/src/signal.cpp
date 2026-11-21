@@ -194,13 +194,38 @@ static SmallSet<DiagDirection, SIG_GLOB_SIZE> _globset("_globset"); ///< set of 
 
 
 /**
+ * Decouple: the trains a look at a block is told to read as not being there.
+ * Null everywhere except inside IsDepotSegmentFreeBut(), so every signal the
+ * game sets is still set from every train there is.
+ */
+static SegmentOverlook *_segment_overlooks = nullptr;
+
+/**
  * Check whether there is a train on rail, not in a depot.
  * @param v The vehicle to check.
  * @return \c true when the vehicle is a train that's not in a depot.
  */
 static bool IsTrainAndNotInDepot(const Vehicle *v)
 {
-	return v->type == VehicleType::Train && Train::From(v)->track != Track::Depot;
+	if (v->type != VehicleType::Train || Train::From(v)->track == Track::Depot) return false;
+	return _segment_overlooks == nullptr || !_segment_overlooks(Train::From(v));
+}
+
+/**
+ * Is a train standing on these tracks of a tile, or across them?
+ * EnsureNoTrainOnTrackBits() asked the other way round, and with the same
+ * exception as above for a look that has been told whom to overlook.
+ */
+static bool IsTrainOnTrackBits(TileIndex tile, TrackBits tracks)
+{
+	if (_segment_overlooks == nullptr) return EnsureNoTrainOnTrackBits(tile, tracks).Failed();
+	for (const Vehicle *v : VehiclesOnTile(tile)) {
+		if (v->type != VehicleType::Train) continue;
+		const Train *t = Train::From(v);
+		if (t->track != tracks && !TracksOverlap(t->track | tracks)) continue;
+		if (!_segment_overlooks(t)) return true;
+	}
+	return false;
 }
 
 
@@ -309,7 +334,7 @@ static SigFlags ExploreSegment(Owner owner)
 				if (tracks == TRACK_BIT_HORZ || tracks == TRACK_BIT_VERT) { // there is exactly one accessible track, no need to check
 					tracks = tracks_masked;
 					/* If no train detected yet, and there is not no train -> there is a train -> set the flag */
-					if (!flags.Test(SigFlag::Train) && EnsureNoTrainOnTrackBits(tile, tracks).Failed()) flags. Set(SigFlag::Train);
+					if (!flags.Test(SigFlag::Train) && IsTrainOnTrackBits(tile, tracks)) flags. Set(SigFlag::Train);
 				} else {
 					if (tracks_masked.None()) continue; // no accessible track
 					if (!flags.Test(SigFlag::Train) && HasVehicleOnTile(tile, IsTrainAndNotInDepot)) flags.Set(SigFlag::Train);
@@ -659,6 +684,44 @@ SigSegState UpdateSignalsOnSegment(TileIndex tile, DiagDirection side, Owner own
 	_globset.Add(tile, side);
 
 	return UpdateSignalsInBuffer(owner);
+}
+
+
+/**
+ * Decouple: would the block outside a depot's door let a train out, if the
+ * trains the caller vouches for were not standing in it?
+ *
+ * Block signalling keeps a train in its shed while anything at all is in the
+ * block outside (SigSegState::Full). That is right for everything that can
+ * move, and it shuts a rescue engine in for good when the thing in the block
+ * is the very train it was called to: on a line with no signals the whole
+ * line is one block, and the casualty stands in it until somebody fetches it.
+ *
+ * A look and nothing else: the same walk the signals are set from, with the
+ * vouched-for trains left out of it, and no signal touched afterwards.
+ *
+ * @param depot    the depot tile
+ * @param owner    whose track it is
+ * @param overlook says of a train (any vehicle of it) that it is to be left out
+ * @return whether the block would not be full without them
+ * @pre no signal update is waiting in the buffer -- ask right after
+ *      UpdateSignalsOnSegment(), which leaves it empty
+ */
+bool IsDepotSegmentFreeBut(TileIndex depot, Owner owner, SegmentOverlook *overlook)
+{
+	assert(IsRailDepotTile(depot));
+	assert(_globset.IsEmpty() && _tbuset.IsEmpty() && _tbdset.IsEmpty());
+
+	_tbdset.Add(depot, DiagDirection::Invalid);
+	_segment_overlooks = overlook;
+	SigFlags flags = ExploreSegment(owner);
+	_segment_overlooks = nullptr;
+	/* The walk collects the signals it would set; none is set. */
+	_tbuset.Reset();
+	_tbdset.Reset();
+
+	return !flags.Test(SigFlag::Train) && !flags.Test(SigFlag::Full) &&
+			(!flags.Test(SigFlag::Exit) || flags.Test(SigFlag::Green));
 }
 
 

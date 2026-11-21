@@ -12095,6 +12095,23 @@ static void CheckNextTrainTile(Train *consist)
 }
 
 /**
+ * Does this train stand where it is until somebody comes and fetches it?
+ *
+ * A casualty waiting for its tow -- broken down, wrecked or sold -- and a rake
+ * with no engine on it. Neither moves by itself, which is the one thing block
+ * signalling keeps trains apart for; see the full block in
+ * CheckTrainStayInDepot().
+ *
+ * @param t any vehicle of the train
+ * @return whether it is such a train
+ */
+static bool StandsUntilFetched(const Train *t)
+{
+	const Train *head = t->First();
+	return head->IsFreeWagon() || IsWaitingToBeRescued(head);
+}
+
+/**
  * Will the train stay in the depot the next tick?
  * @param v %Train to check.
  * @return True if it stays in the depot, false otherwise.
@@ -12148,6 +12165,21 @@ static bool CheckTrainStayInDepot(Train *v)
 		v->wait_counter = 0;
 
 		seg_state = _settings_game.pf.reserve_paths ? SigSegState::Path : UpdateSignalsOnSegment(v->tile, DiagDirection::Invalid, v->owner);
+		/* A block is full with anything at all standing in it, and a train
+		 * waiting for this engine stands in it until this engine comes: on a
+		 * line with no signals the whole line and the shed door are one block,
+		 * and the tow sat behind that door, "exit blocked", for as long as the
+		 * case lasted -- the player's sold train, four times over, given up on
+		 * each time with two engines on call beside it. What the rule is there
+		 * to keep apart is trains that move. So a tow on its way out reads the
+		 * block again without the ones that cannot -- casualties waiting and
+		 * rakes left standing -- and goes if that leaves it empty. It still
+		 * goes on the whole road booked or not at all, like every tow (below);
+		 * anything able to move in that block keeps it at home as before. */
+		if (seg_state == SigSegState::Full && on_call && IsFetchingCasualty(v) && !HasDepotReservation(v->tile) &&
+				IsDepotSegmentFreeBut(v->tile, v->owner, StandsUntilFetched)) {
+			seg_state = SigSegState::Free;
+		}
 		if (seg_state == SigSegState::Full || HasDepotReservation(v->tile)) {
 			/* Full and no PBS signal in block or depot reserved, can't exit. */
 			if (on_call) v->rescue_hold = RescueHold::ExitBlocked;

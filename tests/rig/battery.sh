@@ -680,6 +680,22 @@ testodtah vagony
 testza 3000 testikonaprodat vagonky" 20000
 run_scene odtahprodat "vlak123 on
 testodtah prodat" 16000
+# The same sale and the same breakdown on a line with no signal on it at all:
+# the whole line and both shed doors are one block, the casualty stands in it,
+# and block signalling kept the tow behind its door ("exit blocked") until the
+# case lapsed -- the player's sold train, four times over. A tow on its way out
+# reads the block without the trains that stand until fetched, and goes on its
+# whole road booked. 'dve' is his shape exactly: an engine on call at each end.
+# 'blokova' is the control with ordinary block signals, the casualty two blocks
+# away behind reds: that worked before and has to go on working.
+run_scene odtahprodatbez "vlak123 on
+testodtah prodat bezsignalu" 16000
+run_scene odtahprodatbezdve "vlak123 on
+testodtah prodat bezsignalu dve" 16000
+run_scene odtahrovinabez "vlak123 on
+testodtah rovina bezsignalu" 14000
+run_scene odtahrovinablok "vlak123 on
+testodtah rovina blokova" 14000
 # A sold train the tow turns out not to be able to take: joined, the two would
 # be longer than the game allows, so the coupling is refused on the first tick
 # and on every tick after it. The engine used to stand against it asking for

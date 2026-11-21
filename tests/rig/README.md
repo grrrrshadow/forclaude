@@ -192,6 +192,15 @@ off. Each of those four writes a second line, `vlaku`, `bezrozkazu` and
 `vdepu` at the start / at the end: the same number of trains, none without
 orders, all of them home.
 
+The rescue scenes (`testodtah <variant>`) build their strip with path signals.
+Two words after the variant change that: `bezsignalu` builds no signal at all
+(the whole line and both shed doors are one block) and `blokova` builds
+ordinary block signals. In the battery: `odtahprodatbez`, `odtahprodatbezdve`
+(an engine on call at each end -- the player's line), `odtahrovinabez` and
+`odtahrovinablok`. Before the fix of 21. 11. the three without signals read
+`spojeno=0 odtazeno=0`: the tow stood behind its door, "exit blocked", because
+the casualty itself made the block outside it full.
+
 ## The rig's own sets, in yagl
 
 Every NewGRF the rig makes for itself is a yagl script in `grf/` -- `grf/<set>.yagl`,

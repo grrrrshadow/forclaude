@@ -71,6 +71,10 @@ enum class SigSegState : uint8_t {
 };
 
 SigSegState UpdateSignalsOnSegment(TileIndex tile, DiagDirection side, Owner owner);
+struct Train;
+/** Says of a train, asked with any vehicle of it, that a look at a block is to leave it out. */
+using SegmentOverlook = bool(const Train *);
+bool IsDepotSegmentFreeBut(TileIndex depot, Owner owner, SegmentOverlook *overlook);
 void SetSignalsOnBothDir(TileIndex tile, Track track, Owner owner);
 void AddTrackToSignalBuffer(TileIndex tile, Track track, Owner owner);
 void AddSideToSignalBuffer(TileIndex tile, DiagDirection side, Owner owner);
