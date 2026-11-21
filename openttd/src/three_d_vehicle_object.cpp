@@ -332,6 +332,7 @@ static int GrfStateStep(const ThreeDVehicleObject *obj, EngineID engine, const V
 	if (v != nullptr && v->engine_type == engine && image_type != EngineImageType::Purchase && image_type != EngineImageType::Preview) {
 		int piece = 0;
 		if (ThreeDVehicleObjectOf(v, &piece) == obj) {
+			/* (Its object with its weapons, ThreeDVehicleObject::raid_variant, is the same pieces.) */
 			const int last = static_cast<int>(obj->pieces.size()) - 1;
 			auto role = [&](int k) { return k == obj->anchor ? 1 : k == 0 ? 0 : k == last ? 2 : -1; };
 			sources.clear();

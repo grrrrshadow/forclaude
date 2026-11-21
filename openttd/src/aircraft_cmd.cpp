@@ -569,6 +569,19 @@ static void HelicopterTickHandler(Aircraft *v)
  * @param y New y position.
  * @param z New z position.
  */
+/**
+ * Every aircraft out of its hangar takes its picture anew where it is: an aircraft with weapons of its own shows them,
+ * or stops showing them, the moment the raid is asked for in the console or ends (ThreeDVehicleObject::raid_addon) --
+ * a parked one is asked for its picture only when it moves.
+ */
+void RefreshAircraftLooks()
+{
+	for (Aircraft *a : Aircraft::Iterate()) {
+		if (!a->IsNormalAircraft() || a->vehstatus.Test(VehState::Hidden)) continue;
+		SetAircraftPosition(a, a->x_pos, a->y_pos, a->z_pos);
+	}
+}
+
 void SetAircraftPosition(Aircraft *v, int x, int y, int z)
 {
 	v->x_pos = x;

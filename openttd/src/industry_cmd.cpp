@@ -401,6 +401,9 @@ void DropRaidSmoke(TileIndex tile, Direction facing, Owner who)
 	 * fortnight, so the raid can be judged after it. */
 	_show_industry_health = false;
 	_industry_health_until = TimerGameEconomy::date + RAID_HEALTH_SHOWN_DAYS;
+	extern void RefreshAircraftLooks();
+	RefreshAircraftLooks(); // the weapons of the aircraft that have them go (ThreeDVehicleObject::raid_addon)
+	MarkWholeScreenDirty();
 	InvalidateWindowClassesData(WindowClass::IndustryView);
 	SetWindowClassesDirty(WindowClass::IndustryView);
 	/* And the crosshair row goes out of the vehicle windows with it, rather
@@ -531,6 +534,9 @@ void DropRaidBomb(TileIndex tile, Owner who)
 	/* The errand is over, as after smoke (DropRaidSmoke()). */
 	_show_industry_health = false;
 	_industry_health_until = TimerGameEconomy::date + RAID_HEALTH_SHOWN_DAYS;
+	extern void RefreshAircraftLooks();
+	RefreshAircraftLooks(); // the weapons of the aircraft that have them go (ThreeDVehicleObject::raid_addon)
+	MarkWholeScreenDirty();
 	InvalidateWindowClassesData(WindowClass::IndustryView);
 	SetWindowClassesDirty(WindowClass::IndustryView);
 	InvalidateWindowClassesData(WindowClass::VehicleView);

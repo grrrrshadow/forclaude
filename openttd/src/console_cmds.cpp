@@ -2866,6 +2866,10 @@ static bool ConIndustryHealth(std::span<std::string_view> argv)
 	 * enough. Without this the crosshair turned up only after the player shut
 	 * the window and opened it again. */
 	InvalidateWindowClassesData(WindowClass::VehicleView);
+	/* The aircraft with weapons of their own show them now, or stop showing them (ThreeDVehicleObject::raid_addon). */
+	extern void RefreshAircraftLooks();
+	RefreshAircraftLooks();
+	MarkWholeScreenDirty();
 
 	IConsolePrint(CC_DEFAULT, "Stav budovy prumyslu je ted {}.", _show_industry_health ? "videt" : "schovany");
 	return true;

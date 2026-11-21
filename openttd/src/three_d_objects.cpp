@@ -7157,6 +7157,40 @@ static void MakeHumanoidFigures()
 
 /** Read the vehicles of the indices ("druh": "vozidlo"); their .glb are read when they are first drawn. */
 /**
+ * A vehicle object of an index stored, and with its weapons ("zbrane", ThreeDVehicleObject::raid_addon) the same object
+ * once more with that add-on's first node in every state, of no piece of its own (the engine finds it through this one,
+ * ThreeDRaidVariant(); its pieces as this one's, for its states); this one never shows them.
+ */
+static void StoreVehicleObject(ThreeDVehicleObject &&obj)
+{
+	std::optional<ThreeDVehicleObject> armed;
+	if (!obj.raid_addon.empty()) {
+		const auto addon = std::ranges::find(obj.addons, obj.raid_addon, &ThreeDVehicleAddon::key);
+		if (addon != obj.addons.end() && !addon->nodes.empty()) {
+			const auto named = std::ranges::find(obj.part_names, addon->key + "/" + addon->nodes.front());
+			const size_t part = named - obj.part_names.begin();
+			const size_t a = addon - obj.addons.begin();
+			if (named != obj.part_names.end() && part > 0 && part < static_cast<size_t>(ThreeDParts::COUNT)) {
+				armed = obj;
+				armed->name += "/zbrane";
+				armed->raid_only = true;
+				for (ThreeDVehicleState &st : armed->states) {
+					if (st.addon_parts.size() < obj.addons.size()) st.addon_parts.resize(obj.addons.size(), -1);
+					st.addon_parts[a] = static_cast<int16_t>(part);
+					st.parts.Set(static_cast<uint8_t>(part));
+				}
+			}
+		}
+		if (!armed.has_value()) Debug(misc, 0, "3D vehicles: {}: its weapons \"{}\" are none of its add-ons", obj.name, obj.raid_addon);
+	}
+	_vehicle_objects.push_back(std::move(obj));
+	if (armed.has_value()) {
+		_vehicle_objects.back().raid_variant = static_cast<uint32_t>(_vehicle_objects.size());
+		_vehicle_objects.push_back(std::move(*armed));
+	}
+}
+
+/**
  * The add-ons among the trees of each town theme's land split into plants and trees (_three_d_theme_guests_split): a
  * plant is one that stands under trees somewhere too ("podrost": the banana plants and monsteras), a tree one that does
  * not (the palms). Once all the indices are read, as an add-on's records come in any order.
@@ -8037,6 +8071,9 @@ static void ReadThreeDVehicleObjects()
 				if (e.contains("ponoreni_m") && e.at("ponoreni_m").is_number()) obj.dive_m = std::clamp(e.at("ponoreni_m").get<float>(), 0.0f, 100.0f);
 				/* An aircraft its carrier takes up from a pad (the colleague's Buran on the Energia, "start": "kolmo"). */
 				if (e.contains("start") && e.at("start").is_string()) obj.starts_vertically = e.at("start").get<std::string>() == "kolmo";
+				/* Its weapons, seen only after "miluju karla" (the player, 21. 11.: "jak napíšu miluju karla tak tam můžou být
+				 * zbraně pod křídly, jinak to je multifunkční vrtulník"): an add-on of its, shown by an object of its own. */
+				if (e.contains("zbrane") && e.at("zbrane").is_string()) obj.raid_addon = e.at("zbrane").get<std::string>();
 				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
 				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */
 				if (e.contains("svetla") && e.at("svetla").is_object()) {
@@ -8462,7 +8499,7 @@ static void ReadThreeDVehicleObjects()
 				if (driving) {
 					_driving_objects.push_back(std::move(obj));
 				} else {
-					_vehicle_objects.push_back(std::move(obj));
+					StoreVehicleObject(std::move(obj));
 				}
 			}
 		} catch (const std::exception &ex) {
@@ -8604,6 +8641,7 @@ static void ReadThreeDVehicleObjects()
 	/* A piece is the first object's that has it -- unless another package of the same set lies beside the GRF loaded. */
 	for (size_t i = 0; i < _vehicle_objects.size(); i++) {
 		const ThreeDVehicleObject &o = _vehicle_objects[i];
+		if (o.raid_only) continue;
 		const bool here = PackageBesideLoadedGrf(o.package, o.grfid);
 		for (size_t k = 0; k < o.pieces.size(); k++) {
 			auto [it, added] = _vehicle_object_pieces.emplace(VehiclePieceKey(o.grfid, o.type, o.pieces[k]), std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k)));
@@ -8883,6 +8921,16 @@ static const EnginePiece *EnginePieceOf(EngineID engine)
 	return &p;
 }
 
+/**
+ * The object to draw for one read: with its weapons while the raid is asked for in the console ('miluju karla',
+ * #_show_industry_health; ThreeDVehicleObject::raid_addon), else itself.
+ */
+static const ThreeDVehicleObject *ThreeDRaidVariant(const ThreeDVehicleObject *obj)
+{
+	if (obj == nullptr || obj->raid_variant >= _vehicle_objects.size() || !_show_industry_health) return obj;
+	return &_vehicle_objects[obj->raid_variant];
+}
+
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
@@ -8890,7 +8938,7 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 	const EnginePiece *p = EnginePieceOf(engine);
 	if (p == nullptr || p->obj == nullptr) return nullptr;
 	if (piece != nullptr) *piece = p->piece;
-	return p->obj;
+	return ThreeDRaidVariant(p->obj);
 }
 
 /**
@@ -8980,7 +9028,7 @@ const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece)
 	if (p == nullptr || p->obj == nullptr) return nullptr;
 	const ThreeDVehicleObject *obj = p->obj;
 	if (piece != nullptr) *piece = p->piece;
-	if (p->shared == nullptr) return obj;
+	if (p->shared == nullptr) return ThreeDRaidVariant(obj);
 	/* (Taken now: the pieces about it are asked for below, EnginePiece's reference holds only till then.) */
 	const std::vector<std::pair<uint32_t, int>> &all = *p->shared;
 	/* The one whose pieces before and after match the vehicle's the furthest. */
