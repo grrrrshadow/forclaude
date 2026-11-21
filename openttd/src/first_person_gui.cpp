@@ -36,6 +36,7 @@
 #include "industry.h"
 #include "industry_map.h"
 #include "station_map.h"
+#include "air_map.h"
 #include "water_map.h"
 #include "bridge_map.h"
 #include "three_d.h"
@@ -166,6 +167,8 @@ static constexpr double FIRST_PERSON_MINE_AHEAD_M = 1.8;
 static constexpr double FIRST_PERSON_MINE_UP_M = 0.8;
 /** How near a vehicle the walker gets into it (E), metres from a piece of it. */
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
+/** Half the length of an aircraft of sprites, metres: so much nearer its middle than the walker beside it need come (BoardDistance()). */
+static constexpr double FIRST_PERSON_AIRCRAFT_HALF_M = 6.0;
 /**
  * On board a boat (FirstPersonWindow::aboard): how high a step up on its deck the walker takes (the yacht's cockpit is
  * 1.4 m deep, out of it over its seats, 0.8 m each), how far down it steps, metres; how much deeper than where its
@@ -568,8 +571,11 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 			return true;
 		}
 		case TileType::Station:
-			/* On a platform, round the signal box of a waypoint and the fences of a bay (FirstPersonThingsBlock()). */
-			return (HasStationRail(tile) || IsAnyRoadStop(tile)) && !FirstPersonThingsBlock(x, y, stand);
+			/* On a platform, round the signal box of a waypoint and the fences of a bay (FirstPersonThingsBlock()). And
+			 * about a modular airport (air_map.h; the player, 21. 11.: "I cannot walk onto the modular airport, I need
+			 * to walk there to get into an aircraft"): over its taxiways, stands, runways and helipads, round its
+			 * buildings, its hangar and its heliport's deck by their shapes, as the things of a station. */
+			return (HasStationRail(tile) || IsAnyRoadStop(tile) || IsModularAirport(tile)) && !FirstPersonThingsBlock(x, y, stand);
 		case TileType::Clear:
 			/* The stones of the rocky land: round a big one, up a low one (FirstPersonThingsBlock()). */
 			return !FirstPersonThingsBlock(x, y, stand);
@@ -1205,7 +1211,9 @@ struct FirstPersonWindow : Window {
 	 */
 	double BoardDistance(const Vehicle *u) const
 	{
-		if (u->type == VehicleType::Ship) {
+		/* (An aircraft as a boat: the Buran on its rocket, the Mriya -- from their middle the walker beside them was out
+		 * of reach. One of sprites only from its middle, less the half of a fuselage.) */
+		if (u->type == VehicleType::Ship || u->type == VehicleType::Aircraft) {
 			ThreeDEyeVehicle ev;
 			const ThreeDVehicleShape *shape = GetThreeDEyeVehicle(u, ev) && ev.obj != nullptr ? ev.obj->GetShape() : nullptr;
 			if (shape != nullptr) {
@@ -1215,12 +1223,16 @@ struct FirstPersonWindow : Window {
 				return std::hypot(ox, oy) * ev.scale * OBJECT_UNITS_PER_METRE;
 			}
 		}
+		if (u->type == VehicleType::Aircraft) return std::max(0.0, std::hypot(u->x_pos - this->walker.x, u->y_pos - this->walker.y) - FIRST_PERSON_AIRCRAFT_HALF_M * OBJECT_UNITS_PER_METRE);
 		return std::hypot(u->x_pos - this->walker.x, u->y_pos - this->walker.y);
 	}
 
 	/**
 	 * The vehicle near enough to get into: the nearest going about (a car, a train, a ship, not in its depot), a piece
-	 * of it within reach and about as high as the ground under the walker (not on a bridge overhead).
+	 * of it within reach and about as high as the ground under the walker (not on a bridge overhead). An aircraft too,
+	 * standing or taxiing on its airport (the player, 21. 11.: "to get into an aircraft"; since the cab view's window
+	 * went, 9. 11., E is the one way into a vehicle, and it left the aircraft out): not one in the air overhead, nor its
+	 * shadow or its rotor.
 	 */
 	const Vehicle *VehicleToBoard() const
 	{
@@ -1228,7 +1240,8 @@ struct FirstPersonWindow : Window {
 		double best_d = FIRST_PERSON_BOARD_M * OBJECT_UNITS_PER_METRE;
 		const double ground = FirstPersonFeetZ(this->walker);
 		for (const Vehicle *u : Vehicle::Iterate()) {
-			if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship) continue;
+			if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship && u->type != VehicleType::Aircraft) continue;
+			if (u->type == VehicleType::Aircraft && !Aircraft::From(u)->IsNormalAircraft()) continue;
 			if (u->vehstatus.Any({VehState::Hidden, VehState::Crashed})) continue;
 			if (std::abs(u->z_pos - ground) > 2 * TILE_HEIGHT) continue;
 			const double d = this->BoardDistance(u);
