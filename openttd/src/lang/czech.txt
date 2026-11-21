@@ -1945,10 +1945,10 @@ STR_CONFIG_SETTING_SCROLLMODE_LMB                               :Pohyb v mapě p
 
 STR_CONFIG_SETTING_SMOOTH_SCROLLING                             :Plynulé posouvání po mapě: {STRING}
 STR_CONFIG_SETTING_SMOOTH_SCROLLING_HELPTEXT                    :Ovládá jak se hlavní pohled posouvá na specifické místo na mapě, kliknutím na minimapu nebo spuštěním příkazu na posun na specifický objekt na mapě. Pokud zapnuto, pohled se posouvá plynule, pokud vypnuto, skáče pohled přímo na cílové místo
-STR_CONFIG_SETTING_SMOOTH_ZOOM                                  :Plynulý zoom: {STRING2}
+STR_CONFIG_SETTING_SMOOTH_ZOOM                                  :Plynulý zoom: {STRING}
 STR_CONFIG_SETTING_SMOOTH_ZOOM_HELPTEXT                         :Krok přiblížení nebo oddálení hlavního pohledu se ukáže jako plynulé zvětšení nebo zmenšení mapy kolem kurzoru, ne jako střih. Jen tam, kde mapu kreslí grafická karta
 
-STR_CONFIG_SETTING_ORBIT_VIEW                                   :Orbit view (prostřední tlačítko myši): {STRING2}
+STR_CONFIG_SETTING_ORBIT_VIEW                                   :Orbit view (prostřední tlačítko myši): {STRING}
 STR_CONFIG_SETTING_ORBIT_VIEW_HELPTEXT                          :Vypnuto: prostřední tlačítko myši otáčí a naklání samotnou mapu. Zapnuto: tažením kterýmkoli směrem se mapa hned změní v kameru kroužící kolem místa uprostřed pohledu, do stran i nahoru a dolů; pravé tlačítko posouvá mapu pod ní, kolečko ji přibližuje a oddaluje. Dvojklik prostředním tlačítkem pohled vycentruje a ukáže zase mapu
 
 STR_CONFIG_SETTING_TOOLBAR_DROPDOWN_AUTOSELECT                  :Tradiční chování výběru lišt: {STRING}
@@ -2365,35 +2365,35 @@ STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE                         :3D vozidla (vla
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE_HELPTEXT                :Všechna vozidla, která hra kreslí z jejich 3D objektu (GRF s objekty, ne z obrázků), najednou: velikost původní hry jako větší sady (BRÝLE), o 20 % větší; vypnuto menší, v měřítku CZTR. Délku vlaků a aut určuje objekt, takže vlak je dlouhý, jak vypadá. Pro novou hru: nastav v hlavním menu před založením hry
 STR_CONFIG_SETTING_THREE_D_GROUPS                               :3D
 STR_CONFIG_SETTING_THREE_D_GROUP_HOUSES                         :Domy
-STR_CONFIG_SETTING_THREE_D_HOUSES_MAP                           :Domy ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_HOUSES_MAP                           :Domy ve 3D shora: {STRING}
 STR_CONFIG_SETTING_THREE_D_HOUSES_MAP_HELPTEXT                  :Na mapě, v otočeném pohledu a v malých oknech: domy ve městech jako 3D objekty. Vypnuto: originální domy OpenTTD tak, jak je hra kreslila před 3D objekty – jednoduché krabice při otáčení, původní obrázky při pohledu na sever
-STR_CONFIG_SETTING_THREE_D_HOUSES_EYE                           :Domy ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_HOUSES_EYE                           :Domy ve 3D z očí: {STRING}
 STR_CONFIG_SETTING_THREE_D_HOUSES_EYE_HELPTEXT                  :V pohledu z první osoby a z kabiny: domy ve městech jako 3D objekty. Vypnuto: originální domy OpenTTD jako jednoduché krabice
 STR_CONFIG_SETTING_THREE_D_GROUP_BRIDGES                        :Mosty
-STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP                          :Mosty ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP                          :Mosty ve 3D shora: {STRING}
 STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP_HELPTEXT                 :Na mapě, v otočeném pohledu a v malých oknech: mosty a akvadukty z 3D dílů. Vypnuto: mosty hry
-STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE                          :Mosty ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE                          :Mosty ve 3D z očí: {STRING}
 STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE_HELPTEXT                 :V pohledu z první osoby a z kabiny: mosty a akvadukty z 3D dílů. Vypnuto: mosty hry
 STR_CONFIG_SETTING_THREE_D_GROUP_RAILS                          :Koleje
-STR_CONFIG_SETTING_THREE_D_RAILS_MAP                            :Koleje ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_RAILS_MAP                            :Koleje ve 3D shora: {STRING}
 STR_CONFIG_SETTING_THREE_D_RAILS_MAP_HELPTEXT                   :Na mapě, v otočeném pohledu a v malých oknech: koleje z 3D pražců, kolejnic a štěrku. Vypnuto: koleje hry nebo sady
-STR_CONFIG_SETTING_THREE_D_RAILS_EYE                            :Koleje ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_RAILS_EYE                            :Koleje ve 3D z očí: {STRING}
 STR_CONFIG_SETTING_THREE_D_RAILS_EYE_HELPTEXT                   :V pohledu z první osoby a z kabiny: koleje z 3D pražců, kolejnic a štěrku. Vypnuto: koleje hry nebo sady
 STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY                       :Troleje
-STR_CONFIG_SETTING_THREE_D_CATENARY_MAP                         :Troleje ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MAP                         :Troleje ve 3D shora: {STRING}
 STR_CONFIG_SETTING_THREE_D_CATENARY_MAP_HELPTEXT                :Na mapě, v otočeném pohledu a v malých oknech: troleje z 3D stožárů a drátů. Vypnuto: troleje hry
-STR_CONFIG_SETTING_THREE_D_CATENARY_EYE                         :Troleje ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_EYE                         :Troleje ve 3D z očí: {STRING}
 STR_CONFIG_SETTING_THREE_D_CATENARY_EYE_HELPTEXT                :V pohledu z první osoby a z kabiny: troleje z 3D stožárů a drátů. Vypnuto: troleje hry
-STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_MAP                   :Sloupy trakce shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_MAP                   :Sloupy trakce shora: {STRING}
 STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_MAP_HELPTEXT          :Sloupy 3D trakčního vedení na mapě, v otočeném pohledu a v malých oknech. Vypnuto: jen dráty
-STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_EYE                   :Sloupy trakce z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_EYE                   :Sloupy trakce z očí: {STRING}
 STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_EYE_HELPTEXT          :Sloupy 3D trakčního vedení v pohledu z první osoby a z kabiny. Vypnuto: jen dráty
-STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING                     :Sloupy trakce každých: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING                     :Sloupy trakce každých: {STRING}
 STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING_HELPTEXT            :Jak daleko od sebe stojí sloupy 3D trakčního vedení podél trati, jako rozestup návěstidel při stavbě tahem
 STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING_VALUE               :{COMMA} polí
-STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :Kola vozidel kreslených z 3D objektů se za jízdy točí a přední v zatáčkách zatáčí (vidět zblízka, z kabiny a z první osoby). Vypnuto: kola stojí
-STR_CONFIG_SETTING_THREE_D_GPU                                  :3D obrázky kreslí grafická karta: {STRING2}
+STR_CONFIG_SETTING_THREE_D_GPU                                  :3D obrázky kreslí grafická karta: {STRING}
 STR_CONFIG_SETTING_THREE_D_GPU_HELPTEXT                         :Obrázky 3D vozidel, postav a efektů kreslí grafická karta (OpenGL 3.3, ve vlastním vlákně) místo procesoru. Každý krok s kartou se zapíše do 3d_karta.log ve složce OpenTTD; když karta shodí hru, další start ji vypne a řekne, u čeho umřela (deník zůstane jako 3d_karta_minule.log)
 STR_CONFIG_SETTING_NIGHT                                        :Noc: {STRING}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :Herní plocha jako v noci: ztmavlá, vozidla svítí. Mění se jen obraz, nic ve hře. Taky v nabídce nápovědy u konzole. Potřebuje 32bpp blitter
@@ -2435,9 +2435,9 @@ STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat m
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_LINE                                           :Zdraví {NUM}/{NUM} · u města {TOWN}
 STR_FIRST_PERSON_NEAR_TOWN                                      :U města {TOWN}
-STR_FIRST_PERSON_LINE_AND                                       :{RAW_STRING} · {RAW_STRING}
-STR_FIRST_PERSON_LINE_HINT                                      :{RAW_STRING} · {YELLOW}{RAW_STRING}
-STR_FIRST_PERSON_LINE_HINT_ONLY                                 :{YELLOW}{RAW_STRING}
+STR_FIRST_PERSON_LINE_AND                                       :{STRING} · {STRING}
+STR_FIRST_PERSON_LINE_HINT                                      :{STRING} · {YELLOW}{STRING}
+STR_FIRST_PERSON_LINE_HINT_ONLY                                 :{YELLOW}{STRING}
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
 STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
@@ -2460,7 +2460,7 @@ STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do
 STR_FIRST_PERSON_HELM_HERE                                      :E: řídit {VEHICLE}
 STR_FIRST_PERSON_ASHORE_HERE                                    :E: vystoupit na břeh
 STR_FIRST_PERSON_INTO_WATER_HERE                                :E: vystoupit do vody
-STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
+STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({STRING})
 STR_FIRST_PERSON_FEED_DRAGON                                    :E: nakrmit draka
 STR_FIRST_PERSON_GRILL                                          :E: grilovat u ohně
 STR_FIRST_PERSON_DOOR_OPEN                                      :E: otevřít dveře
@@ -2494,9 +2494,9 @@ STR_WALKER_FOR_SALE                                             :Tady se prodáv
 STR_WALKER_NOTHING_FOR_SALE                                     :Tady se nic neprodává. Dojdi do hospody, k automatu, do hulírny nebo do obchodu ve městě.
 STR_WALKER_BUY                                                  :[koupit za {CURRENCY_LONG}]
 STR_WALKER_SHOP                                                 :Obchod
-STR_WALKER_DOGS_FOR_SALE                                        :Prodává psy ({RAW_STRING}):
-STR_WALKER_DOG                                                  :{RAW_STRING}
-STR_WALKER_YOUR_DOG                                             :Tvůj pes: {RAW_STRING}
+STR_WALKER_DOGS_FOR_SALE                                        :Prodává psy ({STRING}):
+STR_WALKER_DOG                                                  :{STRING}
+STR_WALKER_YOUR_DOG                                             :Tvůj pes: {STRING}
 STR_WALKER_LET_DOG_GO                                           :[pustit]
 STR_WALKER_PLANT                                                :[zasadit před sebe]
 STR_WALKER_PITCH                                                :[postavit před sebe]
@@ -6485,9 +6485,9 @@ STR_ERROR_TOO_MANY_SIGNS                                        :{WHITE}... př�
 STR_ERROR_CAN_T_PLACE_SIGN_HERE                                 :{WHITE}Zde nelze umístit nápis...
 STR_ERROR_CAN_T_CHANGE_SIGN_NAME                                :{WHITE}Nelze změnit nápis...
 STR_ERROR_CAN_T_DELETE_SIGN                                     :{WHITE}Nelze smazat nápis...
-STR_ERROR_THREE_D_BOXES                                         :{WHITE}3D: {RAW_STRING}. Vše je v 3d_domy.log ve složce OpenTTD
-STR_ERROR_THREE_D_GPU_DIED                                      :{WHITE}Grafická karta minule shodila hru, u kroku: {RAW_STRING}. 3D obrázky kreslí procesor; deník je 3d_karta_minule.log ve složce OpenTTD. V Nastavení, Grafika se karta zase zapne
-STR_ERROR_THREE_D_GPU_NOT_STARTED                               :{WHITE}Grafická karta nenastartovala: {RAW_STRING}. 3D obrázky kreslí procesor, pomalu, a vozidla zůstávají na náhradních obrázcích. Spusť hru znovu; deník je 3d_karta.log ve složce OpenTTD
+STR_ERROR_THREE_D_BOXES                                         :{WHITE}3D: {STRING}. Vše je v 3d_domy.log ve složce OpenTTD
+STR_ERROR_THREE_D_GPU_DIED                                      :{WHITE}Grafická karta minule shodila hru, u kroku: {STRING}. 3D obrázky kreslí procesor; deník je 3d_karta_minule.log ve složce OpenTTD. V Nastavení, Grafika se karta zase zapne
+STR_ERROR_THREE_D_GPU_NOT_STARTED                               :{WHITE}Grafická karta nenastartovala: {STRING}. 3D obrázky kreslí procesor, pomalu, a vozidla zůstávají na náhradních obrázcích. Spusť hru znovu; deník je 3d_karta.log ve složce OpenTTD
 
 # Translatable comment for OpenTTD's desktop shortcut
 ###external 1

@@ -252,4 +252,4 @@ zin16filtr: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=
 zin16filtr: 3982 bez 32bpp|3981 bez 32bpp|3982 bez 32bpp|
 zrychleni: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 zrychleni: zrychleni 2500 zpomaleni 30 | klik hned 100 | klik po case 2500 | klik z rychleho 100 | dvojklik 30 | dvojklik po case 30 | klik z pomaleho 100 | klik z pomaleho po case 100 | dvojklik z rychleho 30 | odmitnuto 0
-cestina: nesedi=27
+cestina: nesedi=0
