@@ -1,0 +1,616 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ * Changed for ottd Decouple by Karel Mácha: the changes Copyright (C) 2026 Karel Mácha.
+ */
+
+/** @file clear_cmd.cpp Commands related to clear tiles. */
+
+#include "stdafx.h"
+#include "clear_map.h"
+#include "command_func.h"
+#include "landscape.h"
+#include "genworld.h"
+#include "viewport_func.h"
+#include "core/random_func.hpp"
+#include "newgrf_generic.h"
+#include "landscape_cmd.h"
+#include "town.h"
+#include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
+#include "walker_inventory.h"
+#include "timer/timer_game_tick.h"
+
+#include "table/strings.h"
+#include "table/sprites.h"
+#include "table/clear_land.h"
+
+#include "safeguards.h"
+
+/** @copydoc ClearTileProc */
+static CommandCost ClearTile_Clear(TileIndex tile, DoCommandFlags flags)
+{
+	static constexpr EnumIndexArray<Price, ClearGround, ClearGround::MaxSize> clear_price_table{
+		Price::ClearGrass, // Base price for clearing grass.
+		Price::ClearRough, // Base price for clearing rough land.
+		Price::ClearRocks, // Base price for clearing rocks.
+		Price::ClearFields, // Base price for clearing fields.
+		Price::ClearRough, // Unused.
+		Price::ClearRough, // Base price for clearing desert.
+		Price::ClearRough, // Unused.
+		Price::ClearRough, // Unused.
+	};
+	CommandCost price(ExpensesType::Construction);
+
+	ClearGround ground = GetClearGround(tile);
+	uint8_t density = GetClearDensity(tile);
+	if (IsSnowTile(tile)) {
+		price.AddCost(_price[clear_price_table[ground]]);
+		/* Add a little more for removing snow. */
+		price.AddCost(std::abs(_price[Price::ClearRough] - _price[Price::ClearGrass]));
+	} else if (ground != ClearGround::Grass || density != 0) {
+		price.AddCost(_price[clear_price_table[ground]]);
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) DoClearSquare(tile);
+
+	return price;
+}
+
+/**
+ * Draw a ClearGround::Grass tile.
+ * @param ti The tile to draw.
+ * @param density The density of the dirt -> grass transition to draw.
+ */
+/**
+ * The grass and the rough land of a tile on the land of a themed town (GetThemedLand()): the desert town's is the
+ * tropics' desert (SPR_DESERT_GROUND_BASE), drawn here; the clay town's is grey ash in the 3D views (the player,
+ * 15. 10.: "ash ground", as under the Red Mountain), the grass in the greys of the wrecks.
+ * @param ti the tile
+ * @param[out] pal the palette to draw its grass in
+ * @return whether its ground was drawn here
+ */
+static bool DrawThemedGround(const TileInfo *ti, PaletteID &pal)
+{
+	pal = PAL_NONE;
+	switch (GetThemedLand(ti->tile)) {
+		case ThemedLand::Desert:
+			DrawGroundSprite(SPR_DESERT_GROUND_BASE + 3 * 19 + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			return true;
+		case ThemedLand::Ash:
+			if (ViewportDrawing3D()) pal = PALETTE_CRASH;
+			return false;
+		default:
+			return false;
+	}
+}
+
+void DrawClearLandTile(const TileInfo *ti, uint8_t density)
+{
+	PaletteID pal;
+	if (DrawThemedGround(ti, pal)) return;
+	DrawGroundSprite(_clear_land_sprites_grass[density] + SlopeToSpriteOffset(ti->tileh), pal);
+}
+
+/**
+ * Draw a ClearGround::Rough tile.
+ * @param ti The tile to draw.
+ */
+void DrawRoughLandTile(const TileInfo *ti)
+{
+	PaletteID pal;
+	if (DrawThemedGround(ti, pal)) return;
+	if (ti->tileh != SLOPE_FLAT) {
+		DrawGroundSprite(SPR_FLAT_ROUGH_LAND + SlopeToSpriteOffset(ti->tileh), pal);
+	} else {
+		DrawGroundSprite(_landscape_clear_sprites_rough[GB(TileHash(ti->x, ti->y), 0, 3)], pal);
+	}
+}
+
+/**
+ * Draw the fences atop a ClearGround::Fields tile.
+ * @param ti The tile to draw.
+ */
+/** Whether the fences of fields (and, with the setting, of rails) are drawn at all: the 3D views (three_d.h, cab_view.h) draw without them -- they are lines of the north-up view and stand about as posts and ribbons there. */
+bool _draw_fences = true;
+
+static void DrawClearLandFence(const TileInfo *ti)
+{
+	if (!_draw_fences) return;
+	/* combine fences into one sprite object */
+	StartSpriteCombine();
+
+	SpriteBounds bounds{{}, {TILE_SIZE, TILE_SIZE, 4}, {}};
+
+	bounds.extent.z += GetSlopeMaxPixelZ(ti->tileh);
+
+	uint fence_nw = GetFence(ti->tile, DiagDirection::NW);
+	if (fence_nw != 0) {
+		bounds.offset.x = 0;
+		bounds.offset.y = -static_cast<int>(TILE_SIZE);
+		bounds.offset.z = GetSlopePixelZInCorner(ti->tileh, CORNER_W);
+		SpriteID sprite = _clear_land_fence_sprites[fence_nw - 1] + _fence_mod_by_tileh_nw[ti->tileh];
+		AddSortableSpriteToDraw(sprite, PAL_NONE, *ti, bounds, false);
+	}
+
+	uint fence_ne = GetFence(ti->tile, DiagDirection::NE);
+	if (fence_ne != 0) {
+		bounds.offset.x = -static_cast<int>(TILE_SIZE);
+		bounds.offset.y = 0;
+		bounds.offset.z = GetSlopePixelZInCorner(ti->tileh, CORNER_E);
+		SpriteID sprite = _clear_land_fence_sprites[fence_ne - 1] + _fence_mod_by_tileh_ne[ti->tileh];
+		AddSortableSpriteToDraw(sprite, PAL_NONE, *ti, bounds, false);
+	}
+
+	uint fence_sw = GetFence(ti->tile, DiagDirection::SW);
+	uint fence_se = GetFence(ti->tile, DiagDirection::SE);
+
+	if (fence_sw != 0 || fence_se != 0) {
+		bounds.offset.x = 0;
+		bounds.offset.y = 0;
+		bounds.offset.z = GetSlopePixelZInCorner(ti->tileh, CORNER_S);
+
+		if (fence_sw != 0) {
+			SpriteID sprite = _clear_land_fence_sprites[fence_sw - 1] + _fence_mod_by_tileh_sw[ti->tileh];
+			AddSortableSpriteToDraw(sprite, PAL_NONE, *ti, bounds, false);
+		}
+
+		if (fence_se != 0) {
+			SpriteID sprite = _clear_land_fence_sprites[fence_se - 1] + _fence_mod_by_tileh_se[ti->tileh];
+			AddSortableSpriteToDraw(sprite, PAL_NONE, *ti, bounds, false);
+
+		}
+	}
+	EndSpriteCombine();
+}
+
+/** @copydoc DrawTileProc */
+/**
+ * Plants by some of the houses of the clay towns and of the towns of the tropics (the colleague's
+ * hra/3d/TROPY-PLANTAZ-PRO-HRU.md, point 3; the player, 2. 11.: "only somewhere"): on the grass beside a house, on
+ * about one such tile in three by the tile, one or two of the palms, banana plants, monsteras and ferns
+ * (GetThreeDHousePlants()), on the desert's sand palms alone, as 3D figures where the trees of the map are (in the
+ * turned view, from the eyes, facing north among the houses drawn as objects).
+ * @param ti the tile
+ * @param desert the tile is of the desert: palms only
+ */
+static void DrawHousePlants(const TileInfo *ti, bool desert = false)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return;
+	const uint32_t hash = (TileX(ti->tile) * 2654435761u) ^ (TileY(ti->tile) * 2246822519u) ^ 0x5BD1E995u;
+	if (GB(hash, 0, 8) % 3 != 0) return;
+	bool by_house = false;
+	for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		/* Not past the edge of the map (TileAddByDiagDir() is no guard there). */
+		const TileIndexDiffC step = TileIndexDiffCByDiagDir(d);
+		const TileIndex next = TileAddWrap(ti->tile, step.x, step.y);
+		if (next != INVALID_TILE && IsTileType(next, TileType::House)) {
+			by_house = true;
+			break;
+		}
+	}
+	if (!by_house) return;
+	if (_settings_game.game_creation.landscape != LandscapeType::Tropic && GetTownThemeAt(ti->tile) != TownTheme::Clay) return;
+	const auto plants = GetThreeDHousePlants(desert);
+	if (plants.empty()) return;
+	const int z = ti->z + GetSlopeMaxPixelZ(ti->tileh) / 2;
+	const uint count = 1 + GB(hash, 8, 1);
+	for (uint i = 0; i < count; i++) {
+		const uint32_t h = hash * (i + 1) * 668265263u;
+		const ThreeDMapTree &plant = plants[GB(h, 0, 8) % plants.size()];
+		const float size = std::round((0.8f + 0.3f * static_cast<float>(GB(h, 8, 8)) / 255.0f) * 20.0f) / 20.0f * plant.scale;
+		const float facing = static_cast<float>(GB(h, 16, 9) % 24 * 15);
+		const int x = ti->x + 3 + static_cast<int>(GB(h, 25, 3)) * 10 / 7, y = ti->y + 3 + static_cast<int>(GB(h, 28, 3)) * 10 / 7;
+		if (eye) {
+			AddCabFigure(plant.name, size, x, y, z, facing);
+		} else {
+			AddThreeDFigureToViewport(plant.name, size, x, y, z, facing, _cur_dpi->zoom, ti->tile);
+		}
+	}
+}
+
+/** The tile's own number for the things standing on it by chance (the snowman, its place and facing). */
+static uint32_t SnowmanHash(TileIndex tile)
+{
+	return (TileX(tile) * 2246822519u) ^ (TileY(tile) * 2654435761u) ^ 0x27D4EB2Fu;
+}
+
+/**
+ * Whether a snowman stands on a tile (DrawSnowman()): clear land under snow deep enough, no rocks, not steep, beside a
+ * house, about one such tile in four by the tile.
+ * @param tile the tile
+ */
+bool SnowmanStandsAt(TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::Clear) || !IsSnowTile(tile) || GetClearGround(tile) == ClearGround::Rocks) return false;
+	if (GetClearDensity(tile) < 2 || IsSteepSlope(GetTileSlope(tile))) return false;
+	if (GB(SnowmanHash(tile), 0, 8) % 4 != 0) return false;
+	for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		const TileIndexDiffC step = TileIndexDiffCByDiagDir(d);
+		const TileIndex next = TileAddWrap(tile, step.x, step.y);
+		if (next != INVALID_TILE && IsTileType(next, TileType::House)) return true;
+	}
+	return false;
+}
+
+/**
+ * A snowman by some of the houses on the snow (the colleague's snehulak, set doplnky, hra/3d/PAR18-7-11-PRO-HRU.md part 7;
+ * the player, 7. 11.: "the snowman a decoration on the snow"), where SnowmanStandsAt(), facing a way of its own -- as
+ * the plants by the houses (DrawHousePlants()), in the turned view and from the eyes.
+ * @param ti the tile, of snow
+ */
+static void DrawSnowman(const TileInfo *ti)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return;
+	if (!SnowmanStandsAt(ti->tile)) return;
+	const uint32_t hash = SnowmanHash(ti->tile);
+	static constexpr std::string_view SNOWMAN = "snehulak";
+	const int z = ti->z + GetSlopeMaxPixelZ(ti->tileh) / 2;
+	const float facing = static_cast<float>(GB(hash, 8, 9) % 24 * 15);
+	const int x = ti->x + 4 + static_cast<int>(GB(hash, 17, 3)), y = ti->y + 4 + static_cast<int>(GB(hash, 20, 3));
+	if (eye) {
+		AddCabFigure(SNOWMAN, 1.0f, x, y, z, facing);
+	} else {
+		AddThreeDFigureToViewport(SNOWMAN, 1.0f, x, y, z, facing, _cur_dpi->zoom, ti->tile);
+	}
+}
+
+/**
+ * A walker's tent pitched on the tile (WalkerTent; the player, 7. 11.: "when I click the tent in the inventory it
+ * stands"), its fireplace and its barrel, in the turned view, facing north among the objects and from the eyes, as the
+ * snowman (DrawSnowman()).
+ * @param ti the tile, clear land or trees
+ * @return whether a tent stands there (the tile's plants and snowman are left out)
+ */
+bool DrawWalkerTent(const TileInfo *ti)
+{
+	const WalkerTent *t = _walker_tents.empty() ? nullptr : WalkerTentAt(ti->tile);
+	if (t == nullptr) return false;
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return true;
+	ForWalkerTentParts(*t, [&](const WalkerTentPart &p) {
+		const double z = ti->z + p.up_m * OBJECT_HEIGHT_PER_METRE;
+		if (eye) {
+			int frame = p.frame;
+			if (const ThreeDVehicleObject *fig = frame < 0 ? GetThreeDFigure(p.figure) : nullptr; fig != nullptr) frame = fig->FrameAt(TimerGameTick::counter, ti->tile.base());
+			AddCabFigure(p.figure, p.scale, p.x, p.y, z, p.facing, std::max(frame, 0), p.state);
+		} else if (!p.inside) {
+			AddThreeDFigureToViewport(p.figure, p.scale, static_cast<int>(std::lround(p.x)), static_cast<int>(std::lround(p.y)), static_cast<int>(std::lround(z)),
+					p.facing, _cur_dpi->zoom, ti->tile, 0, p.frame, p.state);
+		}
+	});
+	return true;
+}
+
+static void DrawTile_Clear(TileInfo *ti)
+{
+	if (DrawWalkerTent(ti)) {
+		/* The ground under the tent as it is, without the plants by the houses and the snowman. */
+		if (IsSnowTile(ti->tile)) {
+			DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		} else if (GetClearGround(ti->tile) == ClearGround::Rough) {
+			DrawRoughLandTile(ti);
+		} else if (GetClearGround(ti->tile) == ClearGround::Desert) {
+			DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		} else if (GetClearGround(ti->tile) == ClearGround::Rocks) {
+			DrawGroundSprite(SPR_FLAT_ROCKY_LAND_1 + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		} else {
+			DrawClearLandTile(ti, GetClearDensity(ti->tile));
+		}
+		DrawBridgeMiddle(ti, {});
+		return;
+	}
+	if (IsSnowTile(ti->tile)) {
+		uint8_t density = GetClearDensity(ti->tile);
+		DrawGroundSprite(_clear_land_sprites_snow_desert[density] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		/* In the 3D views the stones stand on the snow (ThreeDRocksStandOn()), none painted on it. */
+		if (GetClearGround(ti->tile) == ClearGround::Rocks && !ThreeDRocksStandOn(ti)) {
+			/* There 4 levels of snowy overlay rocks, each with 19 sprites. */
+			++density;
+			DrawGroundSprite(SPR_OVERLAY_ROCKS_BASE + (density * 19) + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		}
+		DrawSnowman(ti);
+
+		DrawBridgeMiddle(ti, {});
+		return;
+	}
+
+	switch (GetClearGround(ti->tile)) {
+		case ClearGround::Grass:
+			DrawClearLandTile(ti, GetClearDensity(ti->tile));
+			DrawHousePlants(ti);
+			break;
+
+		case ClearGround::Rough:
+			DrawRoughLandTile(ti);
+			DrawHousePlants(ti);
+			break;
+
+		case ClearGround::Rocks:
+			/* In the 3D views the stones stand on the land (ThreeDRocksStandOn(), the colleague's objekty/kameni): grass under
+			 * them, the sand of the desert, none of the rocks painted in. */
+			if (ThreeDRocksStandOn(ti)) {
+				if (GetTropicZone(ti->tile) == TropicZone::Desert) {
+					DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+				} else {
+					DrawClearLandTile(ti, 3);
+				}
+				break;
+			}
+			if (GetTropicZone(ti->tile) == TropicZone::Desert) {
+				DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+				DrawGroundSprite(SPR_OVERLAY_ROCKS_BASE + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			} else {
+				DrawGroundSprite((HasGrfMiscBit(GrfMiscBit::SecondRockyTileSet) && (TileHash(ti->x, ti->y) & 1) ? SPR_FLAT_ROCKY_LAND_2 : SPR_FLAT_ROCKY_LAND_1) + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			}
+			break;
+
+		case ClearGround::Fields:
+			/* A pasture: grass grazed within its fences (IsPasture()). */
+			if (IsPasture(ti->tile)) {
+				DrawClearLandTile(ti, 3);
+			} else {
+				/* After the harvest the 3D views (drawn without fences) stand its bales up (GetThreeDFieldBales()): its
+				 * ground without the haystacks painted in -- our grass tinted to its stubble where that is drawn
+				 * (OurGrassDrawsGround()), else the ripe field's. */
+				uint type = GetFieldType(ti->tile);
+				if (type == 8 && !_draw_fences && !GetThreeDFieldBales(ti->tile, ti->tileh).empty() && !OurGrassDrawsGround(ViewportDrawingEye())) type = 7;
+				DrawGroundSprite(_clear_land_sprites_farmland[type] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			}
+			DrawClearLandFence(ti);
+			break;
+
+		case ClearGround::Desert:
+			DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			DrawHousePlants(ti, true);
+			break;
+
+		default:
+			NOT_REACHED();
+	}
+
+	DrawBridgeMiddle(ti, {});
+}
+
+/** @copydoc GetSlopePixelZProc */
+static int GetSlopePixelZ_Clear(TileIndex tile, uint x, uint y, [[maybe_unused]] bool ground_vehicle)
+{
+	auto [tileh, z] = GetTilePixelSlope(tile);
+
+	return z + GetPartialPixelZ(x & 0xF, y & 0xF, tileh);
+}
+
+static void UpdateFences(TileIndex tile)
+{
+	assert(IsTileType(tile, TileType::Clear) && IsClearGround(tile, ClearGround::Fields));
+	bool dirty = false;
+
+	for (DiagDirection dir : EnumRange(DiagDirection::End)) {
+		if (GetFence(tile, dir) != 0) continue;
+		TileIndex neighbour = tile + TileOffsByDiagDir(dir);
+		/* A pasture fenced from the fields about it too. */
+		if (IsTileType(neighbour, TileType::Clear) && IsClearGround(neighbour, ClearGround::Fields) && IsPasture(neighbour) == IsPasture(tile)) continue;
+		SetFence(tile, dir, 3);
+		dirty = true;
+	}
+
+	if (dirty) MarkTileDirtyByTile(tile);
+}
+
+
+/**
+ * Convert to or from snowy tiles.
+ * @param tile The tile to consider.
+ */
+static void TileLoopClearAlps(TileIndex tile)
+{
+	int k = GetTileZ(tile) - GetSnowLine() + 1;
+
+	if (!IsSnowTile(tile)) {
+		/* Below the snow line, do nothing if no snow. */
+		/* At or above the snow line, make snow tile if needed. */
+		if (k >= 0) {
+			/* Snow density is started at 0 so that it can gradually reach the required density. */
+			MakeSnow(tile, 0);
+			MarkTileDirtyByTile(tile);
+		}
+		return;
+	}
+
+	/* Update snow density. */
+	uint current_density = GetClearDensity(tile);
+	uint req_density = (k < 0) ? 0u : std::min<uint>(k, 3u);
+
+	if (current_density == req_density) {
+		/* Density at the required level. */
+		if (k >= 0) return;
+		ClearSnow(tile);
+	} else {
+		AddClearDensity(tile, current_density < req_density ? 1 : -1);
+	}
+
+	MarkTileDirtyByTile(tile);
+}
+
+/**
+ * Tests if at least one surrounding tile is non-desert
+ * @param tile tile to check
+ * @return does this tile have at least one non-desert tile around?
+ */
+static inline bool NeighbourIsNormal(TileIndex tile)
+{
+	for (DiagDirection dir : EnumRange(DiagDirection::End)) {
+		TileIndex t = tile + TileOffsByDiagDir(dir);
+		if (!IsValidTile(t)) continue;
+		if (GetTropicZone(t) != TropicZone::Desert) return true;
+		if (HasTileWaterClass(t) && GetWaterClass(t) == WaterClass::Sea) return true;
+	}
+	return false;
+}
+
+static void TileLoopClearDesert(TileIndex tile)
+{
+	ClearGround ground = GetClearGround(tile);
+
+	/* Current desert level - 0 if it is not desert */
+	uint current = 0;
+	if (ground == ClearGround::Desert || ground == ClearGround::Rocks) current = GetClearDensity(tile);
+
+	/* Expected desert level - 0 if it shouldn't be desert */
+	uint expected = 0;
+	if (GetTropicZone(tile) == TropicZone::Desert) {
+		expected = NeighbourIsNormal(tile) ? 1 : 3;
+	}
+
+	if (current == expected) return;
+
+	if (ground == ClearGround::Rocks) {
+		SetClearGroundDensity(tile, ClearGround::Rocks, expected);
+	} else if (expected == 0) {
+		SetClearGroundDensity(tile, ClearGround::Grass, 3);
+	} else {
+		/* Transition from clear to desert is not smooth (after clearing desert tile) */
+		SetClearGroundDensity(tile, ClearGround::Desert, expected);
+	}
+
+	MarkTileDirtyByTile(tile);
+}
+
+/** @copydoc TileLoopProc */
+static void TileLoop_Clear(TileIndex tile)
+{
+	AmbientSoundEffect(tile);
+
+	switch (SnowLandscape()) {
+		case LandscapeType::Tropic: TileLoopClearDesert(tile); break;
+		case LandscapeType::Arctic: TileLoopClearAlps(tile);   break;
+		default: break;
+	}
+
+	if (IsSnowTile(tile)) return;
+
+	switch (GetClearGround(tile)) {
+		case ClearGround::Grass:
+			if (GetClearDensity(tile) == 3) return;
+
+			if (_game_mode != GameMode::Editor) {
+				if (GetClearCounter(tile) < 7) {
+					AddClearCounter(tile, 1);
+					return;
+				} else {
+					SetClearCounter(tile, 0);
+					AddClearDensity(tile, 1);
+				}
+			} else {
+				SetClearGroundDensity(tile, GB(Random(), 0, 8) > 21 ? ClearGround::Grass : ClearGround::Rough, 3);
+			}
+			break;
+
+		case ClearGround::Fields:
+			UpdateFences(tile);
+
+			if (_game_mode == GameMode::Editor) return;
+
+			if (GetClearCounter(tile) < 7) {
+				AddClearCounter(tile, 1);
+				return;
+			} else {
+				SetClearCounter(tile, 0);
+			}
+
+			if (GetIndustryIndexOfField(tile) == IndustryID::Invalid() && GetFieldType(tile) >= 7) {
+				/* This farmfield is no longer farmfield, so make it grass again */
+				MakeClear(tile, ClearGround::Grass, 2);
+			} else {
+				uint field_type = GetFieldType(tile);
+				field_type = (field_type < 8) ? field_type + 1 : 0;
+				SetFieldType(tile, field_type);
+			}
+			break;
+
+		default:
+			return;
+	}
+
+	MarkTileDirtyByTile(tile);
+}
+
+void GenerateClearTile()
+{
+	uint i, gi;
+	TileIndex tile;
+
+	/* add rough tiles */
+	i = Map::ScaleBySize(GB(Random(), 0, 10) + 0x400);
+	gi = Map::ScaleBySize(GB(Random(), 0, 7) + 0x80);
+
+	SetGeneratingWorldProgress(GenWorldProgress::RoughAndRocks, gi + i);
+	do {
+		IncreaseGeneratingWorldProgress(GenWorldProgress::RoughAndRocks);
+		tile = RandomTile();
+		if (IsTileType(tile, TileType::Clear) && !IsClearGround(tile, ClearGround::Desert)) SetClearGroundDensity(tile, ClearGround::Rough, 3);
+	} while (--i);
+
+	/* add rocky tiles */
+	i = gi;
+	do {
+		uint32_t r = Random();
+		tile = RandomTileSeed(r);
+
+		IncreaseGeneratingWorldProgress(GenWorldProgress::RoughAndRocks);
+		if (IsTileType(tile, TileType::Clear)) {
+			uint j = GB(r, 16, 4) + 5;
+			for (;;) {
+				TileIndex tile_new;
+
+				SetClearGroundDensity(tile, ClearGround::Rocks, 3);
+				MarkTileDirtyByTile(tile);
+				do {
+					if (--j == 0) goto get_out;
+					tile_new = tile + TileOffsByDiagDir((DiagDirection)GB(Random(), 0, 2));
+				} while (!IsTileType(tile_new, TileType::Clear));
+				tile = tile_new;
+			}
+get_out:;
+		}
+	} while (--i);
+}
+
+/** @copydoc GetTileDescProc */
+static void GetTileDesc_Clear(TileIndex tile, TileDesc &td)
+{
+	/* Each pair holds a normal and a snowy ClearGround description. */
+	static constexpr EnumIndexArray<std::pair<StringID, StringID>, ClearGround, ClearGround::MaxSize> clear_land_str{{{
+		{STR_LAI_CLEAR_DESCRIPTION_GRASS,      STR_LAI_CLEAR_DESCRIPTION_SNOWY_GRASS}, // Description for grass.
+		{STR_LAI_CLEAR_DESCRIPTION_ROUGH_LAND, STR_LAI_CLEAR_DESCRIPTION_SNOWY_ROUGH_LAND}, // Description for rough land.
+		{STR_LAI_CLEAR_DESCRIPTION_ROCKS,      STR_LAI_CLEAR_DESCRIPTION_SNOWY_ROCKS}, // Description for rocks.
+		{STR_LAI_CLEAR_DESCRIPTION_FIELDS,     STR_EMPTY}, // Description for fields.
+		{STR_EMPTY,                            STR_EMPTY}, // unused entry does not appear in the map.
+		{STR_LAI_CLEAR_DESCRIPTION_DESERT,     STR_EMPTY}, // Description for desert.
+		{STR_EMPTY,                            STR_EMPTY}, // unused entry does not appear in the map.
+		{STR_EMPTY,                            STR_EMPTY}, // unused entry does not appear in the map.
+	}}};
+
+	if (!IsSnowTile(tile) && IsClearGround(tile, ClearGround::Grass) && GetClearDensity(tile) == 0) {
+		td.str = STR_LAI_CLEAR_DESCRIPTION_BARE_LAND;
+	} else {
+		const auto &[name, snowy_name] = clear_land_str[GetClearGround(tile)];
+		td.str = IsSnowTile(tile) ? snowy_name : name;
+	}
+	td.owner[0] = GetTileOwner(tile);
+}
+
+/** TileTypeProcs definitions for TileType::Clear tiles. */
+extern const TileTypeProcs _tile_type_clear_procs = {
+	.draw_tile_proc = DrawTile_Clear,
+	.get_slope_pixel_z_proc = GetSlopePixelZ_Clear,
+	.clear_tile_proc = ClearTile_Clear,
+	.get_tile_desc_proc = GetTileDesc_Clear,
+	.tile_loop_proc = TileLoop_Clear,
+	.terraform_tile_proc = [](TileIndex tile, DoCommandFlags flags, int, Slope) { return Command<Commands::LandscapeClear>::Do(flags, tile); },
+	.check_build_above_proc = [](TileIndex, DoCommandFlags, Axis, int) { return CommandCost(); }, // Can always build above clear tiles
+};

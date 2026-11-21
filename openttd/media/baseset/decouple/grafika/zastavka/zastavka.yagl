@@ -1,0 +1,65 @@
+// The girls at a drive-through bus stop in 16x (zoom code 7, zin16), laid over
+// openttd.grf's sprites with Action A (SPR_BUS_STOP_GIRL_X_FAR 5157, Y_FAR 5158,
+// X_NEAR 5159 = SPR_OPENTTD_BASE 4896 + 261..263; table/sprites.h). The player:
+// openttd.grf stays as it is, the 16x pictures of the game's own things go in
+// sets of their own under baseset/decouple/grafika/, static in every game.
+//
+// The 4x and 8x levels are openttd.grf's own pictures (media/baseset/openttd,
+// with their faint shadow); the 16x are the colleague's renders of the same
+// girls from eight directions (grrrrf postavy/osm_smeru_zin16*, 48.8 px/m,
+// scale 2, no shadow): Character People Girl 001 facing south-east by the far
+// shelter on a road along X, facing south-west by the far shelter along Y,
+// College Girl from behind facing north-west at the south corner along X (the
+// 4x and 8x look 260 degrees, ten short of that). Each is placed by her feet
+// at the point the game's table gives, four times the 4x offsets from the
+// shelter's box origin (openttd_budovy.py). Matylda (SPR_BUS_STOP_GIRL_Y_NEAR)
+// is the second set below, from the colleague's render of her from eight
+// directions (12. 10. evening).
+//
+//     yagl -e <abs>/zastavka.grf <abs>/zastavka     (README.md)
+yagl_version: "";
+grf_format: Container2;
+grf // Action08
+{
+    grf_id: "DCzs";
+    version: GRF8;
+    name: "Decouple: girls at the bus stop in 16x";
+    description: "The 16x pictures of the girls at a drive-through bus stop, over openttd.grf's own (OpenTTD Decouple by Karel Macha)";
+}
+replacement_sprite_sets // Action0A
+{
+    replacement_sprite_set<0x1425> // SPR_BUS_STOP_GIRL_X_FAR
+    {
+        sprite_id<0x00000001>
+        {
+            [116, 71, -89, -2], zin4, c32bpp | chunked, "zastavka_x_vzadu_32bpp.png", [0, 0];
+            [238, 139, -190, -3], zin8, c32bpp | chunked, "zastavka_x_vzadu_8x_32bpp.png", [0, 0];
+            [46, 159, -157, -5], zin16, c32bpp | chunked, "zastavka_x_vzadu_16x_32bpp.png", [0, 0];
+        }
+        sprite_id<0x00000002> // SPR_BUS_STOP_GIRL_Y_FAR
+        {
+            [116, 70, 11, 17], zin4, c32bpp | chunked, "zastavka_y_vzadu_32bpp.png", [0, 0];
+            [248, 139, 20, 34], zin8, c32bpp | chunked, "zastavka_y_vzadu_8x_32bpp.png", [0, 0];
+            [54, 151, 253, 69], zin16, c32bpp | chunked, "zastavka_y_vzadu_16x_32bpp.png", [0, 0];
+        }
+        sprite_id<0x00000003> // SPR_BUS_STOP_GIRL_X_NEAR
+        {
+            [113, 69, -162, 33], zin4, c32bpp | chunked, "zastavka_x_vpredu_32bpp.png", [0, 0];
+            [242, 136, -325, 66], zin8, c32bpp | chunked, "zastavka_x_vpredu_8x_32bpp.png", [0, 0];
+            [43, 148, -439, 133], zin16, c32bpp | chunked, "zastavka_x_vpredu_16x_32bpp.png", [0, 0];
+        }
+    }
+    // Matylda on the near pavement along Y (SPR_BUS_STOP_GIRL_Y_NEAR, 5165 = 4896 + 269), looking up the road
+    // for the bus: direction d7 of the colleague's eight (grrrrf postavy/osm_smeru_zin16_holky/matilda), the
+    // same pose as the 4x and 8x. Model "Matilda" by nicolekeane, CC BY-NC-SA 4.0: this set carries that licence
+    // and her name (CREDITS.md).
+    replacement_sprite_set<0x142D>
+    {
+        sprite_id<0x00000004>
+        {
+            [84, 62, -106, 39], zin4, c32bpp | chunked, "zastavka_y_vpredu_32bpp.png", [0, 0];
+            [185, 126, -226, 77], zin8, c32bpp | chunked, "zastavka_y_vpredu_8x_32bpp.png", [0, 0];
+            [70, 146, -302, 155], zin16, c32bpp | chunked, "zastavka_y_vpredu_16x_32bpp.png", [0, 0];
+        }
+    }
+}

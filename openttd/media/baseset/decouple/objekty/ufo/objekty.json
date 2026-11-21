@@ -1,0 +1,76 @@
+[
+ {
+  "soubor": "ufo_talir.glb",
+  "jmeno": "ufo_talir",
+  "druh": "ufo",
+  "nazev": {
+   "cs": "létající talíř",
+   "en": "flying saucer"
+  },
+  "kdy": [
+   "katastrofa",
+   "noc"
+  ],
+  "meritko": 1,
+  "rozmer_m": [
+   7.95,
+   7.93,
+   3.66
+  ],
+  "katastrofa": {
+   "male_ufo": {
+    "meritko": 1
+   },
+   "velke_ufo": {
+    "meritko": 2
+   },
+   "poznamka": "místo malého a velkého UFO z katastrof původní hry: malé sedne na silniční vozidlo, velké na koleje (návrh v hra/3d/PROSBA-UFO.md)"
+  },
+  "noc": {
+   "nici": false,
+   "vyska_m": 13.0,
+   "poznamka": "v noci létá jako strašidla nad ulicemi a nic neničí, ani koleje; paprsek svítí dolů"
+  },
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 8,
+    "tiku": 6,
+    "smycka": true,
+    "krok_m": 12.0
+   }
+  },
+  "paprsek": {
+   "uzel": "paprsek",
+   "konec": "paprsek_konec",
+   "delka_m": 12.0,
+   "od_z": -0.99,
+   "poznamka": "kužel od díry ve spodku talíře dolů po -z, na konci světlá skvrna; počátek uzlu je na spodku talíře (od_z), natáhni uzel v z na výšku nad zemí (měřítko z = výška spodku talíře nad zemí / 12)"
+  },
+  "ovce": {
+   "uzel": "ovce",
+   "poznamka": "ovce z modelu v paprsku (počátek uprostřed ovce); hra ji může zvedat paprskem k talíři a točit, nebo skrýt"
+  },
+  "posadka": [
+   {
+    "postava": "ufon",
+    "poznamka": "pilot je v kabině už v modelu (zelený ufon), tentýž ufon chodí v noci (objekty/strasidla/ufon.glb)"
+   }
+  ],
+  "svetla": {
+   "paprsek": {
+    "barva": "AAFFBE",
+    "dosah_m": 15.0,
+    "uhel": 14
+   },
+   "lem": {
+    "barva": "09FF87",
+    "dosah_m": 6
+   }
+  },
+  "trojuhelniku": 16602,
+  "autor": "UFO stealing a sheep, esarrias (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/ufo-stealing-a-sheep-1f6309876fe943d18f91d3080b184c90), převod tvorove/ufo.py bez renderu; pilot ufo, ilarioseb (Sketchfab, CC BY 4.0); paprsek vlastní",
+  "licence": "CC BY 4.0 (uvést esarrias a ilarioseb; změny: jen talíř a ovce ze scény, srovnaný, zjednodušený, kov zesvětlený, kabina skleněná s pilotem, let ze snímků)",
+  "poznamka": "skutečné metry (8 m přes lem), čelem k +x, počátek uprostřed talíře, s normálami; ve scéně modelu byl nakloněný o 9°, tady srovnaný; let z 8 snímků let_00 až let_07: trup s kabinou (7464 trojúhelníků) a pilot (4323) jako instance jedné sítě, šest světel na hřbetě (1904) se točí o 60° za kolo, uzel snímku se houpe (±0,15 m) a kolébá (±2,5°); lem, světla, kabina, paprsek a skvrna svítí samy (emise, extras sviti); kabina je sklo (BLEND), uvnitř stojí zelený ufon; paprsek (120) a ovce (2791) mimo snímky; glb z gltfpacku"
+ }
+]
