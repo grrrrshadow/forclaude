@@ -2583,6 +2583,9 @@ STR_CAB_VIEW_UNLOAD_CARGO                                       :{BLACK}Vyložit
 STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP                               :{BLACK}Vyložit, co stanice bere, postupně po čtvrtinách, zaplaceno jako doručení; auto stojí na průjezdné zastávce tvé firmy. Znovu stisknuté: přestat
 STR_ERROR_CAB_CAN_T_LOAD                                        :{WHITE}Nelze naložit...
 STR_ERROR_CAB_CAN_T_UNLOAD                                      :{WHITE}Nelze vyložit...
+STR_CAB_VIEW_DROP_CARGO                                         :{BLACK}Vysypat náklad
+STR_CAB_VIEW_DROP_CARGO_TOOLTIP                                 :{BLACK}Shodit, co letadlo veze, tam, kde zrovna letí (B): za každé auto s výbušninami na palubě jedna bomba
+STR_ERROR_CAB_CAN_T_DROP                                        :{WHITE}Nelze vysypat náklad...
 STR_ERROR_CAB_NOT_DRIVEN                                        :{WHITE}... auto jede svou trasu a nakládá podle rozkazů; šipkou převezmeš volant
 STR_ERROR_CAB_NOT_AT_STOP                                       :{WHITE}... auto musí stát na průjezdné zastávce tvé firmy
 STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... stanice tenhle náklad nebere
@@ -6432,6 +6435,7 @@ STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :{WHITE}Nelze ot
 STR_ERROR_AIRCRAFT_IS_IN_FLIGHT                                 :{WHITE}Letadlo letí
 STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND                        :{WHITE}... letadlo musí být na zemi
 STR_ERROR_AIRCRAFT_MUST_BE_EMPTY                                :{WHITE}... letadlo musí být prázdné
+STR_ERROR_AIRCRAFT_MUST_BE_IN_THE_AIR                           :{WHITE}... letadlo musí být ve vzduchu
 STR_ERROR_ANOTHER_AIRCRAFT_IS_ALREADY_OUT                       :{WHITE}... někdo jiný už je venku
 STR_ERROR_RAID_OUT_OF_REACH                                     :{WHITE}... k tomuhle místu se loď nedostane na dostřel
 STR_VEHICLE_VIEW_AIRCRAFT_RAID_TOOLTIP                          :{BLACK}Zaměř místo na mapě

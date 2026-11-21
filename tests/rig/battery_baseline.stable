@@ -140,6 +140,10 @@ kabposunpult: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zazna
 kabposunpult: k vagonum nedojel
 kabposunnaraz: spojeno=0 odtazeno=0 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 kabposunnaraz: k vagonum nedojel
+vysypat: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vysypat: na zemi 1 odmitnuto | nad (59,68) vyska 206 smer 4 - dym|nad (59,75) vyska 206 smer 3 - dym| oblacku 30
+vysypatbomby: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 odmitnuto=0
+vysypatbomby: na zemi 2 odmitnuto | nad (55,16) vyska 198 smer 5 - bomby|atomovka na (55,16) - vraku 0, prumyslu zbourano 0, domu srovnano 0|
 cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0

@@ -56,6 +56,8 @@
 #include "settings_type.h"
 #include "core/geometry_func.hpp"
 #include "simtrains_cab.h"
+#include "industry.h"
+#include "road_on_rail.h"
 #include "3rdparty/fmt/format.h"
 
 #include "table/strings.h"
@@ -215,6 +217,43 @@ void CabCargo(const Vehicle *v, bool unload)
 {
 	const uint8_t op = unload ? Vehicle::CAB_CARGO_UNLOAD : Vehicle::CAB_CARGO_LOAD;
 	Command<Commands::CabCargo>::Post(unload ? STR_ERROR_CAB_CAN_T_UNLOAD : STR_ERROR_CAB_CAN_T_LOAD, v->tile, v->index, v->cab_cargo == op ? Vehicle::CAB_CARGO_NONE : op);
+}
+
+/**
+ * Whether the cab of this vehicle shows the button of dumping its cargo at all (the player, 21. 11.: "we will bomb; a
+ * button 'dump the cargo'; ships no" and "the button must not be seen without 'miluju karla', only once I run it"):
+ * an aircraft of the player's, and only while the raid is asked for in the console (#_show_industry_health) -- the
+ * switch the crosshair of its window goes by. Without it nothing of the button is there, nor its key.
+ */
+bool CabShowsDrop(const Vehicle *v)
+{
+	if (!_show_industry_health) return false;
+	if (v == nullptr || v->type != VehicleType::Aircraft || v->owner != _local_company) return false;
+	return Aircraft::From(v)->IsNormalAircraft();
+}
+
+/**
+ * Whether the button shown (CabShowsDrop()) can be pressed now: in the air and not on a raid of the crosshair, with a
+ * car of explosives aboard (a bomb for each) or with nothing aboard at all (the smoke of a raid), as CmdCabDrive()
+ * takes it (CabDriveOp::Drop).
+ */
+bool CabCanDrop(const Vehicle *v)
+{
+	if (!CabShowsDrop(v)) return false;
+	const Aircraft *a = Aircraft::From(v);
+	if (a->state != FLYING || a->raid_target != INVALID_TILE) return false;
+	if (CarriesExplosiveCar(a)) return true;
+	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+		if (u->cargo.TotalCount() != 0) return false;
+	}
+	return true;
+}
+
+/** The button and the key of dumping the cargo (CabCanDrop()). */
+void CabDrop(const Vehicle *v)
+{
+	if (!CabCanDrop(v)) return;
+	Command<Commands::CabDrive>::Post(STR_ERROR_CAB_CAN_T_DROP, v->tile, v->index, to_underlying(CabDriveOp::Drop));
 }
 
 /**

@@ -6079,7 +6079,7 @@ static void AppendConsoleCargo(Vehicle *v, CargoPacket *cp)
 static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Fill a road vehicle, or a waiting rake's wagons of one cargo. Usage: 'testnalozit auto <unit number>' or 'testnalozit rada <cargo> [<cislo rady>|kazdy2|kazdy2od2|vagonkazdy2]'.");
+		IConsolePrint(CC_HELP, "Fill a road vehicle, or a waiting rake's wagons of one cargo. Usage: 'testnalozit auto <unit number> [vybusniny]' or 'testnalozit rada <cargo> [<cislo rady>|kazdy2|kazdy2od2|vagonkazdy2]'.");
 		return true;
 	}
 	/* 'rada <cargo>': fill the wagons of that cargo in every waiting rake, and
@@ -6127,8 +6127,22 @@ static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 	auto punit = ParseInteger(argv[2]);
 	if (!punit.has_value()) return false;
 
+	/* 'auto <unit> vybusniny': the car made a car of explosives first, whatever it was built to carry -- what a ship or
+	 * an aircraft with it aboard drops as a bomb (ExplosiveCarsAboard()). The rig's shortcut past the plantation, the
+	 * refinery and an armoured car; needs the game's extra industries (economy.extra_industries) for the cargo. */
+	const bool explosives = argv.size() >= 4 && argv[3] == "vybusniny";
 	for (RoadVehicle *rv : RoadVehicle::Iterate()) {
 		if (!rv->IsFrontEngine() || rv->unitnumber != (UnitID)*punit) continue;
+		if (explosives) {
+			const CargoType expl = GetCargoTypeByLabel(CT_EXPLOSIVES);
+			if (!IsValidCargoType(expl)) {
+				IConsolePrint(CC_ERROR, "testnalozit: hra nema vybusniny (economy.extra_industries).");
+				return true;
+			}
+			rv->cargo.Truncate();
+			rv->cargo_type = expl;
+			if (rv->cargo_cap == 0) rv->cargo_cap = 10;
+		}
 		uint put = 0;
 		for (RoadVehicle *u = rv; u != nullptr; u = u->Next()) {
 			uint room = u->cargo_cap - u->cargo.StoredCount();

@@ -1282,6 +1282,32 @@ testzatik 1300 testkde
 testzatik 1320 test3d jizda 0 68 9"
 cab_scene kabposunnaraz "$CAB_DESK
 testzatik 1300 testkde"
+# The cargo of an aircraft dumped from its cab (CabDriveOp::Drop, the player
+# 21. 11.: "we will bomb; a button 'dump the cargo'; ships no"). On the ground
+# it is refused; in the air on its route it goes down under the aircraft --
+# empty, the smoke of a raid; flown by hand (six steps to the left) the same,
+# under where it is then. The second line says each of the three.
+run_scene vysypat "vlak123 on
+testletadlo 60 60 100 100
+test3d jizda 3 1 11
+testzatik 600 test3d jizda 3 1 11
+testzatik 650 test3d jizda 3 1 1 6
+testzatik 750 test3d jizda 3 1 11
+testzatik 760 testdym" 1500
+echo "vysypat: na zemi $(grep -ac 'jizda 3 1 op 11: NEJDE' $S/reg_vysypat.log) odmitnuto | $(grep -a 'vysypat: letadlo' $S/reg_vysypat.log | sed 's/^.*vysypat: letadlo 1 //' | tr '\n' '|') $(grep -a 'testdym: oblacku' $S/reg_vysypat.log | grep -o 'oblacku [0-9]*')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The same with a car of explosives aboard (testautoletadlo; the car is made one
+# by the rig once it waits at its stop): refused while the aircraft is still
+# on the ground, then a bomb under it for the car -- and its explosives gone
+# with it: the next dumping, thirty ticks on, is refused, because the aircraft
+# has no bomb any more and is not empty either (the car still rides in it).
+# So "2 refused": the one on the ground and that one.
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene vysypatbomby "vlak123 on
+testautoletadlo
+testzatik 2000 testnalozit auto 1 vybusniny
+testzatik 3200 test3d jizda 3 1 11
+testzatik 3300 test3d jizda 3 1 11
+testzatik 3330 test3d jizda 3 1 11" 3600
+echo "vysypatbomby: na zemi $(grep -ac 'jizda 3 1 op 11: NEJDE' $S/reg_vysypatbomby.log) odmitnuto | $(grep -a 'vysypat: letadlo\|atomovka: na' $S/reg_vysypatbomby.log | sed 's/^.*vysypat: letadlo 1 //; s/^.*atomovka: /atomovka /' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Automatic departure on a couple order (polygon, TEMATA 2.41): a dual-headed
 # waiter is collected by a dual-headed collector whose next stop is back the
 # way it came. 62 with no flag carries on round the loop; 63 with "automatic"

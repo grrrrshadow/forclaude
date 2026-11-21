@@ -1655,10 +1655,20 @@ struct FirstPersonWindow : Window {
 			this->here_shown = here;
 			this->SetWidgetDirty(WID_FP_HERE);
 		}
+		/* The button of dumping an aircraft's cargo: there or grey as it takes off and lands, as it loads, as the console
+		 * asks for the raid (CabCanDrop()). */
+		const int drop = !CabShowsDrop(rv) ? 0 : CabCanDrop(rv) ? 2 : 1;
+		bool drop_resized = false;
+		if (drop != this->drop_shown) {
+			/* There or gone: its button as wide as what it says then (UpdateWidgetSize()). */
+			drop_resized = (drop == 0) != (this->drop_shown <= 0);
+			this->drop_shown = drop;
+			this->SetWidgetDirty(WID_FP_UNLOAD);
+		}
 		/* The button of the route in a vehicle, of running on foot. */
 		bool changed = this->GetWidget<NWidgetStacked>(WID_FP_RUN_SEL)->SetDisplayedPlane(rv != nullptr ? 1 : 0);
 		changed |= this->GetWidget<NWidgetStacked>(WID_FP_CONTROLS_SEL)->SetDisplayedPlane(IsDeskTrain(rv) ? 0 : SZSP_NONE);
-		if (changed) this->ReInit();
+		if (changed || drop_resized) this->ReInit();
 		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
 		const Company *c = Company::GetIfValid(_local_company);
 		if (c != nullptr && c->walker_health == 0) {
@@ -2794,6 +2804,12 @@ struct FirstPersonWindow : Window {
 				this->SetWidgetDirty(WID_FP_ROUTE);
 				return EventState::Handled;
 			}
+			/* B in an aircraft with the raid asked for: its cargo dumped (CabDrop()). */
+			if ((key == 'b' || key == 'B') && CabShowsDrop(rv)) {
+				CabDrop(rv);
+				this->SetWidgetDirty(WID_FP_UNLOAD);
+				return EventState::Handled;
+			}
 		}
 		/* I: the inventory (as in Morrowind). */
 		if (key == 'i' || key == 'I') {
@@ -2897,11 +2913,20 @@ struct FirstPersonWindow : Window {
 		this->SetWidgetLoweredState(WID_FP_LOAD, rv != nullptr && rv->cab_cargo == Vehicle::CAB_CARGO_LOAD);
 		this->SetWidgetLoweredState(WID_FP_UNLOAD, rv != nullptr && rv->cab_cargo == Vehicle::CAB_CARGO_UNLOAD);
 		this->SetWidgetsDisabledState(rv == nullptr || rv->owner != _local_company || rv->type != VehicleType::Road, WID_FP_LOAD, WID_FP_UNLOAD);
+		/* In an aircraft, while the raid is asked for in the console, the button of unloading is the one of dumping its
+		 * cargo (CabShowsDrop(), CabCanDrop()); without that it is the unloading an aircraft never does, as it was. */
+		if (CabShowsDrop(rv)) {
+			this->SetWidgetDisabledState(WID_FP_UNLOAD, !CabCanDrop(rv));
+			this->GetWidget<NWidgetCore>(WID_FP_UNLOAD)->SetToolTip(STR_CAB_VIEW_DROP_CARGO_TOOLTIP);
+		} else {
+			this->GetWidget<NWidgetCore>(WID_FP_UNLOAD)->SetToolTip(STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP);
+		}
 		this->GetWidget<NWidgetCore>(WID_FP_CENTRE)->SetToolTip(rv != nullptr ? STR_FIRST_PERSON_STAND_TOOLTIP : STR_FIRST_PERSON_CENTRE_TOOLTIP);
 		this->DrawWidgets();
 	}
 
 	int here_shown = -1; ///< what the button where "Here" was says now: 0 Here, 1 Couple, 2 Decouple
+	int drop_shown = -1; ///< the button of dumping an aircraft's cargo as painted: 0 not an aircraft, 1 grey, 2 offered (CabCanDrop())
 
 	/**
 	 * Whether the driver's stand of the train ridden is the one at the engine's back, towards what follows it in its
@@ -2944,6 +2969,8 @@ struct FirstPersonWindow : Window {
 		 * button Here away and in its place the button Couple; coupled, it says Decouple"). */
 		if (widget == WID_FP_HERE && this->Riding() != nullptr) return GetString(this->HereDecouples() ? STR_FIRST_PERSON_DECOUPLE : STR_FIRST_PERSON_COUPLE);
 		if (widget == WID_FP_CAMERA) return CabCameraText();
+		/* In an aircraft with the raid asked for: its cargo dumped, not unloaded (the player, 21. 11.). */
+		if (widget == WID_FP_UNLOAD && CabShowsDrop(this->Riding())) return GetString(STR_CAB_VIEW_DROP_CARGO);
 		if (widget == WID_FP_CONTROLS) return GetString(STR_CAB_VIEW_CONTROLS, _settings_client.gui.cab_msts_keys ? STR_CAB_VIEW_CONTROLS_MSTS : STR_CAB_VIEW_CONTROLS_ARROWS);
 		return this->Window::GetWidgetString(widget, stringid);
 	}
@@ -2953,6 +2980,11 @@ struct FirstPersonWindow : Window {
 		if (widget == WID_FP_CENTRE) {
 			/* On the map, or the driver's stand when riding (as wide as its longest). */
 			for (StringID s : {STR_FIRST_PERSON_CENTRE, STR_FIRST_PERSON_STAND_FRONT, STR_FIRST_PERSON_STAND_BACK}) size.width = std::max(size.width, GetStringBoundingBox(s).width + padding.width);
+			return;
+		}
+		if (widget == WID_FP_UNLOAD) {
+			/* Shown as the dumping of an aircraft's cargo (CabShowsDrop()): as wide as that says, and only then. */
+			if (CabShowsDrop(this->Riding())) size.width = std::max(size.width, GetStringBoundingBox(STR_CAB_VIEW_DROP_CARGO).width + padding.width);
 			return;
 		}
 		if (widget != WID_FP_CAMERA) return;
@@ -3156,7 +3188,11 @@ struct FirstPersonWindow : Window {
 			case WID_FP_LOAD:
 			case WID_FP_UNLOAD:
 				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
-					CabCargo(rv, widget == WID_FP_UNLOAD);
+					if (widget == WID_FP_UNLOAD && CabShowsDrop(rv)) {
+						CabDrop(rv);
+					} else {
+						CabCargo(rv, widget == WID_FP_UNLOAD);
+					}
 					this->SetDirty();
 				}
 				break;

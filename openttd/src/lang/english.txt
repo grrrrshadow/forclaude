@@ -2475,6 +2475,9 @@ STR_CAB_VIEW_UNLOAD_CARGO                                       :{BLACK}Unload
 STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP                               :{BLACK}Unload what the station accepts, a quarter at a time, paid as delivered; the car stands on a drive-through stop of your company. Pressed again: stop
 STR_ERROR_CAB_CAN_T_LOAD                                        :{WHITE}Can't load...
 STR_ERROR_CAB_CAN_T_UNLOAD                                      :{WHITE}Can't unload...
+STR_CAB_VIEW_DROP_CARGO                                         :{BLACK}Dump the cargo
+STR_CAB_VIEW_DROP_CARGO_TOOLTIP                                 :{BLACK}Let go of what the aircraft carries over where it flies (B): a bomb for each car of explosives aboard
+STR_ERROR_CAB_CAN_T_DROP                                        :{WHITE}Can't dump the cargo...
 STR_ERROR_CAB_NOT_DRIVEN                                        :{WHITE}... the vehicle goes its route and loads as its orders say; an arrow takes the wheel
 STR_ERROR_CAB_NOT_AT_STOP                                       :{WHITE}... the vehicle must stand on a drive-through stop of your company
 STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... the station does not take this cargo
@@ -6311,6 +6314,7 @@ STR_ERROR_CAN_T_MAKE_ROAD_VEHICLE_TURN                          :Can't make road
 STR_ERROR_AIRCRAFT_IS_IN_FLIGHT                                 :aircraft is in flight
 STR_ERROR_AIRCRAFT_MUST_BE_ON_THE_GROUND                        :{WHITE}... aircraft must be on the ground
 STR_ERROR_AIRCRAFT_MUST_BE_EMPTY                                :{WHITE}... aircraft must be empty
+STR_ERROR_AIRCRAFT_MUST_BE_IN_THE_AIR                           :{WHITE}... aircraft must be in the air
 STR_ERROR_ANOTHER_AIRCRAFT_IS_ALREADY_OUT                       :{WHITE}... somebody else is already out
 STR_ERROR_RAID_OUT_OF_REACH                                     :{WHITE}... no water within reach of this spot
 STR_VEHICLE_VIEW_AIRCRAFT_RAID_TOOLTIP                          :{BLACK}Point the crosshair at a spot on the map

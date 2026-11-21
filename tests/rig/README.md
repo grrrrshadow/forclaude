@@ -210,6 +210,14 @@ against every one-way signal, couples to the casualty's head and takes it away
 forwards, nothing collides. A tow may defy one-way signals only on its way TO
 a casualty; with one in tow it is an ordinary train.
 
+Dumping an aircraft's cargo from its cab (`CabDriveOp::Drop`, the button
+"Vysypat náklad" of the first person's window, there only after `miluju karla`
+in the console): `test3d jizda 3 <unit> 11` is the press. `testnalozit auto
+<unit> vybusniny` makes a car a car of explosives (once it stands at its stop).
+Battery scenes `vysypat` (refused on the ground; in the air the smoke of a raid
+under the aircraft, on its route and flown by hand) and `vysypatbomby` (a car
+of explosives aboard: a bomb, then refused -- no bomb left, and not empty).
+
 ## The rig's own sets, in yagl
 
 Every NewGRF the rig makes for itself is a yagl script in `grf/` -- `grf/<set>.yagl`,

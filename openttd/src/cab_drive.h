@@ -48,6 +48,7 @@ enum class CabDriveOp : uint8_t {
 	CoupleFront = 8,  ///< a train standing: couple to what stands at its front, at the driver's stand there (CmdCabDrive())
 	CoupleRear = 9,   ///< couple to what stands at the engine's back, or decouple the wagons coupled there
 	Stand = 10,       ///< a train standing: the driver goes to the stand at its other end -- it goes the other way from now on, its vehicles where they are (ChangeTrainStand())
+	Drop = 11,        ///< an aircraft in the air: what it carries let go over where it is -- a bomb for each car of explosives aboard, else, empty, the smoke of a raid (DropRaidPayload())
 };
 
 /** The slowest speed the brake of the cab holds a vehicle to (CabSpeed()); braked further it stops. */

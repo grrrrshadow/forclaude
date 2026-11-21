@@ -17,6 +17,7 @@
 #include "company_func.h"
 #include "train.h"
 #include "road_on_rail.h"
+#include "industry.h"
 #include "aircraft.h"
 #include "newgrf_text.h"
 #include "vehicle_func.h"
@@ -1464,7 +1465,7 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	if (op > to_underlying(CabDriveOp::Stand)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::Drop)) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 	const CabDriveOp what = static_cast<CabDriveOp>(op);
@@ -1472,6 +1473,34 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 	 * engine where the driver's stand is now; at the stand on the side where no wagons are coupled the button does
 	 * nothing"): standing only. At the front, coupled to what stands before it; at the back, the wagons behind the
 	 * engine decoupled, or, the engine alone, coupled to what stands behind it. Else nothing. */
+	if (what == CabDriveOp::Drop) {
+		/* The cargo let go by hand (the player, 21. 11.: "we will bomb; a button 'dump the cargo'; ships no"): only an
+		 * aircraft, and only one in the air -- flown from its cab or on its way, not taking off, landing or already on
+		 * a raid of the crosshair. What goes is what a raid drops, by the raid's own rule (CmdRaid()): a bomb for each
+		 * car of explosives aboard, whatever else it carries; with none, it has to be empty, and it is the smoke. */
+		if (v->type != VehicleType::Aircraft) return CMD_ERROR;
+		Aircraft *a = Aircraft::From(v);
+		if (!a->IsNormalAircraft()) return CMD_ERROR;
+		if (a->state != FLYING || a->raid_target != INVALID_TILE) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_IN_THE_AIR);
+		if (!CarriesExplosiveCar(a)) {
+			for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+				if (u->cargo.TotalCount() != 0) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_EMPTY);
+			}
+		}
+		if (flags.Test(DoCommandFlag::Execute)) {
+			/* Where it is: an aircraft on its way has no tile of its own in the air (only one flown freely is given
+			 * one, AircraftFreeController()), so the tile under its place. */
+			const TileIndex under = TileVirtXY(a->x_pos, a->y_pos);
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "vysypat: letadlo {} nad ({},{}) vyska {} smer {} - {}", a->unitnumber, TileX(under), TileY(under), a->z_pos,
+						to_underlying(a->direction), CarriesExplosiveCar(a) ? "bomby" : "dym");
+			}
+			DropRaidPayload(a, under, a->direction);
+			SetWindowDirty(WindowClass::FirstPerson, 0);
+			SetWindowDirty(WindowClass::VehicleView, a->index);
+		}
+		return CommandCost();
+	}
 	if (what == CabDriveOp::Stand) {
 		/* The driver to the stand at the other end of a standing train (ChangeTrainStand()). */
 		if (v->type != VehicleType::Train) return CMD_ERROR;
