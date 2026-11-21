@@ -1204,6 +1204,56 @@ cross_scene rigXAA "85 86 87 88" "89 90 91 92"
 cross_scene rigXBB "77 78 79 80" "81 82 83 84"
 cross_scene rigXAB "85 86 87 88" "81 82 83 84"
 cross_scene rigXBA "77 78 79 80" "89 90 91 92"
+# Shunting by hand from the cab (the player's #391): train 68, an engine and
+# two wagons, is stopped at its platform with the cab's Down arrow, the driver
+# goes to the stand at the wagons, decouples them, goes back to the other stand,
+# pulls away a tile and a half, stops, and comes back to the first stand. From
+# there the engine stood: nothing can be booked through wagons, it was marked
+# stuck, and the wagons' tile is shut to every train. A train its player holds
+# from the cab now goes up to wagons standing on its line on sight -- at a
+# crawl, onto their tile, to a stand against them (WagonsOnSight()) -- and the
+# driver couples to them by hand: spojeno 1, and the extra line says it came up
+# to them. kabposunpult is the same with the desk of the cab taken over (the
+# realistic controls), a gentle push and a roll up to them; kabposunnaraz with
+# the power left on: it has not braked for them and runs into them like any
+# train into another (two wrecks, one collision) -- faster than a red signal
+# is overrun at, the wagons are no buffer stop.
+cab_scene() { # name cmds
+  run_scene $1 "setting difficulty.vehicle_breakdowns 0
+vlak123 on
+testpauza
+testzatik 10 testbrzda 68
+$2" 1500 -g $S/rig.sav
+  echo "$1: k vagonum $([ $(grep -c 'rizen z kabiny dojel k vagonum' $S/reg_$1.log) -gt 0 ] && echo dojel || echo nedojel)" | tee -a ${BATTERY_STABLE:-/dev/null}
+}
+cab_scene kabposun "testzatik 560 test3d sipka 0 68 dolu 14
+testzatik 610 test3d jizda 0 68 10
+testzatik 620 test3d jizda 0 68 9
+testzatik 640 test3d jizda 0 68 10
+testzatik 650 test3d sipka 0 68 nahoru 5
+testzatik 780 test3d sipka 0 68 dolu 14
+testzatik 910 test3d jizda 0 68 10
+testzatik 920 test3d sipka 0 68 nahoru 6
+testzatik 1300 testkde
+testzatik 1320 test3d jizda 0 68 9"
+CAB_DESK="testzatik 560 test3d kabina pult rizen 1 68
+testzatik 560 test3d kabina pult brzda 255 68
+testzatik 650 test3d jizda 0 68 10
+testzatik 660 test3d jizda 0 68 9
+testzatik 670 test3d jizda 0 68 10
+testzatik 680 test3d kabina pult brzda 0 68
+testzatik 680 test3d kabina pult vykon 120 68
+testzatik 760 test3d kabina pult vykon 0 68
+testzatik 760 test3d kabina pult brzda 255 68
+testzatik 910 test3d jizda 0 68 10
+testzatik 920 test3d kabina pult brzda 0 68
+testzatik 920 test3d kabina pult vykon 40 68"
+cab_scene kabposunpult "$CAB_DESK
+testzatik 950 test3d kabina pult vykon 0 68
+testzatik 1300 testkde
+testzatik 1320 test3d jizda 0 68 9"
+cab_scene kabposunnaraz "$CAB_DESK
+testzatik 1300 testkde"
 # Automatic departure on a couple order (polygon, TEMATA 2.41): a dual-headed
 # waiter is collected by a dual-headed collector whose next stop is back the
 # way it came. 62 with no flag carries on round the loop; 63 with "automatic"

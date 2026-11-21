@@ -1606,6 +1606,15 @@ static bool IsBrakingOnPlayersStop(const Train *v)
 static constexpr int OVERRUN_SPEED = 25;
 
 /**
+ * The speed a train held to a speed from its cab goes at on sight, up to wagons standing on its line (WagonsOnSight()):
+ * what a driver brings a train down to for a stop (CEILING_FLOOR in BrakingCeiling()), so it comes to them at a crawl
+ * and the last metre is the dead stop.
+ */
+static constexpr int ON_SIGHT_SPEED = 15;
+
+static const Train *WagonsOnSight(const Train *consist);
+
+/**
  * Does this train, arriving at a red signal, run past it?
  *
  * "Brake, fail to brake and crash": a red no longer stops a fast train on the
@@ -1743,6 +1752,10 @@ int Train::GetCurrentMaxSpeed() const
 
 	/* Driven from its cab, the player keeps to the speeds: no order, no limit of the arrows holds it. */
 	if (!this->cab_driven) max_speed = std::min<int>(max_speed, this->current_order.GetMaxSpeed());
+
+	/* Held to a speed from its cab and going on sight up to wagons on its line (WagonsOnSight()): at a crawl. The game
+	 * drives it, and nothing else of the game's brings it down for wagons no road is booked to. */
+	if (!this->cab_driven && this->cab_speed_limit != 0 && WagonsOnSight(this) != nullptr) max_speed = std::min<int>(max_speed, ON_SIGHT_SPEED);
 
 	/* If the train is going backwards, without a leading cab, restrict its speed. */
 	if (!moving_front->CanLeadTrain()) {
@@ -5925,6 +5938,56 @@ static Train *FirstTrainAlongLine(const Train *v, const Train *end, DiagDirectio
 		}
 	}
 	return nullptr;
+}
+
+/**
+ * The wagons a train driven by hand may go up to on sight: the first thing standing on the line before its leading
+ * end, as its driver sees it from the stand there -- the look a coupling by hand takes (FirstTrainAlongLine()) --
+ * when that is a rake of ours with no engine, standing, out of a shed.
+ *
+ * To the game such wagons are a wall. No road is booked through them (TryPathReserve()), and no train goes onto a
+ * tile they stand on, not even one sent past a signal (TrainController()): a train on its orders may come to a
+ * platform from any side, and wagons another train left there must not be what it runs into. A train its player
+ * drives is not on its orders. The player (#391): "I drive the engine, decouple the wagons, go to the stand at the
+ * other end, pull away a little, go back to the first stand -- and forwards does nothing. It goes again only once I
+ * have bounced off the end of the track. There is a guard against a collision after decoupling, it may not go that
+ * way, to the wagons; but when I drive, the guard is no use." Standing a tile from its wagons and facing them it
+ * had no road to book, was marked stuck and stood; past that, the wagons' tile was shut to it.
+ *
+ * Driven by hand is the desk of the cab taken over (Train::cab_driven), or the train held to a speed from the cab
+ * (Vehicle::cab_speed_limit, the arrows there). Such a train goes up to the wagons with nothing booked, at a crawl
+ * when the game drives it (ON_SIGHT_SPEED), onto their tile, and comes to a stand against them
+ * (TrainLocoHandler()): where its driver couples to them by hand (CoupleTrainByHand()), or goes to the other stand
+ * and leaves.
+ *
+ * Nothing else can be on the way. The look goes along straight rail only -- plain track, a platform, a level
+ * crossing -- and stops at the first train: between this train's end and the wagons there is no junction for
+ * another to come in by, and no room for one to pass either of them. So nothing booked is nothing missed, and a
+ * signal standing on that stretch has nothing to tell the driver: what it guards is the wagons he is looking at
+ * (TrainController(), TrainCheckIfLineEnds()).
+ *
+ * @param consist the train, any part of it
+ * @return the head of the rake, or nullptr: not driven by hand, or no such wagons before it
+ */
+static const Train *WagonsOnSight(const Train *consist)
+{
+	const Train *head = consist->First();
+	if (!head->cab_driven && head->cab_speed_limit == 0) return nullptr;
+	if (!head->IsFrontEngine() || head->vehstatus.Test(VehState::Crashed)) return nullptr;
+	/* One sent to couple, or standing to be coupled to, is brought up to its partner by that errand's own rules. */
+	if (IsPartyToACoupling(head)) return nullptr;
+	const Train *front = head->GetMovingFront();
+	if (front->track != Track::X && front->track != Track::Y) return nullptr;
+	const Direction going = front->GetMovingDirection();
+	if (!IsDiagonalDirection(going)) return nullptr;
+	const DiagDirection dir = DirToDiagDir(going);
+	if (front->track != TrackBits{AxisToTrack(DiagDirToAxis(dir))}) return nullptr;
+
+	bool met = false;
+	const Train *rake = FirstTrainAlongLine(head, front, dir, met);
+	if (!met || rake == nullptr || !rake->IsFreeWagon() || rake->owner != head->owner) return nullptr;
+	if (rake->cur_speed != 0 || rake->vehstatus.Test(VehState::Crashed) || IsAnyPartInsideDepot(rake)) return nullptr;
+	return rake;
 }
 
 /**
@@ -13353,7 +13416,13 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 
 		bool res_made = false;
 		ChooseTrainTrack(consist, new_tile, exitdir, reachable, true, &res_made, mark_as_stuck);
-		if (!res_made) return false;
+		if (!res_made) {
+			/* Driven by hand up to those wagons: on sight, nothing booked and nothing to wait for (WagonsOnSight()). */
+			if (WagonsOnSight(consist) == nullptr) return false;
+			if (consist->flags.Test(VehicleRailFlag::Stuck)) SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
+			consist->flags.Reset(VehicleRailFlag::Stuck);
+			return true;
+		}
 
 		if (consist->flags.Test(VehicleRailFlag::Stuck)) {
 			consist->wait_counter = 0;
@@ -13386,6 +13455,12 @@ bool TryPathReserve(Train *consist, bool mark_as_stuck, bool first_tile_okay)
 	ChooseTrainTrack(consist, new_tile, exitdir, reachable, true, &res_made, mark_as_stuck);
 
 	if (!res_made) {
+		/* Driven by hand up to wagons a tile or two on (WagonsOnSight()): the same, nothing booked and not stuck. */
+		if (WagonsOnSight(consist) != nullptr) {
+			if (consist->flags.Test(VehicleRailFlag::Stuck)) SetWindowWidgetDirty(WindowClass::VehicleView, consist->index, WID_VV_START_STOP);
+			consist->flags.Reset(VehicleRailFlag::Stuck);
+			return true;
+		}
 		if (_show_train_orientation) {
 			SayOnChange(consist, fmt::format("Vlak {}: cesta neni - hledani/rezervace selhaly (od ({},{}) smerem {} na ({},{}))",
 					consist->unitnumber, TileX(origin.tile), TileY(origin.tile), to_underlying(origin.trackdir), TileX(new_tile), TileY(new_tile)));
@@ -14643,6 +14718,12 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 							overrun_here = true;
 						}
 					}
+					/* Driven by hand up to wagons on its line (WagonsOnSight()): no road was booked onto this tile and
+					 * none is needed. The failed booking has brought it to a stand; it goes on from there, at a crawl,
+					 * this tick or the next. */
+					const Train *on_sight = WagonsOnSight(first);
+					if (on_sight != nullptr && !was_stuck && first->flags.Test(VehicleRailFlag::Stuck)) first->flags.Reset(VehicleRailFlag::Stuck);
+
 					if (!rolls_on && !was_stuck && first->flags.Test(VehicleRailFlag::Stuck) && first->force_proceed == TFP_NONE) {
 						first->cur_speed = 0;
 						first->subspeed = 0;
@@ -14691,6 +14772,8 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 						if (u->type != VehicleType::Train) continue;
 						const Train *t = Train::From(u)->First();
 						if (t == first || t->IsFrontEngine()) continue;
+						/* The wagons its player drives it up to are what it came onto this tile for (WagonsOnSight()). */
+						if (t == on_sight) continue;
 						if (_show_train_orientation) {
 							IConsolePrint(CC_INFO, "  krok duvod: volne vagony na ({},{})", TileX(gp.new_tile), TileY(gp.new_tile));
 						}
@@ -14738,6 +14821,9 @@ bool TrainController(Train *v, Vehicle *nomove, bool reverse)
 					 * like anybody else, so this never turns into a licence to
 					 * drive through reds in general. */
 					bool rescue_on_booked_track = IsFetchingCasualty(first) && HasReservedTracks(gp.new_tile, chosen_track);
+					/* The same for a train driven by hand up to wagons on its line: a signal on the stretch between them
+					 * guards nothing but those wagons (WagonsOnSight()). */
+					if (on_sight != nullptr) rescue_on_booked_track = true;
 
 					/* "Brake, fail to brake and crash": a train that reaches the
 					 * red still going fast runs past it instead of being stopped
@@ -15546,8 +15632,8 @@ static bool TrainCheckIfLineEnds(Train *moving_front, bool reverse)
 
 	/* approaching red signal; not one driven from its cab, which runs past at the speed it is driven (the player, 31. 10.:
 	 * "the train is driven by the player, so the game does not drive it: it runs past" -- it was brought down to 15 km/h
-	 * before every red) */
-	if (trackdirbits.Any(red_signals) && !consist->cab_driven) return TrainApproachingLineEnd(moving_front, true, reverse);
+	 * before every red); nor one going on sight up to wagons on its line, with a signal between (WagonsOnSight()) */
+	if (trackdirbits.Any(red_signals) && !consist->cab_driven && WagonsOnSight(consist) == nullptr) return TrainApproachingLineEnd(moving_front, true, reverse);
 
 	/* approaching a rail/road crossing? then make it red */
 	if (IsLevelCrossingTile(tile)) MaybeBarCrossingWithSound(tile);
@@ -16427,6 +16513,24 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 		consist->cur_speed = 0;
 		consist->subspeed = 0;
 		j = 0;
+	}
+
+	/* Driven by hand up against wagons (WagonsOnSight()): touching them it goes no further, whatever its controls ask
+	 * -- buffers on buffers, where the driver couples by hand or changes the stand. Only a train that came at them
+	 * braked: one still fast has not braked for them and runs into them like any other (OVERRUN_SPEED, the line
+	 * the red signals draw between the two). On the movement and not on the collision check: brought to a stand
+	 * there, it would start again each tick and creep through them a step at a time. */
+	if (consist->cur_speed <= OVERRUN_SPEED) {
+		const Train *wagons = WagonsOnSight(consist);
+		if (wagons != nullptr && AreConsistsTouching(consist, wagons)) {
+			if (_show_train_orientation && consist->cur_speed != 0 && !consist->vehstatus.Test(VehState::Stopped)) {
+				SayOnChange(consist, fmt::format("Vlak {}: rizen z kabiny dojel k vagonum {} na ({},{}) a stoji o ne", consist->unitnumber,
+						wagons->index.base(), TileX(wagons->tile), TileY(wagons->tile)));
+			}
+			consist->cur_speed = 0;
+			consist->subspeed = 0;
+			j = 0;
+		}
 	}
 
 	/* we need to invalidate the widget if we are stopping from 'Stopping 0 km/h' to 'Stopped' */

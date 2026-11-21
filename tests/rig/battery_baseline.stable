@@ -128,6 +128,12 @@ rigXAB: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 au
 rigXAB: vlaku=76/76 bezrozkazu=0/0 vdepu=76/76
 rigXBA: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 rigXBA: vlaku=76/76 bezrozkazu=0/0 vdepu=76/76
+kabposun: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kabposun: k vagonum dojel
+kabposunpult: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kabposunpult: k vagonum nedojel
+kabposunnaraz: spojeno=0 odtazeno=0 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kabposunnaraz: k vagonum nedojel
 cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0

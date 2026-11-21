@@ -13025,6 +13025,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: autojizda: takove vozidlo neni.");
+	} else if (what == "sipka" && argv.size() > 4) {
+		/* 'sipka <type> <unit> <nahoru|dolu> [times]': the Up or the Down arrow of the cab tapped so many times, as the
+		 * player taps it (CabArrows::Drive()): a stopped vehicle started, its speed held higher or lower, at the slowest
+		 * stopped. What the game knows of a player driving with the arrows is only what these leave on the vehicle. */
+		auto type = number(2), unit = number(3), times = number(5);
+		const bool up = argv[4] == "nahoru";
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!type.has_value() || !unit.has_value() || !u->IsPrimaryVehicle() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			AutoRestoreBackup cur_company(_current_company, u->owner);
+			for (int i = 0; i < times.value_or(1); i++) {
+				CabArrows arrows;
+				arrows.route = false;
+				arrows.Drive(u, DirectionKeys{up ? DirectionKey::Up : DirectionKey::Down}, 40);
+				arrows.Drive(u, DirectionKeys{}, 40);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: sipka {} {} {} {}x: omezeni {}, rychlost {}, stoji {}", *type, *unit, up ? "nahoru" : "dolu", times.value_or(1), u->cab_speed_limit, u->GetDisplaySpeed(),
+					u->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: sipka: takove vozidlo neni.");
 	} else if (what == "zastavka" && argv.size() > 3) {
 		/* The rig, the loading from the cab (CmdCabCargo()): 'zastavka <x> <y>' a drive-through stop of a station of its
 		 * own on the road there; 'zastavka <x> <y> naklad <LABEL> <n> <src_x> <src_y>' so much of a cargo waiting at it,
@@ -13167,7 +13187,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		if (argv.size() > 4 && argv[2] == "pult") {
-			/* 'kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer|sberac> <0-255>': a control of the desk of the
+			/* 'kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer|sberac> <0-255> [unit]': a control of the desk of the
 			 * train ridden, as the player at it moves it (CmdTrainCabControl()); sberac 1 the pantograph down. */
 			static const std::pair<std::string_view, TrainCabControl> controls[] = {
 				{"rizen", TrainCabControl::Driven}, {"vykon", TrainCabControl::Power}, {"edb", TrainCabControl::Dynamic}, {"brzda", TrainCabControl::Brake},
@@ -13175,13 +13195,20 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				{"sberac", TrainCabControl::Pantograph},
 			};
 			const Vehicle *cv = RigRiding();
+			/* A unit number after the value: that train, with nobody riding it (a scene without a picture). */
+			if (auto unit = number(5); unit.has_value()) {
+				cv = nullptr;
+				for (const Train *t : Train::Iterate()) {
+					if (t->IsFrontEngine() && t->unitnumber == static_cast<UnitID>(*unit)) cv = t;
+				}
+			}
 			std::optional<TrainCabControl> which;
 			for (const auto &[name, c] : controls) if (argv[3] == name) which = c;
 			if (cv == nullptr || cv->type != VehicleType::Train || !which.has_value()) {
 				IConsolePrint(CC_ERROR, "test3d kabina pult: nobody rides a train, or no such control.");
 				return true;
 			}
-			AutoRestoreBackup cur_company(_current_company, _local_company);
+			AutoRestoreBackup cur_company(_current_company, cv->owner);
 			const CommandCost r = Command<Commands::TrainCabControl>::Do(DoCommandFlag::Execute, cv->First()->index, to_underlying(*which), static_cast<uint8_t>(number(4).value_or(0)));
 			IConsolePrint(CC_DEFAULT, "test3d: kabina pult {} {}: {}", argv[3], number(4).value_or(0), r.Succeeded() ? "ano" : "NE");
 			return true;
