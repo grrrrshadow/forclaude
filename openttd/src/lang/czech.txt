@@ -2586,6 +2586,7 @@ STR_ERROR_CAB_CAN_T_UNLOAD                                      :{WHITE}Nelze vy
 STR_CAB_VIEW_DROP_CARGO                                         :{BLACK}Vysypat náklad
 STR_CAB_VIEW_DROP_CARGO_TOOLTIP                                 :{BLACK}Shodit, co letadlo veze, tam, kde zrovna letí (B): za každé auto s výbušninami na palubě jedna bomba
 STR_ERROR_CAB_CAN_T_DROP                                        :{WHITE}Nelze vysypat náklad...
+STR_ERROR_CAB_CAN_T_FIRE                                        :{WHITE}Nelze vystřelit...
 STR_ERROR_CAB_NOT_DRIVEN                                        :{WHITE}... auto jede svou trasu a nakládá podle rozkazů; šipkou převezmeš volant
 STR_ERROR_CAB_NOT_AT_STOP                                       :{WHITE}... auto musí stát na průjezdné zastávce tvé firmy
 STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... stanice tenhle náklad nebere

@@ -49,10 +49,14 @@ enum class CabDriveOp : uint8_t {
 	CoupleRear = 9,   ///< couple to what stands at the engine's back, or decouple the wagons coupled there
 	Stand = 10,       ///< a train standing: the driver goes to the stand at its other end -- it goes the other way from now on, its vehicles where they are (ChangeTrainStand())
 	Drop = 11,        ///< an aircraft in the air: what it carries let go over where it is -- a bomb for each car of explosives aboard, else, empty, the smoke of a raid (DropRaidPayload())
+	Fire = 12,        ///< an aircraft in the air: a shot straight ahead of it -- a rocket carrying a car's explosives, a bomb where it lands, else the machine gun, the smoke of a raid there (FireRaidRocket())
 };
 
 /** The slowest speed the brake of the cab holds a vehicle to (CabSpeed()); braked further it stops. */
 static constexpr int CAB_SLOWEST = 5;
+
+/** How far ahead of an aircraft its shot lands (CabDriveOp::Fire), in tiles. */
+static constexpr int CAB_SHOT_REACH = 8;
 
 /**
  * How far across a tunnel's tube from its middle a vehicle driven freely in it may go, world units: the tube's half

@@ -18,6 +18,7 @@
 #include "train.h"
 #include "road_on_rail.h"
 #include "industry.h"
+#include "effectvehicle_func.h"
 #include "aircraft.h"
 #include "newgrf_text.h"
 #include "vehicle_func.h"
@@ -1465,7 +1466,7 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	if (op > to_underlying(CabDriveOp::Drop)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::Fire)) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 	const CabDriveOp what = static_cast<CabDriveOp>(op);
@@ -1496,6 +1497,42 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 						to_underlying(a->direction), CarriesExplosiveCar(a) ? "bomby" : "dym");
 			}
 			DropRaidPayload(a, under, a->direction);
+			SetWindowDirty(WindowClass::FirstPerson, 0);
+			SetWindowDirty(WindowClass::VehicleView, a->index);
+		}
+		return CommandCost();
+	}
+	if (what == CabDriveOp::Fire) {
+		/* A shot straight ahead (the player, 21. 11.: "we will shoot rockets straight before the helicopter, and with no
+		 * explosives aboard it shoots the machine gun ahead of itself; the damage the same as the bombing with or without
+		 * explosives"): an aircraft in the air, as the dumping above. A car of explosives aboard makes it a rocket, and
+		 * that car's explosives go with it, one car a shot (the ship's rule, ShipRaidFire()); without, the machine gun,
+		 * whatever else is aboard -- the smoke of a raid where it hits. */
+		if (v->type != VehicleType::Aircraft) return CMD_ERROR;
+		Aircraft *a = Aircraft::From(v);
+		if (!a->IsNormalAircraft()) return CMD_ERROR;
+		if (a->state != FLYING || a->raid_target != INVALID_TILE) return CommandCost(STR_ERROR_AIRCRAFT_MUST_BE_IN_THE_AIR);
+		if (flags.Test(DoCommandFlag::Execute)) {
+			/* Ahead: the heading it is flown on from its cab, else the way it points. */
+			const int yaw = a->cab_free ? a->cab_yaw : DirectionToCabYaw(a->direction);
+			const int reach = CAB_SHOT_REACH * TILE_SIZE;
+			const int tx = std::clamp<int>(a->x_pos + CabCos(yaw) * reach / 256, TILE_SIZE, static_cast<int>(Map::MaxX() - 1) * TILE_SIZE);
+			const int ty = std::clamp<int>(a->y_pos + CabSin(yaw) * reach / 256, TILE_SIZE, static_cast<int>(Map::MaxY() - 1) * TILE_SIZE);
+			const TileIndex target = TileVirtXY(tx, ty);
+			std::vector<RoadVehicle *> cars = ExplosiveCarsAboard(a);
+			const bool armed = !cars.empty();
+			if (armed) SpendExplosives(cars.front());
+			if (_show_train_orientation) {
+				IConsolePrint(CC_INFO, "strelba: letadlo {} z ({},{}) vyska {} na ({},{}) - {}", a->unitnumber, TileX(TileVirtXY(a->x_pos, a->y_pos)),
+						TileY(TileVirtXY(a->x_pos, a->y_pos)), a->z_pos, TileX(target), TileY(target), armed ? "raketa" : "kulomet");
+			}
+			if (!FireRaidRocket(a->x_pos, a->y_pos, a->z_pos, target, a->owner, armed)) {
+				if (armed) {
+					DropRaidBomb(target, a->owner);
+				} else {
+					DropRaidSmoke(target, CabYawToDirection(yaw), a->owner);
+				}
+			}
 			SetWindowDirty(WindowClass::FirstPerson, 0);
 			SetWindowDirty(WindowClass::VehicleView, a->index);
 		}

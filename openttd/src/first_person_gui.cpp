@@ -2784,10 +2784,24 @@ struct FirstPersonWindow : Window {
 				return EventState::Handled;
 			}
 		}
-		/* In a vehicle, as in its cab: I the horn, F the lights, C the next camera, T its route or the wheel again. */
+		/* An aircraft: higher with Ctrl+I or Page Up, lower with Ctrl+F or Page Down, as the submarine (the player, 21. 11.:
+		 * "up and down like the submarine"), a step of its free flight a press (CabDriveOp::Up, ::Down). */
+		if (const Vehicle *rv = this->Riding(); rv != nullptr && rv->type == VehicleType::Aircraft && rv->owner == _local_company) {
+			const uint16_t k = keycode & ~WKC_SPECIAL_KEYS;
+			const bool ctrl = (keycode & WKC_CTRL) != 0;
+			const int way = (ctrl && k == 'I') || keycode == WKC_PAGEUP ? 1 : (ctrl && k == 'F') || keycode == WKC_PAGEDOWN ? -1 : 0;
+			if (way != 0) {
+				if (Aircraft::From(rv)->state == FLYING) {
+					Command<Commands::CabDrive>::Post(rv->tile, rv->index, to_underlying(way > 0 ? CabDriveOp::Up : CabDriveOp::Down));
+				}
+				return EventState::Handled;
+			}
+		}
+		/* In a vehicle, as in its cab: I the horn, F the lights, C the next camera, T its route or the wheel again. In an
+		 * aircraft with the raid asked for, I shoots straight ahead instead of the horn (CabFire()). */
 		if (const Vehicle *rv = this->Riding(); rv != nullptr) {
 			if (key == 'i' || key == 'I') {
-				CabHorn(rv);
+				if (!CabFire(rv)) CabHorn(rv);
 				return EventState::Handled;
 			}
 			if (key == 'f' || key == 'F') {

@@ -257,6 +257,21 @@ void CabDrop(const Vehicle *v)
 }
 
 /**
+ * The key of the horn in an aircraft with the raid asked for (CabShowsDrop()): a shot straight ahead instead -- a
+ * rocket with explosives aboard, the machine gun without (CabDriveOp::Fire). Only in the air, as CmdCabDrive() takes
+ * it; on the ground it is the horn still.
+ * @return whether it was a shot
+ */
+bool CabFire(const Vehicle *v)
+{
+	if (!CabShowsDrop(v)) return false;
+	const Aircraft *a = Aircraft::From(v);
+	if (a->state != FLYING || a->raid_target != INVALID_TILE) return false;
+	Command<Commands::CabDrive>::Post(STR_ERROR_CAB_CAN_T_FIRE, v->tile, v->index, to_underlying(CabDriveOp::Fire));
+	return true;
+}
+
+/**
  * Whoever steers from the cab lets go when leaving it (the cab view closed, the walker getting out): a ship or a road
  * vehicle goes back to its orders; driven freely, back from the next road or course, and a road vehicle out in the
  * fields stops there, not to wander off without anyone at the wheel.

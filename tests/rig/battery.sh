@@ -1308,6 +1308,28 @@ testzatik 3200 test3d jizda 3 1 11
 testzatik 3300 test3d jizda 3 1 11
 testzatik 3330 test3d jizda 3 1 11" 3600
 echo "vysypatbomby: na zemi $(grep -ac 'jizda 3 1 op 11: NEJDE' $S/reg_vysypatbomby.log) odmitnuto | $(grep -a 'vysypat: letadlo\|atomovka: na' $S/reg_vysypatbomby.log | sed 's/^.*vysypat: letadlo 1 //; s/^.*atomovka: /atomovka /' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# A shot straight ahead from an aircraft (CabDriveOp::Fire, the player 21. 11.:
+# "rockets straight before the helicopter; without explosives the machine gun").
+# Refused on the ground; in the air, empty, the machine gun -- the smoke eight
+# tiles ahead along the way it points; then flown by hand six steps left and
+# three steps lower, the shot along the new heading and from lower down.
+run_scene strelba "vlak123 on
+testletadlo 100 100 60 60
+test3d jizda 3 1 12
+testzatik 600 test3d jizda 3 1 12
+testzatik 650 test3d jizda 3 1 1 6
+testzatik 700 test3d jizda 3 1 5 3
+testzatik 750 test3d jizda 3 1 12
+testzatik 900 testdym" 1200
+echo "strelba: na zemi $(grep -ac 'jizda 3 1 op 12: NEJDE' $S/reg_strelba.log) odmitnuto | $(grep -a 'strelba: letadlo' $S/reg_strelba.log | sed 's/^.*strelba: letadlo 1 //' | tr '\n' '|') $(grep -a 'testdym: oblacku' $S/reg_strelba.log | grep -o 'oblacku [0-9]*')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# The same with a car of explosives aboard: a rocket, a bomb where it lands, and
+# the car's explosives gone with it.
+SCENE_NEWGAME='setting_newgame economy.extra_industries 1' run_scene strelbarakety "vlak123 on
+testautoletadlo
+testzatik 2000 testnalozit auto 1 vybusniny
+testzatik 3200 test3d jizda 3 1 12
+testzatik 3300 test3d jizda 3 1 12" 3600
+echo "strelbarakety: na zemi $(grep -ac 'jizda 3 1 op 12: NEJDE' $S/reg_strelbarakety.log) odmitnuto | $(grep -a 'strelba: letadlo\|atomovka: na' $S/reg_strelbarakety.log | sed 's/^.*strelba: letadlo 1 //; s/^.*atomovka: /atomovka /' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Automatic departure on a couple order (polygon, TEMATA 2.41): a dual-headed
 # waiter is collected by a dual-headed collector whose next stop is back the
 # way it came. 62 with no flag carries on round the loop; 63 with "automatic"

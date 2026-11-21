@@ -2478,6 +2478,7 @@ STR_ERROR_CAB_CAN_T_UNLOAD                                      :{WHITE}Can't un
 STR_CAB_VIEW_DROP_CARGO                                         :{BLACK}Dump the cargo
 STR_CAB_VIEW_DROP_CARGO_TOOLTIP                                 :{BLACK}Let go of what the aircraft carries over where it flies (B): a bomb for each car of explosives aboard
 STR_ERROR_CAB_CAN_T_DROP                                        :{WHITE}Can't dump the cargo...
+STR_ERROR_CAB_CAN_T_FIRE                                        :{WHITE}Can't fire...
 STR_ERROR_CAB_NOT_DRIVEN                                        :{WHITE}... the vehicle goes its route and loads as its orders say; an arrow takes the wheel
 STR_ERROR_CAB_NOT_AT_STOP                                       :{WHITE}... the vehicle must stand on a drive-through stop of your company
 STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... the station does not take this cargo

@@ -151,6 +151,7 @@ void CabCargo(const Vehicle *v, bool unload);
 bool CabShowsDrop(const Vehicle *v);
 bool CabCanDrop(const Vehicle *v);
 void CabDrop(const Vehicle *v);
+bool CabFire(const Vehicle *v);
 
 /**
  * The camera of the cab, the same in the cab view and in a vehicle boarded with E in the view from the first person
