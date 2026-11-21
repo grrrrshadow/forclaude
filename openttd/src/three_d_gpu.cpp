@@ -122,6 +122,10 @@ static std::mutex _card_trim_mutex;
 static std::atomic<uint64_t> _standing_async_missed = 0;
 /** The rig ('test3d stojici odmitnout <n>'): so many jobs given without waiting the card does not lay, to see them drawn again. */
 std::atomic<int> _rig_standing_refuse = 0;
+/** The rig ('test3d stojici odvazat <n> [tise]'): so many times a building among what stands finds the corners it
+ * counted on unbound, as a putting on the card between two houses of one shape leaves them. Negative: the same without
+ * the putting being counted (_card_puts), which is the card's code before it asked -- the card's error is the answer. */
+std::atomic<int> _rig_standing_unbind = 0;
 /** The size of the pictures what stands is laid from (_standing_atlas_size) for the main thread: 0 not made yet. */
 static std::atomic<int> _standing_atlas_size_now = 0;
 
@@ -888,6 +892,10 @@ std::atomic<size_t> _card_bytes = 0; ///< (read by the diary of the frames too, 
  * put on it in five seconds in the view from the eyes by a road, the phone's memory growing). */
 std::array<std::atomic<size_t>, 4> _card_bytes_of{};
 std::array<std::atomic<size_t>, 4> _card_sent_of{};
+/** How many things were put on the card since the start, whatever they are. Putting one there leaves the card's
+ * bindings as the putting needed them (no corners bound, unit 0 its texture): who draws leanly across a call that may
+ * put something there asks this before and after (DrawStandingOnCard(), draw_building). The card's thread only. */
+static uint64_t _card_puts = 0;
 std::atomic<size_t> _card_sent = 0; ///< the rig: bytes put on the card since the last ThreeDGpuTimes()
 /** Of _card_sent, what is not a shape, triangles, a texture or a building (none of _card_sent_of): the ground's rects
  * (SendGroundRect()) and the pictures of what stands (StandingPlace()) -- the player's diary of 17. 11.: at zoom 0 by
@@ -3822,6 +3830,7 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 	_card_bytes += g.bytes;
 	_card_bytes_of[0] += g.bytes;
 	_card_sent_of[0] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	return &_card_shapes.emplace(key, g).first->second;
 }
@@ -3846,6 +3855,7 @@ const GpuIndices *IndicesOnCard(const ThreeDGpuTriangles &t)
 	_card_bytes += g.bytes;
 	_card_bytes_of[1] += g.bytes;
 	_card_sent_of[1] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	return &_card_indices.emplace(t.uid, g).first->second;
 }
@@ -3902,6 +3912,7 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	_card_bytes += g.bytes;
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	{
 		std::lock_guard uids_lock(_card_texture_uids_mutex);
@@ -3959,6 +3970,7 @@ static const GpuTexture *MaskOnCard(const ThreeDObjectTexture &t, int channels)
 	_card_bytes += g.bytes;
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	{
 		std::lock_guard uids_lock(_card_texture_uids_mutex);
@@ -3996,6 +4008,7 @@ const GpuTexture *PatternOnCard(const ThreeDObjectTexture &t)
 	_card_bytes += g.bytes;
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	CardHeld(_card_held_textures, t.uid.value, true);
 	return &_card_textures.emplace(t.uid.value, g).first->second;
@@ -4027,6 +4040,7 @@ const GpuTexture *DetailMaskOnCard(const ThreeDDetailMask &m)
 	_card_bytes += g.bytes;
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	CardHeld(_card_held_textures, m.uid.value, true);
 	return &_card_textures.emplace(m.uid.value, g).first->second;
@@ -4851,6 +4865,7 @@ const GpuBuilding *MapBuildingOnCard(const ThreeDGpuBuilding &b)
 	_card_bytes += g.bytes;
 	_card_bytes_of[3] += g.bytes;
 	_card_sent_of[3] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	CardHeld(_card_held_buildings, key, true);
 	return &_card_buildings.emplace(key, std::move(g)).first->second;
@@ -5944,6 +5959,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	int lean_depth = -1;                ///< the depth test on (1) or off (0)
 	GLuint lean_tex0 = 0;               ///< the texture on unit 0, 0 not known
 	GLuint lean_vao = 0;                ///< the corners bound
+	GLuint lean_vao_lost = 0;           ///< the corners that were bound when a putting on the card unbound them (draw_building)
 	bool lean_program = false;          ///< the buildings' program in use
 	std::array<GLuint, 2 * THREE_D_GPU_BUILDING_PAINTS> lean_parts{}; ///< the masks and patterns on the units 1 to 8
 	/* The buildings' uniforms as last set (a uniform keeps its value with its program whatever is used meanwhile): set
@@ -6069,6 +6085,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	auto draw_building = [&](const ThreeDGpuStandingBuilding &b, uint32_t order) {
 		/* Given without waiting: its shape and textures as the card holds them, by their numbers alone -- nothing of the
 		 * game's memory read here (ThreeDGpuStanding::held_only); one let go of meanwhile, not laid. */
+		const uint64_t puts_before = _card_puts;
 		const GpuBuilding *on = s.held_only ? HeldMapBuildingOnCard(b.building.uid) : MapBuildingOnCard(b.building);
 		if (on == nullptr) {
 			building_failed = 1;
@@ -6125,6 +6142,23 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				return false;
 			}
 			parts[k] = {mask->name, pattern != nullptr ? pattern->name : mask->name};
+		}
+		/* Its shape or a texture of it put on the card just now: the putting left no corners bound and its own texture on
+		 * unit 0, whatever the building before left there. Not known any more -- a building of another shape put there
+		 * and then not drawn (none of its cells in this part) left the next house of the shape before it drawn with no
+		 * corners at all: the card's GL_INVALID_OPERATION in glMultiDrawArrays / glDrawArrays (the player's diary of
+		 * 21. 11., #391, seven in two hours, each as the map was zoomed), and the house missing from that block. */
+		/* The rig: the corners this building would not bind again taken away under it, counted as a putting or not. */
+		if (const int unbind = _rig_standing_unbind; unbind != 0 && _gpu_standing_lean && lean_vao == on->vao) {
+			_rig_standing_unbind += unbind > 0 ? -1 : 1;
+			Diary(fmt::format("rig: rohy tvaru {} odvazany pod budovou ({})", b.building.uid, unbind > 0 ? "pocitano" : "tise"), true);
+			gl.glBindVertexArray(0);
+			if (unbind > 0) _card_puts++;
+		}
+		if (_card_puts != puts_before) {
+			lean_vao_lost = lean_vao;
+			lean_vao = 0;
+			lean_tex0 = 0;
 		}
 		/* Its depth not cleared: its triangles laid in the depth of all on the block (ThreeDGpuStanding::depth), where
 		 * they are nearer than what is there. */
@@ -6253,9 +6287,17 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			lean_depth = 1;
 		}
 		if (!lean || lean_vao != on->vao) {
+			/* The case itself, said the first few times so that the diary shows it is met: the shape the buildings
+			 * before left bound, lost to a putting on the card, and now wanted again. */
+			static int told = 0;
+			if (lean && lean_vao_lost != 0 && lean_vao_lost == on->vao && told < 3) {
+				told++;
+				Diary(fmt::format("budova plochy: rohy tvaru {} navazany znovu po nahrani jine veci na kartu", b.building.uid), true);
+			}
 			gl.glBindVertexArray(on->vao);
 			lean_vao = on->vao;
 		}
+		lean_vao_lost = 0;
 		for (const GpuBuilding::Run &r : on->runs) {
 			if (r.texture >= textures.size() || textures[r.texture] == 0) continue;
 			const int run_parts = r.texture == 0 ? part_count : 0;
@@ -6961,6 +7003,7 @@ const GpuBuilding *BuildingOnCard(const ThreeDGpuBuilding &b)
 	_card_bytes += g.bytes;
 	_card_bytes_of[3] += g.bytes;
 	_card_sent_of[3] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	CardHeld(_card_held_buildings, b.uid, true);
 	return &_card_buildings.emplace(b.uid, std::move(g)).first->second;
@@ -7867,6 +7910,7 @@ const GpuTexture *KeptTextureOnCard(uint64_t uid, const uint32_t *px, int w, int
 	_card_bytes += g.bytes;
 	_card_bytes_of[2] += g.bytes;
 	_card_sent_of[2] += g.bytes;
+	_card_puts++;
 	_card_sent += g.bytes;
 	CardHeld(_card_held_textures, uid, true);
 	return &_card_textures.emplace(uid, g).first->second;
@@ -9448,6 +9492,7 @@ bool _standing_vehicles_first = true;
 std::atomic<bool> _gpu_fence_last_only = true;
 std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 std::atomic<int> _rig_standing_refuse = 0;
+std::atomic<int> _rig_standing_unbind = 0;
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }

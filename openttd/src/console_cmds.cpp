@@ -12043,6 +12043,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::atomic<int> _rig_standing_refuse;
 		_rig_standing_refuse = static_cast<int>(number(3).value_or(1));
 		IConsolePrint(CC_DEFAULT, "test3d: stojici odmitnout {}", _rig_standing_refuse.load());
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "odvazat") {
+		/* 'stojici odvazat <n> [tise]': so many times a building on the turned map finds the corners it counted on
+		 * unbound, as putting another thing on the card between two houses of one shape leaves them. 'tise': without
+		 * the putting being counted, the code as it was -- the card answers with its error and the processor draws
+		 * the block ("karta vratila" in the frame diary). */
+		extern std::atomic<int> _rig_standing_unbind;
+		const int n = static_cast<int>(number(3).value_or(1));
+		_rig_standing_unbind = (argv.size() > 4 && argv[4] == "tise") ? -n : n;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici odvazat {}", _rig_standing_unbind.load());
 	} else if (what == "male" && argv.size() > 2 && argv[2] == "naraz") {
 		/* 'male naraz [0|1]': what changed in the small views the card draws laid by it at once, their moves by the card
 		 * (1; TurnedCardLayDirty()), or block by block and strip by strip as before (0). */
