@@ -2459,6 +2459,7 @@ STR_FIRST_PERSON_PLANT_HAY                                      :E: sklidit mari
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
 STR_FIRST_PERSON_HELM_HERE                                      :E: řídit {VEHICLE}
 STR_FIRST_PERSON_ASHORE_HERE                                    :E: vystoupit na břeh
+STR_FIRST_PERSON_INTO_WATER_HERE                                :E: vystoupit do vody
 STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
 STR_FIRST_PERSON_FEED_DRAGON                                    :E: nakrmit draka
 STR_FIRST_PERSON_GRILL                                          :E: grilovat u ohně

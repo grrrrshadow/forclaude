@@ -5092,8 +5092,10 @@ void ForThreeDBoatFigures(const Vehicle *v, const ThreeDVehicleObject &obj, bool
  * its mast): the walker on board does not go through them (first_person_gui.cpp).
  * @param ax,ay,bx,by the way, metres in its frame
  * @param z the height it is tried at, metres in its frame
+ * @param any_face any face of it across the way, a level or a slanting one too (a cabin's slanting window, its roof):
+ *                 whether the way leads out through its hull (the walker's step over its side, MoveOnBoard())
  */
-bool ThreeDVehicleBlocks(const ThreeDVehicleObject &obj, double ax, double ay, double bx, double by, double z)
+bool ThreeDVehicleBlocks(const ThreeDVehicleObject &obj, double ax, double ay, double bx, double by, double z, bool any_face)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape();
 	if (shape == nullptr) return false;
@@ -5103,7 +5105,7 @@ bool ThreeDVehicleBlocks(const ThreeDVehicleObject &obj, double ax, double ay, d
 		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
 		const double nz = ux * vy - uy * vx;
 		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz;
-		if (std::abs(nz) >= THREE_D_DECK_LEVEL * std::sqrt(nx * nx + ny * ny + nz * nz)) return false;
+		if (!any_face && std::abs(nz) >= THREE_D_DECK_LEVEL * std::sqrt(nx * nx + ny * ny + nz * nz)) return false;
 		/* The way (a level segment) against the triangle (Möller and Trumbore). */
 		const double hx = dy * vz, hy = -dx * vz, hz = dx * vy - dy * vx; // (dx, dy, 0) x v
 		const double det = ux * hx + uy * hy + uz * hz;

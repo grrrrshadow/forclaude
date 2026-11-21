@@ -81,7 +81,7 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out, bool no_wait =
 /** How level a face is to be stood on (ThreeDVehicleDeckZ()): its normal's up at least so much of it; steeper ones are walls (ThreeDVehicleBlocks()). */
 static constexpr double THREE_D_DECK_LEVEL = 0.7;
 std::optional<double> ThreeDVehicleDeckZ(const struct ThreeDVehicleObject &obj, double x, double y, double up_to);
-bool ThreeDVehicleBlocks(const struct ThreeDVehicleObject &obj, double ax, double ay, double bx, double by, double z);
+bool ThreeDVehicleBlocks(const struct ThreeDVehicleObject &obj, double ax, double ay, double bx, double by, double z, bool any_face = false);
 std::optional<double> ThreeDVehicleCeilingZ(const struct ThreeDVehicleObject &obj, double x, double y, double above);
 const struct ThreeDVehicleObject *ThreeDBoatRooms(const struct ThreeDVehicleObject &obj);
 struct ThreeDBoatFigure;

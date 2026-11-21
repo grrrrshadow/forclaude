@@ -185,6 +185,19 @@ static constexpr double FIRST_PERSON_DECK_FOOT_M = 0.15;
 static constexpr double FIRST_PERSON_HELM_M = 1.5;
 static constexpr double FIRST_PERSON_DECK_CHEST_M = 1.2;
 static constexpr double FIRST_PERSON_DECK_REACH_M = 0.3;
+/** How far past a step over a boat's side its hull is looked for across the way (MoveOnBoard()), metres: a cabin's side under its windows is so thick from the last floor to the glass. */
+static constexpr double FIRST_PERSON_DECK_OUT_M = 1.5;
+/** A level face of the boat so far over the walker's feet or higher is a roof over him (MoveOnBoard()): he is in a cabin, metres. */
+static constexpr double FIRST_PERSON_DECK_ROOF_OVER_M = 0.3;
+/** How far beside a boat's hull the walker leaving it with E comes into the water (LeaveIntoWater()), metres. */
+static constexpr double FIRST_PERSON_LEAVE_BESIDE_M = 1.2;
+/**
+ * How far from a boat's wheel the walker must stand to leave it into the water with E (LeaveIntoWater()), metres: well
+ * away from where E takes the wheel (FIRST_PERSON_HELM_M), so that a press meant for steering a step off the wheel does
+ * not put him into the sea (the player, 21. 11.: "put the way out far from the wheel, so that E for leaving does not
+ * quarrel with steering"). On a short boat a quarter of its length, never less than the wheel's own reach.
+ */
+static constexpr double FIRST_PERSON_LEAVE_FROM_HELM_M = 4.0;
 /**
  * In a boat's rooms (ThreeDBoatRooms(), the colleague's sailing yacht; the player, 7. 11.: "shrink the player so he fits
  * under the cockpit and the low ceiling over the stairs does not matter"): the walker as small as the room over him, its
@@ -1021,8 +1034,23 @@ struct FirstPersonWindow : Window {
 		const ThreeDVehicleObject &obj = WalkedOn(*ev.obj);
 		double lx, ly;
 		WorldToBoat(ev, this->walker.x + dx, this->walker.y + dy, lx, ly);
-		/* Nothing of the boat under the step at all: over its side (OverBoard()). */
+		/* Nothing of the boat under the step at all: over its side (OverBoard()) -- off an open deck, not out of a
+		 * cabin through its hull. "Nothing under the step" is no level face there, and a cabin's steep side under its
+		 * windows has none either: the walker on the submarine's bench stepped on through the slanting window into the
+		 * sea, swam back in through the hull, and the sea stood in the cabin with him, no more aboard, till the boat
+		 * came up (the player's #389, 21. 11.: "no water in the submarine till I climb the bench, my head out of the
+		 * window; when I get down the water stays"). So under a roof (a ceiling over where he stands) any face of the
+		 * boat across the way out, at the chest or at the head, is its hull: no step. Out of a cabin E leads
+		 * (LeaveIntoWater()). An open deck is stepped off as before, over its railing too (the yacht's). */
 		if (!ThreeDVehicleDeckZ(obj, lx, ly, std::numeric_limits<double>::infinity()).has_value()) {
+			if (ThreeDVehicleCeilingZ(obj, this->deck_x, this->deck_y, this->deck_z + FIRST_PERSON_DECK_ROOF_OVER_M).has_value()) {
+				const double len = std::hypot(lx - this->deck_x, ly - this->deck_y);
+				const double ox = len > 0 ? lx + (lx - this->deck_x) / len * FIRST_PERSON_DECK_OUT_M : lx;
+				const double oy = len > 0 ? ly + (ly - this->deck_y) / len * FIRST_PERSON_DECK_OUT_M : ly;
+				for (double up : {FIRST_PERSON_DECK_CHEST_M, this->walker.eye_z / OBJECT_HEIGHT_PER_METRE / ev.scale}) {
+					if (ThreeDVehicleBlocks(obj, this->deck_x, this->deck_y, ox, oy, this->deck_z + up, true)) return;
+				}
+			}
 			this->OverBoard(this->walker.x + dx, this->walker.y + dy);
 			return;
 		}
@@ -1100,6 +1128,42 @@ struct FirstPersonWindow : Window {
 		return std::nullopt;
 	}
 
+	/**
+	 * Where the walker on board comes into the water beside the boat (LeaveIntoWater()): abeam of where he stands, past
+	 * its side, the nearer side first; open water there (EyeWaterSurfaceZ()), world units. None where there is none,
+	 * and none near the wheel (FIRST_PERSON_LEAVE_FROM_HELM_M): the way out is at the far end from it.
+	 */
+	std::optional<std::pair<double, double>> WaterBeside(const ThreeDEyeVehicle &ev) const
+	{
+		const ThreeDVehicleShape *shape = ev.obj != nullptr ? ev.obj->GetShape() : nullptr;
+		if (shape == nullptr) return std::nullopt;
+		const double hx = ev.obj->has_helm ? ev.obj->helm[0] : 0, hy = ev.obj->has_helm ? ev.obj->helm[1] : 0;
+		const double from_helm = std::clamp(static_cast<double>(shape->x1 - shape->x0) / 4, FIRST_PERSON_HELM_M, FIRST_PERSON_LEAVE_FROM_HELM_M);
+		if (std::hypot(this->deck_x - hx, this->deck_y - hy) < from_helm) return std::nullopt;
+		const double near_side = this->deck_y >= (shape->y0 + shape->y1) / 2 ? 1.0 : -1.0;
+		for (double side : {near_side, -near_side}) {
+			const double ly = side > 0 ? shape->y1 + FIRST_PERSON_LEAVE_BESIDE_M : shape->y0 - FIRST_PERSON_LEAVE_BESIDE_M;
+			double x, y, z;
+			BoatToWorld(ev, this->deck_x, ly, 0, x, y, z);
+			if (EyeWaterSurfaceZ(x, y).has_value()) return std::make_pair(x, y);
+		}
+		return std::nullopt;
+	}
+
+	/**
+	 * E on board away from the wheel with no land near: out into the water beside the boat, swimming at its surface
+	 * (the player, 21. 11.: out of the submarine's cabin he got only by the fault that let him through its window --
+	 * "I used that fault to leave the submarine, to leave the deck; up by its railing I do not walk at all"). Back
+	 * aboard with E from the water (VehicleToBoard()).
+	 */
+	bool LeaveIntoWater(const ThreeDEyeVehicle &ev)
+	{
+		const auto place = this->WaterBeside(ev);
+		if (!place.has_value()) return false;
+		this->IntoWater(place->first, place->second);
+		return this->walker.swimming;
+	}
+
 	/** E on board away from the wheel: over the side onto the land near (AshorePlace()). */
 	bool GoAshore()
 	{
@@ -1153,6 +1217,13 @@ struct FirstPersonWindow : Window {
 	bool SwimBy(double dx, double dy, double dz)
 	{
 		double x = this->walker.x + dx, y = this->walker.y + dy;
+		/* Not into a boat's hull (the fish keep out of it too, three_d_water_life.cpp): swum into, the walker was in its
+		 * cabin with the sea about him. One within already (a boat come over him) swims on, out of it. */
+		{
+			extern bool ThreeDPointInBoatHull(double x, double y, double z);
+			const double eyes = FirstPersonFeetZ(this->walker) + this->walker.eye_z;
+			if (ThreeDPointInBoatHull(x, y, eyes) && !ThreeDPointInBoatHull(this->walker.x, this->walker.y, eyes)) return false;
+		}
 		std::optional<double> surface = EyeWaterSurfaceZ(x, y);
 		if (!surface.has_value()) {
 			const std::optional<double> here = EyeWaterSurfaceZ(this->walker.x, this->walker.y);
@@ -1416,13 +1487,14 @@ struct FirstPersonWindow : Window {
 			this->GetOut();
 			return;
 		}
-		/* On board a boat: by its wheel E takes it again; elsewhere on its deck, over the side onto the land near. */
+		/* On board a boat: by its wheel E takes it again; elsewhere on its deck, over the side onto the land near, or
+		 * with none near into the water beside it. */
 		if (this->aboard != VehicleID::Invalid()) {
 			ThreeDEyeVehicle ev;
 			if (const Vehicle *boat = this->Aboard(ev); boat != nullptr) {
 				if (this->AtHelm(ev)) {
 					this->GetIn(boat);
-				} else if (this->GoAshore()) {
+				} else if (this->GoAshore() || this->LeaveIntoWater(ev)) {
 					this->MakePicture();
 					this->SetDirty();
 				}
@@ -2928,6 +3000,8 @@ struct FirstPersonWindow : Window {
 						hint = GetString(STR_FIRST_PERSON_HELM_HERE, this->aboard);
 					} else if (this->AshorePlace().has_value()) {
 						hint = GetString(STR_FIRST_PERSON_ASHORE_HERE);
+					} else if (this->WaterBeside(ev).has_value()) {
+						hint = GetString(STR_FIRST_PERSON_INTO_WATER_HERE);
 					}
 				} else if (const WalkerPlant *plant = WalkerPlantNear(this->walker.x, this->walker.y, WALKER_PLANT_REACH_M); plant != nullptr) {
 					/* By the walker's plant: how long till the harvest, or E harvests it. */

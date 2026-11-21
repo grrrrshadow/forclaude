@@ -751,6 +751,18 @@ bool SendThreeDWaterAnimal(std::string_view name, double ahead_m)
 }
 
 /** The rig: the fish keep out of the boats' hulls (FindHulls()), or swim through them as before. */
+/**
+ * Whether a point is within the hull of a boat near (FindHulls(), InHull()): the swimming walker does not swim into one
+ * (first_person_gui.cpp) -- through it he was in its cabin with the sea about him.
+ * @param x,y world units
+ * @param z the game's units of height
+ */
+bool ThreeDPointInBoatHull(double x, double y, double z)
+{
+	FindHulls(x, y);
+	return InHull(x, y, z, 0.0);
+}
+
 /** Whether the boats' hulls keep the water out (the rig's 'test3d voda trup 0|1'): the fish, and from within a hull the sea's surface and its haze (viewport.cpp). */
 bool ThreeDWaterHullsKept()
 {
