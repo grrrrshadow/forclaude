@@ -36,6 +36,8 @@
 #include "industry.h"
 #include "industry_map.h"
 #include "station_map.h"
+#include "station_func.h"
+#include "sprite.h"
 #include "air_map.h"
 #include "water_map.h"
 #include "bridge_map.h"
@@ -169,6 +171,12 @@ static constexpr double FIRST_PERSON_MINE_UP_M = 0.8;
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 /** Half the length of an aircraft of sprites, metres: so much nearer its middle than the walker beside it need come (BoardDistance()). */
 static constexpr double FIRST_PERSON_AIRCRAFT_HALF_M = 6.0;
+/**
+ * A box of a sprite of an airport's tile (FixedAirportBlocks()) so tall is in the walker's way, units of height as the
+ * tiles' layouts count them: the radar's mast (8), a jetway (14), a hangar's wall (28), a terminal, the tower; a fence
+ * (6) is stepped over.
+ */
+static constexpr int FIRST_PERSON_AIRPORT_BOX = 8;
 /**
  * On board a boat (FirstPersonWindow::aboard): how high a step up on its deck the walker takes (the yacht's cockpit is
  * 1.4 m deep, out of it over its seats, 0.8 m each), how far down it steps, metres; how much deeper than where its
@@ -470,6 +478,26 @@ static const ThreeDObject *EyeHouseObject(HouseID north, TileIndex origin)
 }
 
 /**
+ * Whether what stands on a tile of an airport of the game's own (not a modular one, air_map.h) is in the walker's way
+ * at a world point (the player, 21. 11.: the airports as they were, "if one can walk there"): its hangar all of it,
+ * else the boxes of the sprites the tile is drawn of (GetStationTileLayout(): the terminal, the tower, the radar's
+ * mast, a jetway), as tall as FIRST_PERSON_AIRPORT_BOX -- a fence is stepped over. Its apron, its stands, its runways
+ * and taxiways are free: the walker comes to an aircraft standing there (VehicleToBoard()).
+ */
+static bool FixedAirportBlocks(TileIndex tile, double x, double y)
+{
+	if (IsHangar(tile)) return true;
+	const DrawTileSprites *layout = GetStationTileLayout(StationType::Airport, GetAirportGfx(tile));
+	if (layout == nullptr) return false;
+	const double lx = x - TileX(tile) * static_cast<double>(TILE_SIZE), ly = y - TileY(tile) * static_cast<double>(TILE_SIZE);
+	for (const DrawTileSeqStruct &box : layout->GetSequence()) {
+		if (!box.IsParentSprite() || box.extent.z < FIRST_PERSON_AIRPORT_BOX) continue;
+		if (lx >= box.origin.x && lx <= box.origin.x + box.extent.x && ly >= box.origin.y && ly <= box.origin.y + box.extent.y) return true;
+	}
+	return false;
+}
+
+/**
  * Whether the walker can stand on a world point: not in a house, an industry's building (a field is walked), a
  * station's building (a platform or a stop is walked), an object, the water or off the map.
  * @param stand the height it stands at there, units of height (FirstPersonStandZ()): up on a building (the dragon
@@ -587,7 +615,9 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 			/* On a platform, round the signal box of a waypoint and the fences of a bay (FirstPersonThingsBlock()). And
 			 * about a modular airport (air_map.h; the player, 21. 11.: "I cannot walk onto the modular airport, I need
 			 * to walk there to get into an aircraft"): over its taxiways, stands, runways and helipads, round its
-			 * buildings, its hangar and its heliport's deck by their shapes, as the things of a station. */
+			 * buildings, its hangar and its heliport's deck by their shapes, as the things of a station. And about an
+			 * airport of the game's own (FixedAirportBlocks()). */
+			if (IsAirport(tile) && !IsModularAirport(tile)) return !FixedAirportBlocks(tile, x, y);
 			return (HasStationRail(tile) || IsAnyRoadStop(tile) || IsModularAirport(tile)) && !FirstPersonThingsBlock(x, y, stand);
 		case TileType::Clear:
 			/* The stones of the rocky land: round a big one, up a low one (FirstPersonThingsBlock()). */

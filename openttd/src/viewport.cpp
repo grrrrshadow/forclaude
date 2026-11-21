@@ -74,6 +74,8 @@
 #include "vehicle_base.h"
 #include "aircraft.h"
 #include "air_map.h"
+#include "newgrf_airporttiles.h"
+#include "station_func.h"
 #include "train.h"
 #include "roadveh.h"
 #include "ship.h"
@@ -3256,9 +3258,25 @@ static void DrawOurGrassVerges(std::span<const EyeRoadSprite> sprites, bool eyes
 }
 
 /**
+ * Whether a tile of an airport of the game's own (not a modular one) has the game's asphalt for its ground: its apron,
+ * its stands, its taxiways and runways (the sprites of the tile's layout, GetStationTileLayout()), not the grass of
+ * the small airfield, nor a tile a set draws its own way.
+ */
+static bool EyeFixedAirportAsphalt(TileIndex tile)
+{
+	if (!IsAirportTile(tile) || IsModularAirport(tile)) return false;
+	const AirportTileSpec *spec = AirportTileSpec::GetByTile(tile);
+	if (spec == nullptr || spec->grf_prop.HasGrfFile()) return false;
+	const DrawTileSprites *layout = GetStationTileLayout(StationType::Airport, GetAirportGfx(tile));
+	if (layout == nullptr) return false;
+	const SpriteID ground = layout->ground.sprite & SPRITE_MASK;
+	return IsInsideMM(ground, SPR_AIRPORT_APRON, SPR_AIRPORT_RUNWAY_END + 1) || IsInsideMM(ground, SPR_NSRUNWAY1, SPR_NSRUNWAY_END + 1);
+}
+
+/**
  * Whether the ground of a tile in the view from the eyes is a road's that DrawEyeRoad() smooths: a plain road (not a
  * level crossing, a depot), of the game's roads or a set's (CZTR), as the player chose (gui.eye_roads); and the asphalt
- * of a modular airport.
+ * of an airport, a modular one's and the game's own.
  */
 static bool EyeRoadTile(int x, int y)
 {
@@ -3268,7 +3286,9 @@ static bool EyeRoadTile(int x, int y)
 	/* And the asphalt of an airport built tile by tile (air_map.h; the player, 21. 11.: "better the airport's asphalt,
 	 * as we smoothed the pixels of the original road"): its ground is the game's sprite of asphalt, its lines and
 	 * paint our pieces over it -- the grey smoothed as a road's. Its gravel as it is. */
-	return IsModularAirportTile(tile) && GetModularAirportSurface(tile) == AirportSurface::Asphalt;
+	if (IsModularAirportTile(tile) && GetModularAirportSurface(tile) == AirportSurface::Asphalt) return true;
+	/* And of an airport of the game's own, walked on now too (FixedAirportBlocks() of first_person_gui.cpp). */
+	return EyeFixedAirportAsphalt(tile);
 }
 
 /**
