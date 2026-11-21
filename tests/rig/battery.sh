@@ -431,6 +431,18 @@ run_scene odtahjednosmer "vlak123 on
 testodtah jednosmer 0" 14000
 run_scene odtahdaleko "vlak123 on
 testodtah daleko 0" 16000
+# The player's rule itself (21. 11.: "pokud bude za poruchou jiny vlak tak
+# odtahovka musi prijet zepredu skrz ty jednosmerny navestidla"): the same two
+# lines with a second train out of the casualty's depot right behind it, which
+# comes up and stands behind the breakdown. The tow comes from the front,
+# against every one-way signal, couples to the casualty's head and takes it
+# away forwards; the train behind then goes on. No collision, nothing wrecked.
+# The second coupling in each line is that follower's own breakdown later on,
+# fetched the same way.
+run_scene odtahjednosmerfronta "vlak123 on
+testodtah jednosmer 0 fronta" 16000
+run_scene odtahdalekofronta "vlak123 on
+testodtah daleko 0 fronta" 18000
 # Two rescue engines, one five tiles from the casualty and one thirty-four
 # away. Each used to ask only which casualty was nearest to itself and then
 # take it, so whose turn came first decided who went -- and the far one went

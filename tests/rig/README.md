@@ -201,6 +201,15 @@ ordinary block signals. In the battery: `odtahprodatbez`, `odtahprodatbezdve`
 `spojeno=0 odtazeno=0`: the tow stood behind its door, "exit blocked", because
 the casualty itself made the block outside it full.
 
+`fronta` after the variant sends a second train out of the casualty's depot
+right behind it; it comes up and stands behind the breakdown. With `jednosmer`
+or `daleko` that is the player's rule put to the question (21. 11.: with a
+train behind the breakdown the tow has to come from the front, through the
+one-way signals): `odtahjednosmerfronta`, `odtahdalekofronta` -- the tow comes
+against every one-way signal, couples to the casualty's head and takes it away
+forwards, nothing collides. A tow may defy one-way signals only on its way TO
+a casualty; with one in tow it is an ordinary train.
+
 ## The rig's own sets, in yagl
 
 Every NewGRF the rig makes for itself is a yagl script in `grf/` -- `grf/<set>.yagl`,

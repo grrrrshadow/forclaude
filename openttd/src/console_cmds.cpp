@@ -5197,7 +5197,7 @@ static bool ConTestSell(std::span<std::string_view> argv)
 static bool ConTestRescue(std::span<std::string_view> argv)
 {
 	if (argv.empty()) {
-		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy|porouchanydlouhy|svah] [signal cycle] [dve] [bezsignalu|blokova]'.");
+		IConsolePrint(CC_HELP, "Build the junction-rescue test scene. Usage: 'testodtah [rovina|krizeni|jednosmer|daleko|depo|vagony|prodat|prodatporucha|prodatdlouhy|porouchanydlouhy|svah] [signal cycle] [dve] [bezsignalu|blokova] [fronta]'.");
 		return true;
 	}
 	if (_game_mode != GameMode::Normal) {
@@ -5282,9 +5282,16 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	/* 'blokova': ordinary block signals instead of path signals, so the
 	 * casualty's block shows red at both ends for as long as it stands there. */
 	bool block_signals = false;
+	/* 'fronta': a second train out of the casualty's depot right behind it, on
+	 * the same order. It comes up to the signal behind the casualty and stands
+	 * there -- the player's rule put to the question: with a train queued
+	 * behind the breakdown the tow has to come from the front, against every
+	 * one-way signal on the line, and take the casualty away forwards. */
+	bool queue_behind = false;
 	for (size_t i = 2; i < argv.size(); i++) {
 		if (argv[i] == "bezsignalu") no_signals = true;
 		if (argv[i] == "blokova") block_signals = true;
+		if (argv[i] == "fronta") queue_behind = true;
 		if (argv[i] == "dve") second_tow = true;
 	}
 	uint8_t sig_cycle = 0;
@@ -5556,6 +5563,17 @@ static bool ConTestRescue(std::span<std::string_view> argv)
 	/* Send the casualty off; the tick watcher breaks it down the moment its
 	 * front turns onto the branch. */
 	Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_c, false);
+	if (queue_behind) {
+		auto [cost_q, veh_q, un_q1, un_q2, un_q3] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_loco, true, INVALID_CARGO, ClientID::Invalid);
+		auto [cost_qw, veh_qw, un_q4, un_q5, un_q6] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_e, eid_wagon, true, INVALID_CARGO, ClientID::Invalid);
+		if (cost_q.Failed() || cost_qw.Failed() || Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh_qw, Train::Get(veh_q)->Last()->index, false).Failed()) {
+			IConsolePrint(CC_ERROR, "testodtah fronta: vlak za poruchou se nepodaril.");
+			return true;
+		}
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh_q, 0, to_branch);
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh_q, false);
+		IConsolePrint(CC_DEFAULT, "testodtah fronta: za poruchou jede vlak {} z depa ({},{}).", Train::Get(veh_q)->unitnumber, TileX(depot_e), TileY(depot_e));
+	}
 	_testodtah_casualty = veh_c;
 	_testodtah_sell = sell_variant;
 	_testodtah_sell_broken = sell_broken_variant;

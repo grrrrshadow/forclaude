@@ -43,6 +43,8 @@ odtahsvahzpet: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zazn
 odtahkrizeni: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahjednosmer: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahdaleko: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahjednosmerfronta: spojeno=2 odtazeno=2 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahdalekofronta: spojeno=2 odtazeno=2 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahdveblizsi: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahbezdepa: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
 odtahvagony: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
