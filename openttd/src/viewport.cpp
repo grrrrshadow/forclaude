@@ -73,6 +73,7 @@
 #include "signs_func.h"
 #include "vehicle_base.h"
 #include "aircraft.h"
+#include "air_map.h"
 #include "train.h"
 #include "roadveh.h"
 #include "ship.h"
@@ -3256,13 +3257,18 @@ static void DrawOurGrassVerges(std::span<const EyeRoadSprite> sprites, bool eyes
 
 /**
  * Whether the ground of a tile in the view from the eyes is a road's that DrawEyeRoad() smooths: a plain road (not a
- * level crossing, a depot), of the game's roads or a set's (CZTR), as the player chose (gui.eye_roads).
+ * level crossing, a depot), of the game's roads or a set's (CZTR), as the player chose (gui.eye_roads); and the asphalt
+ * of a modular airport.
  */
 static bool EyeRoadTile(int x, int y)
 {
 	if (!_settings_client.gui.eye_roads || !IsInsideBS(x, 0, Map::SizeX()) || !IsInsideBS(y, 0, Map::SizeY())) return false;
 	const TileIndex tile = TileXY(x, y);
-	return IsTileType(tile, TileType::Road) && IsNormalRoad(tile);
+	if (IsTileType(tile, TileType::Road) && IsNormalRoad(tile)) return true;
+	/* And the asphalt of an airport built tile by tile (air_map.h; the player, 21. 11.: "better the airport's asphalt,
+	 * as we smoothed the pixels of the original road"): its ground is the game's sprite of asphalt, its lines and
+	 * paint our pieces over it -- the grey smoothed as a road's. Its gravel as it is. */
+	return IsModularAirportTile(tile) && GetModularAirportSurface(tile) == AirportSurface::Asphalt;
 }
 
 /**
@@ -21279,6 +21285,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			if (!same_tunnel) continue;
 		}
 		if (u->type == VehicleType::Effect && u->sprite_cache.sprite_seq.count == 0) continue;
+		/* An aircraft's shadow is a vehicle of its own carrying the aircraft's sprites, drawn dark on the map alone
+		 * (VehState::Shadow): from the eyes it is nothing to see. It has no object (ThreeDVehicleObjectOf(), or a second
+		 * Buran stood under the Buran) and no likeness, so it came to the sprites at the end of this -- the aircraft's
+		 * own picture in full colour standing through it (the player's #389, 21. 11.: "the stand-in 2D sprite of the
+		 * shuttle is used though the 3D object is drawn"). And a helicopter's rotor, a vehicle too: the rotor of one
+		 * drawn from its object is the object's. */
+		if (u->type == VehicleType::Aircraft && !Aircraft::From(u)->IsNormalAircraft()) {
+			if (u->vehstatus.Test(VehState::Shadow)) continue;
+			if (ThreeDEnabled() && ThreeDVehicleObjectOf(u->First()) != nullptr) continue;
+		}
 		/* A disaster's UFO: the saucer among the figures (AddThreeDUfosToEye()), not its sprite. */
 		if (ThreeDEnabled() && ThreeDUfoDrawsDisaster(u)) continue;
 		/* The smoke of an industry's chimney: out of the top of the chimney of its parts (ThreeDIndustrySmokeAt()). */
