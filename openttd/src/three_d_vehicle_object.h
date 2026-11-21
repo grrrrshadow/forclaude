@@ -51,6 +51,8 @@ void GetVehicleSetSpriteLocalIDs(EngineID engine, const Vehicle *v, EngineImageT
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite);
 bool ThreeDVehicleObjectSpriteBounds(uint32_t request, Rect &bounds);
 SpriteID ThreeDVehicleObjectSpriteStandIn(uint32_t request);
+bool TakeThreeDVehicleObjectSpriteEncoded(uint32_t request, const SpriteEncoder *encoder, std::unique_ptr<std::byte[]> &data, size_t &size);
+void ThreeDVehicleObjectSpritesBeforeBlitterChange();
 void TrimThreeDEyePainted();
 void TrimThreeDPictures();
 void ResetThreeDVehicleObjectSprites();

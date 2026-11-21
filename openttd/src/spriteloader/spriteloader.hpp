@@ -76,9 +76,19 @@ public:
 		 * @param size the minimum size of the data field.
 		 */
 		void AllocateData(ZoomLevel zoom, size_t size) { this->data = Sprite::buffer[zoom].ZeroAllocate(size); }
+
+		/**
+		 * Let go of the memory this thread's sprites were passed around in (AllocateData()): after a big one made
+		 * on a thread of its own (ReleaseSpriteMakingBuffers()), which would hold it till the game ends.
+		 */
+		static void ReleaseBuffers() { Sprite::buffer = {}; }
 	private:
-		/** Allocated memory to pass sprite data around */
-		static SpriteCollMap<ReusableBuffer<SpriteLoader::CommonPixel>> buffer;
+		/**
+		 * Allocated memory to pass sprite data around. Each thread's own: the sprites of vehicles drawn from their
+		 * 3D objects are made ready on the thread of the pictures (EncodeThreeDObjectSpriteOffMainThread()), while
+		 * the main thread reads sprites of its own.
+		 */
+		static thread_local SpriteCollMap<ReusableBuffer<SpriteLoader::CommonPixel>> buffer;
 	};
 
 	/**

@@ -12,6 +12,7 @@
 #include "stdafx.h"
 #include "core/backup_type.hpp"
 #include "three_d_vehicle_object.h"
+#include "blitter/factory.hpp"
 #include "three_d_objects.h"
 #include "three_d_gpu.h"
 #include "three_d.h"
@@ -2613,7 +2614,23 @@ struct SpriteMadeInBackground {
 	ObjectRaster raster;
 	ZoomLevel zoom = ZoomLevel::Min; ///< the zoom it was made at (ObjectSpriteZoom())
 	bool drawn = false;              ///< false: not a pixel of the object seen
+	/* Made ready for the sprite cache by the thread too (EncodeThreeDObjectSpriteOffMainThread()): the raster let go
+	 * of then, the main thread takes this (TakeThreeDVehicleObjectSpriteEncoded()). */
+	std::unique_ptr<std::byte[]> encoded; ///< the sprite as the cache keeps it; nullptr: only the raster
+	size_t encoded_size = 0;
+	const SpriteEncoder *encoder = nullptr;        ///< the blitter it was made for
+	ZoomLevel zoom_min = ZoomLevel::Min, zoom_max = ZoomLevel::Max; ///< and the settings its levels were made by
+	bool mitchell = false;
 };
+/**
+ * Whether a sprite the thread made ready for the cache (SpriteMadeInBackground::encoded) is for the blitter there is
+ * now and by the settings its levels are made by now: one that is not is made anew.
+ */
+static bool EncodedSpriteFits(const SpriteMadeInBackground &m)
+{
+	return m.encoder == BlitterFactory::GetCurrentBlitter() && m.zoom_min == _settings_client.gui.zoom_min && m.zoom_max == _settings_client.gui.zoom_max && m.mitchell == _settings_client.gui.sprite_mitchell;
+}
+
 /** The sprites made on the thread, by their request; those asked of it. Under _bg_sprites_mutex. */
 static std::map<uint32_t, SpriteMadeInBackground> _bg_sprites_made;
 static std::set<uint32_t> _bg_sprites_asked;
@@ -2622,103 +2639,31 @@ static std::mutex _bg_sprites_mutex;
 static std::atomic<bool> _gui_sprites_came = false;
 static std::atomic<bool> _map_sprites_came = false;
 
-/**
- * What stands in on the map for a sprite of an object not made yet: the vehicle's sprite of the nearest direction made
- * (a vehicle turning shows the way it faced a moment longer), else nothing (the first of its object).
- */
-static SpriteID NearestObjectSpriteMade(const ObjectSpriteRequest &req)
+/** The cell of the purchase list a sprite for the windows may fill (FillObjectSprite()), pixels; 0: no limit. The main thread's to ask (ObjectSpriteCellOf()). */
+struct ObjectSpriteCell {
+	int w = 0, h = 0;
+};
+
+/** The cell a sprite of an object for the windows is made to fit (GetVehicleImageCellSize()): on the main thread. */
+static ObjectSpriteCell ObjectSpriteCellOf(const ObjectSpriteRequest &req)
 {
-	for (int off = 1; off <= 4; off++) {
-		for (int side : {1, -1}) {
-			const int dir = (req.dir + side * off) & 7;
-			auto it = _object_sprites.find(std::make_tuple(req.obj, static_cast<int>(req.where), dir, static_cast<int>(std::lround(req.scale * 1000)), req.fade, req.walk));
-			if (it != _object_sprites.end() && ThreeDObjectSpriteMade(it->second)) return it->second;
-		}
-	}
-	return EmptyObjectSprite();
+	if (!req.gui || req.obj == nullptr) return {};
+	const VehicleCellSize cell = GetVehicleImageCellSize(req.obj->type, EngineImageType::Purchase);
+	return {static_cast<int>(cell.extend_left + cell.extend_right), static_cast<int>(cell.height)};
 }
 
 /**
- * What the sprite cache draws for a sprite of an object not made yet (the main thread, GetRawSprite()): it is made on
- * the thread in the background, and drawn again when it comes. For the windows (ObjectSpriteRequest::gui) the object
- * read is tenths of a second, the first of a set seconds; the purchase list stood still as it scrolled, for a picture
- * of a few pixels (the player, 17. 10.: "the picture in the purchase menu is tiny, what are you photographing there"):
- * nothing drawn till then. On the map, the first vehicle of an object stood the game two or three seconds, each
- * direction after it ten or twenty milliseconds, "the last place where 0 degrees may bite" (the player, 17. 10.): the
- * vehicle's nearest direction made stands in. The rig makes it now.
- * @return the sprite to draw instead; 0: make it now (it is made)
- */
-SpriteID ThreeDVehicleObjectSpriteStandIn(uint32_t request)
-{
-	if (request < 1 || request > _object_sprite_requests.size()) return 0;
-	const ObjectSpriteRequest &req = _object_sprite_requests[request - 1];
-	if (req.obj == nullptr || _three_d_load_at_once) return 0;
-	const ZoomLevel zoom = ObjectSpriteZoom(req);
-	{
-		std::lock_guard lock(_bg_sprites_mutex);
-		auto it = _bg_sprites_made.find(request);
-		if (it != _bg_sprites_made.end() && it->second.zoom == zoom) return 0;
-		if (!_bg_sprites_asked.insert(request).second) return req.gui ? EmptyObjectSprite() : NearestObjectSpriteMade(req); // asked already
-	}
-	/* What the game's state gives it now (its paint faded by the date), for the thread. */
-	const float fade = FadeAmount(req.obj, req.fade), rust_time = RustTime(req.obj, req.fade);
-	const uint32_t paint_colour = PaletteColour(req.obj, req.fade);
-	ThreeDLoadInBackground([req, request, zoom, fade, rust_time, paint_colour] {
-		{
-			std::lock_guard lock(_bg_sprites_mutex);
-			if (!_bg_sprites_asked.contains(request)) return; // forgotten meanwhile (the objects read anew)
-		}
-		SpriteMadeInBackground made;
-		made.zoom = zoom;
-		made.drawn = RasterObjectSprite(req, zoom, fade, rust_time, paint_colour, made.raster);
-		std::lock_guard lock(_bg_sprites_mutex);
-		if (_bg_sprites_asked.erase(request) == 0) return;
-		_bg_sprites_made[request] = std::move(made);
-		(req.gui ? _gui_sprites_came : _map_sprites_came) = true;
-	});
-	/* Without the thread it was made now. */
-	{
-		std::lock_guard lock(_bg_sprites_mutex);
-		if (_bg_sprites_made.contains(request)) return 0;
-	}
-	return req.gui ? EmptyObjectSprite() : NearestObjectSpriteMade(req);
-}
-
-/**
- * Make a sprite of an object (ReadSprite()): the object drawn with the camera of the sprites, facing the direction
- * asked, about the point the game draws the sprite about -- at 16x for the map, the coarser levels made from it as from
- * a set's zin16, at the zoom of the interface for the windows, the finer made from it (ResizeSprites()); from the
- * thread's pixels when it made them (ThreeDVehicleObjectSpriteStandIn()).
- * @param request the sprite's request, counted from 1
+ * The pixels of a sprite of an object (RasterObjectSprite()) as the sprite cache takes them, at the level they were
+ * made at: about the point the game draws the sprite about. On either thread (MakeThreeDVehicleObjectSprite(), the
+ * thread of ThreeDVehicleObjectSpriteStandIn()).
+ * @param drawn false: not a pixel of the object seen -- a transparent pixel
+ * @param cell for the windows, the cell it may fill
  * @return the level made
  */
-ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite)
+static ZoomLevels FillObjectSprite(const ObjectSpriteRequest &req, ZoomLevel zoom, const ObjectRaster &r, bool drawn, ObjectSpriteCell cell, SpriteLoader::SpriteCollection &sprite)
 {
-	const ObjectSpriteRequest *req = (request >= 1 && request <= _object_sprite_requests.size()) ? &_object_sprite_requests[request - 1] : nullptr;
 	ZoomLevels avail;
-	const ZoomLevel zoom = req != nullptr ? ObjectSpriteZoom(*req) : ZoomLevel::Min;
-	auto start = std::chrono::steady_clock::now();
-	SpriteMadeInBackground made;
-	bool found = false;
-	if (req != nullptr && req->obj != nullptr) {
-		{
-			std::lock_guard lock(_bg_sprites_mutex);
-			auto it = _bg_sprites_made.find(request);
-			if (it != _bg_sprites_made.end()) {
-				if (it->second.zoom == zoom) {
-					made = std::move(it->second);
-					found = true;
-				}
-				_bg_sprites_made.erase(it);
-			}
-		}
-		if (!found) {
-			made.zoom = zoom;
-			made.drawn = RasterObjectSprite(*req, zoom, FadeAmount(req->obj, req->fade), RustTime(req->obj, req->fade), PaletteColour(req->obj, req->fade), made.raster);
-		}
-	}
-	const ObjectRaster &r = made.raster;
-	if (!made.drawn) {
+	if (!drawn) {
 		/* The empty picture, or an object that cannot be drawn: a transparent pixel. */
 		SpriteLoader::Sprite &s = sprite[ZoomLevel::Min];
 		s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
@@ -2733,16 +2678,12 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 	SpriteLoader::Sprite &s = sprite[zoom];
 	s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
 	/* The object's origin from the point the sprite is drawn about, in pixels of the zoom (RemapCoords()). */
-	const double ox = (req->off_y - req->off_x) * 2.0 * ZOOM_BASE / (1 << to_underlying(zoom)), oy = (req->off_x + req->off_y) * static_cast<double>(ZOOM_BASE) / (1 << to_underlying(zoom));
+	const double ox = (req.off_y - req.off_x) * 2.0 * ZOOM_BASE / (1 << to_underlying(zoom)), oy = (req.off_x + req.off_y) * static_cast<double>(ZOOM_BASE) / (1 << to_underlying(zoom));
 	/* For the windows: no bigger than the cell of the list of its kind of vehicle -- an object taller or longer than
 	 * that made smaller as a whole (the player, 15. 11.: "the ships' purchase list, the yacht's picture is too big,
 	 * the submarine's too": the yacht with its mast three rows tall over its neighbours). */
 	double fit = 1.0;
-	if (req->gui && r.width > 0 && r.height > 0) {
-		const VehicleCellSize cell = GetVehicleImageCellSize(req->obj->type, EngineImageType::Purchase);
-		const int cell_w = static_cast<int>(cell.extend_left + cell.extend_right), cell_h = static_cast<int>(cell.height);
-		if (cell_w > 0 && cell_h > 0) fit = std::min({1.0, static_cast<double>(cell_w) / r.width, static_cast<double>(cell_h) / r.height});
-	}
+	if (req.gui && r.width > 0 && r.height > 0 && cell.w > 0 && cell.h > 0) fit = std::min({1.0, static_cast<double>(cell.w) / r.width, static_cast<double>(cell.h) / r.height});
 	if (fit < 1.0) {
 		const int w = std::max(1, static_cast<int>(std::lround(r.width * fit))), h = std::max(1, static_cast<int>(std::lround(r.height * fit)));
 		s.width = static_cast<uint16_t>(w);
@@ -2790,8 +2731,138 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 		}
 	}
 	avail.Set(zoom);
+	return avail;
+}
+
+/**
+ * What stands in on the map for a sprite of an object not made yet: the vehicle's sprite of the nearest direction made
+ * (a vehicle turning shows the way it faced a moment longer), else nothing (the first of its object).
+ */
+static SpriteID NearestObjectSpriteMade(const ObjectSpriteRequest &req)
+{
+	for (int off = 1; off <= 4; off++) {
+		for (int side : {1, -1}) {
+			const int dir = (req.dir + side * off) & 7;
+			auto it = _object_sprites.find(std::make_tuple(req.obj, static_cast<int>(req.where), dir, static_cast<int>(std::lround(req.scale * 1000)), req.fade, req.walk));
+			if (it != _object_sprites.end() && ThreeDObjectSpriteMade(it->second)) return it->second;
+		}
+	}
+	return EmptyObjectSprite();
+}
+
+/**
+ * What the sprite cache draws for a sprite of an object not made yet (the main thread, GetRawSprite()): it is made on
+ * the thread in the background, and drawn again when it comes. For the windows (ObjectSpriteRequest::gui) the object
+ * read is tenths of a second, the first of a set seconds; the purchase list stood still as it scrolled, for a picture
+ * of a few pixels (the player, 17. 10.: "the picture in the purchase menu is tiny, what are you photographing there"):
+ * nothing drawn till then. On the map, the first vehicle of an object stood the game two or three seconds, each
+ * direction after it ten or twenty milliseconds, "the last place where 0 degrees may bite" (the player, 17. 10.): the
+ * vehicle's nearest direction made stands in. The rig makes it now.
+ * @return the sprite to draw instead; 0: make it now (it is made)
+ */
+SpriteID ThreeDVehicleObjectSpriteStandIn(uint32_t request)
+{
+	if (request < 1 || request > _object_sprite_requests.size()) return 0;
+	const ObjectSpriteRequest &req = _object_sprite_requests[request - 1];
+	if (req.obj == nullptr || _three_d_load_at_once) return 0;
+	const ZoomLevel zoom = ObjectSpriteZoom(req);
+	{
+		std::lock_guard lock(_bg_sprites_mutex);
+		auto it = _bg_sprites_made.find(request);
+		if (it != _bg_sprites_made.end()) {
+			if (it->second.zoom == zoom && (it->second.encoded == nullptr || EncodedSpriteFits(it->second))) return 0;
+			/* Made ready for another blitter or by other settings of the levels (the sprite cache was emptied since):
+			 * asked of the thread again, not made by the main thread. */
+			if (it->second.encoded != nullptr) _bg_sprites_made.erase(it);
+		}
+		if (!_bg_sprites_asked.insert(request).second) return req.gui ? EmptyObjectSprite() : NearestObjectSpriteMade(req); // asked already
+	}
+	/* What the game's state gives it now (its paint faded by the date), for the thread. */
+	const float fade = FadeAmount(req.obj, req.fade), rust_time = RustTime(req.obj, req.fade);
+	const uint32_t paint_colour = PaletteColour(req.obj, req.fade);
+	/* And what makes it ready for the sprite cache there too (EncodeThreeDObjectSpriteOffMainThread()): the blitter
+	 * (the thread is stopped before it changes, ThreeDVehicleObjectSpritesBeforeBlitterChange()), the settings of the
+	 * levels, the cell of the list. */
+	SpriteEncoder *encoder = BlitterFactory::GetCurrentBlitter();
+	const ObjectSpriteCell cell = ObjectSpriteCellOf(req);
+	const ZoomLevel zoom_min = _settings_client.gui.zoom_min, zoom_max = _settings_client.gui.zoom_max;
+	const bool mitchell = _settings_client.gui.sprite_mitchell;
+	ThreeDLoadInBackground([req, request, zoom, fade, rust_time, paint_colour, encoder, cell, zoom_min, zoom_max, mitchell] {
+		{
+			std::lock_guard lock(_bg_sprites_mutex);
+			if (!_bg_sprites_asked.contains(request)) return; // forgotten meanwhile (the objects read anew)
+		}
+		SpriteMadeInBackground made;
+		made.zoom = zoom;
+		made.drawn = RasterObjectSprite(req, zoom, fade, rust_time, paint_colour, made.raster);
+		if (made.drawn) {
+			extern bool EncodeThreeDObjectSpriteOffMainThread(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, SpriteEncoder *encoder, std::unique_ptr<std::byte[]> &data, size_t &size);
+			SpriteLoader::SpriteCollection sprite;
+			const ZoomLevels avail = FillObjectSprite(req, zoom, made.raster, true, cell, sprite);
+			if (EncodeThreeDObjectSpriteOffMainThread(sprite, avail, encoder, made.encoded, made.encoded_size)) {
+				made.encoder = encoder;
+				made.zoom_min = zoom_min;
+				made.zoom_max = zoom_max;
+				made.mitchell = mitchell;
+				made.raster = ObjectRaster{};
+			} else {
+				made.encoded.reset();
+			}
+		}
+		std::lock_guard lock(_bg_sprites_mutex);
+		if (_bg_sprites_asked.erase(request) == 0) return;
+		_bg_sprites_made[request] = std::move(made);
+		(req.gui ? _gui_sprites_came : _map_sprites_came) = true;
+	});
+	/* Without the thread it was made now. */
+	{
+		std::lock_guard lock(_bg_sprites_mutex);
+		if (_bg_sprites_made.contains(request)) return 0;
+	}
+	return req.gui ? EmptyObjectSprite() : NearestObjectSpriteMade(req);
+}
+
+/**
+ * Make a sprite of an object (ReadSprite()): the object drawn with the camera of the sprites, facing the direction
+ * asked, about the point the game draws the sprite about -- at 16x for the map, the coarser levels made from it as from
+ * a set's zin16, at the zoom of the interface for the windows, the finer made from it (ResizeSprites()); from the
+ * thread's pixels when it made them (ThreeDVehicleObjectSpriteStandIn()). What the thread made ready for the cache
+ * whole is taken before this (TakeThreeDVehicleObjectSpriteEncoded()); this is the way of a blitter of 8 bpp, of the
+ * rig making it now, and of a sprite read with another encoder.
+ * @param request the sprite's request, counted from 1
+ * @return the level made
+ */
+ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite)
+{
+	const ObjectSpriteRequest *req = (request >= 1 && request <= _object_sprite_requests.size()) ? &_object_sprite_requests[request - 1] : nullptr;
+	const ZoomLevel zoom = req != nullptr ? ObjectSpriteZoom(*req) : ZoomLevel::Min;
+	auto start = std::chrono::steady_clock::now();
+	SpriteMadeInBackground made;
+	bool found = false;
+	if (req != nullptr && req->obj != nullptr) {
+		{
+			std::lock_guard lock(_bg_sprites_mutex);
+			auto it = _bg_sprites_made.find(request);
+			/* (One made ready for the cache has no raster any more: it stays for the cache to take.) */
+			if (it != _bg_sprites_made.end() && it->second.encoded == nullptr) {
+				if (it->second.zoom == zoom) {
+					made = std::move(it->second);
+					found = true;
+				}
+				_bg_sprites_made.erase(it);
+			}
+		}
+		if (!found) {
+			made.zoom = zoom;
+			made.drawn = RasterObjectSprite(*req, zoom, FadeAmount(req->obj, req->fade), RustTime(req->obj, req->fade), PaletteColour(req->obj, req->fade), made.raster);
+		}
+	}
+	const ObjectRaster &r = made.raster;
+	if (!made.drawn || req == nullptr) return FillObjectSprite(ObjectSpriteRequest{}, zoom, r, false, {}, sprite);
+	const ZoomLevels avail = FillObjectSprite(*req, zoom, r, true, ObjectSpriteCellOf(*req), sprite);
 	if (_debug_sprite_level >= 3) {
 		/* And where the game thought it would be before it was made (ThreeDVehicleObjectSpriteBounds()): around it. */
+		const SpriteLoader::Sprite &s = sprite[zoom];
 		Rect before{};
 		ThreeDVehicleObjectSpriteBounds(request, before);
 		const int sc = 1 << to_underlying(zoom);
@@ -2801,6 +2872,33 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 				s.x_offs * sc, s.y_offs * sc, (s.x_offs + s.width - 1) * sc, (s.y_offs + s.height - 1) * sc, before.left, before.top, before.right, before.bottom, around ? "" : " NOT AROUND IT");
 	}
 	return avail;
+}
+
+/**
+ * What the thread of the pictures made of a sprite of an object ready for the sprite cache (the job of
+ * ThreeDVehicleObjectSpriteStandIn(), EncodeThreeDObjectSpriteOffMainThread()): taken by the main thread when the
+ * sprite is read (GetRawSprite()), nothing left for it to make.
+ * @param request the sprite's request, counted from 1
+ * @param encoder the blitter now
+ * @param[out] data,size the sprite as the cache keeps it
+ * @return false: none made so, or made for another blitter or by other settings of the levels (forgotten then) --
+ *         the main thread makes it (MakeThreeDVehicleObjectSprite())
+ */
+bool TakeThreeDVehicleObjectSpriteEncoded(uint32_t request, const SpriteEncoder *encoder, std::unique_ptr<std::byte[]> &data, size_t &size)
+{
+	if (request < 1 || request > _object_sprite_requests.size()) return false;
+	const ZoomLevel zoom = ObjectSpriteZoom(_object_sprite_requests[request - 1]);
+	std::lock_guard lock(_bg_sprites_mutex);
+	auto it = _bg_sprites_made.find(request);
+	if (it == _bg_sprites_made.end() || it->second.encoded == nullptr) return false;
+	SpriteMadeInBackground &m = it->second;
+	const bool fits = m.encoder == encoder && m.zoom == zoom && EncodedSpriteFits(m);
+	if (fits) {
+		data = std::move(m.encoded);
+		size = m.encoded_size;
+	}
+	_bg_sprites_made.erase(it);
+	return fits;
 }
 
 /**
@@ -5516,6 +5614,17 @@ static void ForgetGuiSpritesAndPreviews()
 	ForgetThreeDVehicleObjectPreviews();
 	std::lock_guard lock(_preview_mutex);
 	_preview_extents.clear();
+}
+
+/**
+ * The blitter is about to be changed (RealChangeBlitter()): the thread of the pictures makes sprites ready with the
+ * one there is (ThreeDVehicleObjectSpriteStandIn()), so it is stopped first, and what it made and was asked of the
+ * sprites forgotten -- asked again when drawn, for the new one.
+ */
+void ThreeDVehicleObjectSpritesBeforeBlitterChange()
+{
+	StopThreeDPictureThread();
+	ForgetGuiSpritesAndPreviews();
 }
 
 /** The frames of the previews made go: no preview of a vehicle is shown (three_d_preview_gui.cpp). */

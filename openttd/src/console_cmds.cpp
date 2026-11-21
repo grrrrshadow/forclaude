@@ -9525,6 +9525,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else {
 			IConsolePrint(CC_DEFAULT, "test3d: {} built at {},{}", argv[4], *x, *y);
 		}
+	} else if (what == "naraz" && argv.size() > 2) {
+		/* 'naraz 0|1': what the thread in the background makes (shapes, textures, the sprites of 3D vehicles) made at
+		 * once by the one asking (1), as before there was the thread -- to compare the two ways. */
+		extern bool _three_d_load_at_once;
+		_three_d_load_at_once = number(2).value_or(0) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: naraz {}", _three_d_load_at_once ? "ano" : "ne");
 	} else if (what == "sprity_vozidla" && argv.size() > 2) {
 		/* 'sprity_vozidla <unit>': the sprites of the eight directions of a vehicle drawn from its 3D object made now
 		 * (the map's, at 16x), each with its size and how long the main thread took to make it (the player's #389: the

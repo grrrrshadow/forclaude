@@ -467,6 +467,13 @@ static float MitchellWeight(float x)
 	return 0;
 }
 
+/** What DownscaleMitchell() works in, kept from sprite to sprite: each thread's own. */
+struct MitchellBuffers {
+	std::vector<int> first_x, first_y;
+	std::vector<float> weights_x, weights_y, pre, mid;
+};
+static thread_local MitchellBuffers _mitchell;
+
 /**
  * Make a level a 32bpp sprite has not got straight from a finer one with
  * Mitchell's filter -- the 4x of a set's zin16 from the zin16 itself, not
@@ -515,8 +522,9 @@ static void DownscaleMitchell(SpriteLoader::SpriteCollection &sprite, ZoomLevel 
 			for (int k = 0; k < taps; k++) weights[static_cast<size_t>(o) * taps + k] /= sum;
 		}
 	};
-	static std::vector<int> first_x, first_y;
-	static std::vector<float> weights_x, weights_y, pre, mid;
+	/* (Each thread's own, and let go of after a big sprite made off the main thread: ReleaseSpriteMakingBuffers().) */
+	std::vector<int> &first_x = _mitchell.first_x, &first_y = _mitchell.first_y;
+	std::vector<float> &weights_x = _mitchell.weights_x, &weights_y = _mitchell.weights_y, &pre = _mitchell.pre, &mid = _mitchell.mid;
 	make_taps(dw, first_x, weights_x);
 	make_taps(dh, first_y, weights_y);
 
@@ -1200,6 +1208,45 @@ static void *ReadSprite(const SpriteCache *sc, SpriteID id, SpriteType sprite_ty
 	}
 
 	return encoder->Encode(sprite_type, sprite, allocator);
+}
+
+/**
+ * Let go of what this thread made sprites in (SpriteLoader::Sprite::AllocateData(), DownscaleMitchell()): hundreds of
+ * megabytes after a big one -- a picture of 20 million pixels has its pixels at every level, and as floats twice for
+ * the filter -- held till the game ends otherwise (Android killed the player's game at 3.2 GB).
+ */
+static void ReleaseSpriteMakingBuffers()
+{
+	SpriteLoader::Sprite::ReleaseBuffers();
+	_mitchell = {};
+}
+
+/**
+ * Make the sprite of a vehicle drawn from its 3D object ready for the sprite cache, off the main thread (the thread
+ * of the pictures, ThreeDVehicleObjectSpriteStandIn()): its coarser levels (ResizeSprites()) and the blitter's form of
+ * them (SpriteEncoder::Encode()) -- what ReadSprite() does on the main thread when a sprite is first drawn. For the
+ * object's picture at 16x that was 33 ns a pixel on the rig (the levels with Mitchell's filter most of it), a score
+ * of times that on the player's phone: seconds of the game standing for a big vehicle in a depot's window or a list
+ * (TEMATA 444). The main thread only takes what was made (TakeThreeDVehicleObjectSpriteEncoded()).
+ * @param sprite its pixels at the level made (FillObjectSprite())
+ * @param avail that level
+ * @param encoder the blitter it is for
+ * @param[out] data,size the sprite as the cache keeps it
+ * @return false: not made here -- a blitter of 8 bpp (its palette is the main thread's), or it cannot be resized;
+ *         the main thread makes it as before
+ */
+bool EncodeThreeDObjectSpriteOffMainThread(SpriteLoader::SpriteCollection &sprite, ZoomLevels avail, SpriteEncoder *encoder, std::unique_ptr<std::byte[]> &data, size_t &size)
+{
+	bool made = false;
+	if (encoder != nullptr && encoder->Is32BppSupported() && ResizeSprites(sprite, avail, encoder)) {
+		UniquePtrSpriteAllocator allocator;
+		encoder->Encode(SpriteType::Normal, sprite, allocator);
+		data = std::move(allocator.data);
+		size = allocator.size;
+		made = data != nullptr;
+	}
+	ReleaseSpriteMakingBuffers();
+	return made;
 }
 
 /**
@@ -1987,8 +2034,12 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 			}
 			UniquePtrSpriteAllocator cache_allocator;
 			const auto started = std::chrono::steady_clock::now();
+			bool made_off_main = false;
 			if (sc->type == SpriteType::Recolour) {
 				ReadRecolourSprite(*sc->file, sc->file_pos, sc->length, cache_allocator);
+			} else if (sc->object_sprite != 0 && TakeThreeDVehicleObjectSpriteEncoded(sc->object_sprite, BlitterFactory::GetCurrentBlitter(), cache_allocator.data, cache_allocator.size)) {
+				/* A vehicle's 3D object made ready by the thread of the pictures (EncodeThreeDObjectSpriteOffMainThread()). */
+				made_off_main = true;
 			} else {
 				ReadSprite(sc, sprite, type, cache_allocator, nullptr);
 			}
@@ -1997,7 +2048,7 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 			_spritecache_bytes_used += sc->length;
 			const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
 			sc->load_tenths = static_cast<uint16_t>(std::clamp(ms * 10.0, 0.0, 65535.0));
-			if (sc->object_sprite != 0) {
+			if (sc->object_sprite != 0 && !made_off_main) {
 				_object_sprites_made.made++;
 				_object_sprites_made.ms += ms;
 				if (ms > _object_sprites_made.longest_ms) {
@@ -2128,4 +2179,4 @@ void GfxClearFontSpriteCache()
 	}
 }
 
-/* static */ SpriteCollMap<ReusableBuffer<SpriteLoader::CommonPixel>> SpriteLoader::Sprite::buffer;
+/* static */ thread_local SpriteCollMap<ReusableBuffer<SpriteLoader::CommonPixel>> SpriteLoader::Sprite::buffer;

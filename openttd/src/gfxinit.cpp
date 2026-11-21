@@ -304,6 +304,9 @@ static void RealChangeBlitter(std::string_view repl_blitter)
 
 	Debug(driver, 1, "Switching blitter from '{}' to '{}'... ", cur_blitter, repl_blitter);
 	CrashTrace(fmt::format("blitter {} -> {}", cur_blitter, repl_blitter));
+	/* The thread making the sprites of 3D vehicles ready encodes them with the blitter there is: stopped first. */
+	extern void ThreeDVehicleObjectSpritesBeforeBlitterChange();
+	ThreeDVehicleObjectSpritesBeforeBlitterChange();
 	Blitter *new_blitter = BlitterFactory::SelectBlitter(repl_blitter);
 	if (new_blitter == nullptr) NOT_REACHED();
 	Debug(driver, 1, "Successfully switched to {}.", repl_blitter);
