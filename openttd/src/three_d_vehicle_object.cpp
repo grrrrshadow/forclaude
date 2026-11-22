@@ -70,6 +70,9 @@
 
 #include "fileio_func.h"
 
+#include "aircraft.h"
+#include "airport.h"
+
 #include "safeguards.h"
 
 /** Pixels to a metre at 16x: the camera of the sprites of this game's sets. */
@@ -4092,6 +4095,26 @@ static void OweUnknownFigurePlace(int x, int y, int z)
 static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, double &x, double &y, double &facing, double &rolled, double &curvature, int depth = 0);
 
 /**
+ * How far an aircraft's nose is raised, degrees (the player, 22. 11.: "the take-off from the runway, the climbing of the
+ * Mrija with the shuttle: raise their nose, so that they do not climb flat as a flying carpet"): up off the runway and
+ * climbing to its flight level nose up, coming down to it or onto a runway a little nose down; level in level flight,
+ * rolling and taxiing. A helicopter and one a rocket carries up rise level as they are.
+ */
+static float AircraftPitch(const Aircraft *a)
+{
+	if (a->subtype == AIR_HELICOPTER || AircraftStartsByRocket(a->engine_type)) return 0;
+	switch (a->state) {
+		case ENDTAKEOFF: return 12;
+		case FLYING:
+			if (a->flags.Test(VehicleAirFlag::InMinimumHeightCorrection)) return 8;
+			if (a->flags.Test(VehicleAirFlag::InMaximumHeightCorrection)) return -4;
+			return 0;
+		case LANDING: return -3;
+		default: return 0;
+	}
+}
+
+/**
  * How far a vehicle's front is raised over its back, degrees (the player, #287: "the cars do not lean up a hill"; the
  * tilting of OpenLoco, the player 16. 10.): the ground under its front end and under its back end, its length apart,
  * as its wheels stand on it -- so it tips as its front reaches a slope, not at once on the slope's tile. Level on a
@@ -4109,6 +4132,8 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 	} else if (v->type == VehicleType::Road) {
 		/* In a tunnel, driven freely through it too (hidden there, RoadVehFreeTunnelStep()). */
 		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE || v->vehstatus.Test(VehState::Hidden)) return 0;
+	} else if (v->type == VehicleType::Aircraft) {
+		return AircraftPitch(Aircraft::From(v));
 	} else {
 		return 0;
 	}
