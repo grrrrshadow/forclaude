@@ -2917,6 +2917,21 @@ static OurGrassGround OurGrassGroundOf(SpriteID image, PaletteID pal)
 	return {};
 }
 
+/**
+ * From the eyes the gravel of a modular airport's tile (its ground SPR_AIRFIELD_APRON_C, air_map.h) our grass (the
+ * player, 22. 11.: "the taxiway's surface gravel: from the eyes our 3D grass; the yellow line of the taxiway may stay,
+ * only the pixelated ground goes"): its paint the 3D objects over it as before. The airfield of the game's own keeps
+ * its gravel.
+ */
+static OurGrassGround EyeGravelAirportGrass(SpriteID image, PaletteID pal, int tile_x, int tile_y)
+{
+	if (pal != PAL_NONE || (image & SPRITE_MASK) != SPR_AIRFIELD_APRON_C || _settings_game.game_creation.landscape != LandscapeType::Temperate) return {};
+	if (!IsInsideBS(tile_x, 0, Map::SizeX()) || !IsInsideBS(tile_y, 0, Map::SizeY())) return {};
+	const TileIndex tile = TileXY(tile_x, tile_y);
+	if (!IsModularAirportTile(tile) || GetModularAirportSurface(tile) != AirportSurface::Gravel) return {};
+	return {3, 0};
+}
+
 /** Our grass's picture ("povrch": "trava" of the index, objekty/nase/trava_mirna.png), its levels halved, and over how many tiles each way it runs. */
 struct OurGrassSurface {
 	ThreeDTextureLevels picture; ///< nullptr while the indices are not read, or without it
@@ -4090,7 +4105,9 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 					continue;
 				}
 				for (const TurnedGroundSprite &gs : rec->sprites) {
-					if (const OurGrassGround ours = grass && !gs.has_sub ? OurGrassGroundOf(gs.image, gs.pal) : OurGrassGround{}; ours.kind >= 0) {
+					OurGrassGround ours = grass && !gs.has_sub ? OurGrassGroundOf(gs.image, gs.pal) : OurGrassGround{};
+					if (ours.kind < 0 && eyes && grass && !gs.has_sub) ours = EyeGravelAirportGrass(gs.image, gs.pal, rec->tile_x, rec->tile_y);
+					if (ours.kind >= 0) {
 						DrawOurGrass(gs.image, gs.pal, gs.x, gs.y, ours, eyes, rec->tile_x, rec->tile_y, rec->base_z, rec->slope);
 					} else {
 						DrawSpriteViewport(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
@@ -20966,7 +20983,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 				for (size_t i = t.first; i < t.end; i++) {
 					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
-					if (const OurGrassGround ours = grass && ts.sub == nullptr ? OurGrassGroundOf(ts.image, ts.pal) : OurGrassGround{}; ours.kind >= 0) {
+					OurGrassGround ours = grass && ts.sub == nullptr ? OurGrassGroundOf(ts.image, ts.pal) : OurGrassGround{};
+					if (ours.kind < 0 && grass && ts.sub == nullptr) ours = EyeGravelAirportGrass(ts.image, ts.pal, t.x, t.y);
+					if (ours.kind >= 0) {
 						DrawOurGrass(ts.image, ts.pal, ts.x, ts.y, ours, true, t.x, t.y, t.z, t.slope);
 					} else {
 						DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
