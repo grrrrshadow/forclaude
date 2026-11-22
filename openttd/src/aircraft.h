@@ -110,6 +110,7 @@ enum class ModularAircraftGoal : uint8_t {
 	Hangar = 1, ///< A hangar (to the depot).
 	Runway = 2, ///< The end of a runway (to take off).
 	Pad = 3, ///< A helicopters' pad, out of the hangar on its rocket (to rise from).
+	Helipad = 4, ///< A helipad or else a stand, a helicopter out of its hangar or into it (to rise from, or to load at).
 	End, ///< End marker.
 };
 

@@ -3593,8 +3593,8 @@ STR_TOOLBAR_AIRCRAFT_STAND                                      :{BLACK}Stání
 STR_TOOLBAR_AIRCRAFT_STAND_TOOLTIP                              :{BLACK}Postavit stání, kde letadla nakládají, na volné zemi nebo na pojezdu
 STR_TOOLBAR_AIRCRAFT_HELIPAD                                    :{BLACK}Helipad
 STR_TOOLBAR_AIRCRAFT_HELIPAD_TOOLTIP                            :{BLACK}Postavit helipad na zemi
-STR_TOOLBAR_AIRCRAFT_HELIPORT                                   :{BLACK}Heliport
-STR_TOOLBAR_AIRCRAFT_HELIPORT_TOOLTIP                           :{BLACK}Postavit heliport na budově
+STR_TOOLBAR_AIRCRAFT_HELIPORT                                   :{BLACK}Kosmoport
+STR_TOOLBAR_AIRCRAFT_HELIPORT_TOOLTIP                           :{BLACK}Postavit kosmoport: plošinu s terčem, ze které startuje raketa (vrtulníky na ni nesedají)
 STR_TOOLBAR_AIRCRAFT_HANGAR                                     :{BLACK}Hangár
 STR_TOOLBAR_AIRCRAFT_HANGAR_TOOLTIP                             :{BLACK}Postavit hangár, vraty k pojezdu vedle něj. Klikem na hangár otočíš vrata
 STR_TOOLBAR_AIRCRAFT_BUILDING                                   :{BLACK}Budova
@@ -6144,12 +6144,12 @@ STR_ERROR_MUST_DEMOLISH_DOCK_FIRST                              :{WHITE}Je nutn�
 STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :je nutné nejprve zničit letiště
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_STRAIGHT                       :dráha musí vést rovně v jedné ose
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_TOO_SHORT                      :dráha musí mít aspoň 3 dlaždice
-STR_ERROR_ROCKET_PLANE_NEEDS_MODULAR_AIRPORT                    :letadlo na raketě startuje jen z letiště stavěného po dlaždicích, s dráhou, stáním, hangárem a helipadem nebo heliportem
+STR_ERROR_ROCKET_PLANE_NEEDS_MODULAR_AIRPORT                    :letadlo na raketě startuje jen z letiště stavěného po dlaždicích, s dráhou, stáním, hangárem a kosmoportem nebo helipadem
 STR_ERROR_ROCKET_PLANE_NEEDS_RUNWAY                             :letiště nemá dráhu aspoň 3 dlaždice dlouhou, na které přistane
 STR_ERROR_ROCKET_PLANE_NEEDS_LONG_RUNWAY                        :letiště nemá dráhu aspoň 5 dlaždic dlouhou, na které přistane
 STR_ERROR_ROCKET_PLANE_NEEDS_STAND                              :letiště nemá stání, kde vyloží a naloží
 STR_ERROR_ROCKET_PLANE_NEEDS_HANGAR                             :letiště nemá hangár, kde dostane raketu
-STR_ERROR_ROCKET_PLANE_NEEDS_PAD                                :letiště nemá helipad ani heliport, ze kterého raketa odstartuje
+STR_ERROR_ROCKET_PLANE_NEEDS_PAD                                :letiště nemá kosmoport ani helipad, ze kterého raketa odstartuje
 
 # Waypoint related errors
 STR_ERROR_WAYPOINT_ADJOINS_MORE_THAN_ONE_EXISTING               :{WHITE}Sousedí s více než jedním existujícím bodem na trase

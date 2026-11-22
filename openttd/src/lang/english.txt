@@ -3485,8 +3485,8 @@ STR_TOOLBAR_AIRCRAFT_STAND                                      :{BLACK}Stand
 STR_TOOLBAR_AIRCRAFT_STAND_TOOLTIP                              :{BLACK}Build a stand where aircraft load, on clear land or on a taxiway
 STR_TOOLBAR_AIRCRAFT_HELIPAD                                    :{BLACK}Helipad
 STR_TOOLBAR_AIRCRAFT_HELIPAD_TOOLTIP                            :{BLACK}Build a helipad on the ground
-STR_TOOLBAR_AIRCRAFT_HELIPORT                                   :{BLACK}Heliport
-STR_TOOLBAR_AIRCRAFT_HELIPORT_TOOLTIP                           :{BLACK}Build a heliport on a building
+STR_TOOLBAR_AIRCRAFT_HELIPORT                                   :{BLACK}Spaceport
+STR_TOOLBAR_AIRCRAFT_HELIPORT_TOOLTIP                           :{BLACK}Build a spaceport: a deck with a target a rocket rises from (helicopters do not land on it)
 STR_TOOLBAR_AIRCRAFT_HANGAR                                     :{BLACK}Hangar
 STR_TOOLBAR_AIRCRAFT_HANGAR_TOOLTIP                             :{BLACK}Build a hangar, its entrance towards the taxiway next to it. Click an existing hangar to turn its entrance
 STR_TOOLBAR_AIRCRAFT_BUILDING                                   :{BLACK}Building
@@ -6030,12 +6030,12 @@ STR_ERROR_MUST_DEMOLISH_DOCK_FIRST                              :must demolish d
 STR_ERROR_MUST_DEMOLISH_AIRPORT_FIRST                           :must demolish airport first
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_STRAIGHT                       :a runway goes straight along one axis
 STR_ERROR_MODULAR_AIRPORT_RUNWAY_TOO_SHORT                      :a runway needs at least 3 tiles
-STR_ERROR_ROCKET_PLANE_NEEDS_MODULAR_AIRPORT                    :a plane on a rocket starts only from an airport built tile by tile, with a runway, a stand, a hangar and a helipad or a heliport
+STR_ERROR_ROCKET_PLANE_NEEDS_MODULAR_AIRPORT                    :a plane on a rocket starts only from an airport built tile by tile, with a runway, a stand, a hangar and a spaceport or a helipad
 STR_ERROR_ROCKET_PLANE_NEEDS_RUNWAY                             :this airport has no runway of at least 3 tiles for it to land on
 STR_ERROR_ROCKET_PLANE_NEEDS_LONG_RUNWAY                        :this airport has no runway of at least 5 tiles for it to land on
 STR_ERROR_ROCKET_PLANE_NEEDS_STAND                              :this airport has no stand for it to unload and load at
 STR_ERROR_ROCKET_PLANE_NEEDS_HANGAR                             :this airport has no hangar for it to take its rocket in
-STR_ERROR_ROCKET_PLANE_NEEDS_PAD                                :this airport has neither a helipad nor a heliport for the rocket to rise from
+STR_ERROR_ROCKET_PLANE_NEEDS_PAD                                :this airport has neither a spaceport nor a helipad for the rocket to rise from
 
 # Waypoint related errors
 STR_ERROR_WAYPOINT_ADJOINS_MORE_THAN_ONE_EXISTING               :adjoins more than one existing waypoint

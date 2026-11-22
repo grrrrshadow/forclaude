@@ -7600,6 +7600,20 @@ static bool ConTestSendToDepot(std::span<std::string_view> argv)
 		IConsolePrint(CC_HELP, "Send a train to a depot. Usage: 'testdodepa <unit number> [1 = jen servis]'.");
 		return true;
 	}
+	/* 'letadlo <n>': an aircraft to its hangar (a helicopter at a modular airport lands on a pad and taxis in). */
+	if (argv[1] == "letadlo" && argv.size() >= 3) {
+		auto pa = ParseInteger(argv[2]);
+		if (!pa.has_value()) return false;
+		for (Aircraft *a : Aircraft::Iterate()) {
+			if (!a->IsNormalAircraft() || a->unitnumber != static_cast<UnitID>(*pa)) continue;
+			AutoRestoreBackup cur_company(_current_company, a->owner);
+			CommandCost r = Command<Commands::SendVehicleToDepot>::Do(DoCommandFlag::Execute, a->index, DepotCommandFlags{}, VehicleListIdentifier{});
+			IConsolePrint(r.Succeeded() ? CC_INFO : CC_ERROR, "testdodepa: letadlo {} -> hangar - {}", *pa, r.Succeeded() ? std::string("poslano") : RefusalReason(r));
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testdodepa: letadlo {} nenalezeno.", *pa);
+		return true;
+	}
 	auto punit = ParseInteger(argv[1]);
 	if (!punit.has_value()) return false;
 	bool service = argv.size() >= 3 && ParseInteger(argv[2]).value_or(0) != 0;

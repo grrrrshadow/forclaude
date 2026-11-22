@@ -195,7 +195,7 @@
   "letiste": "heliport",
   "vyska_m": 3.0,
   "nazev": {
-   "cs": "heliport: plošina 3 m nad zemí"
+   "cs": "kosmoport: plošina 3 m nad zemí, terč"
   },
   "noc": {
    "uzel": "noc",
@@ -222,7 +222,7 @@
     4.0
    ]
   },
-  "trojuhelniku": 1574
+  "trojuhelniku": 1660
  },
  {
   "letiste": "hangar",
