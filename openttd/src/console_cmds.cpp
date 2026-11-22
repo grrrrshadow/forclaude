@@ -937,12 +937,14 @@ static bool ConTestLevelCrossing(std::span<std::string_view> argv)
 static bool ConTestModularAirport(std::span<std::string_view> argv)
 {
 	if (argv.size() < 5 || argv.size() > 7) {
-		IConsolePrint(CC_HELP, "Build two modular airports and an aircraft flying between them. Usage: 'testmodletiste <x> <y> <x2> <y2> [<jmeno> [bezpadu|budovy|sterk]]'.");
+		IConsolePrint(CC_HELP, "Build two modular airports and an aircraft flying between them. Usage: 'testmodletiste <x> <y> <x2> <y2> [<jmeno> [bezpadu|budovy|sterk|kosmoport]]'.");
 		return true;
 	}
 	/* 'bezpadu': the airports without their helipad -- what a plane on a rocket is told there (GetRocketAircraftCannotUseReason());
 	 * 'budovy': each with its six buildings in a row behind the hangar (let_budova_0..5). */
 	const bool no_pad = argv.size() > 6 && argv[6] == "bezpadu";
+	/* 'kosmoport': the pad a spaceport (ModularAirportKind::Heliport, a deck 3 m up), the rockets' and not the helicopters'. */
+	const bool spaceport = argv.size() > 6 && argv[6] == "kosmoport";
 	const bool buildings = argv.size() > 6 && argv[6] == "budovy";
 	/* 'sterk': all of it gravel (our grass from the eyes, EyeGravelAirportGrass() of viewport.cpp). */
 	const AirportSurface surface = argv.size() > 6 && argv[6] == "sterk" ? AirportSurface::Gravel : AirportSurface::Asphalt;
@@ -992,7 +994,9 @@ static bool ConTestModularAirport(std::span<std::string_view> argv)
 			taxi(bx, y + 2, bx, y + 2, Track::Right);
 		}
 		piece(x + 3, y + 3, ModularAirportKind::Hangar, DiagDirection::NW);
-		if (!no_pad) {
+		if (spaceport) {
+			piece(x + 5, y + 3, ModularAirportKind::Heliport, DiagDirection::NW);
+		} else if (!no_pad) {
 			piece(x + 5, y + 3, ModularAirportKind::Helipad, DiagDirection::NW);
 			taxi(x + 5, y + 3, x + 5, y + 3, Track::Y);
 		}

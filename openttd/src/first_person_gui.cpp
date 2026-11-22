@@ -4246,6 +4246,10 @@ void RigFirstPersonWalkTo(double x, double y, int steps)
 		w->walker.heading = std::atan2(y - w->walker.y, x - w->walker.x);
 		RigFirstPersonWalk(1, 1, 0, 0, w->walker.pitch);
 	}
+	/* Where it got to and how high it stands (up stairs, onto a deck). */
+	Debug(misc, 0, "test3d: chodec k: na {:.1f},{:.1f} (dlazdice {},{}), nohy {:.1f}, zem {:.1f}", w->walker.x, w->walker.y,
+			static_cast<int>(w->walker.x) / static_cast<int>(TILE_SIZE), static_cast<int>(w->walker.y) / static_cast<int>(TILE_SIZE),
+			FirstPersonFeetZ(w->walker), FirstPersonGroundZ(w->walker.x, w->walker.y));
 }
 
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
