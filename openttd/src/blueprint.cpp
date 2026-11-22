@@ -12,6 +12,7 @@
 #include "stdafx.h"
 #include "blueprint.h"
 #include "blueprint_cmd.h"
+#include "air_map.h"
 #include "bridge_map.h"
 #include "command_func.h"
 #include "company_func.h"
@@ -64,7 +65,7 @@ uint Blueprint::CountItems() const
 			+ this->tunnel_bridges.size() + this->roads.size() + this->road_depots.size()
 			+ this->canals.size() + this->locks.size() + this->ship_depots.size()
 			+ this->station_tiles.size() + this->road_stops.size() + this->docks.size()
-			+ this->buoys.size() + this->airports.size());
+			+ this->buoys.size() + this->airports.size() + this->airport_tiles.size());
 }
 
 /** Remove all contents from this blueprint, keeping its name (see #CopyAreaToBlueprint). */
@@ -259,6 +260,22 @@ static void CopyStationTile(Blueprint &blueprint, TileIndex tile, TileIndexDiffC
 			break;
 		}
 
+		case StationType::ModularAirport: {
+			/* Tile by tile, as it was built (BlueprintAirportTile). */
+			BlueprintAirportTile at{};
+			at.offset = offset;
+			at.kind = GetModularAirportKind(tile);
+			at.axis = IsModularAirportRunway(tile) ? GetModularAirportRunwayAxis(tile) : Axis::X;
+			at.dir = (at.kind == ModularAirportKind::Hangar || at.kind == ModularAirportKind::Building) ? GetModularAirportDirection(tile) : DiagDirection::NE;
+			at.building = at.kind == ModularAirportKind::Building ? GetModularAirportBuilding(tile) : 0;
+			at.surface = GetModularAirportSurface(tile);
+			/* The tracks a runway and a hangar have of themselves come with them; the others are the taxiing laid. */
+			at.tracks = (IsModularAirportRunway(tile) || at.kind == ModularAirportKind::Hangar) ? TrackBits{} : GetModularAirportTracks(tile);
+			at.station = GetStationIndex(tile);
+			blueprint.airport_tiles.push_back(at);
+			break;
+		}
+
 		default: // Oilrigs and anything else is not copyable.
 			break;
 	}
@@ -318,6 +335,7 @@ static TileIndexDiffC ShrinkBlueprintToContents(Blueprint &blueprint)
 		include(v.offset.x, v.offset.y);
 		include(v.offset.x + v.w - 1, v.offset.y + v.h - 1);
 	}
+	for (const BlueprintAirportTile &v : blueprint.airport_tiles) include(v.offset.x, v.offset.y);
 
 	auto shift = [&](TileIndexDiffC &offset) {
 		offset.x = static_cast<int16_t>(offset.x - min_x);
@@ -340,6 +358,7 @@ static TileIndexDiffC ShrinkBlueprintToContents(Blueprint &blueprint)
 	for (BlueprintDock &v : blueprint.docks) shift(v.offset);
 	for (BlueprintBuoy &v : blueprint.buoys) shift(v.offset);
 	for (BlueprintAirport &v : blueprint.airports) shift(v.offset);
+	for (BlueprintAirportTile &v : blueprint.airport_tiles) shift(v.offset);
 
 	blueprint.width = static_cast<uint16_t>(max_x - min_x + 1);
 	blueprint.height = static_cast<uint16_t>(max_y - min_y + 1);
@@ -619,6 +638,16 @@ Blueprint TransformBlueprint(const Blueprint &blueprint, uint8_t rotation, bool 
 		result.airports.push_back(airport);
 	}
 
+	for (BlueprintAirportTile at : blueprint.airport_tiles) {
+		at.offset = tile_offset(at.offset);
+		at.axis = TransformBlueprintAxis(at.axis, rotation);
+		at.dir = TransformBlueprintDiagDir(at.dir, rotation, reflected);
+		TrackBits tracks{};
+		for (Track t : at.tracks) tracks.Set(TransformBlueprintTrack(t, rotation, reflected));
+		at.tracks = tracks;
+		result.airport_tiles.push_back(at);
+	}
+
 	/* Transform the corner height grid; it has one more point than tiles in each direction. */
 	result.corner_heights.resize((result.width + 1) * (result.height + 1), 0);
 	for (uint y = 0; y <= blueprint.height; y++) {
@@ -759,7 +788,10 @@ BlueprintPasteData PrepareBlueprintPaste(const Blueprint &blueprint, const Bluep
 		bp.locks.clear();
 		bp.ship_depots.clear();
 	}
-	if (!options.paste_air) bp.airports.clear();
+	if (!options.paste_air) {
+		bp.airports.clear();
+		bp.airport_tiles.clear();
+	}
 	std::erase_if(bp.tunnel_bridges, [&](const BlueprintTunnelBridge &tb) {
 		switch (tb.transport) {
 			case TransportType::Rail: return !options.paste_rail;
@@ -828,6 +860,11 @@ static bool BlueprintOffsetsValid(const Blueprint &bp)
 	for (const BlueprintDock &v : bp.docks) if (!ok(v.offset) || !IsValidDiagDirection(v.dir)) return false;
 	for (const BlueprintBuoy &v : bp.buoys) if (!ok(v.offset)) return false;
 	for (const BlueprintAirport &v : bp.airports) if (!ok(v.offset)) return false;
+	for (const BlueprintAirportTile &v : bp.airport_tiles) {
+		if (!ok(v.offset) || !IsValidAxis(v.axis) || !IsValidDiagDirection(v.dir) || v.kind >= ModularAirportKind::End) return false;
+		if (v.surface != AirportSurface::Asphalt && v.surface != AirportSurface::Gravel) return false;
+		if (v.kind == ModularAirportKind::Building && v.building >= MODULAR_AIRPORT_BUILDINGS) return false;
+	}
 
 	return true;
 }
@@ -884,6 +921,101 @@ static bool PasteBuild(BlueprintPasteState &state, DoCommandFlags flags, Targs..
 	state.total.AddCost(cost.GetCost());
 	state.any_success = true;
 	return true;
+}
+
+/**
+ * The runways of a blueprint's modular airports, whole: from each end along its axis to the next end, over its
+ * middle (a runway is built whole, CmdBuildAirportRunway(); its ends say which end is which by where they lie, so a
+ * turned blueprint needs nothing more than its axis turned).
+ * @param bp the blueprint
+ * @return the pairs of the indices of its two ends in bp.airport_tiles, the lower first
+ */
+std::vector<std::pair<size_t, size_t>> BlueprintRunways(const Blueprint &bp)
+{
+	std::map<std::pair<int, int>, size_t> at;
+	for (size_t i = 0; i < bp.airport_tiles.size(); i++) at[{bp.airport_tiles[i].offset.x, bp.airport_tiles[i].offset.y}] = i;
+	std::vector<bool> used(bp.airport_tiles.size(), false);
+	std::vector<std::pair<size_t, size_t>> result;
+	/* From the lowest end of each line on, so two runways laid end to end pair as they were. */
+	std::vector<size_t> ends;
+	for (size_t i = 0; i < bp.airport_tiles.size(); i++) {
+		if (bp.airport_tiles[i].kind == ModularAirportKind::RunwayEnd) ends.push_back(i);
+	}
+	std::ranges::sort(ends, [&](size_t a, size_t b) {
+		const auto &ta = bp.airport_tiles[a].offset, &tb = bp.airport_tiles[b].offset;
+		return std::tie(ta.x, ta.y) < std::tie(tb.x, tb.y);
+	});
+	for (size_t first : ends) {
+		if (used[first]) continue;
+		const BlueprintAirportTile &start = bp.airport_tiles[first];
+		const int dx = start.axis == Axis::X ? 1 : 0, dy = start.axis == Axis::Y ? 1 : 0;
+		int x = start.offset.x + dx, y = start.offset.y + dy;
+		for (;;) {
+			auto it = at.find({x, y});
+			if (it == at.end()) break;
+			const BlueprintAirportTile &t = bp.airport_tiles[it->second];
+			if (t.axis != start.axis || t.station != start.station) break;
+			if (t.kind == ModularAirportKind::RunwayEnd) {
+				if (!used[it->second]) {
+					used[first] = used[it->second] = true;
+					result.emplace_back(first, it->second);
+				}
+				break;
+			}
+			if (t.kind != ModularAirportKind::RunwayMiddle) break;
+			x += dx;
+			y += dy;
+		}
+	}
+	return result;
+}
+
+/**
+ * Build the modular airports of a blueprint, as they were built: the runways whole, then the taxiing tracks a track
+ * at a time, then the stands, helipads, heliports, hangars and buildings over them (CmdPasteBlueprint()).
+ */
+template <typename Tvalid, typename Ttarget, typename Tjoin, typename Tregister>
+static void PasteModularAirports(const Blueprint &bp, BlueprintPasteState &state, DoCommandFlags flags, Tvalid tile_valid, Ttarget target_tile, Tjoin join_target, Tregister register_new_station)
+{
+	/* Each a part of the original station: joined to what of it is built already, else a new one (and, joining not
+	 * possible, a new one all the same, as the other stations of a blueprint). */
+	auto build = [&](const BlueprintAirportTile &at, auto &&cmd) {
+		StationID join = join_target(at.station);
+		bool built = cmd(join);
+		if (!built && join != NEW_STATION) built = cmd(NEW_STATION);
+		if (built) register_new_station(at.station, at.offset);
+	};
+	for (const auto &[a, b] : BlueprintRunways(bp)) {
+		const BlueprintAirportTile &low = bp.airport_tiles[a], &high = bp.airport_tiles[b];
+		if (!tile_valid(low.offset) || !tile_valid(high.offset)) continue;
+		build(low, [&](StationID join) {
+			return PasteBuild<Commands::BuildAirportRunway>(state, flags, target_tile(low.offset), target_tile(high.offset), low.surface, join, true);
+		});
+	}
+	for (const BlueprintAirportTile &at : bp.airport_tiles) {
+		if (!tile_valid(at.offset)) continue;
+		for (Track t : at.tracks) {
+			build(at, [&](StationID join) {
+				return PasteBuild<Commands::BuildAirportTaxiway>(state, flags, target_tile(at.offset), target_tile(at.offset), t, at.surface, join, true);
+			});
+		}
+	}
+	for (const BlueprintAirportTile &at : bp.airport_tiles) {
+		if (!tile_valid(at.offset)) continue;
+		switch (at.kind) {
+			case ModularAirportKind::Stand:
+			case ModularAirportKind::Helipad:
+			case ModularAirportKind::Heliport:
+			case ModularAirportKind::Hangar:
+			case ModularAirportKind::Building:
+				build(at, [&](StationID join) {
+					return PasteBuild<Commands::BuildAirportPiece>(state, flags, target_tile(at.offset), at.kind, at.dir, at.building, at.surface, join, true);
+				});
+				break;
+			default:
+				break;
+		}
+	}
 }
 
 /**
@@ -973,6 +1105,7 @@ CommandCost CmdPasteBlueprint(DoCommandFlags flags, TileIndex origin, const Blue
 					for (uint dx = 0; dx < airport.w; dx++) touch(airport.offset.x + dx, airport.offset.y + dy);
 				}
 			}
+			for (const BlueprintAirportTile &at : bp.airport_tiles) touch(at.offset.x, at.offset.y);
 		}
 
 		/* The copied height at the target's north corner is pasted at the height of the
@@ -1191,6 +1324,8 @@ CommandCost CmdPasteBlueprint(DoCommandFlags flags, TileIndex origin, const Blue
 		}
 		if (built) register_new_station(airport.station, airport.offset);
 	}
+
+	PasteModularAirports(bp, state, flags, tile_valid, target_tile, join_target, register_new_station);
 
 	if (!state.any_success) return CMD_ERROR;
 	return state.total;

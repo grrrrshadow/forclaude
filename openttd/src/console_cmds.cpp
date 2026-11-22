@@ -192,6 +192,11 @@
 #include "three_d_shape.h"
 #include "signs_base.h"
 
+#include "blueprint.h"
+#include "blueprint_cmd.h"
+#include "air_map.h"
+#include "misc/endian_buffer.hpp"
+
 #include "safeguards.h"
 
 /* scriptfile handling */
@@ -9625,6 +9630,41 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		uint items = 0, width = 0, height = 0;
 		const bool written = RigWriteBlueprintSet(area, argv.size() > 3 ? std::string(argv[3]) : std::string("polygon"), std::string(argv[2]), items, width, height);
 		IConsolePrint(written ? CC_DEFAULT : CC_ERROR, "test3d: blueprint {}: {} prvku, {}x{} dlazdic, mapa {}x{}, {}", argv[2], items, width, height, Map::SizeX(), Map::SizeY(), written ? "zapsano" : "NEZAPSANO");
+	} else if (what == "blueprint_vlozit" && argv.size() > 7) {
+		/* 'blueprint_vlozit <x0> <y0> <x1> <y1> <tx> <ty> [<otoceni> [zrcadlo]]': the first company's things in the area
+		 * copied into a blueprint, through its text form and back (as a file or the clipboard carries it), and pasted
+		 * with its north at tx,ty; then what of a modular airport stands there, kind by kind, against what was copied. */
+		extern uint CopyAreaToBlueprint(TileArea area, Blueprint &blueprint);
+		if (Company::IsValidID(CompanyID::Begin()) && _local_company != CompanyID::Begin()) SetLocalCompany(CompanyID::Begin());
+		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+		const uint x0 = number(2).value_or(1), y0 = number(3).value_or(1), x1 = number(4).value_or(1), y1 = number(5).value_or(1);
+		const uint tx = number(6).value_or(1), ty = number(7).value_or(1);
+		const TileArea area(TileXY(std::min(x0, x1), std::min(y0, y1)), TileXY(std::max(x0, x1), std::max(y0, y1)));
+		Blueprint copied;
+		const uint items = CopyAreaToBlueprint(area, copied);
+		const Blueprint bp = EndianBufferReader::ToValue<Blueprint>(EndianBufferWriter<>::FromValue(copied));
+		BlueprintPasteOptions options;
+		options.rotation = static_cast<uint8_t>(number(8).value_or(0) % 4);
+		options.reflected = argv.size() > 9 && argv[9] == "zrcadlo";
+		const BlueprintPasteData data = PrepareBlueprintPaste(bp, options, INVALID_RAILTYPE);
+		const CommandCost cost = Command<Commands::PasteBlueprint>::Do(DoCommandFlag::Execute, TileXY(tx, ty), data);
+		auto kinds = [](TileArea a, std::set<StationID> &stations) {
+			std::array<uint, to_underlying(ModularAirportKind::End)> n{};
+			for (TileIndex t : a) {
+				if (!IsModularAirportTile(t)) continue;
+				n[to_underlying(GetModularAirportKind(t))]++;
+				stations.insert(GetStationIndex(t));
+			}
+			return n;
+		};
+		std::set<StationID> src_st, dst_st;
+		const auto src = kinds(area, src_st);
+		const uint w = data.blueprint.width, h = data.blueprint.height;
+		const auto dst = kinds(TileArea(TileXY(tx, ty), std::min(w, Map::SizeX() - 1 - tx), std::min(h, Map::SizeY() - 1 - ty)), dst_st);
+		IConsolePrint(cost.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: blueprint_vlozit: {} prvku, letiste {} dlazdic (text {}), vlozeno {} - pojezd/konec/stred/stani/plocha/heliport/hangar/budova {}/{}/{}/{}/{}/{}/{}/{} -> {}/{}/{}/{}/{}/{}/{}/{}, stanic {} -> {}",
+				items, copied.airport_tiles.size(), bp.airport_tiles.size(), cost.Succeeded() ? "ano" : "NE",
+				src[0], src[1], src[2], src[3], src[4], src[5], src[6], src[7], dst[0], dst[1], dst[2], dst[3], dst[4], dst[5], dst[6], dst[7],
+				src_st.size(), dst_st.size());
 	} else if (what == "naraz" && argv.size() > 2) {
 		/* 'naraz 0|1': what the thread in the background makes (shapes, textures, the sprites of 3D vehicles) made at
 		 * once by the one asking (1), as before there was the thread -- to compare the two ways. */

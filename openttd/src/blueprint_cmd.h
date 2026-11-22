@@ -193,6 +193,20 @@ inline EndianBufferReader &operator >>(EndianBufferReader &buffer, BlueprintAirp
 	return buffer >> data.offset >> data.type >> data.layout >> data.w >> data.h >> data.station;
 }
 
+template <typename Tcont, typename Titer>
+inline EndianBufferWriter<Tcont, Titer> &operator <<(EndianBufferWriter<Tcont, Titer> &buffer, const BlueprintAirportTile &data)
+{
+	return buffer << data.offset << data.kind << data.axis << data.dir << data.building << data.surface << static_cast<uint8_t>(data.tracks.base()) << data.station;
+}
+
+inline EndianBufferReader &operator >>(EndianBufferReader &buffer, BlueprintAirportTile &data)
+{
+	uint8_t tracks = 0;
+	buffer >> data.offset >> data.kind >> data.axis >> data.dir >> data.building >> data.surface >> tracks >> data.station;
+	data.tracks = TrackBits{tracks};
+	return buffer;
+}
+
 /** Write a length-prefixed blueprint vector to a command buffer. */
 template <typename Tcont, typename Titer, typename T>
 inline void WriteBlueprintVector(EndianBufferWriter<Tcont, Titer> &buffer, const std::vector<T> &data)
@@ -235,6 +249,7 @@ inline EndianBufferWriter<Tcont, Titer> &operator <<(EndianBufferWriter<Tcont, T
 	WriteBlueprintVector(buffer, data.buoys);
 	WriteBlueprintVector(buffer, data.airports);
 	WriteBlueprintVector(buffer, data.corner_heights);
+	WriteBlueprintVector(buffer, data.airport_tiles);
 	return buffer;
 }
 
@@ -256,6 +271,7 @@ inline EndianBufferReader &operator >>(EndianBufferReader &buffer, Blueprint &da
 	ReadBlueprintVector(buffer, data.buoys);
 	ReadBlueprintVector(buffer, data.airports);
 	ReadBlueprintVector(buffer, data.corner_heights);
+	ReadBlueprintVector(buffer, data.airport_tiles);
 	return buffer;
 }
 

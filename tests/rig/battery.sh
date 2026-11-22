@@ -1330,6 +1330,19 @@ testzatik 2000 testnalozit auto 1 vybusniny
 testzatik 3200 test3d jizda 3 1 12
 testzatik 3300 test3d jizda 3 1 12" 3600
 echo "strelbarakety: na zemi $(grep -ac 'jizda 3 1 op 12: NEJDE' $S/reg_strelbarakety.log) odmitnuto | $(grep -a 'strelba: letadlo\|atomovka: na' $S/reg_strelbarakety.log | sed 's/^.*strelba: letadlo 1 //; s/^.*atomovka: /atomovka /' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
+# Blueprint of a modular airport (the player 22. 11.: "blueprint and the modular
+# airport, no nice buildings on the marked area, a red error"): copied tile by
+# tile, through the text form and back, pasted as it was, turned a quarter,
+# turned half and mirrored, turned three quarters. Each line: the kinds copied
+# -> the kinds standing there after (taxiway/end/middle/stand/pad/heliport/
+# hangar/building), one station each.
+run_scene bpletiste "vlak123 on
+testmodletiste 100 100 60 60 \"\" budovy
+testzatik 5 test3d blueprint_vlozit 99 99 107 105 130 100
+testzatik 6 test3d blueprint_vlozit 99 99 107 105 100 130 1
+testzatik 7 test3d blueprint_vlozit 99 99 107 105 160 130 2 zrcadlo
+testzatik 8 test3d blueprint_vlozit 99 99 107 105 160 100 3" 30
+echo "bpletiste: $(grep -a 'test3d: blueprint_vlozit' $S/reg_bpletiste.log | sed 's/^.*blueprint_vlozit: //' | tr '\n' '|')" | tee -a ${BATTERY_STABLE:-/dev/null}
 # Automatic departure on a couple order (polygon, TEMATA 2.41): a dual-headed
 # waiter is collected by a dual-headed collector whose next stop is back the
 # way it came. 62 with no flag carries on round the loop; 63 with "automatic"

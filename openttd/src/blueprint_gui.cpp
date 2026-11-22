@@ -446,6 +446,16 @@ static void RebuildPastePreview()
 			for (uint dx = 0; dx < airport.w; dx++) highlight(airport.offset.x + dx, airport.offset.y + dy);
 		}
 	}
+	/* A modular airport: its taxiing tracks and runways as lines, its pieces highlighted. */
+	for (const BlueprintAirportTile &at : bp.airport_tiles) {
+		if (at.kind == ModularAirportKind::RunwayEnd || at.kind == ModularAirportKind::RunwayMiddle) {
+			mark(at.offset.x, at.offset.y, TrackBits{AxisToTrack(at.axis)});
+		} else if (at.kind == ModularAirportKind::Taxiway) {
+			mark(at.offset.x, at.offset.y, at.tracks);
+		} else {
+			highlight(at.offset.x, at.offset.y);
+		}
+	}
 }
 
 /**
@@ -645,6 +655,23 @@ static void RecomputePasteBlocked(TileIndex origin)
 			for (uint dx = 0; dx < airport.w; dx++) block(airport.offset.x + dx, airport.offset.y + dy);
 		}
 	}
+	/* A modular airport: each runway whole, each other tile as the piece it is (a taxiway by its first track). */
+	for (const auto &[a, b] : BlueprintRunways(bp)) {
+		const BlueprintAirportTile &low = bp.airport_tiles[a], &high = bp.airport_tiles[b];
+		if (tile_valid(low.offset) && tile_valid(high.offset) &&
+				PreviewTest<Commands::BuildAirportRunway>(target(low.offset), target(high.offset), low.surface, NEW_STATION, true)) continue;
+		const int dx = low.axis == Axis::X ? 1 : 0, dy = low.axis == Axis::Y ? 1 : 0;
+		for (int x = low.offset.x, y = low.offset.y; x <= high.offset.x && y <= high.offset.y; x += dx, y += dy) block(x, y);
+	}
+	for (const BlueprintAirportTile &at : bp.airport_tiles) {
+		bool ok = tile_valid(at.offset);
+		if (ok && at.kind == ModularAirportKind::Taxiway) {
+			ok = at.tracks.None() || PreviewTest<Commands::BuildAirportTaxiway>(target(at.offset), target(at.offset), *at.tracks.begin(), at.surface, NEW_STATION, true);
+		} else if (ok && at.kind != ModularAirportKind::RunwayEnd && at.kind != ModularAirportKind::RunwayMiddle) {
+			ok = PreviewTest<Commands::BuildAirportPiece>(target(at.offset), at.kind, at.dir, at.building, at.surface, NEW_STATION, true);
+		}
+		if (!ok) block(at.offset.x, at.offset.y);
+	}
 }
 
 /** Tile categories of the hover preview schematic, in increasing draw priority. */
@@ -722,6 +749,7 @@ struct BlueprintSchematic {
 				for (uint dx2 = 0; dx2 < airport.w; dx2++) mark(airport.offset.x + dx2, airport.offset.y + dy2, BlueprintPreviewCell::Airport);
 			}
 		}
+		for (const BlueprintAirportTile &at : bp.airport_tiles) mark(at.offset.x, at.offset.y, BlueprintPreviewCell::Airport);
 	}
 };
 

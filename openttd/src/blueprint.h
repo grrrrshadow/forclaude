@@ -20,6 +20,8 @@
 #include "signal_type.h"
 #include "station_type.h"
 #include "tilearea_type.h"
+#include "air_type.h"
+#include "track_type.h"
 #include "track_type.h"
 #include "transport_type.h"
 
@@ -203,6 +205,23 @@ struct BlueprintAirport {
 	StationID station;     ///< Original station; parts of one station are joined again when pasting.
 };
 
+/**
+ * One tile of a modular airport (air_map.h), built tile by tile as it was: its runways whole again when pasted
+ * (CmdBuildAirportRunway()), its taxiing tracks a track at a time, its stands, helipads, heliports, hangars and
+ * buildings a piece at a time (the player, 22. 11.: "blueprint and the modular airport, no nice buildings on the
+ * marked area, a red error").
+ */
+struct BlueprintAirportTile {
+	TileIndexDiffC offset;   ///< Tile offset relative to the blueprint origin.
+	ModularAirportKind kind; ///< What the tile is.
+	Axis axis;               ///< A runway's axis.
+	DiagDirection dir;       ///< A hangar's entrance, a building's front.
+	uint8_t building;        ///< A building's look.
+	AirportSurface surface;  ///< Asphalt or gravel.
+	TrackBits tracks;        ///< The taxiing tracks on it (taxiways, stands, helipads...).
+	StationID station;       ///< Original station; parts of one station are joined again when pasting.
+};
+
 /** Contents of one blueprint: infrastructure copied from a rectangular map area. */
 struct Blueprint {
 	uint16_t width = 0;  ///< Size of the copied area along the X axis.
@@ -223,6 +242,7 @@ struct Blueprint {
 	std::vector<BlueprintDock> docks;
 	std::vector<BlueprintBuoy> buoys;
 	std::vector<BlueprintAirport> airports;
+	std::vector<BlueprintAirportTile> airport_tiles; ///< Tiles of modular airports (kept after the corner heights in the text form, so older texts read on).
 
 	/** Heights of the tile corners of the copied area, (width + 1) x (height + 1) values, index = y * (width + 1) + x. */
 	std::vector<uint8_t> corner_heights;
@@ -259,6 +279,7 @@ struct BlueprintStationRect {
 Blueprint &GetBlueprint(uint slot);
 uint CopyAreaToBlueprint(TileArea area, Blueprint &blueprint);
 std::vector<BlueprintStationRect> GroupStationTiles(const Blueprint &blueprint);
+std::vector<std::pair<size_t, size_t>> BlueprintRunways(const Blueprint &bp);
 
 TileIndexDiffC TransformBlueprintPoint(TileIndexDiffC point, uint16_t bounds_x, uint16_t bounds_y, uint8_t rotation, bool reflected);
 Track TransformBlueprintTrack(Track track, uint8_t rotation, bool reflected);
