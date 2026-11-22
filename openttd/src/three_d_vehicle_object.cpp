@@ -3207,6 +3207,7 @@ static std::set<VehicleID> _vehicles_owed_pictures;
 /** What the card drew of each vehicle last: its key and size, not its shapes (they may be gone by the next frame). */
 struct CardDrawnOf {
 	const ThreeDVehicleObject *obj = nullptr;
+	int state = 0; ///< the state of its set it was drawn in (StateStep()): it stands in only for the same
 	std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 };
 static std::map<std::pair<VehicleID, int>, CardDrawnOf> _cards_drawn_of; ///< by the vehicle and the zoom it was drawn at
@@ -3476,7 +3477,14 @@ static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::millis
 		}
 		for (WindowClass wc : {WindowClass::VehicleDepot, WindowClass::VehicleView, WindowClass::VehicleDetails, WindowClass::TrainList, WindowClass::RoadVehicleList, WindowClass::ShipList, WindowClass::AircraftList}) SetWindowClassesDirty(wc);
 	}
-	if (!TakePicturesMade() || _vehicles_owed_pictures.empty()) return;
+	/* Those owed their look drawn again when pictures or loads came -- and now and then when none did: what such a
+	 * vehicle waited for may have come without a word (the card's own uploads, a load done before the vehicle was
+	 * noted), and with the game paused nothing else draws it again (the rig, 22. 11.: the Buran's rocket not on its
+	 * pad for seconds after the pause, at the zoom it was last seen at lying). */
+	static std::chrono::steady_clock::time_point owed_redrawn;
+	const bool came = TakePicturesMade();
+	if (_vehicles_owed_pictures.empty() || (!came && now - owed_redrawn < std::chrono::milliseconds(200))) return;
+	owed_redrawn = now;
 	std::set<VehicleID> owed;
 	owed.swap(_vehicles_owed_pictures);
 	for (VehicleID id : owed) {
@@ -4231,7 +4239,7 @@ double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 }
 
 /** Keep what the card drew of a vehicle: laid again by its key while its next look is not made yet (CardDrawnBefore()). */
-static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, const std::shared_ptr<const ThreeDGpuStandingVehicle> &card, ZoomLevel zoom)
+static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, const std::shared_ptr<const ThreeDGpuStandingVehicle> &card, ZoomLevel zoom, int state)
 {
 	const std::pair<VehicleID, int> of(v->index, to_underlying(zoom));
 	if (card == nullptr) {
@@ -4239,7 +4247,7 @@ static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, cons
 		return;
 	}
 	CardDrawnOf &kept = _cards_drawn_of[of];
-	if (kept.card != nullptr && kept.card->key == card->key) return;
+	if (kept.card != nullptr && kept.card->key == card->key && kept.state == state) return;
 	auto drawn = std::make_shared<ThreeDGpuStandingVehicle>();
 	drawn->key = card->key;
 	drawn->supersample = card->supersample;
@@ -4252,7 +4260,7 @@ static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, cons
 	drawn->near_top = card->near_top;
 	drawn->near_min = card->near_min;
 	drawn->near_span = card->near_span;
-	kept = {obj, std::move(drawn)};
+	kept = {obj, state, std::move(drawn)};
 }
 
 /**
@@ -4283,10 +4291,15 @@ static bool CardKeptGone(const ThreeDGpuStandingVehicle &card, double x, double 
  * view nearer in stood the vehicle in with the picture of one further out, a quarter of its size, till its look came
  * (the rig, 20. 11.: the Buran's rocket tiny on its pad as its engines were lit; a vehicle's window beside the map).
  */
-static std::shared_ptr<const ThreeDGpuStandingVehicle> CardDrawnBefore(const Vehicle *v, const ThreeDVehicleObject *obj, ZoomLevel zoom)
+static std::shared_ptr<const ThreeDGpuStandingVehicle> CardDrawnBefore(const Vehicle *v, const ThreeDVehicleObject *obj, ZoomLevel zoom, int state)
 {
 	auto it = _cards_drawn_of.find(std::pair<VehicleID, int>(v->index, to_underlying(zoom)));
-	if (it == _cards_drawn_of.end() || it->second.obj != obj) return nullptr;
+	/* In the same state of its set only (the player, 22. 11., build #393: the Buran landing alone drawn with its rocket
+	 * lying on the transporter, huge and cut, "the rocket is drawn with the landing Buran, the Buran is not to have a
+	 * rocket when it lands", in one direction again and again -- what the card drew of it at that zoom last, on its
+	 * way out of the hangar, stood in for the look of its landing not made yet): another state is another thing to
+	 * see, and nothing for a moment is nearer the truth than that. */
+	if (it == _cards_drawn_of.end() || it->second.obj != obj || it->second.state != state) return nullptr;
 	return it->second.card;
 }
 
@@ -4449,10 +4462,10 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 			made = CardVehicle(request, place.card, place.card_lights);
 		}
 		place.on_card = made != CardMade::TooBig;
-		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card, zoom);
+		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card, zoom, state);
 		if (made == CardMade::Drawn && lasting) lasting_drawn = true;
 		if (made == CardMade::NotYet) {
-			place.card = CardDrawnBefore(v, obj, zoom);
+			place.card = CardDrawnBefore(v, obj, zoom, state);
 			_vehicles_owed_pictures.insert(v->index);
 		}
 	}
