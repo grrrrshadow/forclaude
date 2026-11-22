@@ -1104,6 +1104,13 @@ struct StandingSlot {
 	bool vehicle = false;
 };
 constexpr int STANDING_SLOT_STEP = 16;
+/**
+ * And so long when even that left no room, before all the kept pictures are forgotten (the player's stress test of
+ * 22. 11., build #393: by night at the second nearest zoom, 150 to 200 big pictures filling them, all forgotten six
+ * times in 5 s and every vehicle drawn again each time, 3 to 7 frames a second -- the vehicles turning and their lights
+ * make new looks faster than a second lets the old ones go).
+ */
+constexpr std::chrono::milliseconds STANDING_SLOT_IDLE_HARD{150};
 constexpr std::chrono::milliseconds STANDING_SLOT_IDLE{1000}; ///< so long not laid from, a place is given to another picture when room is needed
 std::unordered_map<uint64_t, StandingSlot> _standing_slots;
 std::map<std::pair<int, int>, std::vector<std::array<int, 2>>> _standing_free; ///< the places free again, by their size
@@ -5450,15 +5457,19 @@ static void StandingFillCount()
 }
 
 /** The places of the kept pictures not laid from for STANDING_SLOT_IDLE (nor in this pass) made free, their pictures forgotten; once a pass. */
-static void SweepStandingPlaces()
+static void SweepStandingPlaces(bool hard = false)
 {
 	StandingFillCount();
-	if (_standing_swept_at == _card_clock) return;
-	_standing_swept_at = _card_clock;
+	/* (The hard sweep once a pass too, after the soft one of that pass found too little.) */
+	static uint64_t swept_hard_at = 0;
+	uint64_t &swept_at = hard ? swept_hard_at : _standing_swept_at;
+	if (swept_at == _card_clock) return;
+	swept_at = _card_clock;
 	std::lock_guard lock(_standing_kept_mutex);
 	const auto now = std::chrono::steady_clock::now();
+	const std::chrono::milliseconds idle = hard ? STANDING_SLOT_IDLE_HARD : STANDING_SLOT_IDLE;
 	for (auto it = _standing_slots.begin(); it != _standing_slots.end();) {
-		if (it->second.used == _card_clock || now - it->second.when < STANDING_SLOT_IDLE || (it->second.vehicle && _standing_pinned.contains(it->second.kept_key))) {
+		if (it->second.used == _card_clock || now - it->second.when < idle || (it->second.vehicle && _standing_pinned.contains(it->second.kept_key))) {
 			++it;
 			continue;
 		}
@@ -5517,6 +5528,10 @@ std::array<int, 2> StandingReserve(bool kept, int w, int h, const std::function<
 		const bool row_full = shelf.x + w > _standing_atlas_size;
 		if ((row_full ? shelf.y + shelf.h + h : shelf.y + h) > _standing_atlas_size) {
 			SweepStandingPlaces();
+			_standing_reserved_size = {w, h};
+			if (TakeFreeStandingPlace(w, h, free_place)) return free_place;
+			/* Still none: those not laid from for a moment too, rather than all of them forgotten below. */
+			SweepStandingPlaces(true);
 			_standing_reserved_size = {w, h};
 			if (TakeFreeStandingPlace(w, h, free_place)) return free_place;
 		}
