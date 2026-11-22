@@ -1161,7 +1161,8 @@ struct ThreeDVehicleObject {
 	bool starts_vertically = false; ///< "start": "kolmo": an aircraft a rocket carries up from a pad, landing on a runway as a plane (the Buran on the Energia; aircraft_modular.cpp)
 	std::string raid_addon;         ///< "zbrane": the add-on (its file, the first of its nodes) shown in every state only while the raid is asked for in the console ('miluju karla', #_show_industry_health): the Mi-24's rocket pods
 	uint32_t raid_variant = UINT32_MAX; ///< the object as it is with that add-on shown, an index of the objects read; none UINT32_MAX (ThreeDRaidVariant())
-	bool raid_only = false;         ///< that object itself: of no piece in the lookup, reached only through the one it is of
+	bool raid_only = false;
+	float map_scale = 1.0f;         ///< "meritko_mapy": on the map (its sprites and its picture on the card) so many times bigger than through the eyes         ///< that object itself: of no piece in the lookup, reached only through the one it is of
 	float dive_m = 0;               ///< "ponoreni_m": a submarine's, how deep its waterline may go under the surface (ShipDiveM()), metres; 0 it does not dive
 	float floors_over = NAN;        ///< a boat's rooms (ReadBoatRooms()): their floors under its waterline lifted to so many metres over it, NAN as they are
 	std::string interior_figure;    ///< a boat with rooms ("interier", the colleague's sailing yacht): the figure of its whole hull with its cabins, walked on and drawn while the walker is aboard; empty none

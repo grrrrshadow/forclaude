@@ -1102,14 +1102,16 @@ static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir,
 	/* (The piece and the place along in eighths of a step: the article of a train of lorries is hung where its
 	 * coupling puts it, and a refit changes its pieces' lengths.) */
 	const uint32_t where = static_cast<uint32_t>(piece & 0xFF) | (static_cast<uint32_t>(std::lround(along * 8)) & 0xFFFF) << 8 | static_cast<uint32_t>(length & 0x7F) << 24 | (gui ? 1U << 31 : 0U);
-	auto key = std::make_tuple(obj, static_cast<int>(where), dir, static_cast<int>(std::lround(ObjectScale(obj) * 1000)), fade, walk);
+	/* On the map its own size there ("meritko_mapy"); in the windows as through the eyes. */
+	const float scale = ObjectScale(obj) * (gui ? 1.0f : obj->map_scale);
+	auto key = std::make_tuple(obj, static_cast<int>(where), dir, static_cast<int>(std::lround(scale * 1000)), fade, walk);
 	auto it = _object_sprites.find(key);
 	if (it != _object_sprites.end()) return it->second;
 
 	ObjectSpriteRequest req;
 	req.obj = obj;
 	req.dir = dir;
-	req.scale = ObjectScale(obj);
+	req.scale = scale;
 	req.fade = fade;
 	req.walk = walk;
 	req.gui = gui;
@@ -4359,7 +4361,7 @@ static const ThreeDVehicleObject *PlaceVehicleObjectNow(const Vehicle *v, ZoomLe
 	{
 		GatherStep step(1);
 		lights = VehicleObjectLightsOn(obj, front, last, reversed, zoom);
-		scale = ObjectScale(obj);
+		scale = ObjectScale(obj) * obj->map_scale;
 		state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
 	}
 	/* Kept with the place: asked of every lit vehicle by night (ObjectDrawsNothing(), its lights and those of what it

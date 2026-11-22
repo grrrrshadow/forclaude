@@ -1466,7 +1466,7 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	if (op > to_underlying(CabDriveOp::Fire)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::Hover)) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 	const CabDriveOp what = static_cast<CabDriveOp>(op);
@@ -1565,6 +1565,20 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 			return CommandCost();
 		}
 		return CoupleTrainByHand(flags, t, rear);
+	}
+	if (v->type == VehicleType::Aircraft && (what == CabDriveOp::Hover || what == CabDriveOp::Forward)) {
+		/* A helicopter stops in the air and hangs there, and goes on again (the player, 22. 11., in the Mi-24: "the
+		 * arrows up and down as in the submarine, forwards and backwards; I cannot stop in place"): its cab_reverse,
+		 * which an aircraft has no other use for, is its hanging (AircraftFreeController()). */
+		const Aircraft *a = Aircraft::From(v);
+		if (a->subtype != AIR_HELICOPTER || a->state != FLYING || !v->cab_free || v->cab_rejoin) return CMD_ERROR;
+		if (flags.Test(DoCommandFlag::Execute)) {
+			v->cab_reverse = what == CabDriveOp::Hover;
+			v->cab_speed_limit = CAB_SLOWEST;
+			SetWindowDirty(WindowClass::FirstPerson, 0);
+			SetWindowDirty(WindowClass::VehicleView, v->index);
+		}
+		return CommandCost();
 	}
 	const bool height = what == CabDriveOp::Up || what == CabDriveOp::Down;
 	/* Backwards only a road vehicle or a ship driven freely already (a ship: the player, 16. 11., in the submarine,

@@ -50,6 +50,7 @@ enum class CabDriveOp : uint8_t {
 	Stand = 10,       ///< a train standing: the driver goes to the stand at its other end -- it goes the other way from now on, its vehicles where they are (ChangeTrainStand())
 	Drop = 11,        ///< an aircraft in the air: what it carries let go over where it is -- a bomb for each car of explosives aboard, else, empty, the smoke of a raid (DropRaidPayload())
 	Fire = 12,        ///< an aircraft in the air: a shot straight ahead of it -- a rocket carrying a car's explosives, a bomb where it lands, else the machine gun, the smoke of a raid there (FireRaidRocket())
+	Hover = 13,       ///< a helicopter flown freely: it stops where it is and hangs there (Vehicle::cab_reverse, as an aircraft's), Forward on again
 };
 
 /** The slowest speed the brake of the cab holds a vehicle to (CabSpeed()); braked further it stops. */

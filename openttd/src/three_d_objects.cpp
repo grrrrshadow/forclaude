@@ -8074,6 +8074,9 @@ static void ReadThreeDVehicleObjects()
 				/* Its weapons, seen only after "miluju karla" (the player, 21. 11.: "jak napíšu miluju karla tak tam můžou být
 				 * zbraně pod křídly, jinak to je multifunkční vrtulník"): an add-on of its, shown by an object of its own. */
 				if (e.contains("zbrane") && e.at("zbrane").is_string()) obj.raid_addon = e.at("zbrane").get<std::string>();
+				/* Bigger on the map than through the eyes (the player, 22. 11., the Mi-24: "from above much bigger, from
+				 * the eyes a bit"). */
+				if (e.contains("meritko_mapy") && e.at("meritko_mapy").is_number()) obj.map_scale = std::clamp(e.at("meritko_mapy").get<float>(), 0.25f, 8.0f);
 				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
 				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */
 				if (e.contains("svetla") && e.at("svetla").is_object()) {

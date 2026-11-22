@@ -6133,6 +6133,38 @@ static bool ConTestFillRoadVehicle(std::span<std::string_view> argv)
 		return true;
 	}
 
+	/* 'letadlo <unit> <cargo label> [prazdne]': an aircraft made to carry that cargo (the rig's refit, in the air too)
+	 * and filled, or left empty -- what its set picks for each (the Mi-24's wood under it only with wood aboard). */
+	if (argv[1] == "letadlo" && argv.size() >= 4) {
+		auto pu = ParseInteger(argv[2]);
+		if (!pu.has_value() || argv[3].size() != 4) return false;
+		const CargoType want = GetCargoTypeByLabel(CargoLabel{static_cast<uint32_t>(argv[3][0]) << 24 | static_cast<uint32_t>(argv[3][1]) << 16 |
+				static_cast<uint32_t>(argv[3][2]) << 8 | static_cast<uint32_t>(argv[3][3])});
+		const bool empty = argv.size() >= 5 && argv[4] == "prazdne";
+		for (Aircraft *a : Aircraft::Iterate()) {
+			if (!a->IsNormalAircraft() || a->unitnumber != static_cast<UnitID>(*pu)) continue;
+			if (!IsValidCargoType(want)) {
+				IConsolePrint(CC_ERROR, "testnalozit: takovy naklad hra nema.");
+				return true;
+			}
+			a->cargo.Truncate();
+			a->cargo_type = want;
+			if (a->cargo_cap == 0) a->cargo_cap = 8;
+			uint put = 0;
+			if (!empty && CargoPacket::CanAllocateItem()) {
+				AppendConsoleCargo(a, CargoPacket::Create(a->last_station_visited, a->cargo_cap, Source{}));
+				put = a->cargo_cap;
+			}
+			a->InvalidateNewGRFCacheOfChain();
+			extern void RefreshAircraftLooks();
+			RefreshAircraftLooks();
+			IConsolePrint(CC_DEFAULT, "testnalozit: letadlo {} nese {} jednotek nakladu {}.", a->unitnumber, put, argv[3]);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "testnalozit: letadlo {} neni.", *pu);
+		return true;
+	}
+
 	auto punit = ParseInteger(argv[2]);
 	if (!punit.has_value()) return false;
 

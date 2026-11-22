@@ -1004,6 +1004,7 @@ static bool AircraftFreeController(Aircraft *v)
 		for (Vehicle *u = v; u != nullptr; u = u->Next()) {
 			u->cab_free = false;
 			u->cab_rejoin = false;
+			u->cab_reverse = false;
 		}
 		SetWindowDirty(WindowClass::FirstPerson, 0);
 		return false;
@@ -1012,11 +1013,23 @@ static bool AircraftFreeController(Aircraft *v)
 		v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
 		v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
 	}
-	int count = UpdateAircraftSpeed(v);
-	if (count == 0) return true;
 	int low, high;
 	GetAircraftFlightLevelBounds(v, &low, &high);
 	const int want = Clamp<int>(v->cab_altitude, low - AIRCRAFT_MIN_FLYING_ALTITUDE / 2, high);
+	if (v->cab_reverse) {
+		/* A helicopter hanging where it is (CabDriveOp::Hover): no way on, only up or down to the height asked for and
+		 * round as it is turned. */
+		v->cur_speed = 0;
+		v->subspeed = 0;
+		const Direction d = CabYawToDirection(v->cab_yaw);
+		if (v->z_pos != want || v->direction != d) {
+			v->direction = d;
+			SetAircraftPosition(v, v->x_pos, v->y_pos, v->z_pos + Clamp(want - v->z_pos, -1, 1));
+		}
+		return true;
+	}
+	int count = UpdateAircraftSpeed(v);
+	if (count == 0) return true;
 	const int max_x = static_cast<int>(Map::MaxX() * TILE_SIZE) - 1, max_y = static_cast<int>(Map::MaxY() * TILE_SIZE) - 1;
 	while (count-- > 0) {
 		const int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);

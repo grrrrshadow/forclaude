@@ -381,6 +381,7 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		}
 	}
 	const bool flying = v != nullptr && v->type == VehicleType::Aircraft;
+	const bool helicopter = flying && Aircraft::From(v)->subtype == AIR_HELICOPTER;
 	/* A road vehicle driven freely goes backwards too (the player, 27. 10.: "Down to brake and then reverse"): Down
 	 * brakes it to the slowest and then stops it; held on with it stopped (CAB_BACKWARDS_HOLD_MS), it goes backwards
 	 * while it is held, at most Vehicle::CAB_REVERSE_SPEED, and stops as it is let go; Up stops it and turns it
@@ -403,6 +404,25 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 				return CabTurn(v, key == DirectionKey::Left);
 			case DirectionKey::Up:
 			case DirectionKey::Down:
+				/* A helicopter flown freely: its speed, as the submarine's, Down at the slowest hanging where it is, Up
+				 * from there on again (the player, 22. 11.: "the arrows up and down as in the submarine, forwards and
+				 * backwards; I cannot stop in place"); its height on Page Up and Page Down (first_person_gui.cpp). */
+				if (helicopter) {
+					if (!v->cab_free) return false;
+					if (v->cab_reverse) {
+						if (key == DirectionKey::Up) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Forward));
+						this->done = key == DirectionKey::Up ? "nahoru: z visu dopredu" : "dolu: visi";
+						return false;
+					}
+					if (key == DirectionKey::Down && v->cab_speed_limit != 0 && v->cab_speed_limit <= CAB_SLOWEST) {
+						Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Hover));
+						this->done = "dolu: zastavit ve vzduchu";
+						return false;
+					}
+					CabSpeed(v, key == DirectionKey::Up);
+					this->done = fmt::format("{}: omezeni {}", key == DirectionKey::Up ? "nahoru" : "dolu", v->cab_speed_limit);
+					return true;
+				}
 				/* An aircraft: its height instead of its speed (the player, 17. 10.). */
 				if (flying) {
 					if (!v->cab_free) return false;
@@ -453,7 +473,7 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		if (!now.Test(key)) continue;
 		/* Turning and an aircraft's height: about seven steps a second (a quarter turn held a second and a quarter);
 		 * the speed three. */
-		const int again = key == DirectionKey::Left || key == DirectionKey::Right || flying ? 150 : 300;
+		const int again = key == DirectionKey::Left || key == DirectionKey::Right || (flying && !helicopter) ? 150 : 300;
 		if (!this->held.Test(key)) {
 			if (key == DirectionKey::Up) this->up_tapped = 0;
 			left = arrow(key) ? again + 150 : INT_MAX;
