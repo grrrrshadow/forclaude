@@ -5653,6 +5653,15 @@ static void ClearInScissor(GLbitfield mask, int x, int y, int w, int h, float de
 	gl.glGetIntegerv(GL_DEPTH_TEST, &depth_test);
 	gl.glGetIntegerv(GL_DEPTH_FUNC, &depth_func);
 	gl.glGetIntegerv(GL_DEPTH_WRITEMASK, &depth_write);
+	/* And no side of it left out: drawn in the middle of the buildings of a block, the side they leave out last stays
+	 * set (the lean drawing keeps it from one building to the next), and when that was the front the rect was not
+	 * drawn at all -- nothing cleared. The frame the vehicles are drawn into first kept what was drawn there before, and
+	 * a vehicle was kept with the pieces of others about it (the player's phone, zink, which clears so; 22. 11., build
+	 * #393: trees about the rocket, pieces of the Buran, the Mrija over a Buran that has none, a huge rocket cut). */
+	GLint cull_on = 0;
+	gl.glGetIntegerv(GL_CULL_FACE, &cull_on);
+	const bool cull = cull_on != 0;
+	if (cull) gl.glDisable(GL_CULL_FACE);
 	gl.glViewport(x, y, w, h);
 	gl.glDisable(GL_BLEND);
 	if (deep) {
@@ -5681,6 +5690,7 @@ static void ClearInScissor(GLbitfield mask, int x, int y, int w, int h, float de
 		gl.glDisable(GL_DEPTH_TEST);
 	}
 	if (blend != 0) gl.glEnable(GL_BLEND);
+	if (cull) gl.glEnable(GL_CULL_FACE);
 	gl.glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
 	gl.glBindVertexArray(static_cast<GLuint>(vao));
 	gl.glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(buffer));
