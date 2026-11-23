@@ -1227,6 +1227,7 @@ struct GlbTexture {
 	bool double_sided = false; ///< the material's "doubleSided": its triangles are seen from behind too
 	uint32_t glow = 0;         ///< its own light (ThreeDVehicleShape::tex_glow), 0 none
 	uint8_t alpha = 255;       ///< how much of what is behind it hides (ThreeDVehicleShape::tex_alpha)
+	bool decal = false;        ///< a decal over another surface ("extras" "obtisk", ThreeDVehicleShape::tex_decal)
 };
 
 /**
@@ -1244,6 +1245,7 @@ static void ReadMaterialLight(const nlohmann::json &mat, GlbTexture &t)
 		const Colour e(c(0), c(1), c(2), mat.contains("emissiveTexture") ? ThreeDVehicleShape::GLOW_TEXTURED : ThreeDVehicleShape::GLOW_FLAT);
 		if (e.r != 0 || e.g != 0 || e.b != 0) t.glow = e.data;
 	}
+	if (mat.contains("extras") && mat.at("extras").is_object() && mat.at("extras").value("obtisk", false)) t.decal = true;
 	if (mat.value("alphaMode", std::string()) == "BLEND") {
 		t.alpha = 254;
 		if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
@@ -9647,6 +9649,7 @@ static void ShrinkShape(ThreeDVehicleShape &s)
 	s.tex_addon.shrink_to_fit();
 	s.tex_glow.shrink_to_fit();
 	s.tex_alpha.shrink_to_fit();
+	s.tex_decal.shrink_to_fit();
 	s.corner_wheel.shrink_to_fit();
 	s.tri_glass.shrink_to_fit();
 	s.facing.shrink_to_fit();
@@ -9742,6 +9745,7 @@ void ThreeDVehicleObject::AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVe
 		made.tex_names.push_back(t < fs->tex_names.size() ? fs->tex_names[t] : std::string());
 		made.tex_glow.push_back(fs->Glow(t));
 		made.tex_alpha.push_back(fs->Alpha(t));
+		made.tex_decal.push_back(fs->Decal(t) ? 1 : 0);
 	}
 	const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a), s = c.scale;
 	uint32_t base = static_cast<uint32_t>(made.pos.size() / 3);
@@ -10087,6 +10091,8 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 		out->tex_addon = shape.tex_addon;
 		out->tex_glow = shape.tex_glow;
 		out->tex_alpha = shape.tex_alpha;
+	out->tex_decal = shape.tex_decal;
+		out->tex_decal = shape.tex_decal;
 		out->glass_alpha = shape.glass_alpha;
 		out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
 		ShrinkShape(*out);
@@ -10252,6 +10258,7 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 	out->tex_addon = shape.tex_addon;
 	out->tex_glow = shape.tex_glow;
 	out->tex_alpha = shape.tex_alpha;
+	out->tex_decal = shape.tex_decal;
 	out->glass_alpha = shape.glass_alpha;
 	out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
 	ShrinkShape(*out);
@@ -10396,6 +10403,7 @@ static void AddHeldThing(const ThreeDVehicleObject &f, const GlbSkeleton &sk, co
 		made.tex_names.push_back(t.name);
 		made.tex_glow.push_back(t.glow);
 		made.tex_alpha.push_back(t.alpha);
+		made.tex_decal.push_back(t.decal ? 1 : 0);
 	}
 }
 
@@ -10494,6 +10502,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 		made->tex_names.push_back(t.name);
 		made->tex_glow.push_back(t.glow);
 		made->tex_alpha.push_back(t.alpha);
+		made->tex_decal.push_back(t.decal ? 1 : 0);
 	}
 	if (!this->held_file.empty()) AddHeldThing(*this, *sk, pose, *made);
 	/* Its extent as posed (how big it is in the view from the eyes, CabFigure). */
@@ -10635,6 +10644,7 @@ static std::shared_ptr<const ThreeDVehicleShape> RestShapeOf(const ThreeDVehicle
 		made->tex_names.push_back(t.name);
 		made->tex_glow.push_back(t.glow);
 		made->tex_alpha.push_back(t.alpha);
+		made->tex_decal.push_back(t.decal ? 1 : 0);
 	}
 	/* Each corner's joints, as Skin() moves it: a joint of no weight, or one the bones have not, none. */
 	made->corner_joints.assign(corners * 4, 0);
@@ -10676,6 +10686,8 @@ static std::shared_ptr<const ThreeDVehicleShape> RestShapeOf(const ThreeDVehicle
 			made->tex_names.push_back(t.name);
 			made->tex_glow.push_back(t.glow);
 			made->tex_alpha.push_back(t.alpha);
+			made->tex_decal.push_back(t.decal ? 1 : 0);
+		made->tex_decal.push_back(t.decal ? 1 : 0);
 		}
 		for (size_t i = 0; i < n; i++) {
 			made->corner_joints.insert(made->corner_joints.end(), {static_cast<uint8_t>(joints), 0, 0, 0});
@@ -11266,6 +11278,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->tex_names.push_back(std::move(m.name));
 			made->tex_glow.push_back(0);
 			made->tex_alpha.push_back(m.alpha);
+			made->tex_decal.push_back(0);
 		}
 		made->paint_whole = true;
 		/*
@@ -11550,6 +11563,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->tex_names.push_back(std::move(t.name));
 		made->tex_glow.push_back(t.glow);
 		made->tex_alpha.push_back(t.alpha);
+		made->tex_decal.push_back(t.decal ? 1 : 0);
 	}
 	/* The glass and the wheels that turn (the colleague's hra/3d/PROSBA-V3S-3D.md). */
 	made->glass_alpha = this->glass_alpha;
@@ -11592,6 +11606,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->tex_names.push_back(t.name);
 			made->tex_glow.push_back(t.glow);
 			made->tex_alpha.push_back(t.alpha);
+			made->tex_decal.push_back(t.decal ? 1 : 0);
+		made->tex_decal.push_back(t.decal ? 1 : 0);
 		}
 		for (const auto &at : w.at) {
 			for (int side = 0; side < (w.both_sides && std::abs(at[1]) > 0.001f ? 2 : 1); side++) {
@@ -11741,6 +11757,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->tex_names.push_back(std::move(tx.name));
 			made->tex_glow.push_back(tx.glow);
 			made->tex_alpha.push_back(tx.alpha);
+			made->tex_decal.push_back(tx.decal ? 1 : 0);
 			made->tex_addon.push_back(static_cast<int8_t>(std::min<size_t>(ai, 127)));
 		}
 		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
@@ -11801,9 +11818,11 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->y0 -= my;
 		made->y1 -= my;
 	}
-	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m (bottom {:.2f} m), read in {} ms", this->name,
+	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures{}, {:.2f} x {:.2f} x {:.2f} m (bottom {:.2f} m), read in {} ms", this->name,
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
-			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0, made->z0,
+			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(),
+			made->HasDecals() ? fmt::format(" ({} of them decals)", std::ranges::count_if(made->tex_decal, [](uint8_t d) { return d != 0; })) : std::string(),
+			made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0, made->z0,
 			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
 	made->keep_whole = this->keep_whole;
 	ShrinkShape(*made);
@@ -17130,7 +17149,7 @@ size_t ThreeDVehicleShape::Bytes() const
 	b += VectorBytes(this->night_pos) + VectorBytes(this->night_tri) + VectorBytes(this->night_colour) + VectorBytes(this->night_kind) + VectorBytes(this->front_back_lights) + VectorBytes(this->back_front_lights);
 	b += VectorBytes(this->tri_part) + VectorBytes(this->corner_wheel) + VectorBytes(this->tri_glass) + VectorBytes(this->night_part);
 	b += VectorBytes(this->lanterns) + VectorBytes(this->torches) + VectorBytes(this->torch_aims);
-	b += VectorBytes(this->tex_glow) + VectorBytes(this->tex_alpha);
+	b += VectorBytes(this->tex_glow) + VectorBytes(this->tex_alpha) + VectorBytes(this->tex_decal);
 	b += VectorBytes(this->corner_joints) + VectorBytes(this->corner_weights);
 	int simpler_count;
 	b += this->SimplerBytes(simpler_count);

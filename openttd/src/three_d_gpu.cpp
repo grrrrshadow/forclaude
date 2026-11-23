@@ -308,13 +308,16 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 			if (glass != (pass == 1)) continue;
 			if (shape.tri[t] >= corners || shape.tri[t + 1] >= corners || shape.tri[t + 2] >= corners) continue;
 			uint32_t ti = tn < shape.tri_tex.size() ? shape.tri_tex[tn] : 0;
+			/* A decal drawn nearer with the texture (and the paint) of the surface it is the material of again. */
+			const bool decal = shape.Decal(ti);
+			ti = static_cast<uint32_t>(shape.Undecal(ti));
 			if (ti >= textures) ti = 0;
 			const int8_t facing = shape.Facing(tn);
 			const uint32_t at = static_cast<uint32_t>(made->indices.size());
-			if (!runs.empty() && runs.back().texture == ti && runs.back().facing == facing && runs.back().first + runs.back().count == at) {
+			if (!runs.empty() && runs.back().texture == ti && runs.back().facing == facing && runs.back().decal == decal && runs.back().first + runs.back().count == at) {
 				runs.back().count += 3;
 			} else {
-				runs.push_back({at, 3, ti, facing});
+				runs.push_back({at, 3, ti, facing, decal});
 			}
 			made->indices.insert(made->indices.end(), {shape.tri[t], shape.tri[t + 1], shape.tri[t + 2]});
 			made->used[ti] = true;
@@ -950,7 +953,16 @@ struct GpuProgram {
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
 	GLint instanced = -1;   ///< the view from the eyes' meshes alike drawn at once: each instance's matrix and light in attributes 4-8 (EyeMeshSource())
 	GLint bones = -1, bone_row = -1; ///< a figure on bones: its joints' matrices and their row of them (MESH_VERTEX)
+	GLint decal = -1;       ///< how far a decal is drawn nearer, metres, 0 not a decal (MESH_VERTEX, EyeMeshSource(); ThreeDVehicleShape::tex_decal)
 };
+
+/**
+ * How much nearer a decal is drawn (ThreeDVehicleShape::tex_decal; the player, 23. 11.: "the sticker flickers like on
+ * the UACS wagon and the Jesterka, you patch the fault, you do not mend its cause"): its surface lies a few millimetres
+ * over the one under it, or in it (the UAZ van's louvre panel over its side, both 1 380 cm2, under a centimetre apart),
+ * so it is drawn 2 cm nearer along the view -- whatever the distance -- and is on top.
+ */
+static constexpr float DECAL_NEARER = ThreeDVehicleShape::DECAL_NEARER;
 GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _ground_program, _standing_program;
 GpuProgram _standing_building_program; ///< the buildings among what stands on the turned map (DrawStandingOnCard())
 GLuint _fbo = 0, _colour_rb = 0, _lit_rb = 0, _depth_rb = 0;
@@ -1227,6 +1239,7 @@ uniform vec4 u_light_lit;
 #define u_lit (u_light_lit.w)
 uniform sampler2D u_bones;
 uniform int u_bone_row;
+uniform float u_decal;
 noperspective out vec2 v_uv;
 noperspective out float v_light;
 void main()
@@ -1249,6 +1262,14 @@ void main()
 		nrm = l > 0.0 ? n / l : n;
 	}
 	gl_Position = u_matrix * vec4(pos, 1.0);
+	/* A decal u_decal metres nearer along the view: the depth's change of a metre that way (the matrix's third row
+	 * along the direction its first two leave alone) times it, a picture's depth the less the nearer. */
+	if (u_decal > 0.0) {
+		vec3 r0 = vec3(u_matrix[0][0], u_matrix[1][0], u_matrix[2][0]), r1 = vec3(u_matrix[0][1], u_matrix[1][1], u_matrix[2][1]);
+		vec3 r2 = vec3(u_matrix[0][2], u_matrix[1][2], u_matrix[2][2]), along = cross(r0, r1);
+		float l = length(along);
+		if (l > 0.0) gl_Position.z -= u_decal * abs(dot(r2, along / l)) * gl_Position.w;
+	}
 	v_uv = a_uv;
 	v_light = u_lit > 0.5 ? 0.55 + 0.45 * max(0.0, dot(nrm, u_light)) : 1.0;
 }
@@ -1999,8 +2020,9 @@ std::string EyeMeshSource(const char *source, bool fragment)
 	};
 	for (size_t at; (at = s.find("noperspective ")) != std::string::npos;) s.erase(at, 14);
 	if (fragment) {
-		s.insert(s.find('\n') + 1, "uniform float u_near;\n");
-		s.insert(s.rfind('}'), "\tgl_FragDepth = u_near * gl_FragCoord.w;\n");
+		s.insert(s.find('\n') + 1, "uniform float u_near;\nuniform float u_decal;\n");
+		/* A decal u_decal metres nearer (DECAL_NEARER): its distance (1 / w) less that. */
+		s.insert(s.rfind('}'), "\tgl_FragDepth = u_decal > 0.0 ? u_near / max(1.0 / gl_FragCoord.w - u_decal, 1e-3) : u_near * gl_FragCoord.w;\n");
 		/* Its own light alone in the second picture, as glow_after_night of viewport.cpp draws it over the dark: the
 		 * texel by its colour's strongest, or -- a material shining its colour alone (u_glow.a 2), as by day -- that
 		 * colour: the fire Tatra's blue beacon was the red of its body's paint by night (the player, 16. 11.: "the
@@ -3356,6 +3378,7 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.tex = gl.glGetUniformLocation(p.program, "u_tex");
 	p.glass = gl.glGetUniformLocation(p.program, "u_glass");
 	p.glass_alpha = gl.glGetUniformLocation(p.program, "u_glass_alpha");
+	p.decal = gl.glGetUniformLocation(p.program, "u_decal");
 	p.texel_alpha = gl.glGetUniformLocation(p.program, "u_texel_alpha");
 	p.glow = gl.glGetUniformLocation(p.program, "u_glow");
 	p.paint = gl.glGetUniformLocation(p.program, "u_paint");
@@ -4482,8 +4505,13 @@ static void DrawPicturePass(const ThreeDGpuPicture &pic, const std::vector<MeshO
 		if (!lean || d.indices->ibo != b.ibo_set) gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, d.indices->ibo);
 		b.ibo_set = d.indices->ibo;
 		if (!d.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
+		float decal_set = -1.0f;
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
+			/* A decal nearer (DECAL_NEARER). */
+			const float decal = r.decal ? DECAL_NEARER : 0.0f;
+			if (decal != decal_set) gl.glUniform1f(_mesh_program.decal, decal);
+			decal_set = decal;
 			SetPaint(_mesh_program, r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture], lean ? &b.paint_set : nullptr);
 			/* Its material's own light, and see-through by its own alpha (a material "BLEND") or the glass's. */
 			const uint32_t glow = d.mesh->Glow(r.texture);
@@ -4508,6 +4536,7 @@ static void DrawPicturePass(const ThreeDGpuPicture &pic, const std::vector<MeshO
 			b.cull_set = cull;
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
+		if (decal_set > 0.0f) gl.glUniform1f(_mesh_program.decal, 0.0f);
 		if (!lean) {
 			gl.glDisable(GL_CULL_FACE);
 			gl.glFrontFace(GL_CCW);
@@ -7439,7 +7468,16 @@ struct EyeDrawState {
 	float glass_alpha = NAN;
 	int texel_alpha = -1, wheel_count = -1, bone_row = INT_MIN;
 	int cull = -2;           ///< -2 not known, 0 off, 1 the front clockwise, 2 anticlockwise
+	int decal = -1;          ///< -1 not known, 0 not a decal, 1 a decal (DECAL_NEARER)
 	GLuint vao = 0, ibo = 0, texture = 0;
+
+	/** A decal drawn nearer, or not (DECAL_NEARER). */
+	void Decal(const GpuProgram &p, bool d)
+	{
+		if (static_cast<int>(d) == this->decal) return;
+		gl.glUniform1f(p.decal, d ? DECAL_NEARER : 0.0f);
+		this->decal = d;
+	}
 
 	/** The VAO, and with another one its element buffer not known. */
 	void Vao(GLuint v)
@@ -7569,6 +7607,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		if (wheels > 0) gl.glUniformMatrix4fv(p.wheels, static_cast<GLsizei>(wheels), GL_TRUE, d.mesh->wheels[0].data());
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
+			st.Decal(p, r.decal);
 			st.Glow(p, d.mesh->Glow(r.texture));
 			const uint8_t alpha = d.mesh->shape->Alpha(r.texture);
 			if (glass) st.GlassAlpha(p, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
@@ -7604,6 +7643,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 			gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(b.instances.size() * sizeof(float)), b.instances.data(), GL_STREAM_DRAW);
 			for (const ThreeDGpuTriangles::Run &r : runs) {
 				if (r.texture >= b.textures.size() || b.textures[r.texture] == 0) continue;
+				st.Decal(p, r.decal);
 				st.Glow(p, b.mesh->Glow(r.texture));
 				const uint8_t alpha = b.mesh->shape->Alpha(r.texture);
 				if (glass) st.GlassAlpha(p, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
@@ -7626,6 +7666,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		if (buffer_bound) gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
 		gl.glUniform1i(p.instanced, 0);
 	}
+	st.Decal(p, false);
 	gl.glDisable(GL_CULL_FACE);
 	gl.glFrontFace(GL_CCW);
 	if (glass) gl.glDisable(GL_BLEND);

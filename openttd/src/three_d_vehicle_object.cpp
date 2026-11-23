@@ -1888,7 +1888,11 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	 * tinted) or of its crew that walks (as it is). */
 	auto fill = [&](const ThreeDVehicleShape &s, const std::vector<float> &sx, const std::vector<float> &sy, const std::vector<float> &depth, const std::vector<float> &light, const std::vector<const ThreeDObjectTexture *> &texs, size_t t, bool body, const ObjectPaintOfState *own = nullptr) {
 		const uint32_t a = s.tri[t], b = s.tri[t + 1], c = s.tri[t + 2];
-		const int ti = t / 3 < s.tri_tex.size() ? s.tri_tex[t / 3] : 0;
+		const int ti0 = t / 3 < s.tri_tex.size() ? s.tri_tex[t / 3] : 0;
+		/* A decal nearer (ThreeDVehicleShape::DECAL_NEARER, as the card draws it; the depth in the game's units), with
+		 * the texture and the paint of the surface it is the material of again (Undecal()). */
+		const float nearer = s.Decal(static_cast<size_t>(ti0)) ? ThreeDVehicleShape::DECAL_NEARER * scale : 0.0f;
+		const int ti = static_cast<int>(s.Undecal(static_cast<size_t>(ti0)));
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
 		if (tex == nullptr) return;
 		const uint32_t glow = s.Glow(static_cast<size_t>(ti));
@@ -1907,7 +1911,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				float w2 = 1.0f - w0 - w1;
 				if (w0 < 0 || w1 < 0 || w2 < 0) continue;
 				size_t at = static_cast<size_t>(py) * width + px;
-				float dz = w0 * depth[a] + w1 * depth[b] + w2 * depth[c];
+				float dz = w0 * depth[a] + w1 * depth[b] + w2 * depth[c] - nearer;
 				if (dz >= zb[at]) continue;
 				float u = w0 * s.uv[a * 2] + w1 * s.uv[b * 2] + w2 * s.uv[c * 2];
 				float v = w0 * s.uv[a * 2 + 1] + w1 * s.uv[b * 2 + 1] + w2 * s.uv[c * 2 + 1];
@@ -1972,7 +1976,10 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	 * written); over nothing, a pane of that alpha. */
 	for (size_t t : glass_triangles) {
 		const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
-		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
+		const int ti0 = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
+		/* Glass lying in a solid surface, a decal (the UAZ van's right side): nearer, as the card draws it. */
+		const float nearer = shape->Decal(static_cast<size_t>(ti0)) ? ThreeDVehicleShape::DECAL_NEARER * scale : 0.0f;
+		const int ti = static_cast<int>(shape->Undecal(static_cast<size_t>(ti0)));
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
 		const float material_alpha = shape->SeeThroughAlpha(t / 3);
 		const bool by_texel = shape->BlendsByTexel(t / 3);
@@ -1992,7 +1999,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				const float w2 = 1.0f - w0 - w1;
 				if (w0 < 0 || w1 < 0 || w2 < 0) continue;
 				const size_t at = static_cast<size_t>(py) * width + px;
-				const float dz = w0 * depth[a] + w1 * depth[b] + w2 * depth[c];
+				const float dz = w0 * depth[a] + w1 * depth[b] + w2 * depth[c] - nearer;
 				if (dz >= zb[at]) continue;
 				float u = w0 * shape->uv[a * 2] + w1 * shape->uv[b * 2] + w2 * shape->uv[c * 2];
 				float v = w0 * shape->uv[a * 2 + 1] + w1 * shape->uv[b * 2 + 1] + w2 * shape->uv[c * 2 + 1];

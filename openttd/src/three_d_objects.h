@@ -646,6 +646,11 @@ struct ThreeDVehicleShape {
 	static constexpr uint8_t GLOW_FLAT = 2;     ///< tex_glow's alpha: its light the colour alone
 	std::vector<uint32_t> tex_glow;     ///< for each texture, its own light (Colour::data, the alpha GLOW_*), 0 none: added to it unshaded, and at night it is not darkened
 	std::vector<uint8_t> tex_alpha;     ///< for each texture, how much of what is behind it hides (a material "BLEND", times its texels' alpha), 255 all
+	/* A decal (the player, 23. 11.: "the sticker on the UAZ van's side flickers like on the UACS wagon and the Jesterka,
+	 * you patch the fault, you do not mend its cause"): a material lying a few millimetres over another surface
+	 * ("extras" "obtisk" of the generator, auto/auto3d.py), drawn nearer by a depth offset that grows with the distance
+	 * and the slant (glPolygonOffset on the card, the same share on the processor), so it is on top at any distance. */
+	std::vector<uint8_t> tex_decal;     ///< for each texture, 1 a decal; empty none
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
 	float all[6] = {};          ///< the extent of all its corners, what the states show among them: x0, x1, y0, y1, z0, z1, metres; all 0 not known
 	bool has_seat = false;      ///< a figure posed by its bones with a node "sedlo" (the colleague's horses): where it is in this pose
@@ -720,6 +725,25 @@ struct ThreeDVehicleShape {
 	uint32_t Glow(size_t texture) const { return texture < this->tex_glow.size() ? this->tex_glow[texture] : 0; }
 	/** How much of what is behind a texture hides (tex_alpha), 255 all. */
 	uint8_t Alpha(size_t texture) const { return texture < this->tex_alpha.size() ? this->tex_alpha[texture] : 255; }
+	/** How much nearer a decal is drawn, metres (tex_decal; the card's DECAL_NEARER, the processor's alike). */
+	static constexpr float DECAL_NEARER = 0.02f;
+	/** Whether a texture is a decal (tex_decal). */
+	bool Decal(size_t texture) const { return texture < this->tex_decal.size() && this->tex_decal[texture] != 0; }
+	/**
+	 * The texture a decal is drawn with: the first one not a decal of the same picture and colour (the generator's
+	 * decal is the body's material again, auto/auto3d.py: so it is painted as the body is, texture 0 the painted one),
+	 * else its own; a texture not a decal itself.
+	 */
+	size_t Undecal(size_t texture) const
+	{
+		if (!this->Decal(texture) || texture >= this->pngs.size()) return texture;
+		for (size_t k = 0; k < this->pngs.size(); k++) {
+			if (k != texture && !this->Decal(k) && this->pngs[k] == this->pngs[texture] && k < this->flats.size() && texture < this->flats.size() && this->flats[k] == this->flats[texture]) return k;
+		}
+		return texture;
+	}
+	/** Whether it has a decal. */
+	bool HasDecals() const { return std::ranges::any_of(this->tex_decal, [](uint8_t d) { return d != 0; }); }
 	/** Whether any of its textures has a light of its own. */
 	bool Glows() const { return std::ranges::any_of(this->tex_glow, [](uint32_t g) { return g != 0; }); }
 	/** Whether a triangle is drawn see-through after the rest: of the glass, or of a material "BLEND". */

@@ -54,6 +54,7 @@ struct ThreeDGpuTriangles {
 		uint32_t count = 0;          ///< and how many
 		uint32_t texture = 0;        ///< the texture of these triangles (its index)
 		int8_t facing = 0;           ///< a building's: the side seen, 1 where the corners go round clockwise on the picture, -1 the other, 0 both
+		bool decal = false;          ///< drawn nearer (ThreeDVehicleShape::tex_decal), its texture the one it is drawn with (Undecal())
 	};
 	std::vector<Run> opaque;         ///< the triangles drawn through the depth
 	std::vector<Run> glass;          ///< the vehicle's glass, drawn see-through after all else
