@@ -13069,6 +13069,21 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: jizda {} {}: takove vozidlo neni.", *type, *unit);
+	} else if (what == "pozaoci" && argv.size() > 3) {
+		/* 'pozaoci <type> <unit>': where the view from the eyes has a vehicle and the way it faces (GetThreeDEyeVehicle()),
+		 * beside its whole units and its exact place when driven freely: a vehicle driven across the tiles from its cab
+		 * swung from side to side (the player 23. 11.). */
+		auto type = number(2), unit = number(3);
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!u->IsPrimaryVehicle() || !type.has_value() || !unit.has_value() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			ThreeDEyeVehicle ev;
+			bool ok = false;
+			for (const Vehicle *w = u; w != nullptr && !ok; w = w->Next()) ok = GetThreeDEyeVehicle(w, ev) && ev.obj != nullptr; // (its object's anchor piece)
+			IConsolePrint(CC_DEFAULT, "test3d: pozaoci {} {}: {} oci {:.3f},{:.3f} smer {:.2f} | na {},{} presne {:.3f},{:.3f} yaw {} volne {}", *type, *unit, ok ? "ano" : "ne",
+					ev.x, ev.y, ev.facing, u->x_pos, u->y_pos, u->cab_px / 256.0, u->cab_py / 256.0, u->cab_yaw, u->cab_free);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: pozaoci: takove vozidlo neni.");
 	} else if (what == "jizda_na" && argv.size() > 5) {
 		/* 'jizda_na <unit> <x> <y> <yaw> [lod [<ox> <oy>]]': a road vehicle driven freely put on the middle of a tile at
 		 * a heading (CAB_YAW_TURN a turn, 0 along +x): before the end of a bridge, to drive up it; 'lod' a ship (before

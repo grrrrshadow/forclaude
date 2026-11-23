@@ -11,6 +11,7 @@
 
 #include "stdafx.h"
 #include "core/backup_type.hpp"
+#include "cab_drive.h"
 #include "three_d_vehicle_object.h"
 #include "blitter/factory.hpp"
 #include "three_d_objects.h"
@@ -4999,10 +5000,29 @@ static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, dou
 	const Vehicle *front, *last;
 	ObjectEnds(obj, anchor, front, last);
 	facing = EyeFacing(anchor, reversed ? last : front, reversed ? front : last, DirectionAngle(PieceDirection(anchor)), SqueezedType(obj->type), rolled, curvature);
+	double ax = anchor->x_pos, ay = anchor->y_pos;
+	/* Driven freely from its cab (cab_drive.h): where it is exactly and the way the player steers it, not its whole
+	 * units and the way they step -- across the tiles they go by the eight directions in stairs, and the view from
+	 * its cab swung its tail and its nose from side to side (the player 23. 11.: "když řídím vrtulník, mrská ocasem
+	 * ... tatru, vrtí čumákem ... jedu rovně, ale napříč dlaždicí, tak od strany ke straně je to schodovitý"). The
+	 * exact place of a piece only while it is the one of its whole units (the game may have moved it since); an
+	 * object over several pieces (the fire Tatra) faces from the exact place of its last piece to its first's, one of
+	 * a single piece the way it is steered. */
+	auto exact = [](const Vehicle *u) { return u->cab_px / CAB_SUBUNIT == u->x_pos && u->cab_py / CAB_SUBUNIT == u->y_pos; };
+	if (anchor->First()->cab_free && exact(anchor)) {
+		ax = static_cast<double>(anchor->cab_px) / CAB_SUBUNIT;
+		ay = static_cast<double>(anchor->cab_py) / CAB_SUBUNIT;
+		const double dx = static_cast<double>(front->cab_px - last->cab_px) / CAB_SUBUNIT, dy = static_cast<double>(front->cab_py - last->cab_py) / CAB_SUBUNIT;
+		if (front == last || !exact(front) || !exact(last) || dx * dx + dy * dy < 4.0) {
+			facing = std::remainder(anchor->cab_yaw * 2 * M_PI / CAB_YAW_TURN + (reversed ? M_PI : 0.0), 2 * M_PI);
+		} else {
+			facing = std::atan2(reversed ? -dy : dy, reversed ? -dx : dx);
+		}
+	}
 	/* Hung from the middle of its pieces, as on the map: from the anchor piece that many steps along. */
 	const double along = MiddleOnMap(obj, anchor) * ChainStep(facing);
-	x = anchor->x_pos + along * std::cos(facing);
-	y = anchor->y_pos + along * std::sin(facing);
+	x = ax + along * std::cos(facing);
+	y = ay + along * std::sin(facing);
 	const ThreeDVehicleObject *before = nullptr;
 	const Vehicle *before_anchor = nullptr;
 	if (depth >= 4 || !CoupledBehind(obj, anchor, before, before_anchor)) return;
