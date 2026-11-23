@@ -843,7 +843,12 @@ int GetAircraftFlightLevel(T *v, bool takeoff)
 		/* Descend lower. You are an aircraft, not an space ship.
 		 * And again, don't stop correcting altitude too early. */
 		v->flags.Set(VehicleAirFlag::InMaximumHeightCorrection);
-		z--;
+		/* A space ship though, the Buran come down from space (its rocket took it up, ROCKET_APEX_Z): a height unit
+		 * every fourth step while it is over twice the highest an aircraft flies (the player, 23. 11.: "it comes down too
+		 * fast, really too fast"; a fast plane takes many steps a tick, from up there it fell in a few seconds). */
+		bool hold = false;
+		if constexpr (std::is_same_v<T, Aircraft>) hold = AircraftStartsByRocket(v->engine_type) && z > 2 * aircraft_max_altitude && (++v->space_steps & 3) != 0;
+		if (!hold) z--;
 	} else if (v->flags.Test(VehicleAirFlag::InMinimumHeightCorrection) && z >= aircraft_middle_altitude) {
 		/* Now, we have corrected altitude enough. */
 		v->flags.Reset(VehicleAirFlag::InMinimumHeightCorrection);

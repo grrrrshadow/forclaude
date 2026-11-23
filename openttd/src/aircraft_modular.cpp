@@ -755,6 +755,18 @@ static void HandleApproach(Aircraft *v)
 	start.x = Clamp(start.x, 0, static_cast<int>(Map::MaxX() * TILE_SIZE));
 	start.y = Clamp(start.y, 0, static_cast<int>(Map::MaxY() * TILE_SIZE));
 	const int want = GroundZ(v->modular.tile) + PLANE_HOLD_MAX_FLYING_ALTITUDE / 2;
+	/* Too high to come down along the runway (the Buran back from space, ROCKET_APEX_Z; the player, 23. 11.: "it comes
+	 * down too fast, really too fast": from thousands of units its final approach fell to the runway in a moment):
+	 * round the approach's start, four tiles about it, coming down a unit a step till it is at its approach height. */
+	if (v->z_pos > want + 2 * static_cast<int>(TILE_HEIGHT)) {
+		constexpr int ROUND = 4 * static_cast<int>(TILE_SIZE);
+		const int k = (v->tick_counter >> 6) & 3;
+		Point c = {start.x + (k == 0 || k == 3 ? ROUND : -ROUND), start.y + (k < 2 ? ROUND : -ROUND)};
+		c.x = Clamp(c.x, 0, static_cast<int>(Map::MaxX() * TILE_SIZE));
+		c.y = Clamp(c.y, 0, static_cast<int>(Map::MaxY() * TILE_SIZE));
+		FlyTowards(v, c, SPEED_LIMIT_HOLD, want);
+		return;
+	}
 	if (FlyTowards(v, start, SPEED_LIMIT_HOLD, want)) {
 		v->modular.state = ModularAircraftState::Landing;
 		v->state = LANDING;

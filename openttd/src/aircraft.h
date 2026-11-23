@@ -154,6 +154,7 @@ struct Aircraft final : public SpecializedVehicle<Aircraft, VehicleType::Aircraf
 
 	AircraftCache acache{};
 	ModularAircraft modular{}; ///< At a modular airport (aircraft_modular.cpp).
+	uint8_t space_steps = 0; ///< Steps flown coming down from space (a plane a rocket took up): it descends a unit every fourth (GetAircraftFlightLevel()); not saved
 
 	Aircraft(VehicleID index) : SpecializedVehicleBase(index) {}
 	/** We want to 'destruct' the right class. */
