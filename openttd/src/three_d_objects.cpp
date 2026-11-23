@@ -15518,11 +15518,26 @@ static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObjec
 	std::vector<std::unordered_map<uint64_t, uint32_t>> cells(o.Textures());
 	std::vector<Sum> sums;
 	std::vector<uint32_t> to(corners);
+	/* The paint lying on the ground (a triangle flat and at most PAINT_HIGH over the object's foot: the yellow lines
+	 * of a modular airport's taxiways, 0.4 m wide) keeps its corners: in cells wider than it its two edges became one
+	 * and it went -- a curve of a taxiway was gone from the map zoomed out (the player 23. 11.: "při oddálení se to
+	 * zjednoduší, že vypadá, že tam chybí zatáčka"). It is a few flat triangles; the cells are for what stands. */
+	static constexpr double PAINT_HIGH = 0.15 * OBJECT_HEIGHT_PER_METRE, PAINT_FLAT = 0.01 * OBJECT_HEIGHT_PER_METRE;
+	std::vector<bool> paint(corners, false);
+	for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
+		const float z0 = o.pos[o.tri[t] * 3 + 2], z1 = o.pos[o.tri[t + 1] * 3 + 2], z2 = o.pos[o.tri[t + 2] * 3 + 2];
+		if (std::max({z0, z1, z2}) > PAINT_HIGH || std::max({z0, z1, z2}) - std::min({z0, z1, z2}) > PAINT_FLAT) continue;
+		paint[o.tri[t]] = paint[o.tri[t + 1]] = paint[o.tri[t + 2]] = true;
+	}
+	/* (fine enough, and within the 13 and 12 bits of a key: +-88 world units, the texture 0 to 2) */
+	const double fine_xy = 0.02 * OBJECT_UNITS_PER_METRE, fine_z = 0.01 * OBJECT_HEIGHT_PER_METRE, fine_uv = 1.0 / 1024;
 	for (size_t i = 0; i < corners; i++) {
 		const double x = o.pos[i * 3], y = o.pos[i * 3 + 1], z = o.pos[i * 3 + 2];
 		const double u = o.uv[i * 2], v = o.uv[i * 2 + 1];
 		const uint8_t tex = i < o.corner_tex.size() && o.corner_tex[i] < cells.size() ? o.corner_tex[i] : 0;
-		const uint64_t key = cell(x, cell_xy, 13) | cell(y, cell_xy, 13) << 13 | cell(z, cell_z, 13) << 26 | cell(u, cell_uv, 12) << 39 | cell(v, cell_uv, 12) << 51;
+		const double cxy = paint[i] ? fine_xy : cell_xy, cz = paint[i] ? fine_z : cell_z, cuv = paint[i] ? fine_uv : cell_uv;
+		const uint64_t key = cell(x, cxy, 13) | cell(y, cxy, 13) << 13 | cell(z, cz, 13) << 26 | cell(u, cuv, 12) << 39 | cell(v, cuv, 12) << 51 |
+				(paint[i] ? uint64_t{1} << 63 : 0);
 		auto [it, added] = cells[tex].try_emplace(key, static_cast<uint32_t>(sums.size()));
 		if (added) sums.emplace_back().tex = tex;
 		Sum &sum = sums[it->second];
