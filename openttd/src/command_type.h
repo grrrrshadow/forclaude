@@ -420,6 +420,8 @@ enum class Commands : uint8_t {
 	BuildAirportPiece, ///< build a stand, a helipad, a heliport, a hangar or a building of a modular airport
 	RemoveAirportPiece, ///< remove tiles of a modular airport
 
+	TurnObject, ///< turn a built object of a GRF by a quarter, its view (the decorative castle walls, a click on them)
+
 	End, ///< @important Must ALWAYS be on the end of this list!! (period)
 };
 

@@ -390,6 +390,7 @@ struct ThreeDObject {
 	size_t outside = SIZE_MAX;                ///< that object, SIZE_MAX none
 	std::string outside_of;                   ///< of that object: the interior's file whose box is left out
 	std::string door_node;                    ///< a door's wing: its node in the file, turned about the node's origin (the hinge)
+	std::string only_root;                    ///< a GRF's object (GetThreeDGrfObject()): this root node of its file alone, turned by scene_turns quarters about the tile's middle
 	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
 	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
 	std::vector<ThreeDObjectFigure> dragon_places; ///< "mista_draku" (the dragon farm): where each of its dragons stands, its creature ("drak") as figure
@@ -1766,6 +1767,8 @@ const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin);
  * @return nullptr: another tile, or the sets have no lighthouse
  */
 const ThreeDObject *GetThreeDLighthouse(TileIndex tile);
+const ThreeDObject *GetThreeDGrfObject(TileIndex tile);
+bool ThreeDGrfObjectTurns(TileIndex tile);
 bool ThreeDTrackWide();
 double ThreeDTrackWidth();
 struct ThreeDWitchLight;

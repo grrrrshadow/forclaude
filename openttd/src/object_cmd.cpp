@@ -493,6 +493,9 @@ static void DrawTile_Object(TileInfo *ti)
 		}
 	} else {
 		DrawNewObjectTile(ti, spec);
+		/* A GRF's object of ours in the 3D views (the decorative castle walls): its 3D object on its sprites, which
+		 * are only the ground (ThreeDGrfObjectStandsOn()). */
+		if (!IsInvisibilitySet(TransparencyOption::Structures)) ThreeDGrfObjectStandsOn(ti);
 	}
 
 	DrawBridgeMiddle(ti, {});
@@ -744,8 +747,39 @@ static void TileLoop_Object(TileIndex tile)
 
 
 /** @copydoc ClickTileProc */
+/**
+ * Turn a built object of a GRF by a quarter: its next view (the player 23. 11., the decorative castle walls of
+ * Okrasne_hradby: "normálně zeď, kliknu pootočí se, další dlaždice věžička, to je roh, kliknu pootočí se"). Only a GRF's
+ * object of one tile with four views, the company's own or no one's; its 3D object is drawn by the view
+ * (GetThreeDGrfObject()).
+ * @param flags type of operation
+ * @param tile the object's tile
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdTurnObject(DoCommandFlags flags, TileIndex tile)
+{
+	if (!IsValidTile(tile) || !IsTileType(tile, TileType::Object)) return CMD_ERROR;
+	const ObjectSpec *spec = ObjectSpec::GetByTile(tile);
+	if (spec == nullptr || !spec->grf_prop.HasGrfFile() || spec->views < 4 || spec->size != 0x11) return CMD_ERROR;
+	if (GetTileOwner(tile) != OWNER_NONE) {
+		CommandCost ret = CheckTileOwnership(tile);
+		if (ret.Failed()) return ret;
+	}
+	if (flags.Test(DoCommandFlag::Execute)) {
+		Object *o = Object::GetByTile(tile);
+		o->view = static_cast<uint8_t>((o->view + 1) % spec->views);
+		MarkTileDirtyByTile(tile);
+	}
+	return CommandCost();
+}
+
 static bool ClickTile_Object(TileIndex tile)
 {
+	/* A GRF's object of ours turns by a quarter (CmdTurnObject(), ThreeDGrfObjectTurns()). */
+	if (ThreeDGrfObjectTurns(tile)) {
+		Command<Commands::TurnObject>::Post(STR_ERROR_CAN_T_DO_THIS, tile);
+		return true;
+	}
 	if (!IsObjectType(tile, OBJECT_HQ)) return false;
 
 	ShowCompany(GetTileOwner(tile));

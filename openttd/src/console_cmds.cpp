@@ -48,6 +48,9 @@
 #include "table/sprites.h"
 #include "core/string_consumer.hpp"
 #include "console_internal.h"
+#include "newgrf_object.h"
+#include "object_cmd.h"
+#include "core/backup_type.hpp"
 #include "console_gui.h"
 #include "debug.h"
 #include "engine_func.h"
@@ -9747,6 +9750,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			break;
 		}
+	} else if (what == "objektgrf" && argv.size() > 5) {
+		/* 'objektgrf <x> <y> <grf> <objekt> [pohled]': build the object of a GRF there as the player's company (the
+		 * decorative castle walls of Okrasne_hradby: "objektgrf 40 40 MAXZ 1"). */
+		auto x = number(2), y = number(3), id = number(5), view = argv.size() > 6 ? number(6) : std::optional<int>(0);
+		if (!x.has_value() || !y.has_value() || !id.has_value() || !view.has_value() || argv[4].size() != 4) return true;
+		const GrfID grfid = static_cast<GrfID>(static_cast<uint8_t>(argv[4][0])) | (static_cast<GrfID>(static_cast<uint8_t>(argv[4][1])) << 8) |
+				(static_cast<GrfID>(static_cast<uint8_t>(argv[4][2])) << 16) | (static_cast<GrfID>(static_cast<uint8_t>(argv[4][3])) << 24);
+		const TileIndex tile = TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY()));
+		if (_local_company == COMPANY_SPECTATOR && Company::IsValidID(CompanyID::Begin())) SetLocalCompany(CompanyID::Begin());
+		const ObjectSpec *found = nullptr;
+		for (const ObjectSpec &spec : ObjectSpec::Specs()) {
+			if (spec.grf_prop.HasGrfFile() && spec.grf_prop.grfid == grfid && spec.grf_prop.local_id == *id && spec.IsEnabled()) found = &spec;
+		}
+		if (found == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: objektgrf {} {}: neni", argv[4], *id);
+			return true;
+		}
+		Backup<CompanyID> cur_company(_current_company, _local_company);
+		const CommandCost ret = Command<Commands::BuildObject>::Do(DoCommandFlag::Execute, tile, found->Index(), static_cast<uint8_t>(*view));
+		cur_company.Restore();
+		IConsolePrint(ret.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: objektgrf {} {} na {},{} pohled {}: {}", argv[4], *id, *x, *y, *view,
+				ret.Succeeded() ? std::string("postaveno") : GetString(ret.GetErrorMessage()));
 	} else if (what == "klikni" && argv.size() > 3) {
 		/* 'klikni <x> <y> [nakup [text]]': a click on the tile as the player's (ClickTile(): a station's window, a depot's, a
 		 * hangar's); with "nakup" the purchase window of the depot or hangar there after it. */

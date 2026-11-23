@@ -3553,7 +3553,12 @@
   "moduly": {
    "poznamka": "hrad je složený z kopií: zed (hradba s bránou, cimbuřím a loučemi) 4× (zed_00–03), vez (nárožní věž) 4× (vez_00–03), obojí otočené po 90° kolem středu pozemku; schod 2×; síň jednou (souměrná); v souboru je každá síť jednou, uzly ji kreslí s vlastní polohou a otočením (jako seno_NN)"
   },
-  "poznamka": "dračí hrad 3 × 3 jako nový vzhled dračí farmy (hráč 25. 10.: „budem dělat hrad aby dole byla mistnost s drakem a zvenku schody nahoru na střechu te mistnosti, na hradby a tam budou v noci svitit louče“, „hranaty mi je jedno ale aby neměl hodně trojuhelničků“; potom: „modularni čtyři stejny věžičky, čtyři zdi mezi věžičkama a pak mistnost s rozhlednou a schodama tak zrcadlově leva stejna jako prava“): hradby 7 m s ochozem a cimbuřím kolem dokola, v každé brána s vytaženou mříží (průchody ze všech stran, zadní vede do síně), čtyři stejné nárožní věže s praporem (ochoz jimi prochází; prapory od 30. 10. černá parní mašinka na červeném), souměrná dračí síň u zadní zdi s vjezdem 9 × 6 m uprostřed (není interiér, má zdi kolem sebe), rozhlednou na střeše a schody z obou stran na střechu (terasa na úrovni ochozu) a na hradby, louče (noc), nádvoří s dlážděnou cestou, žlabem a kupami sena, kvádr k sezení. Hra kreslí 5036 trojúhelníků (dnešní zřícenina 14 864), v souboru je každý modul jednou (2348), atlas 1024 px, kámen barvou číslem; glb z gltfpacku (-cc). Stejný průmysl jako draci_farma (bere FICR a STUD), stejné klíče seno, mista_draku a postavy_s_holkami; místa draků mají navíc kde (sin, nadvori, strecha)"
+  "poznamka": "dračí hrad 3 × 3 jako nový vzhled dračí farmy (hráč 25. 10.: „budem dělat hrad aby dole byla mistnost s drakem a zvenku schody nahoru na střechu te mistnosti, na hradby a tam budou v noci svitit louče“, „hranaty mi je jedno ale aby neměl hodně trojuhelničků“; potom: „modularni čtyři stejny věžičky, čtyři zdi mezi věžičkama a pak mistnost s rozhlednou a schodama tak zrcadlově leva stejna jako prava“): hradby 7 m s ochozem a cimbuřím kolem dokola, v každé brána s vytaženou mříží (průchody ze všech stran, zadní vede do síně), čtyři stejné nárožní věže s praporem (ochoz jimi prochází; prapory od 30. 10. černá parní mašinka na červeném), souměrná dračí síň u zadní zdi s vjezdem 9 × 6 m uprostřed (není interiér, má zdi kolem sebe), rozhlednou na střeše a schody z obou stran na střechu (terasa na úrovni ochozu) a na hradby, louče (noc), nádvoří s dlážděnou cestou, žlabem a kupami sena, kvádr k sezení. Hra kreslí 5816 trojúhelníků (dnešní zřícenina 14 864), v souboru je každý modul jednou (2816), atlas 1024 px, kámen barvou číslem; glb z gltfpacku (-cc). Stejný průmysl jako draci_farma (bere FICR a STUD), stejné klíče seno, mista_draku a postavy_s_holkami; místa draků mají navíc kde (sin, nadvori, strecha)",
+  "bez_uzlu": [
+   "hradba_zed",
+   "hradba_brana",
+   "hradba_vez"
+  ]
  },
  {
   "soubor": "les_zem.glb",
@@ -5573,5 +5578,95 @@
   "autor": "grrrrf: srub, ohniště a interiér z lesa (les_paseka_srub, prumysl/les_dily.py); tráva palouku z plantaz_palouk; palmy, banánovníky, monstery a kapradí jako společné doplňky (Tropical Plants Pack M02P, MozzarellaARC, CC BY 4.0), papírové lucerny ze sady lampy",
   "licence": "GPL-2.0 (vlastní geometrie i textura); doplňky rostlin CC BY 4.0 (MozzarellaARC)",
   "poznamka": "palouček plantáže s lesním srubem místo rákosové chajdy (hráč 3. 11.: „vem z lesa chajdu … mužou zustat dřevěné okna a dveře. zachovej interier, otviraci okna dveře, venku pryč ten cihlovej grill a zase to vem cely z lesa, ohniště, rožeň, včetně funkčnosti E. nic nemusi byt dvakrat, objekty dělame usporně“; „dej rovnou srub z lesa a skus ho nějak ozdobit zvenku exoticky“): soubor lesního srubu bez posedu, jeho schodů a hromady klád (bez_uzlu; posed stojí na kraji plantáže, plantaz_zem_posed), země v trávě palouku (textury_materialu: les_zem dostane obrázek materiálu plantaz_palouk z plantaz_palouk.glb, stejné UV), ohniště s rožněm a E jako v lese, holky na kládách u ohně, opice; zvenku exoticky: palmy, banánovníky, monstera, kapradí a dvě papírové lucerny pod okapem u dveří; banánovník před srubem pryč (hráč 18. 11.: „dej pryč ten strom bez kmene uprostřed obrázku, před chajdou je ten strom, asi banánovník“)"
+ },
+ {
+  "jmeno": "hradba_zed",
+  "druh": "objekt_grf",
+  "grf": "MAXZ",
+  "objekt": 0,
+  "soubor": "draci_hrad.glb",
+  "uzel": "hradba_zed",
+  "barvy": [
+   {
+    "cast": "kamen",
+    "maska": "draci_hrad_maska_kamen.png",
+    "zacatek": 160,
+    "paleta": [
+     "A8A296",
+     "B8A888",
+     "A08C7A",
+     "8E8E8A",
+     "C2B79E",
+     "9A8270",
+     "7E7A72",
+     "B0A898"
+    ]
+   }
+  ],
+  "okraje_textur": 16,
+  "otaceni": "pohled objektu (0–3) = čtvrtotáčky kolem středu dlaždice; kliknutím na postavený dílek se otočí o 90°",
+  "autor": "grrrrf: vlastní model prumysl/draci_hrad.py (moduly dračího hradu)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "okrasné hradby (hráč 23. 11.: „okrasný modulární zdi našich hradů, věžička, zeď, brána … a složím si svůj hrad okrasnej“, „nemůžem mít dvakrát stejný objekty“): objekt 0 GRF MAXZ, zeď: hradba dračího hradu 7 m s ochozem, cimbuří na straně -y (venku), od okraje k okraji dlaždice; kořen hradba_zed souboru draci_hrad.glb (žádný další soubor; hrad ho vynechává), rám dlaždice: počátek v jejím severním rohu, metry"
+ },
+ {
+  "jmeno": "hradba_vez",
+  "druh": "objekt_grf",
+  "grf": "MAXZ",
+  "objekt": 1,
+  "soubor": "draci_hrad.glb",
+  "uzel": "hradba_vez",
+  "barvy": [
+   {
+    "cast": "kamen",
+    "maska": "draci_hrad_maska_kamen.png",
+    "zacatek": 160,
+    "paleta": [
+     "A8A296",
+     "B8A888",
+     "A08C7A",
+     "8E8E8A",
+     "C2B79E",
+     "9A8270",
+     "7E7A72",
+     "B0A898"
+    ]
+   }
+  ],
+  "okraje_textur": 16,
+  "otaceni": "pohled objektu (0–3) = čtvrtotáčky kolem středu dlaždice; kliknutím na postavený dílek se otočí o 90°",
+  "autor": "grrrrf: vlastní model prumysl/draci_hrad.py (moduly dračího hradu)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "okrasné hradby (hráč 23. 11.: „okrasný modulární zdi našich hradů, věžička, zeď, brána … a složím si svůj hrad okrasnej“, „nemůžem mít dvakrát stejný objekty“): objekt 1 GRF MAXZ, věž (roh): nárožní věž dračího hradu (tatáž síť vez, uzel hradba_vez_vez) a dva pahýly zdi k okrajům +x a +y, ochoz prochází věží; venku strany -x a -y; kořen hradba_vez souboru draci_hrad.glb (žádný další soubor; hrad ho vynechává), rám dlaždice: počátek v jejím severním rohu, metry"
+ },
+ {
+  "jmeno": "hradba_brana",
+  "druh": "objekt_grf",
+  "grf": "MAXZ",
+  "objekt": 2,
+  "soubor": "draci_hrad.glb",
+  "uzel": "hradba_brana",
+  "barvy": [
+   {
+    "cast": "kamen",
+    "maska": "draci_hrad_maska_kamen.png",
+    "zacatek": 160,
+    "paleta": [
+     "A8A296",
+     "B8A888",
+     "A08C7A",
+     "8E8E8A",
+     "C2B79E",
+     "9A8270",
+     "7E7A72",
+     "B0A898"
+    ]
+   }
+  ],
+  "okraje_textur": 16,
+  "otaceni": "pohled objektu (0–3) = čtvrtotáčky kolem středu dlaždice; kliknutím na postavený dílek se otočí o 90°",
+  "autor": "grrrrf: vlastní model prumysl/draci_hrad.py (moduly dračího hradu)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "okrasné hradby (hráč 23. 11.: „okrasný modulární zdi našich hradů, věžička, zeď, brána … a složím si svůj hrad okrasnej“, „nemůžem mít dvakrát stejný objekty“): objekt 2 GRF MAXZ, brána: zeď s branou hradu uprostřed (5 × 5 m, mříž vytažená); kořen hradba_brana souboru draci_hrad.glb (žádný další soubor; hrad ho vynechává), rám dlaždice: počátek v jejím severním rohu, metry"
  }
 ]

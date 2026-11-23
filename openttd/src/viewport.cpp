@@ -16429,6 +16429,22 @@ bool ThreeDLighthouseStandsOn(const TileInfo *ti)
 }
 
 /**
+ * A GRF's object drawn by a root node of a file of ours in the 3D views (GetThreeDGrfObject(): the decorative castle
+ * walls of Okrasne_hradby), turned as its view; its sprites (the grass) stay under it.
+ * @return whether it stands there
+ */
+bool ThreeDGrfObjectStandsOn(const TileInfo *ti)
+{
+	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Structures) || !ObjectsIndexReadOrOwed()) return false;
+	const ThreeDObject *obj = GetThreeDGrfObject(ti->tile);
+	if (obj == nullptr) return false;
+	if (_cab_collecting) return true;
+	if (!ObjectReadyOrOwed(obj, ti->tile, ti->tile)) return false;
+	_turned_objects.emplace_back(obj, ti->tile, GetTileMaxPixelZ(ti->tile));
+	return true;
+}
+
+/**
  * Whether a modular airport's tile is drawn in 3D by its objects (GetThreeDStation(), objekty/letiste): its paint, lights
  * and buildings; the game's sprites only its ground then (GetModularAirportTileLayout()).
  */
@@ -20722,6 +20738,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* A lighthouse of the game's own: its object, its reflector turning among its figures (ThreeDLighthouseStandsOn()). */
 		if (tile_type == TileType::Object && !IsTransparencySet(TransparencyOption::Structures)) {
 			if (const ThreeDObject *lighthouse = GetThreeDLighthouse(_cur_ti.tile); lighthouse != nullptr) objects.push_back({lighthouse, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile)});
+			/* A GRF's object of ours (the decorative castle walls, ThreeDGrfObjectStandsOn()). */
+			if (const ThreeDObject *grf_obj = GetThreeDGrfObject(_cur_ti.tile); grf_obj != nullptr) objects.push_back({grf_obj, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile)});
 		}
 		/* The bench and the BUS sign of a bus stop for its shelters (AddBusStopObjects()). */
 		if (tile_type == TileType::Station && !IsTransparencySet(TransparencyOption::Buildings)) {

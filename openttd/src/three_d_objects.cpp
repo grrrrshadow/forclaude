@@ -14,6 +14,7 @@
 #include "three_d_objects.h"
 #include "three_d_witches.h"
 #include "object_base.h"
+#include "newgrf_object.h"
 #include "simtrains.h"
 #include "beamng.h"
 #include "industry.h"
@@ -277,6 +278,17 @@ static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStation
 static std::map<std::pair<int, int>, size_t> _three_d_depots;
 /** The lighthouses' objects (ReadLighthouse()), objects in _three_d_objects: one of them on each lighthouse's tile (GetThreeDLighthouse()). */
 static std::vector<size_t> _three_d_lighthouses;
+/**
+ * The objects of GRFs drawn by a root node of a file of ours (records "druh" "objekt_grf": the decorative castle walls of
+ * the GRF Okrasne_hradby, roots of the dragon castle's file -- the player 23. 11.: "nemůžem mít dvakrát stejný objekty"):
+ * its set, its object and the first of its four objects in _three_d_objects, one a view (a quarter turn each).
+ */
+struct ThreeDGrfObjectLook {
+	GrfID grfid;
+	uint16_t local_id;
+	size_t first;
+};
+static std::vector<ThreeDGrfObjectLook> _three_d_grf_objects;
 /** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
 static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
 /** The pieces of the modular airports read (objekty/letiste, "druh": "letiste"; grrrrf letiste/letiste.py): their add-ons' names. */
@@ -2834,6 +2846,22 @@ static bool ReadGlbDoor(const std::string &path, const std::string &node, int8_t
 	return true;
 }
 
+/**
+ * A root node of a file alone (ThreeDObject::only_root, a GRF's object), turned about the middle of the tile by quarter
+ * turns (its view).
+ */
+static bool ReadGlbRoot(const std::string &path, const std::string &node, ThreeDObject &obj, int quarter_turns)
+{
+	GlbMesh mesh;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	o.only_node = node;
+	if (!ReadGlbMesh(path, mesh, o)) return false;
+	TurnGlbMeshQuarters(mesh, quarter_turns);
+	TakeGlbMesh(mesh, obj);
+	return true;
+}
+
 /** The wings of the doors and the windows of a .glb: the nodes "dvere_NN", "okno_NN" with a mesh under them (the old houses' doors are empty places), by name. */
 static std::vector<std::string> GlbDoorNodes(const std::string &path)
 {
@@ -3792,6 +3820,13 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 	/* All its nodes but its heaps of hay, read as objects of their own below, and the day's. */
 	obj.all_roots = !field;
 	obj.left_out = {"den", "seno"};
+	/* Roots of its file that are not of it ("bez_uzlu": the decorative walls of the GRF Okrasne_hradby in the dragon
+	 * castle's file, ReadGrfObject()). */
+	if (e.contains("bez_uzlu") && e.at("bez_uzlu").is_array()) {
+		for (const auto &n : e.at("bez_uzlu")) {
+			if (n.is_string()) obj.left_out.push_back(n.get<std::string>());
+		}
+	}
 	if (e.contains("seno") && e.at("seno").is_object() && e.at("seno").contains("uzly")) {
 		for (const auto &n : e.at("seno").at("uzly")) {
 			if (n.is_string()) obj.left_out.push_back(n.get<std::string>());
@@ -6294,6 +6329,8 @@ static void TakeFlatFloors(ThreeDObject &obj)
  * middle of the tile as it is made (+x forward, the door to south-west); the reflector a figure of its own that turns
  * (the figures' index), stood where its bottom is.
  */
+static void ReadGrfObject(const nlohmann::json &e, const std::string &folder);
+
 static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 {
 	ThreeDObject addon;
@@ -6722,6 +6759,10 @@ static void ReadThreeDObjectsNow()
 					_three_d_surfaces.emplace(e.at("povrch").get<std::string>(), ThreeDSurfaceFile{folder + e.at("soubor").get<std::string>(), tiles});
 					continue;
 				}
+				if (kind == "objekt_grf") {
+					ReadGrfObject(e, folder);
+					continue;
+				}
 				if (kind == "majak") {
 					if (e.contains("soubor") && e.at("soubor").is_string()) ReadLighthouse(e, folder);
 					continue;
@@ -6908,6 +6949,40 @@ static std::optional<uint32_t> ParseIndexGrfId(const std::string &text)
 }
 
 /** A number of the index: a JSON number, or a string in decimal or "0x" hex ("0x0100", an engine's number in its set). */
+static std::optional<uint32_t> ParseIndexNumber(const nlohmann::json &value);
+
+/**
+ * An object of a GRF drawn by a root node of a file ("druh" "objekt_grf": "grf" its set, "objekt" its number in the set,
+ * "soubor" the file, "uzel" the root; "barvy" as a building's): four objects, one a view of the object, the root turned
+ * by so many quarter turns about the tile's middle (the player 23. 11.: "kliknu pootočí se", ThreeDGrfObjectTurns()).
+ * The root is in the tile's frame: the origin in its north corner, metres.
+ */
+static void ReadGrfObject(const nlohmann::json &e, const std::string &folder)
+{
+	const auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
+	const auto id = e.contains("objekt") ? ParseIndexNumber(e.at("objekt")) : std::nullopt;
+	const std::string file = e.value("soubor", std::string()), root = e.value("uzel", std::string());
+	const std::string name = e.value("jmeno", root);
+	if (!grfid.has_value() || !id.has_value() || file.empty() || root.empty()) {
+		Debug(misc, 0, "3D object of a GRF {}: no grf, objekt, soubor or uzel", name);
+		return;
+	}
+	_three_d_grf_objects.push_back({*grfid, static_cast<uint16_t>(*id), _three_d_objects.size()});
+	for (int k = 0; k < 4; k++) {
+		ThreeDObject obj;
+		obj.file = file;
+		obj.name = fmt::format("{}/{}", name, k * 90);
+		obj.glb_path = folder + file;
+		obj.variants = 0; // no house's
+		obj.only_root = root;
+		obj.scene_turns = static_cast<int8_t>(k);
+		ReadMaterialPictures(e, folder, obj);
+		ReadColourParts(e, folder, obj);
+		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+		_three_d_objects.push_back(std::move(obj));
+	}
+}
+
 static std::optional<uint32_t> ParseIndexNumber(const nlohmann::json &value)
 {
 	if (value.is_number_integer()) return value.get<uint32_t>();
@@ -14016,6 +14091,37 @@ const ThreeDObject *GetThreeDLighthouse(TileIndex tile)
 	return &_three_d_objects[_three_d_lighthouses[(TileX(tile) * 7 + TileY(tile) * 13) % _three_d_lighthouses.size()]];
 }
 
+/**
+ * The object of a GRF's object on the tile drawn by a root node of a file of ours (ReadGrfObject()): its view's.
+ * @return nullptr when the tile has none
+ */
+const ThreeDObject *GetThreeDGrfObject(TileIndex tile)
+{
+	if (!_three_d_objects_read || _three_d_grf_objects.empty() || !IsValidTile(tile) || !IsTileType(tile, TileType::Object)) return nullptr;
+	const ObjectSpec *spec = ObjectSpec::GetByTile(tile);
+	if (spec == nullptr || !spec->grf_prop.HasGrfFile()) return nullptr;
+	for (const ThreeDGrfObjectLook &g : _three_d_grf_objects) {
+		if (g.grfid != spec->grf_prop.grfid || g.local_id != spec->grf_prop.local_id) continue;
+		return &_three_d_objects[g.first + (Object::GetByTile(tile)->view & 3)];
+	}
+	return nullptr;
+}
+
+/**
+ * Whether a click on the tile turns its object (CmdTurnObject()): a GRF's object of one tile with four views that a
+ * root node of a file of ours draws (the decorative castle walls; the player: "kliknu pootočí se").
+ */
+bool ThreeDGrfObjectTurns(TileIndex tile)
+{
+	if (!IsValidTile(tile) || !IsTileType(tile, TileType::Object)) return false;
+	const ObjectSpec *spec = ObjectSpec::GetByTile(tile);
+	if (spec == nullptr || !spec->grf_prop.HasGrfFile() || spec->views < 4 || spec->size != 0x11) return false;
+	for (const ThreeDGrfObjectLook &g : _three_d_grf_objects) {
+		if (g.grfid == spec->grf_prop.grfid && g.local_id == spec->grf_prop.local_id) return true;
+	}
+	return false;
+}
+
 /** How many steps a turn of a lighthouse's beams on the map goes in: as its reflector's picture (SPIN_STEPS of three_d_vehicle_object.cpp). */
 static constexpr int LIGHTHOUSE_BEAM_STEPS = 24;
 
@@ -15645,6 +15751,8 @@ bool ThreeDObject::Read() const
 		bool ok;
 		if (!this->door_node.empty()) {
 			ok = ReadGlbDoor(this->glb_path, this->door_node, this->door_turn, read, std::max<int>(0, this->scene_turns));
+		} else if (!this->only_root.empty()) {
+			ok = ReadGlbRoot(this->glb_path, this->only_root, read, std::max<int>(0, this->scene_turns));
 		} else if (this->is_interior) {
 			ok = ReadGlbInterior(this->glb_path, read, std::max<int>(0, this->scene_turns));
 		} else if (this->scene_turns >= 0) {
