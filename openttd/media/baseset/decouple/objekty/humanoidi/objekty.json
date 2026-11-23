@@ -130,6 +130,22 @@
   }
  },
  {
+  "soubor": "claudia.glb",
+  "jmeno": "claudia",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.65,
+  "vyska_kycli": 0.8996,
+  "trojuhelniku": 14105,
+  "autor": "Yandere Uniform Longskirt, ilyakardailskiy (Sketchfab, CC BY 4.0); na Claudii upravila postavy/claudia.py (mikádo s ofinou, černé s měděnými pramínky, rty, pihy, headset, hvězdička; postava Claudia podle otevřené postavy od anabology); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést ilyakardailskiy)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)",
+  "nazev": {
+   "cs": "Claudia",
+   "en": "Claudia"
+  }
+ },
+ {
   "soubor": "dzoint.glb",
   "jmeno": "dzoint",
   "druh": "predmet",
