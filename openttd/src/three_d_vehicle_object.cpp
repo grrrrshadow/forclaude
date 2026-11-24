@@ -3578,6 +3578,7 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 	if (_pictures_collected != nullptr || _object_picture_may_wait || stand_in) {
 		/* Till it comes: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
 		const ThreeDModelPicture *nearest = nullptr;
+		ObjectPictureEntry *nearest_entry = nullptr;
 		int best = INT_MAX;
 		for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, zoom_seen, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
 				n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == zoom_seen; ++n) {
@@ -3587,9 +3588,20 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 			if (off < best) {
 				best = off;
 				nearest = &n->second.picture;
+				nearest_entry = &n->second;
 			}
 		}
+		/* The one standing in asked for now, as one found (above): the block drawing it keeps it till it is drawn
+		 * (KeepThreeDPicturesOfBlock()). Its old clock let MakeRoomForPicture() let it go while the block was still
+		 * collected, and the block drew from freed memory (the player's test14, 24. 11., no card: a crash in
+		 * BlitTurnedPicture(), the pixels read from 0). */
+		auto stand_in_used = [&]() {
+			if (nearest_entry == nullptr) return;
+			nearest_entry->used = ++_object_pictures_clock;
+			if (obj != nullptr) obj->MarkDrawn();
+		};
 		if (stand_in && nearest != nullptr && AskForPicture(std::move(p))) {
+			stand_in_used();
 			_stand_ins_given++;
 			_stand_in_pictures.insert(nearest);
 			return nearest;
@@ -3610,6 +3622,7 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 		}
 		if (_object_picture_may_wait && AskForPicture(std::move(p))) {
 			_object_picture_waited = true;
+			stand_in_used();
 			return nearest;
 		}
 	}
