@@ -443,6 +443,8 @@ constexpr GLenum GL_FRAGMENT_SHADER = 0x8B30;
 constexpr GLenum GL_VERTEX_SHADER = 0x8B31;
 constexpr GLenum GL_COMPILE_STATUS = 0x8B81;
 constexpr GLenum GL_LINK_STATUS = 0x8B82;
+constexpr GLenum GL_ATTACHED_SHADERS = 0x8B85;
+constexpr GLenum GL_SHADING_LANGUAGE_VERSION = 0x8B8C;
 constexpr GLenum GL_DEPTH_COMPONENT32F = 0x8CAC;
 constexpr GLenum GL_FRAMEBUFFER_COMPLETE = 0x8CD5;
 constexpr GLenum GL_COLOR_ATTACHMENT0 = 0x8CE0;
@@ -3062,13 +3064,15 @@ GLuint CompileShader(GLenum type, const char *source, std::string &why)
 	gl.glCompileShader(shader);
 	GLint ok = 0;
 	gl.glGetShaderiv(shader, GL_COMPILE_STATUS, &ok);
-	if (ok == GL_FALSE) {
-		char log[1024] = {};
-		gl.glGetShaderInfoLog(shader, sizeof(log) - 1, nullptr, log);
-		why = fmt::format("a shader not compiled: {}", log);
-		gl.glDeleteShader(shader);
+	char log[1024] = {};
+	gl.glGetShaderInfoLog(shader, sizeof(log) - 1, nullptr, log);
+	if (shader == 0 || ok == GL_FALSE) {
+		why = fmt::format("a shader not compiled ({} {}): {}", type == GL_VERTEX_SHADER ? "vertex" : "fragment", shader, log);
+		if (shader != 0) gl.glDeleteShader(shader);
 		return 0;
 	}
+	/* Compiled, yet what the card said of it in the diary (Gladio linked none of them: why, test14). */
+	if (log[0] != '\0') Diary(fmt::format("karta: shader {} prelozen s hlasenim: {}", shader, log), true);
 	return shader;
 }
 
@@ -3363,16 +3367,21 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	gl.glAttachShader(p.program, vs);
 	gl.glAttachShader(p.program, fs);
 	gl.glLinkProgram(p.program);
-	gl.glDeleteShader(vs);
-	gl.glDeleteShader(fs);
+	/* Its state asked before the shaders go (a card that frees a shader at once, not when its program is done with it). */
 	GLint ok = 0;
 	gl.glGetProgramiv(p.program, GL_LINK_STATUS, &ok);
 	if (ok == GL_FALSE) {
 		char log[1024] = {};
 		gl.glGetProgramInfoLog(p.program, sizeof(log) - 1, nullptr, log);
-		why = fmt::format("a program not linked: {}", log);
+		GLint attached = -1;
+		gl.glGetProgramiv(p.program, GL_ATTACHED_SHADERS, &attached);
+		why = fmt::format("a program not linked (program {}, shaders {} {}, attached {}, error 0x{:x}): {}", p.program, vs, fs, attached, gl.glGetError(), log);
+		gl.glDeleteShader(vs);
+		gl.glDeleteShader(fs);
 		return false;
 	}
+	gl.glDeleteShader(vs);
+	gl.glDeleteShader(fs);
 	p.matrix = gl.glGetUniformLocation(p.program, "u_matrix");
 	p.light = gl.glGetUniformLocation(p.program, "u_light_lit");
 	p.tex = gl.glGetUniformLocation(p.program, "u_tex");
@@ -3412,6 +3421,13 @@ bool StartCard(std::string &why, std::string &describe)
 	const char *version = reinterpret_cast<const char *>(gl.glGetString(GL_VERSION));
 	const char *renderer = reinterpret_cast<const char *>(gl.glGetString(GL_RENDERER));
 	Diary(fmt::format("karta: {}, OpenGL {}", renderer != nullptr ? renderer : "?", version != nullptr ? version : "?"), true);
+	{
+		/* The language of its programs too (Gladio of Winlator on the player's phone, 24. 11., named OpenGL 3.3 and
+		 * linked no program: "Link failed because of missing shader", test14). */
+		const char *glsl = reinterpret_cast<const char *>(gl.glGetString(GL_SHADING_LANGUAGE_VERSION));
+		Diary(fmt::format("karta: GLSL {}", glsl != nullptr ? glsl : "?"), true);
+		for (int i = 0; i < 16 && gl.glGetError() != 0; i++) {}
+	}
 	/* "4.5 (Core Profile) Mesa ...": the first two numbers. */
 	int major = 0, minor = 0;
 	const char *c = version != nullptr ? version : "";
