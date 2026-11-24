@@ -11,6 +11,7 @@
 #include "../stdafx.h"
 #include <mutex>
 #include <atomic>
+#include <set>
 
 /* Define to disable buffer syncing. Will increase max fast forward FPS but produces artifacts. Mainly useful for performance testing. */
 // #define NO_GL_BUFFER_SYNC
@@ -1839,7 +1840,13 @@ void OpenGLSprite::Update(uint width, uint height, uint level, const SpriteLoade
 		_glTexSubImage2D(GL_TEXTURE_2D, level, 0, 0, width, height, GL_RED, GL_UNSIGNED_BYTE, buf_pal.GetBuffer());
 	}
 
-	assert(_glGetError() == GL_NO_ERROR);
+	/* A driver's error told, not the game ended (virgl of Winlator on the player's phone, 24. 11., test14: the game
+	 * ended at this assert while loading the sprites); each kind once, with the sprite's size. */
+	if (GLenum err = _glGetError(); err != GL_NO_ERROR) {
+		static std::set<GLenum> told;
+		if (told.insert(err).second) Debug(driver, 0, "OpenGL: sprite {}x{} level {} not uploaded, error 0x{:x}", width, height, level, err);
+		while (_glGetError() != GL_NO_ERROR) {}
+	}
 }
 
 /**
