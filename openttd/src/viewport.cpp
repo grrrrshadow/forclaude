@@ -7343,13 +7343,18 @@ static std::optional<std::array<double, 3>> GuessedCabEye(const ThreeDVehicleObj
 		for (int c = 0; c < 3; c++) sum += shape->pos[shape->tri[t * 3 + c] * 3 + k];
 		return sum / 3;
 	};
+	/* Only glass in the upper half of its height: the windscreen is over the bonnet, the glass of the headlamps under it
+	 * -- the Dacia's lamps (their glass the windscreen's material) were taken for its windscreen and the eye sat in its
+	 * engine, the view from before the grille (the player 24. 11.: "kamera, když řídím, je na mřížce chladiče před
+	 * autem"). */
+	const double over = floor + 0.5 * (roof - floor);
 	double glass_front = -1e9;
 	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
-		if (shape->IsGlass(t) && std::abs(centre(t, 1)) < 0.3 * width) glass_front = std::max(glass_front, centre(t, 0));
+		if (shape->IsGlass(t) && std::abs(centre(t, 1)) < 0.3 * width && centre(t, 2) > over) glass_front = std::max(glass_front, centre(t, 0));
 	}
 	double top_x = 1e9, low = 1e9, high = -1e9;
 	for (size_t t = 0; t * 3 + 2 < shape->tri.size() && glass_front > -1e8; t++) {
-		if (!shape->IsGlass(t) || centre(t, 0) < glass_front - 0.8 || std::abs(centre(t, 1)) > 0.45 * width) continue;
+		if (!shape->IsGlass(t) || centre(t, 2) <= over || centre(t, 0) < glass_front - 0.8 || std::abs(centre(t, 1)) > 0.45 * width) continue;
 		for (int c = 0; c < 3; c++) {
 			const size_t i = shape->tri[t * 3 + c] * 3;
 			/* Its top edge in the middle, not the side windows' corners behind it. */
