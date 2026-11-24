@@ -14114,12 +14114,28 @@ const ThreeDObject *GetThreeDGrfObject(TileIndex tile)
 bool ThreeDGrfObjectTurns(TileIndex tile)
 {
 	if (!IsValidTile(tile) || !IsTileType(tile, TileType::Object)) return false;
-	const ObjectSpec *spec = ObjectSpec::GetByTile(tile);
+	return ThreeDGrfObjectSpecTurns(ObjectSpec::GetByTile(tile));
+}
+
+/** Whether a built object of this spec turns by a click (ThreeDGrfObjectTurns()). */
+bool ThreeDGrfObjectSpecTurns(const ObjectSpec *spec)
+{
 	if (spec == nullptr || !spec->grf_prop.HasGrfFile() || spec->views < 4 || spec->size != 0x11) return false;
 	for (const ThreeDGrfObjectLook &g : _three_d_grf_objects) {
 		if (g.grfid == spec->grf_prop.grfid && g.local_id == spec->grf_prop.local_id) return true;
 	}
 	return false;
+}
+
+/**
+ * How many views the building menu offers for an object: one for an object that turns by a click once built, the
+ * others as many as it has (the player 24. 11.: "v menu výstavby nemusí být čtyři obrázky orientace ... jen vyberu
+ * mezi brána, zeď, věž a otočím je klikáním. jako hangár na letišti").
+ */
+int ObjectGuiViews(const ObjectSpec *spec)
+{
+	if (spec == nullptr) return 1;
+	return ThreeDGrfObjectSpecTurns(spec) ? 1 : spec->views;
 }
 
 /** How many steps a turn of a lighthouse's beams on the map goes in: as its reflector's picture (SPIN_STEPS of three_d_vehicle_object.cpp). */

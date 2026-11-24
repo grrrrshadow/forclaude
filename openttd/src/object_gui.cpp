@@ -27,6 +27,7 @@
 #include "zoom_func.h"
 #include "terraform_cmd.h"
 #include "object_cmd.h"
+#include "three_d_objects.h"
 #include "road_cmd.h"
 
 #include "widgets/object_widget.h"
@@ -102,7 +103,7 @@ public:
 			const DrawTileSprites *dts = &_objects[spec->grf_prop.local_id];
 			DrawOrigTileSeqInGUI(x, y, dts, PAL_NONE);
 		} else {
-			DrawNewObjectTileInGUI(x, y, spec, std::min<int>(_object_gui.sel_view, spec->views - 1));
+			DrawNewObjectTileInGUI(x, y, spec, std::min<int>(_object_gui.sel_view, ObjectGuiViews(spec) - 1));
 		}
 	}
 
@@ -165,8 +166,8 @@ public:
 				const ObjectClass *objclass = ObjectClass::Get(_object_gui.sel_class);
 				const ObjectSpec *spec = objclass->GetSpec(_object_gui.sel_type);
 				if (spec != nullptr) {
-					if (spec->views >= 2) size.width  += resize.width;
-					if (spec->views >= 4) size.height += resize.height;
+					if (ObjectGuiViews(spec) >= 2) size.width  += resize.width;
+					if (ObjectGuiViews(spec) >= 4) size.height += resize.height;
 				}
 				resize.width = 0;
 				resize.height = 0;
@@ -180,8 +181,8 @@ public:
 				size.width  = ScaleGUITrad(PREVIEW_WIDTH) + WidgetDimensions::scaled.fullbevel.Horizontal();
 				size.height = ScaleGUITrad(PREVIEW_HEIGHT) + WidgetDimensions::scaled.fullbevel.Vertical();
 				if (spec != nullptr) {
-					if (spec->views <= 1) size.width = size.width * 2 + WidgetDimensions::scaled.hsep_normal;
-					if (spec->views <= 2) size.height = size.height * 2 + WidgetDimensions::scaled.vsep_normal;
+					if (ObjectGuiViews(spec) <= 1) size.width = size.width * 2 + WidgetDimensions::scaled.hsep_normal;
+					if (ObjectGuiViews(spec) <= 2) size.height = size.height * 2 + WidgetDimensions::scaled.vsep_normal;
 				}
 				break;
 			}
@@ -278,7 +279,7 @@ public:
 			SetTileSelectSize(1, 1);
 			ResetObjectToPlace();
 		} else {
-			_object_gui.sel_view = std::min<int>(_object_gui.sel_view, spec->views - 1);
+			_object_gui.sel_view = std::min<int>(_object_gui.sel_view, ObjectGuiViews(spec) - 1);
 			SetObjectToPlaceWnd(SPR_CURSOR_TRANSMITTER, PAL_NONE, HT_RECT | HT_DIAGONAL, this);
 			int w = GB(spec->size, HasBit(_object_gui.sel_view, 0) ? 4 : 0, 4);
 			int h = GB(spec->size, HasBit(_object_gui.sel_view, 0) ? 0 : 4, 4);
@@ -308,7 +309,7 @@ public:
 		if (pi.Test(PickerInvalidation::Position)) {
 			const auto objclass = ObjectClass::Get(_object_gui.sel_class);
 			const auto spec = objclass->GetSpec(_object_gui.sel_type);
-			_object_gui.sel_view = std::min<int>(_object_gui.sel_view, spec->views - 1);
+			_object_gui.sel_view = std::min<int>(_object_gui.sel_view, ObjectGuiViews(spec) - 1);
 			this->UpdateButtons(spec);
 		}
 	}
@@ -333,6 +334,13 @@ public:
 	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
 	{
 		const ObjectSpec *spec = ObjectClass::Get(_object_gui.sel_class)->GetSpec(_object_gui.sel_type);
+
+		/* A click with the tool on an object that turns turns it, as without the tool (the player 24. 11.: "teď nejde
+		 * otočit kliknutím, že tam už stojí předchozí": the tool built over it and failed). */
+		if (ThreeDGrfObjectTurns(tile)) {
+			Command<Commands::TurnObject>::Post(STR_ERROR_CAN_T_DO_THIS, tile);
+			return;
+		}
 
 		if (spec->size == OBJECT_SIZE_1X1) {
 			VpStartPlaceSizing(tile, VPM_X_AND_Y, DDSP_BUILD_OBJECT);
