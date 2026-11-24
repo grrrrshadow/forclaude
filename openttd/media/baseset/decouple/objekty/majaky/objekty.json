@@ -1,0 +1,480 @@
+[
+ {
+  "druh": "majak",
+  "jmeno": "majak_kulaty",
+  "soubor": "majak_kulaty.glb",
+  "nazev": {
+   "cs": "kulatý maják",
+   "en": "round lighthouse"
+  },
+  "rozmer_m": {
+   "x": [
+    -3.92,
+    3.92
+   ],
+   "y": [
+    -3.92,
+    3.92
+   ],
+   "z": [
+    0.0,
+    20.98
+   ]
+  },
+  "trojuhelniku": 2802,
+  "dvere": [
+   {
+    "poloha": [
+     3.2,
+     0.0,
+     0.6
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.15,
+    "vyska": 2.3,
+    "otevrene": true,
+    "poznamka": "otevřený vchod do věže, uvnitř točité schody"
+   }
+  ],
+  "podlahy": {
+   "prizemi": 0.6,
+   "lucerna": 16.6,
+   "ochoz": 16.6,
+   "poznamka": "uvnitř 64 schodů po 0.25 m a 22,5° kolem sloupu (0,35 m), od 22,5° (vlevo za dveřmi) proti směru hodinových ručiček, 4 m na otáčku, z přízemí na podlahu lucerny; v podlaze lucerny (spodek 16,35 m) je otvor nad schody od 14,35 m (od 157,5°) a 0,45 m před nimi, nad každým schodem je aspoň 2,1 m volna (hra 10. 11.); podlaha lucerny je mezi 22,5° a 112,5° celá, mezi 112,5° a 135° od 1,25 m ke sklu; z lucerny dveře na ochoz (bez skla mezi 90° a 135°), ochoz 1,3 m široký s červeným zábradlím 1 m"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "otaceni": {
+   "uzel": "reflektor",
+   "osa": "z",
+   "stred": [
+    0.0,
+    0.0,
+    17.9
+   ],
+   "otacka_s": 10,
+   "noc_uzel": "reflektor_noc",
+   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček, jen v noci jako uzel noc; paprsky jsou světla (svetla.svitilna, body svitilna_NN a paprsek_NN pod reflektorem)"
+  },
+  "svetla": {
+   "svitilna": {
+    "barva": "FFEDB2",
+    "dosah_m": 230,
+    "uhel": 8,
+    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku u čočky reflektoru, paprsek_NN kam míří (5° dolů, spodní kraj kužele 0,15 m nad zábradlím ochozu); barva, dosah v metrech a úhel kužele ve stupních"
+   }
+  },
+  "doplnky": [
+   {
+    "jmeno": "hrob_kolega_grrrrf",
+    "poloha": [
+     -5.6,
+     0.0,
+     0
+    ],
+    "otoceni": 270
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -6.15,
+     1.25,
+     0
+    ],
+    "otoceni": 290,
+    "meritko": 0.55
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -5.8,
+     -1.2,
+     0
+    ],
+    "otoceni": 20,
+    "meritko": 0.45
+   },
+   {
+    "jmeno": "kamen_plochy",
+    "poloha": [
+     -4.85,
+     1.35,
+     0
+    ],
+    "otoceni": 340,
+    "meritko": 0.4
+   },
+   {
+    "jmeno": "kamen_stredni",
+    "poloha": [
+     -4.65,
+     -1.45,
+     0
+    ],
+    "otoceni": 70,
+    "meritko": 0.4
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -7.05,
+     -0.75,
+     0
+    ],
+    "otoceni": 160,
+    "meritko": 0.4
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -7.15,
+     0.6,
+     0
+    ],
+    "otoceni": 210,
+    "meritko": 0.5
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "lucerna",
+    "poloha": [
+     -6.15,
+     -0.41,
+     0.09
+    ],
+    "otoceni": 270
+   }
+  ],
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -6.1,
+     0.15,
+     0.09
+    ],
+    "otoceni": 295,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.78,
+     -0.14,
+     0.09
+    ],
+    "otoceni": 50,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.43,
+     0.08,
+     0.09
+    ],
+    "otoceni": 170,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -6.22,
+     -0.13,
+     0.09
+    ],
+    "otoceni": 270,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.8,
+     0.17,
+     0.09
+    ],
+    "otoceni": 340,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.48,
+     -0.16,
+     0.09
+    ],
+    "otoceni": 60,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.96,
+     0.0,
+     0.09
+    ],
+    "otoceni": 130,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.3,
+     0.14,
+     0.09
+    ],
+    "otoceni": 210,
+    "meritko": 0.8
+   }
+  ],
+  "hrob_poznamka": "hrobeček kolegy za majákem, na straně dál od dveří (hráč 13. 11.: „ať mají klid ode mně“): hrob_kolega_grrrrf (predmety/hroby_kolegu.py), náhrobek k věži, nápis a záhon ven; na něm lucerna od grrrrf (predmety lucerna), v záhonu mladá marihuana (kytka_mari_mlada, 0,35 m) a kvítky naší trávy (trava_kvitky), kolem opodál kameny (objekty/kameni); polohy v rámu majáku (počátek uprostřed), jako u domů doplnky, postavy, rostliny",
+  "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice, inspirace rozhledna Petra Š.)",
+  "licence": "GPL-2.0 (vlastní geometrie i barvy)",
+  "poznamka": "kulatý maják (hráč 9. 11.: „tak skus kulaty majak se schdama uvnitř, mužou byt dva majaky“): bílá zužující se věž s dvěma červenými pruhy na kamenném soklu, dole otevřený vchod k +x, uvnitř točité schody nahoru do prosklené lucerny, z ní ven na ochoz; v lucerně lampa a reflektor, který se točí (otaceni), v noci lampa svítí (noc) a reflektor dává dva paprsky; počátek uprostřed na zemi; levný, jen barvy"
+ },
+ {
+  "druh": "majak",
+  "jmeno": "majak_hranaty",
+  "soubor": "majak_hranaty.glb",
+  "nazev": {
+   "cs": "hranatý maják",
+   "en": "square lighthouse"
+  },
+  "rozmer_m": {
+   "x": [
+    -3.7,
+    3.7
+   ],
+   "y": [
+    -3.7,
+    3.7
+   ],
+   "z": [
+    0.0,
+    16.29
+   ]
+  },
+  "trojuhelniku": 1856,
+  "dvere": [
+   {
+    "poloha": [
+     2.78,
+     0.0,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.1,
+    "vyska": 2.1,
+    "otevrene": false,
+    "napis": "VCHOD",
+    "poznamka": "zavřené dveře s cedulí VCHOD, bez interiéru (hráč: „bude tam chodit mat“)"
+   }
+  ],
+  "podlahy": {
+   "strecha": 12.0,
+   "skleník": 12.0,
+   "poznamka": "schody venku jednou kolem dokola: 4 ramena po 15 schodech (0.2 m, hloubka 0.35 m, šířka 1.0 m) a odpočívadla v rozích; začínají u rohu +x −y na zemi, jdou podél −y, −x, +y a +x, horní odpočívadlo ve 12 m pokračuje podél −y na střechu mezerou v zábradlí (x 1,2 až 2,7); skleník na střeše 2,6 × 2,6 m s otevřenými dveřmi na −y"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "otaceni": {
+   "uzel": "reflektor",
+   "osa": "z",
+   "stred": [
+    0.0,
+    0.0,
+    13.3
+   ],
+   "otacka_s": 10,
+   "noc_uzel": "reflektor_noc",
+   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček, jen v noci jako uzel noc; paprsky jsou světla (svetla.svitilna, body svitilna_NN a paprsek_NN pod reflektorem)"
+  },
+  "svetla": {
+   "svitilna": {
+    "barva": "FFEDB2",
+    "dosah_m": 230,
+    "uhel": 8,
+    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku u čočky reflektoru, paprsek_NN kam míří (5° dolů, spodní kraj kužele 0,15 m nad zábradlím ochozu); barva, dosah v metrech a úhel kužele ve stupních"
+   }
+  },
+  "doplnky": [
+   {
+    "jmeno": "hrob_kolega",
+    "poloha": [
+     -5.6,
+     0.0,
+     0
+    ],
+    "otoceni": 270
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -6.15,
+     1.25,
+     0
+    ],
+    "otoceni": 290,
+    "meritko": 0.55
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -5.8,
+     -1.2,
+     0
+    ],
+    "otoceni": 20,
+    "meritko": 0.45
+   },
+   {
+    "jmeno": "kamen_plochy",
+    "poloha": [
+     -4.85,
+     1.35,
+     0
+    ],
+    "otoceni": 340,
+    "meritko": 0.4
+   },
+   {
+    "jmeno": "kamen_stredni",
+    "poloha": [
+     -4.65,
+     -1.45,
+     0
+    ],
+    "otoceni": 70,
+    "meritko": 0.4
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -7.05,
+     -0.75,
+     0
+    ],
+    "otoceni": 160,
+    "meritko": 0.4
+   },
+   {
+    "jmeno": "kamen_maly",
+    "poloha": [
+     -7.15,
+     0.6,
+     0
+    ],
+    "otoceni": 210,
+    "meritko": 0.5
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "lucerna",
+    "poloha": [
+     -6.15,
+     -0.41,
+     0.09
+    ],
+    "otoceni": 270
+   }
+  ],
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -6.1,
+     0.15,
+     0.09
+    ],
+    "otoceni": 295,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.78,
+     -0.14,
+     0.09
+    ],
+    "otoceni": 50,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.43,
+     0.08,
+     0.09
+    ],
+    "otoceni": 170,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -6.22,
+     -0.13,
+     0.09
+    ],
+    "otoceni": 270,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.8,
+     0.17,
+     0.09
+    ],
+    "otoceni": 340,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.48,
+     -0.16,
+     0.09
+    ],
+    "otoceni": 60,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.96,
+     0.0,
+     0.09
+    ],
+    "otoceni": 130,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.3,
+     0.14,
+     0.09
+    ],
+    "otoceni": 210,
+    "meritko": 0.8
+   }
+  ],
+  "hrob_poznamka": "hrobeček kolegy za majákem, na straně dál od dveří (hráč 13. 11.: „ať mají klid ode mně“): hrob_kolega (predmety/hroby_kolegu.py), náhrobek k věži, nápis a záhon ven; na něm lucerna od grrrrf (predmety lucerna), v záhonu mladá marihuana (kytka_mari_mlada, 0,35 m) a kvítky naší trávy (trava_kvitky), kolem opodál kameny (objekty/kameni); polohy v rámu majáku (počátek uprostřed), jako u domů doplnky, postavy, rostliny",
+  "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy a cedule)",
+  "poznamka": "hranatý maják (hráč 9. 11.: „široka krabice pul kachličky, vnějškem schodiště nahoru, schody jednou okolo budovy, vyšsí nebude budova. na střeše dveře do skleníku, uvnitř skleníku světlo, reflektor se bude točit. budova bude mit dole dveře označené vchod bez interieru. bude tam chodit mat“): bílá krabice 5,4 m (se schody 7,4 m, půl dlaždice) s červeným pásem a zábradlím, střecha ve 12 m, skleník s lampou a reflektorem, který se točí (otaceni); dole zavřené dveře s cedulí VCHOD k +x; počátek uprostřed na zemi"
+ }
+]

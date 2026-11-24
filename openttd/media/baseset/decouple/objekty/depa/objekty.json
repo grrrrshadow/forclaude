@@ -1,0 +1,372 @@
+[
+ {
+  "druh": "depo",
+  "jmeno": "depo_vlak",
+  "soubor": "depo_vlak.glb",
+  "nazev": {
+   "cs": "depo vlaků"
+  },
+  "typ": "zeleznice",
+  "vjezd": {
+   "smer": [
+    1,
+    0
+   ],
+   "diagdir": "SW",
+   "poloha": [
+    14.2,
+    7.4,
+    0.0
+   ],
+   "sirka": 8.4,
+   "vyska": 7.2,
+   "kolej_y": 7.4
+  },
+  "dvere": [
+   {
+    "uzel": "dvere_00",
+    "druh": "vrata",
+    "pant": [
+     14.15,
+     3.2
+    ],
+    "osa": "z",
+    "poloha": [
+     14.2,
+     5.3,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 4.2,
+    "vyska": 6.64,
+    "otevira_se": "ven",
+    "otevreni_uhel": -100,
+    "poznamka": "křídlo vjezdu, zavřené; otevřené = otočené o otevreni_uhel stupňů kolem svislé osy pantu (kladně proti směru hodinových ručiček shora)"
+   },
+   {
+    "uzel": "dvere_01",
+    "druh": "vrata",
+    "pant": [
+     14.15,
+     11.6
+    ],
+    "osa": "z",
+    "poloha": [
+     14.2,
+     9.5,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 4.2,
+    "vyska": 6.64,
+    "otevira_se": "ven",
+    "otevreni_uhel": 100,
+    "poznamka": "křídlo vjezdu, zavřené; otevřené = otočené o otevreni_uhel stupňů kolem svislé osy pantu (kladně proti směru hodinových ručiček shora)"
+   },
+   {
+    "uzel": "dvere_02",
+    "druh": "dvere",
+    "pant": [
+     8.08,
+     12.55
+    ],
+    "osa": "z",
+    "poloha": [
+     7.55,
+     12.6,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.1,
+    "vyska": 2.2,
+    "otevira_se": "ven",
+    "otevreni_uhel": -100,
+    "poznamka": "dveře pro lidi na boku (křídlo −x od pantu), zavřené; nad nimi nadsvětlík v oblouku"
+   }
+  ],
+  "interier": false,
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 11,
+   "poznamka": "v noci ukaž uzel noc: rozsvícená okna (kopie skel 1,5 cm před nimi) a lampy u vjezdu a u dveří; svetlo_NN jsou místa záře"
+  },
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model depa/depa.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "atlas_px": [
+   1024,
+   512
+  ],
+  "rozmer_m": {
+   "x": [
+    0.55,
+    14.78
+   ],
+   "y": [
+    1.56,
+    13.24
+   ],
+   "z": [
+    0.0,
+    10.1
+   ]
+  },
+  "trojuhelniku": 6350,
+  "poznamka": "depo vlaků ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 6350 trojúhelníků, 498 kB"
+ },
+ {
+  "druh": "depo",
+  "jmeno": "depo_auta",
+  "soubor": "depo_auta.glb",
+  "nazev": {
+   "cs": "garáž (depo silničních vozidel)"
+  },
+  "typ": "silnice",
+  "vjezd": {
+   "smer": [
+    1,
+    0
+   ],
+   "diagdir": "SW",
+   "poloha": [
+    14.2,
+    7.4,
+    0.0
+   ],
+   "sirka": 9.2,
+   "vyska": 4.3
+  },
+  "dvere": [
+   {
+    "uzel": "dvere_00",
+    "druh": "vrata",
+    "pant": [
+     14.15,
+     2.8
+    ],
+    "osa": "z",
+    "poloha": [
+     14.2,
+     5.1,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 4.6,
+    "vyska": 4.3,
+    "otevira_se": "ven",
+    "otevreni_uhel": -100,
+    "poznamka": "křídlo vrat, zavřené; otevřené = otočené o otevreni_uhel stupňů kolem svislé osy pantu (kladně proti směru hodinových ručiček shora)"
+   },
+   {
+    "uzel": "dvere_01",
+    "druh": "vrata",
+    "pant": [
+     14.15,
+     12.0
+    ],
+    "osa": "z",
+    "poloha": [
+     14.2,
+     9.7,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 4.6,
+    "vyska": 4.3,
+    "otevira_se": "ven",
+    "otevreni_uhel": 100,
+    "poznamka": "křídlo vrat, zavřené; otevřené = otočené o otevreni_uhel stupňů kolem svislé osy pantu (kladně proti směru hodinových ručiček shora)"
+   },
+   {
+    "uzel": "dvere_02",
+    "druh": "dvere",
+    "pant": [
+     13.03,
+     0.95
+    ],
+    "osa": "z",
+    "poloha": [
+     12.5,
+     0.9,
+     0.0
+    ],
+    "smer": [
+     0,
+     -1
+    ],
+    "sirka": 1.1,
+    "vyska": 2.2,
+    "otevira_se": "ven",
+    "otevreni_uhel": 100,
+    "poznamka": "plechové dveře pro lidi na boku u vrat (křídlo −x od pantu), zavřené"
+   }
+  ],
+  "interier": false,
+  "barva_firmy": {
+   "cast": "sklo_strechy",
+   "maska": "depo_auta_maska_firmy.png",
+   "zacatek": 222,
+   "poznamka": "pás oken dokola pod střechou v barvě firmy (OpenGFX má tento pruh v barvě firmy; hráč 10. 11.: „to bylo lepší ta barva firmy“, „i v noci“), ve dne i v noci, v noci nesvítí; maska je pro texturu prvního materiálu (atlas), barvení jako barvy domů"
+  },
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 11,
+   "poznamka": "v noci ukaž uzel noc: rozsvícená okna a okénka vrat, lampa nad vraty a u dveří; svetlo_NN jsou místa záře"
+  },
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model depa/depa.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "atlas_px": [
+   1024,
+   768
+  ],
+  "rozmer_m": {
+   "x": [
+    0.09,
+    14.78
+   ],
+   "y": [
+    0.32,
+    14.41
+   ],
+   "z": [
+    0.0,
+    8.56
+   ]
+  },
+  "trojuhelniku": 3630,
+  "poznamka": "garáž (depo silničních vozidel) ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 3630 trojúhelníků, 529 kB"
+ },
+ {
+  "druh": "depo",
+  "jmeno": "depo_lode",
+  "soubor": "depo_lode.glb",
+  "nazev": {
+   "cs": "lodní depo"
+  },
+  "typ": "voda",
+  "dlazdice": [
+   2,
+   1
+  ],
+  "casti": {
+   "North": [
+    0.0,
+    14.8
+   ],
+   "South": [
+    14.8,
+    29.6
+   ],
+   "poznamka": "dvě dlaždice podél x: severní část (DepotPart North) x 0–14,8, jižní (South) x 14,8–29,6; objekt patří k severní dlaždici a kreslí se jednou za celé depo"
+  },
+  "vjezd": [
+   {
+    "cast": "North",
+    "smer": [
+     -1,
+     0
+    ],
+    "diagdir": "NE",
+    "poloha": [
+     0.6,
+     7.4,
+     0.0
+    ],
+    "sirka": 9.9,
+    "vyska": 5.6
+   },
+   {
+    "cast": "South",
+    "smer": [
+     1,
+     0
+    ],
+    "diagdir": "SW",
+    "poloha": [
+     29.0,
+     7.4,
+     0.0
+    ],
+    "sirka": 9.9,
+    "vyska": 5.6
+   }
+  ],
+  "osa_y": {
+   "otoceni": 90,
+   "stred": [
+    7.4,
+    7.4
+   ],
+   "poznamka": "depo podél y: otoč o +90° kolem středu severní dlaždice (7,4; 7,4), kladně proti směru hodinových ručiček shora: x' = 14,8 − y, y' = x; světlíky pak na straně −x jako ve spritech 0xFE7/0xFE9"
+  },
+  "lavky": {
+   "z": 0.6,
+   "y": [
+    [
+     1.5,
+     2.7
+    ],
+    [
+     12.1,
+     13.3
+    ]
+   ],
+   "poznamka": "dřevěné lávky uvnitř podél obou dlouhých zdí, kudy chodí chodec; dveře depo nemá (hráč 10. 11.: „tohle depo bez dveří“), na lávky se jde od vjezdů"
+  },
+  "dvere": [],
+  "interier": false,
+  "barva_firmy": {
+   "cast": "pas_nad_vjezdy_a_vlajky",
+   "maska": "depo_lode_maska_firmy.png",
+   "zacatek": 222,
+   "poznamka": "pás nad oběma vjezdy a vlajky na hřebeni v barvě firmy (OpenGFX je má modré); stejný atlas i maska jako garáž"
+  },
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 26,
+   "poznamka": "v noci ukaž uzel noc: okna, světlíky, lampy u vjezdů a nad dveřmi; svetlo_NN jsou místa záře"
+  },
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model depa/depa.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "atlas_px": [
+   1024,
+   512
+  ],
+  "rozmer_m": {
+   "x": [
+    0.08,
+    29.52
+   ],
+   "y": [
+    0.64,
+    14.16
+   ],
+   "z": [
+    0.0,
+    12.6
+   ]
+  },
+  "trojuhelniku": 4964,
+  "poznamka": "lodní depo ve stylu OpenGFX (hráč 10. 11.: „udělame 3D depo pro lodě“): dvě dlaždice podél x nad vodou, počátek v severním rohu severní dlaždice, osy hry, metry; otevřené na obou čelech (vjezd obou částí), vodu kreslí hra; uvnitř lávky podél zdí; 4964 trojúhelníků, 354 kB"
+ }
+]

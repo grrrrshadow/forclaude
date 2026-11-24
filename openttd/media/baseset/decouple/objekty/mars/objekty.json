@@ -1,0 +1,456 @@
+[
+ {
+  "soubor": "mars_0_inhab_bydleni_a.glb",
+  "jmeno": "mars_0_inhab_bydleni_a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 0,
+  "varianty": [
+   0,
+   1
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab Housing Module (dům 0 sady 524A450B, vzhled A): jeden modul, přechodová komora, trubky k sousedům, anténa s talířem, bedny, lampa; 472 trojúhelníků, textura 512×256, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     6.6,
+     14.78,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 25,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (50 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_0_inhab_bydleni_b.glb",
+  "jmeno": "mars_0_inhab_bydleni_b",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 0,
+  "varianty": [
+   2,
+   3
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab Housing Module (dům 0 sady 524A450B, vzhled B): modul otočený, skleník pod kopulí, nádrž na čtyřech nohách, trubky podél x, anténa, lampa; 1178 trojúhelníků, textura 512×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     5.5,
+     11.45,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 23,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (46 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_1_inhab_byty_a.glb",
+  "jmeno": "mars_1_inhab_byty_a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 1,
+  "varianty": [
+   0,
+   1
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab ApartModule (dům 1 sady 524A450B, vzhled A): dva moduly nad sebou, solární panely na střeše, rover, trubky, lampy; 808 trojúhelníků, textura 512×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     11.0,
+     12.45,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (78 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_1_inhab_byty_b.glb",
+  "jmeno": "mars_1_inhab_byty_b",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 1,
+  "varianty": [
+   2,
+   3
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab ApartModule (dům 1 sady 524A450B, vzhled B): dva moduly, střešní skleník pod kopulí, přistávací modul na kruhové plošině, trubka, lampa; 1350 trojúhelníků, textura 512×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     11.0,
+     13.4,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (70 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_2_inhab_kondominium_a.glb",
+  "jmeno": "mars_2_inhab_kondominium_a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 2,
+  "varianty": [
+   0,
+   1
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab CondoModule (dům 2 sady 524A450B, vzhled A): tři patra, stožáry a talíř na střeše, solární panely u domu, trubka, bedny, lampa; 750 trojúhelníků, textura 512×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     6.2,
+     14.78,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (130 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_2_inhab_kondominium_b.glb",
+  "jmeno": "mars_2_inhab_kondominium_b",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 2,
+  "varianty": [
+   2,
+   3
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab CondoModule (dům 2 sady 524A450B, vzhled B): tři patra, talíř na střeše, vysoká nádrž, pole solárních panelů 2 × 2, dvě trubky, lampa; 904 trojúhelníků, textura 512×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     10.6,
+     11.7,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (136 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_3_inhab_vez_a.glb",
+  "jmeno": "mars_3_inhab_vez_a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 3,
+  "varianty": [
+   0,
+   1
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab Tower Module (dům 3 sady 524A450B, vzhled A): věž o pěti patrech, svazek stožárů s červenými špičkami, trubky, kruhová plošina, rover, lampy; 1294 trojúhelníků, textura 1024×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     5.6,
+     14.78,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (220 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_3_inhab_vez_b.glb",
+  "jmeno": "mars_3_inhab_vez_b",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 3,
+  "varianty": [
+   2,
+   3
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab Tower Module (dům 3 sady 524A450B, vzhled B): věž o šesti patrech, talíř na stožáru, přistávací modul na plošině, trubky, lampa; 1390 trojúhelníků, textura 1024×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     5.4,
+     14.78,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (208 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_4_luxurehab_arkologie.glb",
+  "jmeno": "mars_4_luxurehab_arkologie",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 4,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "LuxureHab Arcology Module (dům 4 sady 524A450B): arkologie o sedmi patrech ve dvou stupních, nahoře zahrada pod skleněnou kopulí, trubky, lampy; 1892 trojúhelníků, textura 1024×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     6.4,
+     14.78,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (296 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_5_inhab_namesti.glb",
+  "jmeno": "mars_5_inhab_namesti",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 5,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "inHab Plaza Module (dům 5 sady 524A450B): zahrada pod velkou skleněnou kopulí se stromy, trubky ke všem sousedům, lampy v rozích; 1158 trojúhelníků, textura 1024×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     7.4,
+     14.78,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ]
+ },
+ {
+  "soubor": "mars_6_luxurehab_hotel_a.glb",
+  "jmeno": "mars_6_luxurehab_hotel_a",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 6,
+  "varianty": [
+   0,
+   1
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "LuxureHab Hotel Module (dům 6 sady 524A450B, vzhled A): hotel o pěti patrech se střešní zahradou pod kopulí, přistávací plošina s majákem, rover, trubka, lampa; 1802 trojúhelníků, textura 1024×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     5.8,
+     14.78,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (208 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ },
+ {
+  "soubor": "mars_6_luxurehab_hotel_b.glb",
+  "jmeno": "mars_6_luxurehab_hotel_b",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mars",
+  "nahrazuje_grf": "524A450B",
+  "nahrazuje_house_grf": 6,
+  "varianty": [
+   2,
+   3
+  ],
+  "autor": "grrrrf (mars_glb.py: vlastní geometrie a textury, barvy podle spritů (Fixed) OpenGFX Mars Houses)",
+  "licence": "GPL-2.0 (podle (Fixed) OpenGFX Mars Houses, BaNaNaS 524A450B, GPL-2.0)",
+  "poznamka": "LuxureHab Hotel Module (dům 6 sady 524A450B, vzhled B): hotel o pěti patrech se střešní zahradou, přistávací modul na plošině, nádrž, trubka; 1870 trojúhelníků, textura 1024×512, 12.0 texelů na metr; průhledné tabulky kopulí alfou",
+  "dvere": [
+   {
+    "poloha": [
+     11.3,
+     13.7,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (210 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  }
+ }
+]

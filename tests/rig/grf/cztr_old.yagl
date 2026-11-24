@@ -1,0 +1,148 @@
+// A stand-in for CZTR Wagons-Cargo 1.0.0, the release the rig has not got: the
+// set's id (4D490213) and that release's very name, which is how the game tells
+// it from the set's other releases (IsWagonCargoExceptionGrf()), on the rig's
+// one-layer St (st_old.yagl). Played by the scene cztrvymena (see README.md): a
+// game with FIRS 5 and another release of the set plays this one in its place.
+//     yagl -e <out>/cztr_old.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x44 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "MI\x02\x13";
+    version: GRF8;
+    name: "CZTR Wagons-Cargo 1.0.0";
+    description: "Rig: a stand-in for CZTR Wagons-Cargo 1.0.0 -- the set's id and that release's name on the rig's one-layer St.";
+}
+properties<GlobalSettings, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        cargo_translation_table: "COAL";
+    }
+}
+sprite_sets<Trains, 0x0000> // <feature, first_set> Action01
+{
+    sprite_set // 0x0000
+    {
+        sprite_id<0x00000006>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [10, 10];
+        }
+        sprite_id<0x00000007>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [40, 10];
+        }
+        sprite_id<0x00000008>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [70, 10];
+        }
+        sprite_id<0x00000009>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [100, 10];
+        }
+        sprite_id<0x0000000A>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [130, 10];
+        }
+        sprite_id<0x0000000B>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [160, 10];
+        }
+        sprite_id<0x0000000C>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [190, 10];
+        }
+        sprite_id<0x0000000D>
+        {
+            [20, 8, -10, -2], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [220, 10];
+        }
+    }
+    sprite_set // 0x0001
+    {
+        sprite_id<0x0000000E>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [250, 10];
+        }
+        sprite_id<0x0000000F>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [280, 10];
+        }
+        sprite_id<0x00000010>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [310, 10];
+        }
+        sprite_id<0x00000011>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [340, 10];
+        }
+        sprite_id<0x00000012>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [370, 10];
+        }
+        sprite_id<0x00000013>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [400, 10];
+        }
+        sprite_id<0x00000014>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [430, 10];
+        }
+        sprite_id<0x00000015>
+        {
+            [20, 12, -10, -6], normal, c8bpp, "cztr_old-8bpp-normal-0.png", [460, 10];
+        }
+    }
+}
+sprite_groups<Trains, 0xFF> // Action02 basic
+{
+    primary_spritesets: [ 0x0000 0x0001 ];
+    secondary_spritesets: [ 0x0000 0x0001 ];
+}
+properties<Trains, 0x00C8> // Action00
+{
+    // instance_id: 0x00C8
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0xFD;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x00;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+    }
+}
+strings<Trains, default, 0x00C8> // <feature, language, first_id> Action04, Default
+{
+    /* 0x00C8 */ "St (rig)";
+}
+feature_graphics<Trains> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x00FF;
+    feature_ids: [ 0x00C8 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}

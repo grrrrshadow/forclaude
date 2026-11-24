@@ -1,0 +1,277 @@
+zakl: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+couvej: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+poruchaspoj: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nedobrzdil: spojeno=1 odtazeno=1 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
+nedobrzdilles: spojeno=1 odtazeno=1 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
+nedobrzdilvidet5: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nedobrzdilvyp: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nedobrzdilbez: spojeno=1 odtazeno=1 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
+nedobrzdilcesta: spojeno=1 odtazeno=1 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
+projetcervenou: spojeno=1 odtazeno=1 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+nedobrzdilblok: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oranzblizko: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oranzdaleko: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oranzzapomene: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oranzzapomene3: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oranzhusto2: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oranzhusto1: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oranzdve: spojeno=2 odtazeno=2 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depo: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depopocet: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depostoji: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depozrus: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depovagony: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depooboji: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+sklad2: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+sklad6: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+sklad20: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+skladdve: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+koupitpri: spojeno=2 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+filtrspatny: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+filtropraveny: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+clanky: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+clankycouvej: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+smes: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rad: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+blok: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+dodepa: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vlek: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vlekblok: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahrovina: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahsvah: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahsvahzpet: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahkrizeni: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahjednosmer: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahdaleko: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahjednosmerfronta: spojeno=2 odtazeno=2 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahdalekofronta: spojeno=2 odtazeno=2 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahdveblizsi: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahbezdepa: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahvagony: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+koupitvagonky: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vybervagonu: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vybervagonustanice: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vybervagonunaklad: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+koupitjinytyp: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+koupitdoplnit: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depocelyvlak: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+koupitcelyvlak: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+typsnakladem: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+typvsechny: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+oknorozkazu: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+prestavbacudlik: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+prestavbanabidka: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depoplne: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+koupitplne: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+typbezkoupeni: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rolovaktypu: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+hledejvrade: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zalozhledej: spojeno=7 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+prodatvagonkydepo: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+prodatvagonkyperon: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+ikonaprodatvlak: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+ikonaprodatvagonky: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahprodat: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahprodatbez: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahprodatbezdve: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahrovinabez: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahrovinablok: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahprodatdlouhy: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+porouchanydlouhy: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahzavagonky: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=4 auto=0 odmitnuto=0
+odtahprodatporucha: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+okruh: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+odtahcudlik: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+naklad: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nakladcekat: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nakladsmer: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nakladcil: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nakladsav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+emu: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+emujz: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+save91: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+save91rev: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+mess: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+messodvoz: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+messodtah: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+ekaodtah: spojeno=7 odtazeno=5 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=3 auto=0 odmitnuto=0
+vlak31: spojeno=0 odtazeno=0 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=12 auto=0 odmitnuto=0
+protlacit: spojeno=2 odtazeno=2 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+radasmasinkou: spojeno=38 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+sklad128: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+poruchavrata: spojeno=10 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=5 auto=0 odmitnuto=0
+poruchanastup: spojeno=14 odtazeno=2 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+poruchazavlakem: spojeno=4 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=3 auto=0 odmitnuto=0
+odtahperon: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+lokonula: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=5 auto=0 odmitnuto=0
+lokocely: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
+zaloz: spojeno=7 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zalozsmerperon: spojeno=6 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zalozsmer: spojeno=10 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
+zalozsmerdlouho: spojeno=25 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=0 odmitnuto=0
+odtahotoc: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+odtahvyhybka: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+mezera: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+depoodpoj: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+auto: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigC2h: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigC1m: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigD0: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigD3: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigD1: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=5 auto=0 odmitnuto=0
+rigD2: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=3 auto=0 odmitnuto=0
+rigD5: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=17 auto=0 odmitnuto=0
+rigD4: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigDA: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=6 auto=0 odmitnuto=0
+rigDB: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=11 auto=0 odmitnuto=0
+rigDAo: spojeno=10 odtazeno=6 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+rigDBo: spojeno=9 odtazeno=5 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=8 auto=0 odmitnuto=0
+rigXAA: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigXAA: vlaku=76/76 bezrozkazu=0/0 vdepu=76/76
+rigXBB: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigXBB: vlaku=76/76 bezrozkazu=0/0 vdepu=76/76
+rigXAB: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigXAB: vlaku=76/76 bezrozkazu=0/0 vdepu=76/76
+rigXBA: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+rigXBA: vlaku=76/76 bezrozkazu=0/0 vdepu=76/76
+kabposun: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kabposun: k vagonum dojel
+kabposunpult: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kabposunpult: k vagonum nedojel
+kabposunnaraz: spojeno=0 odtazeno=0 havaroval=2 srazka=1 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kabposunnaraz: k vagonum nedojel
+vysypat: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vysypat: na zemi 1 odmitnuto | nad (59,68) vyska 206 smer 4 - dym|nad (59,75) vyska 206 smer 3 - dym| oblacku 30
+vysypatbomby: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 odmitnuto=0
+vysypatbomby: na zemi 2 odmitnuto | nad (55,16) vyska 198 smer 5 - bomby|atomovka na (55,16) - vraku 0, prumyslu zbourano 0, domu srovnano 0|
+strelba: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+strelba: na zemi 1 odmitnuto | z (89,96) vyska 216 na (83,91) - kulomet|z (89,89) vyska 192 na (92,81) - kulomet| oblacku 30
+strelbarakety: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 odmitnuto=0
+strelbarakety: na zemi 1 odmitnuto | z (55,16) vyska 198 na (63,16) - raketa|atomovka na (63,16) - vraku 0, prumyslu zbourano 0, domu srovnano 0|
+bpletiste: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+bpletiste: 24 prvku, letiste 24 dlazdic (text 24), vlozeno ano - pojezd/konec/stred/stani/plocha/heliport/hangar/budova 8/2/5/1/1/0/1/6 -> 8/2/5/1/1/0/1/6, stanic 1 -> 1|24 prvku, letiste 24 dlazdic (text 24), vlozeno ano - pojezd/konec/stred/stani/plocha/heliport/hangar/budova 8/2/5/1/1/0/1/6 -> 8/2/5/1/1/0/1/6, stanic 1 -> 1|24 prvku, letiste 24 dlazdic (text 24), vlozeno ano - pojezd/konec/stred/stani/plocha/heliport/hangar/budova 8/2/5/1/1/0/1/6 -> 8/2/5/1/1/0/1/6, stanic 1 -> 1|24 prvku, letiste 24 dlazdic (text 24), vlozeno ano - pojezd/konec/stred/stani/plocha/heliport/hangar/budova 8/2/5/1/1/0/1/6 -> 8/2/5/1/1/0/1/6, stanic 1 -> 1|
+cplnic: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+cplauto: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+cplauto1: spojeno=1 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vrakzmizi: spojeno=0 odtazeno=0 havaroval=1 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=0 odmitnuto=0
+stopkadepo: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+stopkatrat: spojeno=1 odtazeno=1 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+autovlak: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=4 odmitnuto=0
+autozanik: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=2 auto=1 odmitnuto=0
+prodatsautem: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=1 auto=1 odmitnuto=0
+autodve: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=6 odmitnuto=0
+autoposun: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 odmitnuto=0
+autoposunne: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+autoletadlo: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=7 odmitnuto=0
+autoletadlotam: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=5 odmitnuto=0
+autoletadlodve: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=13 odmitnuto=0
+autoloddve: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=34 odmitnuto=0
+autolod: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=16 odmitnuto=0
+autonaauta: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=4 odmitnuto=0
+autosmery: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=1 odmitnuto=0
+domy: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=4
+domyvypnute: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+marsmesta: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+marsmestacz: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+domyklima: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+klimamesta: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+snihtemperate: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+snihvyp: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=3
+snihbezarktidy: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+delenigrf: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+smerdepo: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+domypicker: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+naklady: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+grfvzdalo: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nakladysdilene: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=5
+nakladysdilene2: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=5
+grfodmita: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=5
+grfodmitavyp: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=4
+domypickervypnute: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+domypostav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+prumyslklimat: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+prumyslgrafika: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+prumyslsada: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+marihuana: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=13
+marihuanasada: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=12
+vozidlahry: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zelenest: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=13
+zelenestjednovrstvy: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+cztrvymena: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+cztrvymena: vymena=0 
+cztrbezfirs: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+cztrbezfirs: vymena=0 
+konfig: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+konfig: 
+barvy: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=1
+barvy: 
+barvynahoda: 
+getsjmena: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=13
+getsjmena: marihuana jinych vozidel s prestavbou na marihuanu: 6
+vybusniny: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+atomovka: spojeno=1 odtazeno=0 havaroval=2 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+piskoviste: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+piskovisteklik: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+krizovatka: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+krizovatka2: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+krizovatka: nikdo=0 zaseknuto=0
+krizovatka2: nikdo=0 zaseknuto=0
+ridicjmeno: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+ridicjmenosav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+ridicjmeno: okno vlaku 'Train #1 "Pepa"' po nacteni: vlaku 1: jmeno 'Pepa' vlaku 2: jmeno '' 
+vlak6plne: spojeno=4 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vlak6plne: radu na (35,60): nebere zaklada=1
+zrychleni: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zrychleni: patnact=1
+nakup: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+nakup: skoro_vse=36 krome=2 krome_silnicni=0
+mmm: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=3 odmitnuto=1
+mmm: mmm: nalozeno 1 aut, 1 vlaku, 0 lodi, 0 letadel mmm: nalozeno 0 aut, 0 vlaku, 0 lodi, 0 letadel naklad 0 30/30 naklad 0 30/30 naklad 0 30/30 vagon=naklad 0/1 Road naklad 40/40 Passengers naklad 0/1 Road naklad 40/40 Passengers naklad 0/1 Road naklad 40/40 Passengers 
+vozidlasada: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=12
+bloky: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+blokysav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+bloky: siroke= zamek= 
+blokysav: siroke= zamek= 
+vestaveny: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vestavenysav: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+vestaveny:   vypinac= 
+vestavenysav:   vypinac= 
+studentky: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+studentky:  STUD | Studentky  hulirna bere: MARI BEER BOOM STUD 
+kostely_temperate: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kostely_temperate: naklad STUD slot 123 jmeno Studentky | dum 3 Church lidi 5 bere STUD 8/8 klima ano dum 11 Park lidi 0 bere STUD 8/8 klima ano dum 12 Park lidi 0 bere STUD 8/8 klima ano | na mape 38 dlazdic kostelu a parku, vyrobeno studentek 287 cestujicich 6348
+kostely_arctic: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kostely_arctic: naklad STUD slot 123 jmeno Studentky | dum 60 Church lidi 6 bere STUD 8/8 klima ano dum 61 Church lidi 6 bere STUD 8/8 klima ano | na mape 18 dlazdic kostelu a parku, vyrobeno studentek 127 cestujicich 4354
+kostely_bez: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+kostely_bez: naklad STUD neni ve hre
+gymnazium_temperate: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+gymnazium_temperate: 235 Statue of Karel Mácha zap, dlazdic 1, bere: STUD vyrabi: nic|236 Girls' Grammar School zap, dlazdic 4, bere: STUD vyrabi: STUD|237 Weed Vending Machine zap, dlazdic 1, bere: MARI vyrabi: nic|
+gymnazium_temperate: 5126 (256x256 od 0,0)|5127 (512x540 od -496,-26)|5128 (1024x1326 od -496,-812)|5129 (512x822 od 16,-308)|5130 (1024x608 od -494,-96)|5132 (1024x1326 od -496,-812)|5133 (1024x608 od -494,-96)|5134 (1024x910 od -496,-398)|5137 (1024x910 od -496,-398)|5138 (1020x512 od -494,0)|5139 (1020x512 od -494,0)|5140 (770x538 od -508,-38)|5141 (1018x534 od -494,-22)|5142 (1020x646 od -494,-134)|5143 (142x194 od -156,-54)|5145 (950x498 od -482,10)|5156 (1020x498 od -494,14)|5164 (776x484 od -250,20)|
+gymnazium_temperate: automat daleko od gymnazia: only one allowed per town|hulirna u gymnazia: must stand at least ten tiles from a girls' grammar school|socha u gymnazia: must stand at least ten tiles from a girls' grammar school|
+gymnazium_temperate 1: Girls' Grammar School 17 holky ne, sprity + 231 233 232|Weed Vending Machine 18 holky ne, sprity + 234|Statue of Karel Mácha 16 holky ne, sprity + 238|Statue of Karel Mácha 23 holky ne, sprity + 240|Statue of Karel Mácha 29 holky ne, sprity + 240|plantaz 20 pece 0 dni, do zpustnuti 0 dni, hole, holky ne, dlazdic 5x4, cesta volna 5/5, sprity +242 az +242|gymnazium 17 u (143,134) 2x2, vyrobeno studentek 96|automat 18 od gymnazia 2|hulirna 19 od gymnazia 101|hulirna 26 od gymnazia 23|socha 16 od gymnazia 116|socha 23 od gymnazia 66|socha 29 od gymnazia 47|na mape gymnazii 1 automatu 1 hulicen 2 soch 3|
+gymnazium_temperate 2: Girls' Grammar School 17 holky ano, sprity + 235 233 236|Weed Vending Machine 18 holky ano, sprity + 237|Statue of Karel Mácha 16 holky ano, sprity + 239|Statue of Karel Mácha 23 holky ano, sprity + 241|Statue of Karel Mácha 29 holky ano, sprity + 241|plantaz 20 pece 0 dni, do zpustnuti 0 dni, hole, holky ano, dlazdic 5x4, cesta volna 5/5, sprity +242 az +242|gymnazium 17 u (143,134) 2x2, vyrobeno studentek 96|automat 18 od gymnazia 2|hulirna 19 od gymnazia 101|hulirna 26 od gymnazia 23|socha 16 od gymnazia 116|socha 23 od gymnazia 66|socha 29 od gymnazia 47|na mape gymnazii 1 automatu 1 hulicen 2 soch 3|
+gymnazium_temperate 3: Girls' Grammar School 17 holky ne, sprity + 231 233 232|Weed Vending Machine 18 holky ne, sprity + 234|Statue of Karel Mácha 16 holky ne, sprity + 238|Statue of Karel Mácha 23 holky ne, sprity + 240|Statue of Karel Mácha 29 holky ne, sprity + 240|plantaz 20 pece 29 dni, do zpustnuti 169 dni, vzrostle, holky ne, dlazdic 5x4, cesta volna 5/5, sprity +246 az +246|gymnazium 17 u (143,134) 2x2, vyrobeno studentek 228|automat 18 od gymnazia 2|hulirna 19 od gymnazia 101|hulirna 26 od gymnazia 23|socha 16 od gymnazia 116|socha 23 od gymnazia 66|socha 29 od gymnazia 47|na mape gymnazii 1 automatu 1 hulicen 2 soch 3|
+gymnazium_arctic: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+gymnazium_arctic: 235 Statue of Karel Mácha zap, dlazdic 1, bere: STUD vyrabi: nic|236 Girls' Grammar School zap, dlazdic 4, bere: STUD PAPR vyrabi: STUD|237 Weed Vending Machine zap, dlazdic 1, bere: MARI vyrabi: nic|
+gymnazium_arctic: 5126 (256x256 od 0,0)|5127 (512x540 od -496,-26)|5128 (1024x1326 od -496,-812)|5129 (512x822 od 16,-308)|5130 (1024x608 od -494,-96)|5132 (1024x1326 od -496,-812)|5133 (1024x608 od -494,-96)|5134 (1024x910 od -496,-398)|5137 (1024x910 od -496,-398)|5138 (1020x512 od -494,0)|5139 (1020x512 od -494,0)|5140 (770x538 od -508,-38)|5141 (1018x534 od -494,-22)|5142 (1020x646 od -494,-134)|5143 (142x194 od -156,-54)|5145 (950x498 od -482,10)|5156 (1020x498 od -494,14)|5164 (776x484 od -250,20)|
+gymnazium_arctic: automat daleko od gymnazia: can only be built at most two tiles from a girls' grammar school|hulirna u gymnazia: must stand at least ten tiles from a girls' grammar school|socha u gymnazia: must stand at least ten tiles from a girls' grammar school|
+gymnazium_arctic 1: Girls' Grammar School 16 holky ne, sprity + 231 233 232|Weed Vending Machine 17 holky ne, sprity + 234|Statue of Karel Mácha 15 holky ne, sprity + 240|plantaz 19 pece 0 dni, do zpustnuti 0 dni, hole, holky ne, dlazdic 5x4, cesta volna 5/5, sprity +242 az +242|gymnazium 16 u (155,133) 2x2, vyrobeno studentek 48|automat 17 od gymnazia 2|hulirna 18 od gymnazia 85|socha 15 od gymnazia 99|na mape gymnazii 1 automatu 1 hulicen 1 soch 1|
+gymnazium_arctic 2: Girls' Grammar School 16 holky ano, sprity + 235 233 236|Weed Vending Machine 17 holky ano, sprity + 237|Statue of Karel Mácha 15 holky ano, sprity + 241|plantaz 19 pece 0 dni, do zpustnuti 0 dni, hole, holky ano, dlazdic 5x4, cesta volna 5/5, sprity +242 az +242|gymnazium 16 u (155,133) 2x2, vyrobeno studentek 48|automat 17 od gymnazia 2|hulirna 18 od gymnazia 85|socha 15 od gymnazia 99|na mape gymnazii 1 automatu 1 hulicen 1 soch 1|
+gymnazium_arctic 3: Girls' Grammar School 16 holky ne, sprity + 231 233 232|Weed Vending Machine 17 holky ne, sprity + 234|Statue of Karel Mácha 15 holky ne, sprity + 240|plantaz 19 pece 29 dni, do zpustnuti 169 dni, vzrostle, holky ne, dlazdic 5x4, cesta volna 5/5, sprity +246 az +246|gymnazium 16 u (155,133) 2x2, vyrobeno studentek 120|automat 17 od gymnazia 2|hulirna 18 od gymnazia 85|socha 15 od gymnazia 99|na mape gymnazii 1 automatu 1 hulicen 1 soch 1|
+plantaz: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+plantaz: plantaz 20 pece 0 dni, do zpustnuti 0 dni, hole, holky ne, dlazdic 5x4, cesta volna 5/5, sprity +242 az +242|plantaz 20 pece 0 dni, do zpustnuti 0 dni, hole, holky ano, dlazdic 5x4, cesta volna 5/5, sprity +242 az +242|plantaz 20 pece 13 dni, do zpustnuti 180 dni, male, holky ano, dlazdic 5x4, cesta volna 5/5, sprity +245 az +245|plantaz 20 pece 29 dni, do zpustnuti 162 dni, vzrostle, holky ne, dlazdic 5x4, cesta volna 5/5, sprity +246 az +246|plantaz 20 pece 0 dni, do zpustnuti 0 dni, hole, holky ne, dlazdic 5x4, cesta volna 5/5, sprity +242 az +242|
+zastavka: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zastavka: zastavka podel X u (134,134), podel Y u (137,137)|bez studentek holky X ne Y ne|se studentkami holky X ano Y ano|
+hulirna: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+hulirna: hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky stoji (+266) ohnostroj ne|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky stoji (+266) ohnostroj ne|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky sedi (+267) ohnostroj ne|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky sedi (+267) ohnostroj ne|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|
+ohnostroj: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+ohnostroj: hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky stoji (+266) ohnostroj ne|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky stoji (+266) ohnostroj ne|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky sedi (+267) ohnostroj ano, animace ne, barvy zzz cmz mmm mcm czc cmm|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky sedi (+267) ohnostroj ano, animace ne, barvy mzz cmz zcc zzz czm mcm|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky sedi (+267) ohnostroj ano, animace ano, barvy zzz cmz mmm mcm czc cmm|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky sedi (+267) ohnostroj ano, animace ano, barvy mzz cmz zcc zzz czm mcm|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne, animace ano|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne, animace ano|hulirna 19 u 98,236 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|hulirna 26 u 167,143 2x1, (0,0) dlazdice 2039 sprite +265 (1,0) dlazdice 2038 sprite +264 holky zadne ohnostroj ne|
+zoom8: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zoom8: ZOOM_BASE 16 In16x 0 In8x 1 In4x 2 Normal 4 Max 7 End 8|nastaveni zoom_min 1 zoom_max 7 sprite_zoom_min 0 gui_zoom 4 pamet spritu 2048 MB|hlavni pohled zoom 4 okno 640x480 virtualne 10240x7680 dlazdice 32 px|grafika hry decouple/grafika/zastavka.grf (44437A73) staticky stav 4|sprite 3981 z ogfxt_toyland velikosti 0:528x496(-496,0) 1:264x248(-248,0) 2:132x124(-124,0) 3:66x62(-62,0) 4:33x31(-31,0) 5:17x16(-15,0) 6:9x8(-7,0) 7:5x4(-3,0)|sprite 5128 z openttd velikosti 0:528x514(-496,-812) 1:264x257(-248,-406) 2:132x129(-124,-203) 3:66x65(-62,-101) 4:33x33(-31,-50) 5:17x17(-15,-25) 6:9x9(-7,-12) 7:5x5(-3,-6)|sprite 0 z ogfx1_base velikosti 0:208x288(0,0) 1:104x144(0,0) 2:52x72(0,0) 3:26x36(0,0) 4:13x18(0,0) 5:7x9(0,0) 6:4x5(0,0) 7:2x3(0,0)|ZOOM_BASE 16 In16x 0 In8x 1 In4x 2 Normal 4 Max 7 End 8|nastaveni zoom_min 0 zoom_max 7 sprite_zoom_min 0 gui_zoom 4 pamet spritu 2048 MB|hlavni pohled zoom 0 okno 640x480 virtualne 640x480 dlazdice 512 px|grafika hry decouple/grafika/zastavka.grf (44437A73) staticky stav 4|sprite 3981 z ogfxt_toyland velikosti 0:528x496(-496,0) 1:264x248(-248,0) 2:132x124(-124,0) 3:66x62(-62,0) 4:33x31(-31,0) 5:17x16(-15,0) 6:9x8(-7,0) 7:5x4(-3,0)|sprite 5128 z openttd velikosti 0:528x514(-496,-812) 1:264x257(-248,-406) 2:132x129(-124,-203) 3:66x65(-62,-101) 4:33x33(-31,-50) 5:17x17(-15,-25) 6:9x9(-7,-12) 7:5x5(-3,-6)|sprite 0 z ogfx1_base velikosti 0:208x288(0,0) 1:104x144(0,0) 2:52x72(0,0) 3:26x36(0,0) 4:13x18(0,0) 5:7x9(0,0) 6:4x5(0,0) 7:2x3(0,0)|
+zin16: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zin16: sprite 3981 zoom_min 1 sprite_zoom_min 0 z ogfxt_toyland v souboru 32bpp - 8bpp 4 nacteno 4 0:1024x496 bez pixelu 1:512x248 stred 0,0,0,255 m89 2:256x124 stred 0,0,0,255 m89|sprite 3982 zoom_min 1 sprite_zoom_min 0 z ogfxt_toyland v souboru 32bpp - 8bpp 4 nacteno 4 0:1024x496 bez pixelu 1:512x248 stred 0,0,0,255 m83 2:256x124 stred 0,0,0,255 m83|sprite 3981 zoom_min 0 sprite_zoom_min 0 z ogfxt_toyland v souboru 32bpp - 8bpp 4 nacteno 4 0:1024x496 stred 0,0,0,255 m89 1:512x248 stred 0,0,0,255 m89 2:256x124 stred 0,0,0,255 m89|sprite 3982 zoom_min 0 sprite_zoom_min 0 z ogfxt_toyland v souboru 32bpp - 8bpp 4 nacteno 4 0:1024x496 stred 0,0,0,255 m83 1:512x248 stred 0,0,0,255 m83 2:256x124 stred 0,0,0,255 m83|sprite 3982 zoom_min 0 sprite_zoom_min 1 z ogfxt_toyland v souboru 32bpp - 8bpp 4 nacteno 4 0:1024x496 stred 0,0,0,255 m83 1:512x248 stred 0,0,0,255 m83 2:256x124 stred 0,0,0,255 m83|
+zin16filtr: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zin16filtr: 3982 bez 32bpp|3981 bez 32bpp|3982 bez 32bpp|
+zrychleni: spojeno=0 odtazeno=0 havaroval=0 srazka=0 assert=0 vyjimka=0 zaznam=0 auto=0 odmitnuto=0
+zrychleni: zrychleni 2500 zpomaleni 30 | klik hned 100 | klik po case 2500 | klik z rychleho 100 | dvojklik 30 | dvojklik po case 30 | klik z pomaleho 100 | klik z pomaleho po case 100 | dvojklik z rychleho 30 | odmitnuto 0
+cestina: nesedi=0

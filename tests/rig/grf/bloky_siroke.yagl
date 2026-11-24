@@ -1,0 +1,99 @@
+// Test GRF: Action 2 IDs above 255 ('decouple_more_action2_ids', newgrf_act14.cpp,
+// newgrf_act2.cpp). Asks for two-byte IDs and for the 128-cargo lock; builds
+// blocks 7, 300, 600 and 1000 for the first road vehicle. 1000 calls 600 as a
+// subroutine (which computes 5), and on 5 goes to 300, which computes 0x123;
+// anything else goes to 7 (0x0EE). A block without ranges answers the value it
+// computed. The Action 14 comes before the Action 8: a file is scanned only up
+// to its Action 8, and the feature tests are read in that scan.
+// The bit test of the Action 7 takes its bit as one byte whatever size is
+// written (newgrf_act7_9.cpp), which is how yagl writes it.
+//     yagl -e <out>/bloky_siroke.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container1;
+optional_info // Action14
+{
+    FTST: 
+    {
+        NAME: default, "decouple_more_action2_ids"; // Default
+        MINV: [ 0x01 0x00 ];
+        SETP: [ 0x09 ];
+    }
+    FTST: 
+    {
+        NAME: default, "decouple_128_cargo"; // Default
+        MINV: [ 0x01 0x00 ];
+        SETP: [ 0x08 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGb";
+    version: GRF8;
+    name: "Rig: bloky nad 255";
+    description: "Action 2 IDs above 255";
+}
+if_act7 (is_bit_set(global_var[0x9D] & 0xFF, 1 << 8)) // Action07
+{
+    skip_sprites: 0x01;
+    // Or skip to the next label (Action10) with this value - search wraps at end of GRF.
+    // 0x00 means skip to end of GRF file - may disable the GRF.
+}
+error_message<Fatal, default, 0xFF> // Action0B <severity, language, message>
+{
+    message: "Tento GRF patri ke hre OpenTTD decouple by Karel Macha a jinde nefunguje.";
+}
+switch<RoadVehicles, 0x07, PrimaryWord> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x000000EE;
+    };
+    ranges:
+    {
+    };
+    default: 0x7FFF;
+}
+switch<RoadVehicles, 0x012C, PrimaryWord> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00000123;
+    };
+    ranges:
+    {
+    };
+    default: 0x7FFF;
+}
+switch<RoadVehicles, 0x0258, PrimaryByte> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x1A] & 0x00000005;
+    };
+    ranges:
+    {
+    };
+    default: 0x7FFE;
+}
+switch<RoadVehicles, 0x03E8, PrimaryByte> // Action02 variable
+{
+    expression:
+    {
+        value1 = variable[0x7E, 0x0258] & 0x000000FF;
+    };
+    ranges:
+    {
+        0x00000005: 0x012C;
+    };
+    default: 0x0007;
+}
+feature_graphics<RoadVehicles> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x03E8;
+    feature_ids: [ 0x0000 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}

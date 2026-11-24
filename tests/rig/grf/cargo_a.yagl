@@ -1,0 +1,235 @@
+// One of two tiny cargo sets that the scene nakladysdilene plays together (see
+// README.md). Each switches the game's cargoes off and brings three cargoes of
+// its own under the ids 0, 1 and 2 -- the same ids, as every set numbers its
+// cargoes from 0. This one: passengers, coal and a cargo of its own (RIGA).
+//     yagl -e <out>/cargo_a.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x41 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGa";
+    version: GRF8;
+    name: "Rig: cargo set A";
+    description: "Switches the game's cargoes off and brings passengers, coal and RIGA under the ids 0, 1 and 2.";
+}
+strings<Cargos, default, 0xDC00*> // <feature, language, first_id> Action04, Default
+{
+    /* 0xDC00 */ "PassengersA";
+    /* 0xDC01 */ "CoalA";
+    /* 0xDC02 */ "RigCargoA";
+}
+properties<Cargos, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0001
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0002
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0003
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0004
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0005
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0006
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0007
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0008
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0009
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000A
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000B
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000C
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000D
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000E
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000F
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0010
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0011
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0012
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0013
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0014
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0015
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0016
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0017
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0018
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0019
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x001A
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+}
+properties<Cargos, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        bit_number: 0x00;
+        cargo_type_name_id: 0xDC00;
+        single_unit_name_id: 0xDC00;
+        cargo_type_abbrev_id: 0xDC00;
+        cargo_units_id: 0xDC00;
+        cargo_amount_id: 0xDC00;
+        single_unit_weight: 0x10;
+        is_freight: false;
+        cargo_classes: 0x0001;
+        cargo_label: "PASS";
+        base_price: 0x00001010;
+        penalty_time_1: 0x0A;
+        penalty_time_2: 0x64;
+        station_list_colour: 0x98;
+        payment_list_colour: 0x98;
+        capacity_multiplier: 0x0100;
+    }
+}
+properties<Cargos, 0x0001> // Action00
+{
+    // instance_id: 0x0001
+    {
+        bit_number: 0x01;
+        cargo_type_name_id: 0xDC01;
+        single_unit_name_id: 0xDC01;
+        cargo_type_abbrev_id: 0xDC01;
+        cargo_units_id: 0xDC01;
+        cargo_amount_id: 0xDC01;
+        single_unit_weight: 0x10;
+        is_freight: true;
+        cargo_classes: 0x0010;
+        cargo_label: "COAL";
+        base_price: 0x00001010;
+        penalty_time_1: 0x0A;
+        penalty_time_2: 0x64;
+        station_list_colour: 0x98;
+        payment_list_colour: 0x98;
+        capacity_multiplier: 0x0100;
+    }
+}
+properties<Cargos, 0x0002> // Action00
+{
+    // instance_id: 0x0002
+    {
+        bit_number: 0x02;
+        cargo_type_name_id: 0xDC02;
+        single_unit_name_id: 0xDC02;
+        cargo_type_abbrev_id: 0xDC02;
+        cargo_units_id: 0xDC02;
+        cargo_amount_id: 0xDC02;
+        single_unit_weight: 0x10;
+        is_freight: true;
+        cargo_classes: 0x0010;
+        cargo_label: "RIGA";
+        base_price: 0x00001010;
+        penalty_time_1: 0x0A;
+        penalty_time_2: 0x64;
+        station_list_colour: 0x98;
+        payment_list_colour: 0x98;
+        capacity_multiplier: 0x0100;
+    }
+}
