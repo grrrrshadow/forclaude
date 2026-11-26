@@ -11393,13 +11393,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value() || static_cast<uint>(*x) >= Map::SizeX() || static_cast<uint>(*y) >= Map::SizeY()) return true;
 		const TileIndex tile = TileXY(*x, *y);
-		if (!IsTileType(tile, TileType::House)) {
+		/* Or a GRF's object of ours (the castle walls: the walker through the gate, FirstPersonWalkable()). */
+		const ThreeDObject *grf_obj = GetThreeDGrfObject(tile);
+		if (!IsTileType(tile, TileType::House) && grf_obj == nullptr) {
 			IConsolePrint(CC_ERROR, "test3d: pudorys: na {},{} neni dum", *x, *y);
 			return true;
 		}
-		HouseID north = GetHouseType(tile);
-		const TileIndex origin = tile + GetHouseNorthPart(north);
-		const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
+		const ThreeDObject *obj = grf_obj;
+		if (obj == nullptr) {
+			HouseID north = GetHouseType(tile);
+			obj = GetThreeDHouseObjectAt(north, tile + GetHouseNorthPart(north));
+		}
 		if (obj == nullptr) {
 			IConsolePrint(CC_ERROR, "test3d: pudorys: dum na {},{} neni 3D objekt", *x, *y);
 			return true;

@@ -537,7 +537,10 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 			 * walker's circle on its own floor there as far as one steps up onto a thing (CAB_THING_STEP_UP_M), as a body
 			 * stands: the edge of its base, 0.6 m, and the riser of the step after next not walls in the way of the feet
 			 * still on the ground or a step lower. */
+			/* A GRF's object of ours (the decorative castle walls) by the shape of its view: through the gate, round the
+			 * wall and the tower (the player, 26. 11.: "hradby neprojdu bránou"; every object a wall before). */
 			const ThreeDObject *lighthouse = GetThreeDLighthouse(tile);
+			if (lighthouse == nullptr) lighthouse = GetThreeDGrfObject(tile);
 			if (lighthouse == nullptr) return false;
 			const double lx = x - TileX(tile) * TILE_SIZE, ly = y - TileY(tile) * TILE_SIZE;
 			double up = feet(tile);
