@@ -17,12 +17,20 @@
 
 #include "table/sprites.h"
 
+#include <deque>
+#include <mutex>
 #include <unordered_map>
 
 #include "safeguards.h"
 
-/** Every set of colours some vehicle has been drawn in; set n is at n - 1. */
-static std::vector<TrueColourSet> _true_colour_sets;
+/**
+ * Every set of colours some vehicle has been drawn in; set n is at n - 1. A deque: a set stays where it is when one
+ * more is added, as the thread making the pictures of the vehicles holds them (ObjectDetailPaint) while the main thread
+ * adds sets -- a vector moved them all and the thread read freed memory (the player's crash of 26. 11., #397: in
+ * GpuDetailColoursOf() on MakePicturesInBackground(), two seconds after a game was loaded). Looked into under a lock.
+ */
+static std::deque<TrueColourSet> _true_colour_sets;
+static std::mutex _true_colour_sets_mutex;
 /** The pictures made in a set of colours: the picture and the set, to the picture made. */
 static std::unordered_map<uint64_t, SpriteID> _true_colour_sprites;
 /** Changes whenever the sets are read anew, so every vehicle asks its colours again (GetVehicleTrueColours()). */
@@ -187,6 +195,7 @@ uint8_t TrueColourLightness(const TrueColourRange &range, uint8_t m, uint8_t r, 
 uint16_t InternTrueColourSet(const TrueColourSet &set)
 {
 	if (set.empty()) return 0;
+	std::lock_guard lock(_true_colour_sets_mutex);
 	auto it = std::ranges::find(_true_colour_sets, set);
 	if (it != _true_colour_sets.end()) return static_cast<uint16_t>(it - _true_colour_sets.begin() + 1);
 	if (_true_colour_sets.size() >= UINT16_MAX) return 0;
@@ -201,6 +210,7 @@ uint16_t InternTrueColourSet(const TrueColourSet &set)
  */
 const TrueColourSet &GetTrueColourSet(uint16_t id)
 {
+	std::lock_guard lock(_true_colour_sets_mutex);
 	assert(id != 0 && id <= _true_colour_sets.size());
 	return _true_colour_sets[id - 1];
 }
@@ -211,6 +221,7 @@ const TrueColourSet &GetTrueColourSet(uint16_t id)
  */
 uint16_t GetTrueColourSetCount()
 {
+	std::lock_guard lock(_true_colour_sets_mutex);
 	return static_cast<uint16_t>(_true_colour_sets.size());
 }
 
